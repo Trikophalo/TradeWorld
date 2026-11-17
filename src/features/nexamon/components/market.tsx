@@ -8,6 +8,7 @@ import {
   NEXAMON_RARITIES,
   NEXAMON_SETS,
   nexamonCard,
+  nexamonSetRarities,
   type NexamonRarity,
   type NexamonSetKey,
 } from "@/config/nexamon";
@@ -29,9 +30,10 @@ import type {
 import { formatInteger, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useNexamonMarket, useRememberedFilters } from "../hooks";
-import { ownListings } from "../view";
+import { ownListings, setsByPackPrice } from "../view";
 import { CopyActions } from "./copy-actions";
 import { BuySheet, DealNote, ListingRow } from "./listing-row";
+import { NexamonPack } from "./pack";
 import { CopyQuality, CopyVisual, SelectField } from "./parts";
 
 export type MarketView = "all" | "mine";
@@ -55,6 +57,12 @@ const MARKET_ALLOWED = {
 const SORTS: readonly NexamonMarketSort[] = ["new", "price_asc", "price_desc", "deal", "value", "number"];
 const SELLERS: readonly NexamonMarketSeller[] = ["all", "players", "ai", "mine"];
 const GRADED: readonly Graded[] = ["all", "raw", "slab", "black"];
+const GRADED_LABEL = {
+  all: "market.condition.all",
+  raw: "market.condition.raw",
+  slab: "market.condition.graded",
+  black: "market.graded.black",
+} as const satisfies Record<Graded, string>;
 
 const dateTime = new Intl.DateTimeFormat("de-DE", {
   day: "2-digit",
@@ -71,13 +79,26 @@ export interface MarketProps {
   /** Only offers of this card (from the card's page). */
   cardKey: string | null;
   onCardChange: (cardKey: string | null) => void;
+  /** The set in the address (`?set=`); null: the remembered one, or the set picker. */
+  setKey?: NexamonSetKey | null;
+  /** Chooses a set (null: back to the set picker). */
+  onSetChange?: (set: NexamonSetKey | null) => void;
 }
 
 /**
  * The card market (ADR-165): single copies from players and the AI sellers, filtered and sorted by the server,
  * page by page. The second view lists the own offers with the way to take them back.
  */
-export function Market({ overview, collection, view, onViewChange, cardKey, onCardChange }: MarketProps) {
+export function Market({
+  overview,
+  collection,
+  view,
+  onViewChange,
+  cardKey,
+  onCardChange,
+  setKey = null,
+  onSetChange,
+}: MarketProps) {
   const t = useTranslations("nexamon");
   const mine = collection ? ownListings(collection.copies) : [];
   return (
@@ -99,20 +120,123 @@ export function Market({ overview, collection, view, onViewChange, cardKey, onCa
       {view === "mine" ? (
         <OwnListings collection={collection} limit={overview?.limits.maxListings ?? null} />
       ) : (
-        <Listings cardKey={cardKey} onCardChange={onCardChange} />
+        <Listings cardKey={cardKey} onCardChange={onCardChange} setKey={setKey} onSetChange={onSetChange} />
       )}
     </div>
   );
 }
 
-function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCardChange">) {
+/**
+ * The market of one set (ADR-174): first a set is chosen (a tile per set with its pack, offers and price span),
+ * then its offers with Raw / Graded and the other filters. The set comes from the address, else from the
+ * remembered filters; a card from its page brings its own set.
+ */
+function Listings({
+  cardKey,
+  onCardChange,
+  setKey,
+  onSetChange,
+}: Pick<MarketProps, "cardKey" | "onCardChange" | "setKey" | "onSetChange">) {
+  const [filters, patchFilters] = useRememberedFilters<MarketFilters>("market", MARKET_DEFAULTS, MARKET_ALLOWED);
+  const chosen: NexamonSetKey | "all" = (cardKey ? nexamonCard(cardKey)?.set : null) ?? setKey ?? filters.set;
+  const choose = (next: NexamonSetKey | null) => {
+    patchFilters({ set: next ?? "all", rarity: "all" });
+    if (next === null && cardKey) onCardChange(null);
+    onSetChange?.(next);
+  };
+  if (chosen === "all") return <SetPicker onPick={choose} />;
+  return (
+    <SetListings
+      set={chosen}
+      filters={filters}
+      patchFilters={patchFilters}
+      cardKey={cardKey}
+      onCardChange={onCardChange}
+      onBack={() => choose(null)}
+    />
+  );
+}
+
+/** One tile per set: the pack, how many offers, the cheapest and the most expensive one. */
+function SetPicker({ onPick }: { onPick: (set: NexamonSetKey) => void }) {
+  const t = useTranslations("nexamon");
+  return (
+    <section className="space-y-3" data-testid="market-set-picker">
+      <div>
+        <h3 className="font-pixel text-sm text-fg-1 uppercase">{t("market.sets.title")}</h3>
+        <p className="mt-1 text-sm text-pretty text-fg-2">{t("market.sets.intro")}</p>
+      </div>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {setsByPackPrice().map((set) => (
+          <li key={set}>
+            <SetTile set={set} onPick={onPick} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SetTile({ set, onPick }: { set: NexamonSetKey; onPick: (set: NexamonSetKey) => void }) {
+  const t = useTranslations("nexamon");
+  const tc = useTranslations("nexamonCards");
+  const base = { set, rarity: null, seller: "all", graded: null, blackLabel: null, cardKey: null, page: 1 } as const;
+  const low = useNexamonMarket({ ...base, sort: "price_asc" });
+  const high = useNexamonMarket({ ...base, sort: "price_desc" });
+  const total = low.data?.total;
+  const cheapest = low.data?.listings[0]?.priceCents;
+  const top = high.data?.listings[0]?.priceCents;
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(set)}
+      data-testid={`market-set-${set}`}
+      aria-label={t("market.sets.open", { set: tc(`sets.${set}`) })}
+      className="group flex h-full w-full items-center gap-3 rounded-lg border-2 border-line-1 bg-surface-1 p-3 text-left shadow-1 focus-ring transition duration-fast ease-standard hover:border-line-2 hover:bg-surface-2 active:translate-y-0.5 active:shadow-none"
+    >
+      <NexamonPack set={set} scale={1} sheen={false} />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="font-pixel text-sm text-fg-1 uppercase">{tc(`sets.${set}`)}</span>
+        {total === undefined ? (
+          <Skeleton className="h-4 w-24 rounded-xs" />
+        ) : (
+          <span className="nums text-sm text-fg-2" data-testid="market-set-total">
+            {t("market.sets.listings", { count: total })}
+          </span>
+        )}
+        {cheapest !== undefined && (
+          <span className="nums text-xs text-fg-3">{t("market.sets.cheapest", { price: formatMoney(cheapest) })}</span>
+        )}
+        {top !== undefined && (
+          <span className="nums text-xs text-fg-3">{t("market.sets.top", { price: formatMoney(top) })}</span>
+        )}
+        <span className="mt-auto label-pixel text-accent transition-transform duration-fast group-hover:translate-x-0.5">
+          <span aria-hidden>→</span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function SetListings({
+  set,
+  filters,
+  patchFilters,
+  cardKey,
+  onCardChange,
+  onBack,
+}: {
+  set: NexamonSetKey;
+  filters: MarketFilters;
+  patchFilters: (patch: Partial<MarketFilters>) => void;
+  cardKey: string | null;
+  onCardChange: (cardKey: string | null) => void;
+  onBack: () => void;
+}) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
   const listId = useId();
-  // remembered per browser (ADR-165): the filters are back on the next visit
-  const [filters, patchFilters] = useRememberedFilters<MarketFilters>("market", MARKET_DEFAULTS, MARKET_ALLOWED);
-  const { set, rarity, seller, graded, sort } = filters;
-  const setSet = (value: NexamonSetKey | "all") => patchFilters({ set: value });
+  const { rarity, seller, graded, sort } = filters;
   const setRarity = (value: NexamonRarity | "all") => patchFilters({ rarity: value });
   const setSeller = (value: NexamonMarketSeller) => patchFilters({ seller: value });
   const setGraded = (value: Graded) => patchFilters({ graded: value });
@@ -123,7 +247,7 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
 
   const query: NexamonMarketQuery = useMemo(
     () => ({
-      set: set === "all" ? null : set,
+      set,
       rarity: rarity === "all" ? null : rarity,
       seller,
       graded: graded === "all" || graded === "black" ? null : graded === "slab",
@@ -146,7 +270,7 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
   const card = cardKey ? nexamonCard(cardKey) : undefined;
   const pick = (text: string) => {
     setSearch(text);
-    const found = NEXAMON_CARDS.find((c) => c.name.toLowerCase() === text.trim().toLowerCase());
+    const found = NEXAMON_CARDS.find((c) => c.set === set && c.name.toLowerCase() === text.trim().toLowerCase());
     if (found) {
       onCardChange(found.key);
       setSearch("");
@@ -156,18 +280,26 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="sm" variant="ghost" onClick={onBack} data-testid="market-back">
+          <span aria-hidden>←</span> {t("market.sets.back")}
+        </Button>
+        <span className="flex items-center gap-2 font-pixel text-sm text-fg-1 uppercase" data-testid="market-set-title">
+          <NexamonPack set={set} scale={1} sheen={false} className="h-8 w-auto" />
+          {tc(`sets.${set}`)}
+        </span>
+      </div>
+      <div data-testid="market-condition">
+        <Segmented<Graded>
+          value={graded}
+          onValueChange={first(setGraded)}
+          label={t("market.condition.label")}
+          block
+          options={GRADED.map((key) => ({ value: key, label: t(GRADED_LABEL[key]) }))}
+        />
+      </div>
       <div className="space-y-3 rounded-lg bg-surface-2 p-3">
-        <div className="grid grid-cols-2 items-end gap-2 lg:grid-cols-6">
-          <SelectField<NexamonSetKey | "all">
-            label={t("filter.set")}
-            value={set}
-            onChange={first(setSet)}
-            testId="market-set"
-            options={[
-              { value: "all", label: t("filter.allSets") },
-              ...NEXAMON_SETS.map((key) => ({ value: key, label: tc(`sets.${key}`) })),
-            ]}
-          />
+        <div className="grid grid-cols-2 items-end gap-2 lg:grid-cols-4">
           <SelectField<NexamonRarity | "all">
             label={t("filter.rarity")}
             value={rarity}
@@ -175,7 +307,9 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
             testId="market-rarity"
             options={[
               { value: "all", label: t("filter.allRarities") },
-              ...NEXAMON_RARITIES.map((key) => ({ value: key, label: tc(`rarityShort.${key}`) })),
+              ...nexamonSetRarities(set)
+                .reverse()
+                .map((key) => ({ value: key, label: tc(`rarityShort.${key}`) })),
             ]}
           />
           <SelectField<NexamonMarketSeller>
@@ -184,13 +318,6 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
             onChange={first(setSeller)}
             testId="market-seller"
             options={SELLERS.map((key) => ({ value: key, label: t(`market.seller.${key}`) }))}
-          />
-          <SelectField<Graded>
-            label={t("filter.graded")}
-            value={graded}
-            onChange={first(setGraded)}
-            testId="market-graded"
-            options={GRADED.map((key) => ({ value: key, label: t(`market.graded.${key}`) }))}
           />
           <SelectField<NexamonMarketSort>
             label={t("filter.sort")}
@@ -225,7 +352,7 @@ function Listings({ cardKey, onCardChange }: Pick<MarketProps, "cardKey" | "onCa
                 className="h-10 w-full rounded-sm border-2 border-line-1 bg-surface-1 px-2 font-sans text-sm tracking-normal text-fg-1 normal-case focus-ring transition-colors duration-fast placeholder:text-fg-3 hover:border-line-2"
               />
               <datalist id={listId}>
-                {NEXAMON_CARDS.map((c) => (
+                {NEXAMON_CARDS.filter((c) => c.set === set).map((c) => (
                   <option key={c.key} value={c.name} />
                 ))}
               </datalist>

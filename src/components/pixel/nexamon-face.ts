@@ -1,6 +1,6 @@
 import type { NexamonArt, NexamonCard, NexamonRarity } from "@/config/nexamon/types";
 import { NEXAMON_CARD_SIZE } from "@/config/nexamon/types";
-import { drawMicroTextCentered } from "./nexamon-font";
+import { drawMicroText, drawMicroTextCentered, microTextWidth } from "./nexamon-font";
 import {
   bayer,
   bevelRect,
@@ -17,7 +17,16 @@ import {
   validateArt,
   type Raster,
 } from "./nexamon-raster";
-import { GOLD_INK, PRISM_INKS, rarityMark, setSymbol, TYPE_INK, TYPE_SYMBOL, typeGlyph } from "./nexamon-symbols";
+import {
+  GOLD_INK,
+  ONE_OF_ONE_INK,
+  PRISM_INKS,
+  rarityMark,
+  setSymbol,
+  TYPE_INK,
+  TYPE_SYMBOL,
+  typeGlyph,
+} from "./nexamon-symbols";
 
 /*
  * The pixel layer of a Nexamon card (ADR-165): frame, plates, symbols and the artwork on the 72 x 100 canvas.
@@ -111,7 +120,14 @@ export const FACE_LAYOUT: Record<NexamonRarity, FaceLayout> = {
   ultra: BREAKOUT,
   prisma: FULL,
   legendary: FULL,
+  one_of_one: FULL,
 };
+
+/** The "ONE OF ONE" band across the middle of a One of One (ADR-174), and the serial "1/1" in it. */
+export const ONE_OF_ONE_BAND: Box = { x: 0, y: 38, w: 72, h: 19 };
+
+/** The plate in the head of an event card where the component writes "EREIGNIS" instead of the HP (ADR-174). */
+export const EVENT_LABEL: Box = { x: 41, y: 4, w: 17, h: 6 };
 
 /** Plates of the full-art layouts (name, attack, flavour, footer), shared by prisma and legendary. */
 const FULL_PLATES: readonly Box[] = [
@@ -174,12 +190,19 @@ function drawFooterMarks(r: Raster, layout: FaceLayout, card: Pick<NexamonCard, 
   blitGrid(r, mark.grid, mark.palette, layout.rarity.x, layout.rarity.y);
 }
 
-type FaceCard = Pick<NexamonCard, "type" | "rarity" | "set">;
+type FaceCard = Pick<NexamonCard, "type" | "rarity" | "set" | "kind">;
+
+/** A sprinkle of stars over a box (event frames), always the same. */
+function starDust(r: Raster, box: Box, hex: string, every: number): void {
+  for (let y = box.y; y < box.y + box.h; y++)
+    for (let x = box.x; x < box.x + box.w; x++) if ((x * 17 + y * 31 + x * y) % every === 0) setPixel(r, x, y, hex);
+}
 
 function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout): Raster {
   const r = createRaster(W, H);
   const ink = TYPE_INK[card.type];
   const ultra = card.rarity === "ultra";
+  const event = card.kind === "event";
 
   // Frame: a dithered run from light to shadow; the ultra frame is brushed metal with diagonal bands.
   if (ultra) {
@@ -191,10 +214,14 @@ function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: Face
         const next = pos - base > bayer(x, y) ? Math.min(stops.length - 1, base + 1) : base;
         setPixel(r, x, y, stops[next]!);
       }
+  } else if (event) {
+    // Event cards: a night-sky frame, deep at the edges, with stardust in the type's light ink.
+    ditherRect(r, 0, 0, W, H, [ink.dark, mixHex(ink.dark, ink.deep, 0.5), ink.deep, ink.deep]);
+    starDust(r, { x: 0, y: 0, w: W, h: H }, ink.pale, 23);
   } else {
     ditherRect(r, 0, 0, W, H, [mixHex(ink.base, ink.light, 0.45), ink.base, ink.base, mixHex(ink.base, ink.dark, 0.6)]);
   }
-  bevelRect(r, 1, 1, W - 2, H - 2, ultra ? "#ffffff" : ink.light, ink.dark);
+  bevelRect(r, 1, 1, W - 2, H - 2, ultra ? "#ffffff" : event ? ink.light : ink.light, ink.dark);
 
   // Name bar.
   const headTop = 2;
@@ -227,6 +254,7 @@ function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: Face
     drawPlaceholderArt(r, win, card);
   }
 
+  if (event) drawEventMarks(r, layout, ink.deep, ink.pale);
   const symbol = TYPE_SYMBOL[card.type];
   blitGrid(r, symbol.grid, symbol.palette, layout.type.x, layout.type.y);
   blitGrid(r, symbol.grid, symbol.palette, layout.attackSymbol.x, layout.attackSymbol.y);
@@ -237,12 +265,25 @@ function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: Face
   return r;
 }
 
+/**
+ * The marks of an event card: a dark plate for the "EREIGNIS" label where the HP would be (moved to the head of
+ * the layout) and a dashed rule under the attack plate's name, so effect text reads as a rule, not a hit.
+ */
+function drawEventMarks(r: Raster, layout: FaceLayout, deep: string, pale: string): void {
+  const label = { ...EVENT_LABEL, y: Math.round(layout.hp.y) };
+  fillRect(r, label.x, label.y, label.w, label.h, deep);
+  strokeRect(r, label.x, label.y, label.w, label.h, pale, 0.85);
+  for (let x = layout.attackName.x; x < layout.attackName.x + layout.attackName.w + 14; x += 2)
+    setPixel(r, x, Math.round(layout.attackName.y + layout.attackName.h), deep, 0.5);
+}
+
 /** Corner ornament of the legendary frame, drawn for the top left corner and mirrored for the others. */
 const GOLD_CORNER = ["lllllll", "lbbbbd.", "lbldd..", "lbdl...", "lbd.l..", "ld.....", "l......"] as const;
 
 function composeFull(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout): Raster {
   const r = createRaster(W, H);
   const ink = TYPE_INK[card.type];
+  if (card.rarity === "one_of_one") return composeOneOfOne(card, art, layout);
   const gold = card.rarity === "legendary";
   drawArt(r, layout, card, art);
 
@@ -303,6 +344,98 @@ function composeFull(card: FaceCard, art: NexamonArt | undefined, layout: FaceLa
   roundCorners(r, 3);
   outlineEdge(r, gold ? GOLD_INK.deep : ink.deep);
   return r;
+}
+
+/**
+ * The One of One frame (ADR-174): full art inside a black-and-gold double frame whose inner line shimmers in an
+ * iridescent run (teal, blue, violet, magenta, rose), black plates with gold rules and, across the middle, a
+ * black band with gold edges and the words ONE OF ONE in big gold pixel letters, the serial 1/1 beneath.
+ */
+function composeOneOfOne(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout): Raster {
+  const r = createRaster(W, H);
+  const o = ONE_OF_ONE_INK;
+  drawArt(r, layout, card, art);
+
+  for (const plate of FULL_PLATES) {
+    fillRect(r, plate.x, plate.y, plate.w, plate.h, o.black, 0.8);
+    fillRect(r, plate.x, plate.y, plate.w, 1, o.gold);
+    fillRect(r, plate.x, plate.y + plate.h - 1, plate.w, 1, o.goldDeep);
+  }
+  if (card.kind === "event") drawEventMarks(r, layout, o.black, o.gold);
+
+  // The band: black with a gold edge, an iridescent hairline inside, the words in gold with a deep shadow.
+  const band = ONE_OF_ONE_BAND;
+  fillRect(r, band.x, band.y, band.w, band.h, o.black, 0.9);
+  fillRect(r, band.x, band.y, band.w, 1, o.goldLight);
+  fillRect(r, band.x, band.y + 1, band.w, 1, o.goldDeep);
+  fillRect(r, band.x, band.y + band.h - 1, band.w, 1, o.goldLight);
+  fillRect(r, band.x, band.y + band.h - 2, band.w, 1, o.goldDeep);
+  for (let x = 0; x < W; x++) {
+    setPixel(r, x, band.y + 2, o.iris[Math.floor(x / 5) % o.iris.length]!, 0.8);
+    setPixel(r, x, band.y + band.h - 3, o.iris[(Math.floor(x / 5) + 2) % o.iris.length]!, 0.8);
+  }
+  // Letters at twice the size with a one-pixel gap, so the words fill the band: 64 of 72 pixels.
+  const text = "ONE OF ONE";
+  const advance = (ch: string) => (ch === " " ? 4 : microTextWidth(ch, 2) + 1);
+  const width = [...text].reduce((w, ch) => w + advance(ch), -1);
+  const ty = band.y + 4;
+  const word = (x0: number, y0: number, hex: string) => {
+    let x = x0;
+    for (const ch of text) {
+      if (ch !== " ") drawMicroText(r, ch, x, y0, hex, 2);
+      x += advance(ch);
+    }
+  };
+  const tx = Math.round((W - width) / 2);
+  word(tx + 1, ty + 1, o.goldDeep);
+  word(tx, ty, o.gold);
+  // highlight the top row of every letter
+  for (let x = 0; x < W; x++) if (pixelIs(r, x, ty, o.gold)) setPixel(r, x, ty, o.goldLight);
+  drawMicroTextCentered(r, "1/1", W / 2, ty + 11, o.white, 1);
+
+  // Double frame: black, gold with a bevel, then the iridescent run, then black again.
+  strokeRect(r, 0, 0, W, H, o.black);
+  bevelRect(r, 1, 1, W - 2, H - 2, o.goldLight, o.goldDeep);
+  const perimeter: [number, number][] = [];
+  for (let x = 2; x < W - 2; x++) perimeter.push([x, 2]);
+  for (let y = 3; y < H - 2; y++) perimeter.push([W - 3, y]);
+  for (let x = W - 4; x >= 2; x--) perimeter.push([x, H - 3]);
+  for (let y = H - 4; y >= 3; y--) perimeter.push([2, y]);
+  perimeter.forEach(([x, y], i) => setPixel(r, x, y, o.iris[Math.floor(i / 6) % o.iris.length]!));
+  strokeRect(r, 3, 3, W - 6, H - 6, o.black, 0.9);
+  // gold diamonds in the corners
+  for (const [cx, cy] of [
+    [5, 5],
+    [W - 6, 5],
+    [5, H - 6],
+    [W - 6, H - 6],
+  ] as const) {
+    setPixel(r, cx, cy, o.goldLight);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const)
+      setPixel(r, cx + dx, cy + dy, o.gold);
+  }
+
+  const symbol = TYPE_SYMBOL[card.type];
+  blitGrid(r, symbol.grid, symbol.palette, layout.type.x, layout.type.y);
+  blitGrid(r, symbol.grid, symbol.palette, layout.attackSymbol.x, layout.attackSymbol.y);
+  drawFooterMarks(r, layout, card, o.goldLight);
+
+  roundCorners(r, 3);
+  outlineEdge(r, o.black);
+  return r;
+}
+
+function pixelIs(r: Raster, x: number, y: number, hex: string): boolean {
+  const i = (y * r.width + x) * 4;
+  const v = parseInt(hex.slice(1), 16);
+  return (
+    r.data[i + 3]! > 0 && r.data[i]! === v >> 16 && r.data[i + 1]! === ((v >> 8) & 255) && r.data[i + 2]! === (v & 255)
+  );
 }
 
 /** Composes the pixel layer of a card front. Without artwork (or with a broken one) the placeholder is drawn. */

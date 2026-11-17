@@ -19,7 +19,7 @@ import type { NexamonArt } from "./types";
  * - cw-030 Sternwal -> cw-031 Galaxwal -> prisma cw-081: a deep-blue whale with a pale belly, its back speckled
  *   with constellations (white star dots joined by faint lines), a gold star-spout from its blowhole;
  *   cw-031 adds a small violet spiral galaxy on its flank.
- * - cw-040 Polarlichtschlange -> cw-041 Aurorawinde -> prisma cw-083: a long S-curved serpent of aurora green
+ * - cw-040 Polarschlange -> cw-041 Aurorawinde -> prisma cw-083: a long S-curved serpent of aurora green
  *   fading to teal and violet, a translucent ribbon fin along its back, white-green glowing eyes.
  */
 
@@ -79,7 +79,7 @@ const ROWS: readonly Row[] = [
   [37, "Kiesel im All", "cosmic", "event", 0, 0, null, "Treffer!", 0, "Wirf eine Münze. Bei Kopf erhält das aktive Nexamon des Gegners 30 Schaden.", "Klein, hart und mit 30 Kilometern pro Sekunde unterwegs. Bitte ausweichen.", 3450],
   [38, "Nebuli", "dragon", "monster", 50, 0, null, "Nebelhauch", 20, "", "Schlüpfte in einem Sternennebel. Seine Schuppen haben noch den rosa Schimmer.", 6300],
   [39, "Nebulon", "dragon", "monster", 100, 1, "cw-038", "Nebelfeuer", 60, "", "Atmet glühende Gaswolken aus, in denen später neue Sterne entstehen.", 13500],
-  [40, "Polarlichtschlange", "dragon", "monster", 60, 0, null, "Lichtband", 20, "", "Schlängelt sich durch den Himmel über den Polen. Wer sie sieht, darf sich ein Grün aussuchen.", 13950],
+  [40, "Polarschlange", "dragon", "monster", 60, 0, null, "Lichtband", 20, "", "Schlängelt sich durch den Himmel über den Polen. Wer sie sieht, darf sich ein Grün aussuchen.", 13950],
   [41, "Aurorawinde", "dragon", "monster", 100, 1, "cw-040", "Polarwirbel", 60, "", "Ihr Körper ist aus Licht gewebt. Sie windet sich durch ganze Sonnensysteme.", 22500],
   [42, "Raumstaubwolke", "cosmic", "event", 0, 0, null, "Sichtnebel", 0, "Der nächste Angriff des Gegners trifft nur bei Kopf.", "Ein Hauch aus Staub, der ganze Sterne verschwinden lässt. Bitte nicht niesen.", 2550],
   [43, "Mondhasi", "fairy", "monster", 50, 0, null, "Kraterhops", 10, "", "Springt auf dem Mond sechsmal so hoch. Auf der Erde ist es deshalb oft enttäuscht.", 4050],

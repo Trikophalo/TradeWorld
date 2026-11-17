@@ -8,6 +8,7 @@ import { COIN } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
+import { BulkSell } from "./bulk-sell";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NexamonCollection } from "@/features/game/nexamon-types";
@@ -44,9 +45,9 @@ const BINDER_ALLOWED = {
 } as const;
 
 /** ADR-171: "Nur gegradete" shows only the slabs; remembered with the other filters. */
-type BinderView = { slabs: "off" | "on" };
-const VIEW_DEFAULTS: BinderView = { slabs: "off" };
-const VIEW_ALLOWED = { slabs: ["off", "on"] } as const;
+type BinderView = { slabs: "off" | "on"; mode: "cards" | "bulk" };
+const VIEW_DEFAULTS: BinderView = { slabs: "off", mode: "cards" };
+const VIEW_ALLOWED = { slabs: ["off", "on"], mode: ["cards", "bulk"] } as const;
 
 /**
  * The binder (ADR-165): every card of the three sets in number order. Owned cards show their best copy (a slab
@@ -80,138 +81,158 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
   }
 
   const totals = collectionTotals(collection.copies);
+  const bulk = binderView.mode === "bulk";
   return (
     <div className="space-y-4" data-testid="nexamon-binder">
-      <div className="space-y-1">
-        <h2 className="font-pixel text-sm text-fg-1 uppercase">{t("binder.title")}</h2>
-        <p className="text-sm text-pretty text-fg-2" data-testid="binder-kept">
-          {t("binder.keptHint", { listed: totals.listed, kept: totals.copies - totals.listed })}
-        </p>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <Stat label={t("binder.copies")} testId="binder-copies">
-          {totals.copies}
-        </Stat>
-        <Stat label={t("binder.distinct")} testId="binder-distinct">
-          {t("binder.distinctValue", { owned: totals.distinct, total: collection.cards.length })}
-        </Stat>
-        <Stat label={t("binder.value")} testId="binder-value">
-          <span title={formatMoney(totals.valueCents)}>{formatMoneyShort(totals.valueCents)}</span>
-        </Stat>
-      </div>
-
-      <div className="space-y-3 rounded-lg bg-surface-2 p-3">
-        <label className="flex items-center justify-between gap-3 text-sm text-fg-1" data-testid="binder-slabs-only">
-          {t("binder.slabsOnly")}
-          <Switch
-            checked={slabsOnly}
-            onCheckedChange={(on) => patchView({ slabs: on ? "on" : "off" })}
-            label={t("binder.slabsOnly")}
-          />
-        </label>
-        {!slabsOnly && (
-          <>
-            <Segmented<BinderOwnership>
-              value={filter.ownership}
-              onValueChange={(ownership) => patch({ ownership })}
-              label={t("binder.ownership")}
-              size="sm"
-              block
-              options={BINDER_OWNERSHIPS.map((value) => ({ value, label: t(`binder.own.${value}`) }))}
-            />
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              <SelectField<NexamonSetKey | "all">
-                label={t("filter.set")}
-                value={filter.set}
-                onChange={(set) => patch({ set })}
-                testId="binder-set"
-                options={[
-                  { value: "all", label: t("filter.allSets") },
-                  ...NEXAMON_SETS.map((set) => ({ value: set, label: tc(`sets.${set}`) })),
-                ]}
-              />
-              <SelectField<NexamonRarity | "all">
-                label={t("filter.rarity")}
-                value={filter.rarity}
-                onChange={(rarity) => patch({ rarity })}
-                testId="binder-rarity"
-                options={[
-                  { value: "all", label: t("filter.allRarities") },
-                  ...NEXAMON_RARITIES.map((rarity) => ({ value: rarity, label: tc(`rarityShort.${rarity}`) })),
-                ]}
-              />
-              <SelectField<BinderSort>
-                label={t("filter.sort")}
-                value={filter.sort}
-                onChange={(sort) => patch({ sort })}
-                testId="binder-sort"
-                options={BINDER_SORTS.map((sort) => ({ value: sort, label: t(`binder.sort.${sort}`) }))}
-              />
-              <SelectField<BinderSale>
-                label={t("binder.saleLabel")}
-                value={filter.sale}
-                onChange={(sale) => patch({ sale })}
-                testId="binder-sale"
-                options={BINDER_SALES.map((sale) => ({ value: sale, label: t(`binder.sale.${sale}`) }))}
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {slabsOnly ? (
-        <SlabList
-          scale={scale}
-          items={collection.copies
-            .filter((c) => c.state === "graded" && c.grade !== null)
-            .map((c) => ({
-              id: c.id,
-              cardKey: c.cardKey,
-              serial: c.serial,
-              grade: c.grade!,
-              valueCents: c.valueCents,
-            }))}
-        />
-      ) : entries.length === 0 ? (
-        <EmptyState
-          art={<PixelIcon {...COIN} scale={4} />}
-          title={t(totals.copies === 0 ? "binder.emptyTitle" : "binder.noMatchTitle")}
-          description={t(totals.copies === 0 ? "binder.emptyText" : "binder.noMatchText")}
-          action={
-            totals.copies === 0 ? (
-              <Link href="/nexamon?tab=shop" className="text-sm font-medium text-accent focus-ring hover:underline">
-                {t("binder.toShop")}
-              </Link>
-            ) : undefined
-          }
-        />
+      <Segmented<"cards" | "bulk">
+        value={bulk ? "bulk" : "cards"}
+        onValueChange={(mode) => patchView({ mode })}
+        label={t("binder.modeLabel")}
+        block
+        options={[
+          { value: "cards", label: t("binder.modeCards") },
+          { value: "bulk", label: t("bulk.mode") },
+        ]}
+      />
+      {bulk ? (
+        <BulkSell collection={collection} />
       ) : (
-        groups.map((group) => (
-          <section key={group.set ?? "all"} className="space-y-2" data-set={group.set ?? "all"}>
-            {group.set && (
-              <h3 className="flex items-center justify-between gap-2">
-                <SetIcon set={group.set} label className="font-pixel text-xs uppercase" />
-                <span className="nums text-xs text-fg-3">
-                  {t("binder.setCount", {
-                    owned: group.entries.filter((e) => e.copies.length > 0).length,
-                    total: group.entries.length,
-                  })}
-                </span>
-              </h3>
-            )}
-            <ul
-              className={cn(
-                "grid items-end justify-between gap-x-1 gap-y-3",
-                scale === 1 ? "grid-cols-[repeat(auto-fill,86px)]" : "grid-cols-[repeat(auto-fill,172px)]",
-              )}
-              data-testid="binder-grid"
+        <>
+          <div className="space-y-1">
+            <h2 className="font-pixel text-sm text-fg-1 uppercase">{t("binder.title")}</h2>
+            <p className="text-sm text-pretty text-fg-2" data-testid="binder-kept">
+              {t("binder.keptHint", { listed: totals.listed, kept: totals.copies - totals.listed })}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label={t("binder.copies")} testId="binder-copies">
+              {totals.copies}
+            </Stat>
+            <Stat label={t("binder.distinct")} testId="binder-distinct">
+              {t("binder.distinctValue", { owned: totals.distinct, total: collection.cards.length })}
+            </Stat>
+            <Stat label={t("binder.value")} testId="binder-value">
+              <span title={formatMoney(totals.valueCents)}>{formatMoneyShort(totals.valueCents)}</span>
+            </Stat>
+          </div>
+
+          <div className="space-y-3 rounded-lg bg-surface-2 p-3">
+            <label
+              className="flex items-center justify-between gap-3 text-sm text-fg-1"
+              data-testid="binder-slabs-only"
             >
-              {group.entries.map((entry) => (
-                <BinderTile key={entry.stats.cardKey} entry={entry} scale={scale} />
-              ))}
-            </ul>
-          </section>
-        ))
+              {t("binder.slabsOnly")}
+              <Switch
+                checked={slabsOnly}
+                onCheckedChange={(on) => patchView({ slabs: on ? "on" : "off" })}
+                label={t("binder.slabsOnly")}
+              />
+            </label>
+            {!slabsOnly && (
+              <>
+                <Segmented<BinderOwnership>
+                  value={filter.ownership}
+                  onValueChange={(ownership) => patch({ ownership })}
+                  label={t("binder.ownership")}
+                  size="sm"
+                  block
+                  options={BINDER_OWNERSHIPS.map((value) => ({ value, label: t(`binder.own.${value}`) }))}
+                />
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  <SelectField<NexamonSetKey | "all">
+                    label={t("filter.set")}
+                    value={filter.set}
+                    onChange={(set) => patch({ set })}
+                    testId="binder-set"
+                    options={[
+                      { value: "all", label: t("filter.allSets") },
+                      ...NEXAMON_SETS.map((set) => ({ value: set, label: tc(`sets.${set}`) })),
+                    ]}
+                  />
+                  <SelectField<NexamonRarity | "all">
+                    label={t("filter.rarity")}
+                    value={filter.rarity}
+                    onChange={(rarity) => patch({ rarity })}
+                    testId="binder-rarity"
+                    options={[
+                      { value: "all", label: t("filter.allRarities") },
+                      ...NEXAMON_RARITIES.map((rarity) => ({ value: rarity, label: tc(`rarityShort.${rarity}`) })),
+                    ]}
+                  />
+                  <SelectField<BinderSort>
+                    label={t("filter.sort")}
+                    value={filter.sort}
+                    onChange={(sort) => patch({ sort })}
+                    testId="binder-sort"
+                    options={BINDER_SORTS.map((sort) => ({ value: sort, label: t(`binder.sort.${sort}`) }))}
+                  />
+                  <SelectField<BinderSale>
+                    label={t("binder.saleLabel")}
+                    value={filter.sale}
+                    onChange={(sale) => patch({ sale })}
+                    testId="binder-sale"
+                    options={BINDER_SALES.map((sale) => ({ value: sale, label: t(`binder.sale.${sale}`) }))}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {slabsOnly ? (
+            <SlabList
+              scale={scale}
+              items={collection.copies
+                .filter((c) => c.state === "graded" && c.grade !== null)
+                .map((c) => ({
+                  id: c.id,
+                  cardKey: c.cardKey,
+                  serial: c.serial,
+                  grade: c.grade!,
+                  valueCents: c.valueCents,
+                }))}
+            />
+          ) : entries.length === 0 ? (
+            <EmptyState
+              art={<PixelIcon {...COIN} scale={4} />}
+              title={t(totals.copies === 0 ? "binder.emptyTitle" : "binder.noMatchTitle")}
+              description={t(totals.copies === 0 ? "binder.emptyText" : "binder.noMatchText")}
+              action={
+                totals.copies === 0 ? (
+                  <Link href="/nexamon?tab=shop" className="text-sm font-medium text-accent focus-ring hover:underline">
+                    {t("binder.toShop")}
+                  </Link>
+                ) : undefined
+              }
+            />
+          ) : (
+            groups.map((group) => (
+              <section key={group.set ?? "all"} className="space-y-2" data-set={group.set ?? "all"}>
+                {group.set && (
+                  <h3 className="flex items-center justify-between gap-2">
+                    <SetIcon set={group.set} label className="font-pixel text-xs uppercase" />
+                    <span className="nums text-xs text-fg-3">
+                      {t("binder.setCount", {
+                        owned: group.entries.filter((e) => e.copies.length > 0).length,
+                        total: group.entries.length,
+                      })}
+                    </span>
+                  </h3>
+                )}
+                <ul
+                  className={cn(
+                    "grid items-end justify-between gap-x-1 gap-y-3",
+                    scale === 1 ? "grid-cols-[repeat(auto-fill,86px)]" : "grid-cols-[repeat(auto-fill,172px)]",
+                  )}
+                  data-testid="binder-grid"
+                >
+                  {group.entries.map((entry) => (
+                    <BinderTile key={entry.stats.cardKey} entry={entry} scale={scale} />
+                  ))}
+                </ul>
+              </section>
+            ))
+          )}
+        </>
       )}
     </div>
   );

@@ -1664,6 +1664,7 @@ const RENDER: Record<string, () => Float64Array> = {
   "pull-ultra": pullUltra,
   "pull-prisma": pullPrisma,
   "pull-legendary": pullLegendary,
+  "pull-one-of-one": pullOneOfOne,
   "grade-drum": gradeDrum,
   "grade-tick": gradeTick,
   "grade-low": gradeLow,
@@ -1808,6 +1809,50 @@ function pullLegendary(): Float64Array {
     bell(m, 0.72 + i * 0.1, ["G6", "C7", "E7", "G7", "E7", "C7", "G6", "C7"][i]!, { gain: 0.11 });
   noise(m, 0.66, 1, { type: "hp", cutoff: 6500 }, 0.05, { a: 0.04, d: 1, r: 0.3 });
   return master(m.buf, { room: { mix: 0.24, size: 1.1 } });
+}
+
+/**
+ * A One of One (ADR-174), the biggest moment of the game: a long rising sub drone in the dark, a heartbeat, a
+ * silence, then a slow minor-to-major chord that swells with bells falling like stars.
+ */
+function pullOneOfOne(): Float64Array {
+  const m = new Mix(4.6, 174);
+  m.tone({
+    at: 0,
+    note: "C2",
+    to: "C3",
+    glide: 1.4,
+    gate: 1.4,
+    wave: "sine",
+    gain: 0.55,
+    env: { a: 0.6, d: 0.6, s: 0.6, r: 0.2 },
+  });
+  noise(m, 0, 1.4, { type: "lp", cutoff: 400 }, 0.25, { a: 1.0, d: 0.3, r: 0.1 });
+  for (const at of [0.5, 0.78, 1.15, 1.4]) {
+    m.tone({
+      at,
+      note: "A1",
+      to: "E1",
+      glide: 0.08,
+      gate: 0.1,
+      wave: "sine",
+      gain: 0.7,
+      env: { a: 0.002, d: 0.12, s: 0, r: 0.06 },
+    });
+  }
+  const swell = { a: 0.9, d: 0.8, s: 0.7, r: 1.0 };
+  const vibrato = { rate: 4.5, cents: 10, delay: 0.6 };
+  chip(m, 1.75, "A4", 0.6, { env: { a: 0.3, d: 0.3, s: 0.5, r: 0.2 }, gain: 0.5 });
+  chip(m, 1.75, "C5", 0.6, { env: { a: 0.3, d: 0.3, s: 0.5, r: 0.2 }, gain: 0.4 });
+  chip(m, 2.35, "C5", 1.6, { env: swell, vibrato, gain: 0.8, sparkle: 0.3 });
+  chip(m, 2.35, "E5", 1.6, { env: swell, vibrato, gain: 0.55, bright: 0.6 });
+  chip(m, 2.35, "G5", 1.6, { env: swell, vibrato, gain: 0.45, bright: 0.7 });
+  chip(m, 2.35, "C6", 1.6, { env: swell, vibrato, gain: 0.35, bright: 0.8 });
+  m.tone({ at: 2.35, note: "C2", gate: 1.6, wave: "triangle", gain: 0.4, env: swell });
+  const stars = ["C8", "G7", "E7", "C7", "G6", "E7", "C7", "G6", "E6", "C7", "G6", "C6"];
+  stars.forEach((note, i) => bell(m, 2.5 + i * 0.13, note, { gain: 0.1 }));
+  noise(m, 2.35, 1.6, { type: "hp", cutoff: 7000 }, 0.05, { a: 0.3, d: 1.2, r: 0.4 });
+  return master(m.buf, { room: { mix: 0.32, size: 1.4 } });
 }
 
 /** The ASP package is open: a snare roll that gets denser and louder while the slab rises (ADR-165). */

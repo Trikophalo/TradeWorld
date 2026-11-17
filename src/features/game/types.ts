@@ -2185,6 +2185,10 @@ export const GAME_ERROR_KEYS = [
   "nexamon_battle_opponent_locked",
   "nexamon_live_unknown",
   "nexamon_battle_not_yours",
+  // ADR-174
+  "nexamon_one_of_one_taken",
+  "nexamon_ai_excluded",
+  "nexamon_not_enough",
   "not_listed",
   "item_unknown",
   "item_locked",

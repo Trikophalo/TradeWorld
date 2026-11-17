@@ -9,7 +9,7 @@ import type { NexamonArt } from "./types";
 /*
  * "Nexamon: Cosmic Winds", chase cards cw-081 to cw-090: Prisma Illustration Rares (81-85), the two golden
  * Legendary Illustration Rares (86-87) and the three One of One cards (88-90). All 72 x 100 full art.
- * Final forms: cw-081 Kosmowal (Sternwal line, from cw-031), cw-083 Boreagon (Polarlichtschlange line, from cw-041).
+ * Final forms: cw-081 Kosmowal (Sternwal line, from cw-031), cw-083 Boreagon (Polarschlange line, from cw-041).
  */
 export const COSMIC_WINDS_CHASE_CARDS: CosmicCardDraft[] = [
   {

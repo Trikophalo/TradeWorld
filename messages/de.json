@@ -594,7 +594,7 @@
     "nexamonPacks": {
       "title": "Booster und Ziehungsraten",
       "summary": "{count} Karten je Booster, ab {price}",
-      "text": "Ab Level {level} kaufst du Booster. In jedem stecken {count} Karten: Die ersten drei sind immer Commons, die letzten zwei werden gewürfelt. Eine Rare gibt es dort mit {rare}, eine Ultra Rare mit {ultra}. Prisma ({prisma}) und Legendary ({legendary}) gibt es nur auf dem letzten Platz. Die genauen Raten stehen im Shop.",
+      "text": "Ab Level {level} kaufst du Booster. In jedem stecken {count} Karten: Die ersten drei sind immer Commons, die letzten zwei werden gewürfelt. Eine Rare gibt es dort mit {rare}, eine Ultra Rare mit {ultra}. Prisma ({prisma}) und Legendary ({legendary}) gibt es nur auf dem letzten Platz. Nur im Set Cosmic Winds stecken drei One of Ones: Platz 5 würfelt zuerst 1 zu {oneOfOne} auf eine von ihnen. Jede gibt es im ganzen Spiel nur ein einziges Mal, und die KI zieht und kauft sie nie. Die genauen Raten stehen im Shop.",
       "example": "Ein Booster Mystic Energy kostet {price}. Im Schnitt ist in jedem zweiten eine Rare, in jedem zwölften eine Ultra Rare und in einem von {legendaryPacks} eine Legendary.",
       "where": "Collectibles → Shop"
     },
@@ -883,6 +883,9 @@
     "nexamon_battle_opponent_locked": "Dein Freund hat Nexamon noch nicht freigeschaltet.",
     "nexamon_live_unknown": "Dieses Live-Öffnen ist schon vorbei.",
     "nexamon_battle_not_yours": "Darauf kann nur der andere Spieler antworten.",
+    "nexamon_one_of_one_taken": "Diese One of One hat gerade jemand anderes gezogen.",
+    "nexamon_ai_excluded": "One of Ones handeln nur Spieler untereinander.",
+    "nexamon_not_enough": "So viele passende Karten hast du nicht frei.",
     "not_listed": "Das geht erst, wenn deine Firma an der Börse ist.",
     "item_unknown": "Das gibt es nicht (mehr).",
     "item_locked": "Dafür fehlt noch eine Voraussetzung.",
@@ -8644,21 +8647,24 @@
       "dark": "Finsternis",
       "steel": "Stahl",
       "fairy": "Fee",
-      "dragon": "Drache"
+      "dragon": "Drache",
+      "cosmic": "Kosmos"
     },
     "rarity": {
       "common": "Common",
       "rare": "Rare",
       "ultra": "Ultra Rare",
       "prisma": "Prisma Illustration Rare",
-      "legendary": "Legendary Illustration Rare"
+      "legendary": "Legendary Illustration Rare",
+      "one_of_one": "One of One"
     },
     "rarityShort": {
       "common": "Common",
       "rare": "Rare",
       "ultra": "Ultra",
       "prisma": "Prisma",
-      "legendary": "Legendary"
+      "legendary": "Legendary",
+      "one_of_one": "1 of 1"
     },
     "condition": {
       "poor": "Poor",
@@ -8669,7 +8675,8 @@
     "sets": {
       "mystic_energy": "Mystic Energy",
       "super_apex": "Super Apex",
-      "prismatic_peak": "Prismatic Peak"
+      "prismatic_peak": "Prismatic Peak",
+      "cosmic_winds": "Cosmic Winds"
     },
     "grade": {
       "blackLabel": "Black Label",
@@ -8704,7 +8711,12 @@
       "summary": "Deine Karten",
       "cards": "5 Karten",
       "openButton": "Ohne Ziehen aufreißen"
-    }
+    },
+    "event": "Ereignis",
+    "eventLabel": "{name}, Ereigniskarte, {rarity}",
+    "oneOfOne": "One of One",
+    "oneOfOneSerial": "1/1",
+    "eventLine": "Ereignis · {type}"
   },
   "nexamon": {
     "title": "Collectibles",
@@ -8741,7 +8753,7 @@
     "locked": {
       "title": "Nexamon-Sammelkarten",
       "text": "Ab Level {level} ziehst du Karten aus Boostern, lässt sie bewerten und handelst sie am Kartenmarkt.",
-      "point1": "{sets} Sets mit je {cards} Karten, von Common bis Legendary.",
+      "point1": "{sets} Sets mit {cards} Karten, von Common bis Legendary und drei Karten, die es nur einmal gibt.",
       "point2": "ASP bewertet deine Karten mit Noten von 1 bis 10, dazu 8,5 und 9,5. Eine 10 ist {best} wert, das seltene Black Label {black}.",
       "point3": "Am Markt bestimmen Knappheit und Nachfrage, was eine Karte wert ist."
     },
@@ -8775,11 +8787,13 @@
       "againPlain": "Noch eins",
       "balance": "Dein Geld: {cash}",
       "howTo": "Erst mit „Kaufen“ wird bezahlt. Danach reißt du das Booster selbst auf.",
-      "scrollHint": "Weiter unten: alle Karten dieses Sets und ihre Chancen."
+      "scrollHint": "Weiter unten: alle Karten dieses Sets und ihre Chancen.",
+      "oneOfOne": "ONE OF ONE",
+      "oneOfOneText": "Diese Karte gibt es im ganzen Spiel nur ein einziges Mal. Und du hast sie gezogen."
     },
     "odds": {
       "title": "Ziehungsraten",
-      "intro": "Jedes Booster hat {count} Karten. Die ersten {sure} sind immer Commons, die letzten beiden werden gewürfelt. Die Raten gelten für alle drei Sets.",
+      "intro": "Jedes Booster hat {count} Karten. Die ersten {sure} sind immer Commons, die letzten beiden werden gewürfelt. Die Raten gelten für alle Sets.",
       "rarity": "Seltenheit",
       "slot": "Platz {slot}",
       "average": "Im Schnitt",
@@ -8787,7 +8801,10 @@
       "oneIn": "1 in {count} Boostern",
       "perPack": "{count} je Booster",
       "conditionIntro": "Jede gezogene Karte bekommt einen Zustand:",
-      "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld."
+      "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld.",
+      "cardsInSets": "{count} je Set, {cosmic} in Cosmic Winds",
+      "oneOfOne": "1 in {count} Packs, jede Karte nur einmal",
+      "oneOfOneNote": "Nur in Cosmic Winds: Platz 5 würfelt zuerst 1 zu {count} auf eine der drei One of Ones. Jede gibt es im ganzen Spiel nur ein einziges Mal; ist sie gezogen, ist sie weg. Die KI zieht und kauft sie nie."
     },
     "contents": {
       "value": "Marktwert:",
@@ -8797,7 +8814,12 @@
       "intro": "Alle Karten dieses Sets nach Seltenheit, mit der Chance je Booster. Karten, die du schon hast, sind farbig.",
       "slots": "Platz 4: {slot4} · Platz 5: {slot5}",
       "lastSlot": "nur Platz 5: {slot5}",
-      "owned": "{owned} von {total}"
+      "owned": "{owned} von {total}",
+      "oneOfOne": "1 in {count} Packs, jede Karte nur einmal",
+      "oneOfOneOpen": "noch nicht gezogen",
+      "oneOfOneTaken": "gezogen von {name}",
+      "oneOfOneTakenAnon": "schon gezogen",
+      "oneOfOneLeft": "{count, plural, =0 {Alle gezogen: Platz 5 würfelt wieder normal} one {Noch # im Spiel} other {Noch # im Spiel}}"
     },
     "binder": {
       "copies": "Karten",
@@ -8834,7 +8856,9 @@
       },
       "listedTag": "Im Markt",
       "listedHint": "{count, plural, one {Steht im Markt für {price}} other {# Kopien im Markt, ab {price}}}",
-      "slabsOnly": "Nur gegradete"
+      "slabsOnly": "Nur gegradete",
+      "modeLabel": "Ansicht der Sammlung",
+      "modeCards": "Karten"
     },
     "filter": {
       "set": "Set",
@@ -8854,7 +8878,9 @@
       "sell": "Verkaufen",
       "grade": "Zu ASP",
       "quick": "Sofort an KI",
-      "crack": "Slab aufbrechen"
+      "crack": "Slab aufbrechen",
+      "unlistAll": "Alle {count} zurücknehmen",
+      "unlistManyDone": "{count} Angebote zurückgenommen"
     },
     "sell": {
       "title": "Am Markt anbieten",
@@ -8873,7 +8899,9 @@
       "aiMax": "Für diese Kopie zahlen KI-Sammler bis zu {max}, {premium} über dem Wert: Guter Zustand ist ihnen etwas mehr wert.",
       "aiMaxValue": "Mehr als den Wert zahlen KI-Sammler für diese Kopie nicht.",
       "aiMinutes": "Zu diesem Preis kauft die KI nur mit etwas Glück: im Schnitt nach etwa {minutes} Minuten.",
-      "aiNever": "So viel zahlen KI-Sammler nie. Zu diesem Preis kaufen nur andere Spieler."
+      "aiNever": "So viel zahlen KI-Sammler nie. Zu diesem Preis kaufen nur andere Spieler.",
+      "confirmMany": "{count} Stück für je {price} anbieten",
+      "doneMany": "{count} Karten stehen am Markt"
     },
     "quick": {
       "title": "Sofort an die KI verkaufen",
@@ -8881,7 +8909,8 @@
       "done": "Karte verkauft",
       "confirm": "Für {price} verkaufen",
       "offer": "Die KI zahlt ({rate})",
-      "text": "Das Geld kommt sofort, die Karte ist weg. Das geht nur mit losen Commons und Rares. Am Markt bekommst du meistens mehr, musst aber auf einen Käufer warten."
+      "text": "Das Geld kommt sofort, die Karte ist weg. Das geht nur mit losen Commons und Rares. Am Markt bekommst du meistens mehr, musst aber auf einen Käufer warten.",
+      "confirmMany": "{count} Stück für {price} verkaufen"
     },
     "grade": {
       "title": "Zu ASP schicken",
@@ -8958,7 +8987,23 @@
       "toCollection": "Zur Sammlung",
       "mineCount": "{count} von höchstens {max} Angeboten",
       "since": "seit {date}",
-      "worth": "Wert {value}"
+      "worth": "Wert {value}",
+      "sets": {
+        "title": "Welches Set?",
+        "intro": "Wähl zuerst ein Set. Danach siehst du seine Angebote und filterst nach losen Karten oder Slabs.",
+        "listings": "{count, plural, =0 {Keine Angebote} one {# Angebot} other {# Angebote}}",
+        "cheapest": "Ab {price}",
+        "top": "Teuerstes: {price}",
+        "open": "Angebote für {set} ansehen",
+        "back": "Alle Sets",
+        "loading": "Angebote werden gezählt …"
+      },
+      "condition": {
+        "label": "Raw oder Graded",
+        "all": "Alle",
+        "raw": "Raw",
+        "graded": "Graded"
+      }
     },
     "buy": {
       "title": "Karte kaufen?",
@@ -9113,7 +9158,7 @@
       "cards": "Aktive Bonus-Karten: {n} von {total}",
       "noneTitle": "Noch kein Karten-Bonus",
       "noneText": "Ultra Rares, Prismas, Legendaries und die Rare Nr. 60 jedes Sets bringen Account-Boni. Zieh sie aus Boostern oder kauf sie im Markt.",
-      "masterRule": "Master-Set: alle 77 Karten und jede Prisma und Legendary als eigener Slab ab Note {grade}.",
+      "masterRule": "Master-Set: alle Karten des Sets und jede Prisma und Legendary als eigener Slab ab Note {grade}. One of Ones zählen für keine Sammlung.",
       "activeBadge": "Aktiv",
       "rewardPaid": "Belohnung schon erhalten",
       "missing": "Fehlt:",
@@ -9136,6 +9181,41 @@
       "emptyTitle": "Noch kein Slab",
       "emptyText": "Schick Karten zu ASP. Bewertete Karten erscheinen hier, die beste Note zuerst.",
       "label": "{name}, {grade}, Wert {value}"
+    },
+    "quantity": {
+      "label": "Anzahl",
+      "less": "Eine weniger",
+      "more": "Eine mehr",
+      "of": "{n} / {max}",
+      "all": "Alle"
+    },
+    "bulk": {
+      "mode": "Bulk verkaufen",
+      "intro": "Bulk sind lose Karten unter Ultra Rare. Stell ein, was gehen darf: An das Spiel verkauft bekommst du sofort den Marktwert abzüglich {fee} Gebühr. Oder du stellst sie zum Marktwert auf den Markt und wartest auf Käufer.",
+      "condition": "Zustand",
+      "anyCondition": "Alle Zustände",
+      "maxValue": "Höchstens wert (€)",
+      "maxValueAny": "egal",
+      "keepOne": "Behalte 1 pro Karte",
+      "skipBonus": "Bonus-Karten behalten",
+      "duplicatesOnly": "Nur Duplikate",
+      "emptyTitle": "Kein Bulk zu diesen Filtern",
+      "emptyText": "Lose Commons und Rares, die du abgeben kannst, erscheinen hier. Stell die Filter anders ein oder öffne ein paar Booster.",
+      "selectAll": "Alle auswählen",
+      "selectNone": "Keine",
+      "rowValue": "ab {value} je Karte",
+      "count": "Ausgewählt",
+      "value": "Marktwert",
+      "fee": "Gebühr ({rate})",
+      "payout": "Auszahlung",
+      "sellGame": "An das Spiel verkaufen · {price}",
+      "sellFailed": "Bulk nicht verkauft",
+      "sold": "{count, plural, one {# Karte verkauft} other {# Karten verkauft}}",
+      "share": "% vom Wert",
+      "listMarket": "Auf den Markt stellen",
+      "listFailed": "Nicht alle Karten eingestellt",
+      "listed": "{count, plural, one {# Karte steht am Markt} other {# Karten stehen am Markt}}",
+      "listLimit": "Auf den Markt passen höchstens {max} Angebote auf einmal."
     }
   },
   "hq": {
@@ -9658,7 +9738,8 @@
     "sets": {
       "mystic_energy": "Mystic Energy",
       "super_apex": "Super Apex",
-      "prismatic_peak": "Prismatic Peak"
+      "prismatic_peak": "Prismatic Peak",
+      "cosmic_winds": "Cosmic Winds"
     },
     "battle": {
       "title": "Pack Battle",

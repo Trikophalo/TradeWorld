@@ -14,7 +14,7 @@ import { GameError } from "@/features/game/types";
 import { formatMoney } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { formatCardNumber } from "../lib";
+import { formatSetNumber } from "../lib";
 import { useNexamonAction, useNexamonBonuses } from "../hooks";
 import { dealBps, dealTone, formatChance } from "../view";
 import { RarityBadge, SetIcon } from "./badges";
@@ -120,7 +120,7 @@ export function ListingRow({
         {!compact && (
           <p className="flex items-center gap-1.5 text-xs text-fg-3">
             <SetIcon set={listing.set} scale={1} />
-            <span className="nums">{formatCardNumber(card.number)}</span>
+            <span className="nums">{formatSetNumber(card)}</span>
           </p>
         )}
         <p className="flex min-w-0 items-center gap-1.5 text-xs text-fg-2">

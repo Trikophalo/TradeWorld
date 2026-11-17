@@ -3770,3 +3770,77 @@ Das Meme lebt so lange wie die Firma. Eine echte börsennotierte Firma mit ähnl
 - Demo: Schalter `demo.preview` zeigt den Gag mit der erfundenen Firma „Vulcan Energy“ von „Bohr_Boris“, wenn die
   Demo-Firma nicht so heißt; `/dev/ui` hat den Knopf „Running Gag“.
 - Bewusst nicht in Changelog und Patchnotes (Überraschung, Wunsch des Owners).
+
+## ADR-174: Cosmic Winds, One of Ones, eigene Seltenheiten je Set, Bulk und Markt nach Sets — `Annahme`
+
+**Kontext:** Der Besitzer wünscht ein viertes Nexamon-Set „Cosmic Winds“ (Monster aus dem Kosmos und
+Ereigniskarten wie Galaxien oder Kometen), Pack 5.000 €, 50 Commons, 15 Rares, 15 Ultra Rares, 5 Prismas,
+2 Legendaries und eine neue Seltenheit „One of One“: drei Karten, die es im ganzen Spiel nur einmal gibt, 1 in
+5.000 Packs, Wert 16 bis 33 Mio. €, für die KI tabu. Dazu: der Markt zeigt erst die Sets, mehrere Kopien lassen sich
+auf einmal einstellen, die KI-Angebote wachsen nicht endlos, Bulk lässt sich an das Spiel verkaufen. Ein fünftes Set
+(Titans Revenge, ADR-175) bringt eigene Seltenheiten und eine eigene Pack-Zusammensetzung.
+
+**Entscheidung:**
+
+- **Seltenheiten je Set:** `NEXAMON_RARITIES` ist die Liste aller Seltenheiten aller Sets (bisher `common` …
+  `legendary`, neu `one_of_one`). Jedes Set erklärt in `NEXAMON_SET_LAYOUT` seine Seltenheiten in Nummernfolge mit
+  ihrer Anzahl (die ersten drei Sets 50/10/10/5/2, Cosmic Winds 50/15/15/5/2/3 = 90 Karten). Daraus folgen
+  `nexamonSetSize`, `nexamonRarityRange`, `nexamonRarityOfNumber(n, set)` und `nexamonSetRarities`.
+  `NEXAMON_RARITY_RANK` ordnet alle Seltenheiten (Sortierung, Abzeichen, Pack-Battle-Gleichstand, Größe der
+  Enthüllung); `pnpm db:config` schreibt Rang und Layout nach `game_config.nexamon_rarities`, die Datenbank liest den
+  Rang daraus. Kunstgröße, Preisspanne, Popularität, Nachfrage, KI-Bestand, Hype und Boni sind Datensätze je
+  Seltenheit; ein neues Set mit eigenen Seltenheiten trägt sie dort ein (TypeScript zeigt jede Stelle).
+- **Pack-Zusammensetzung je Set:** Ohne Eintrag gilt die Platz-Tabelle `odds` (Platz 1–3 Common, Platz 4/5
+  würfeln) samt One-of-One-Wurf. Mit `packRules[set] = { kind: "tiers", base, tiers: [{ rarity, packs, min, max }] }`
+  würfelt jede Stufe (beste zuerst) 1 zu `packs`, bringt dann `min`…`max` Karten von hinten, der Rest ist `base`
+  (nie zweimal dieselbe Basis-Karte). Gleiche Regel in `nexamonTierRarities` und in `nexamon_open_pack()`.
+- **Cosmic Winds:** Pack 5.000 €, Karten zum 22,5-Fachen der ersten Preisspannen (4,5 × Super Apex), Typ „cosmic“
+  (Stern-Symbol, Mitternachtsviolett) mit Bonusart XP („Wissen aus der Ferne“; Dunkel gibt ebenfalls XP),
+  Set-Bonusfaktor 1,5. Ereigniskarten (`kind: "event"`) haben keine KP, ein „Ereignis“-Schild statt der KP, einen
+  Nachthimmel-Rahmen mit Sternenstaub und eine gestrichelte Linie unter dem Effektnamen; Schaden 0, der Effekt steht
+  als Text in der Angriffsplatte.
+- **One of One:** Platz 5 eines Spieler-Packs würfelt zuerst 1 zu `oneOfOne.packs` (5.000); bei Treffer nimmt er unter
+  einer Advisory-Sperre eine noch freie One of One des Sets (gleich verteilt), sonst die normale Tabelle. Jede Karte
+  steht danach in `nexamon_one_of_ones` (Primärschlüssel je Karte), dazu die Prüfung `population <= 1`: zwei
+  gleichzeitige Züge können nie beide gelingen. Sind alle drei weg, ist die Chance 0. Ein Zug postet
+  `nexamon_one_of_one` in den Feed (Klatschquelle der Nachrichten), benachrichtigt jeden aktiven Spieler und löst die
+  größte Enthüllung des Spiels aus (Abdunkeln, Blitz, langsames „ONE OF ONE“, eigener Klang). Rahmen: Vollbild,
+  schwarz-goldener Doppelrahmen mit irisierendem Lauf (Türkis bis Rosé), quer durch die Mitte ein schwarzes Band mit
+  „ONE OF ONE“ in großen goldenen Pixelbuchstaben und „1/1“, eigene sehr langsame Folie; Slab-Etikett mit irisierenden
+  Linien. Sie zählt für keine Sammlung („Set komplett“ = 87 Karten, Master-Set = 87 plus Prismas und Legendaries
+  als Slab ab 9), gibt aber einen Karten-Bonus. Grading und Black Label wie jede Karte, Hype nur für Black Labels.
+- **KI und One of Ones:** Die KI zieht, hält und kauft sie nie (`ai.excludedRarities`; Trigger auf
+  `nexamon_copies`, Kaufchance 0). Ihr Wert startet beim Katalogwert und bewegt sich nur durch Handel unter Spielern
+  (`value.tradeOnlyRarities`: kein Angebot-Nachfrage-Schritt), mit Band und Anti-Manipulation wie sonst. In einem
+  Pack Battle geht sie wie jede Karte an den Sieger.
+- **Markt nach Sets:** Der Markt zeigt erst eine Kachel je Set (Pack, Zahl der Angebote, günstigstes und teuerstes
+  Angebot); danach die Angebote des Sets mit Raw/Graded/Black-Label-Schalter und den übrigen Filtern. Das Set steht in
+  der Adresse (`?set=`) und in `nexa-nexamon-filters`; „Alle Sets“ führt zurück.
+- **Mehrere Kopien:** `list_nexamon_cards()` stellt n gleiche Kopien (lose im gleichen Zustand oder Slabs der gleichen
+  Note, älteste zuerst) zu einem Preis je Stück ein, `unlist_nexamon_cards()` nimmt mehrere zurück; beide laufen über
+  die Einzel-RPCs (Limit 30 Angebote, Ratenlimit, Missionen) und sind je Anfrage idempotent.
+- **KI-Angebote:** Alle 6 Stunden (`ai.listingResetHours`) verschwinden alle KI-Angebote, der KI-Bestand je Karte
+  über `ai.stockCap` wird ausgemustert (neueste zuerst, Slabs zuletzt; gelöscht, damit `nexamon_copies` nicht
+  endlos wächst) und die KI stellt ihre üblichen Mengen zum aktuellen Wert neu ein. Die Population bleibt „jemals
+  gezogene Kopien“ und zählt ausgemusterte Kopien mit. Die Demo kappt den KI-Bestand schon immer.
+- **Bulk:** Bulk sind lose Kopien der Bulk-Seltenheiten ihres Sets (`quickSell.rarities`, je Set
+  `quickSell.setRarities`; für Titans z. B. Eisen). Das Spiel kauft sie sofort für den Wert minus 35 % Gebühr
+  (`quickSell.bps` 6.500, vorher 50 %), bezahlt von den Haushalten; jede so verkaufte Kopie senkt den Kartenwert um
+  `dropBps` wie bisher. Die Sammlung hat dafür einen Bulk-Modus mit Filtern (Set, Seltenheit, Zustand, nur
+  Duplikate, 1 behalten, Bonus-Karten behalten, höchstens wert), Mengenwahl je Karte und zwei Wegen: „An das Spiel
+  verkaufen“ (`bulk_sell_nexamon`, bis 500 Kopien) oder „Auf den Markt stellen“ (zum Wert oder einem Anteil davon).
+- **Platzhalter:** Die Kartendaten von Cosmic Winds kommen aus drei Entwurfsdateien (`cards-cosmic-winds-commons`,
+  `-rares-ultras`, `-chase`) in der Form von `cosmic-draft.ts`; `cards-cosmic-winds.ts` übersetzt sie. Bis die echten
+  Dateien da sind, stehen dort Platzhalter („Kosmo 12“, „Komet 3“).
+
+**Konsequenzen:** Die Datenbank kennt beliebige Seltenheitsnamen (Prüfung nur auf die Länge). Neue Fehler NX270
+(`nexamon_one_of_one_taken`), NX271 (`nexamon_ai_excluded`), NX272 (`nexamon_not_enough`). Migrationen 6500–6540.
+Bulk bringt jetzt 65 % statt 50 % des Werts.
+
+**Nachtrag (Note 10 nach Beliebtheit):** Ein Slab mit 10 ist nicht mehr bei jeder Karte das 4-Fache wert, sondern
+je nach Beliebtheit der Karte (`popularityBps`, Seltenheit und Population) das 2,5- bis 4-Fache
+(`grading.tenFactorRange`), eine 9,5 das 1,8- bis 2,6-Fache (`grading.nineHalfFactorRange`), linear und abgerundet.
+Beide Spannen liegen über der Note darunter, darum gilt 8 < 8,5 < 9 < 9,5 < 10 für jede Karte. Das Black Label bleibt
+beim eigenen Faktor (mit Hype). Server: `nexamon_grade_factor_bps(grade, card)`, genutzt von
+`nexamon_copy_value_cents(..., card)` und vom Verkaufsfaktor; `grading.valueBps` bleibt der Rückfall ohne Karte.
+Kartenseite, Grading-Blatt und Desk zeigen die Faktoren der Karte.

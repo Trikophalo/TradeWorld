@@ -28,6 +28,10 @@ import {
   quickSellOffer,
   revealKey,
   setContents,
+  bulkGroups,
+  setsByPackPrice,
+  bulkPick,
+  DEFAULT_BULK_FILTER,
   sortCopiesBestFirst,
   splitGraded,
   suggestedPriceCents,
@@ -118,6 +122,47 @@ describe("pack odds", () => {
   });
 });
 
+describe("Cosmic Winds and bulk (ADR-174)", () => {
+  it("shows the One of One row only for Cosmic Winds, 1 in 5 000 packs", () => {
+    const groups = setContents("cosmic_winds", []);
+    expect(groups.map((g) => [g.rarity, g.cards.length])).toEqual([
+      ["one_of_one", 3],
+      ["legendary", 2],
+      ["prisma", 5],
+      ["ultra", 15],
+      ["rare", 15],
+      ["common", 50],
+    ]);
+    expect(groups[0]!.odds).toMatchObject({ kind: "one_of_one", oneInPacks: 5_000, slot5: 1, denominator: 5_000 });
+    expect(packOdds("mystic_energy").some((r) => r.rarity === "one_of_one")).toBe(false);
+    expect(setsByPackPrice()).toEqual(["mystic_energy", "super_apex", "cosmic_winds", "prismatic_peak"]);
+  });
+
+  it("offers raw bulk copies after the filters, keeps the best copy, skips bonus cards", () => {
+    const own = [
+      copy("me-001", { valueCents: 100 }),
+      copy("me-001", { valueCents: 300, condition: "mint" }),
+      copy("me-002", { valueCents: 50 }),
+      copy("me-060", { valueCents: 900 }),
+      copy("me-061", { valueCents: 9_000 }),
+      copy("me-003", { valueCents: 80, grade: 9, state: "graded" }),
+      copy("me-003", { valueCents: 40 }),
+    ];
+    const bonus = (c: { number: number }) => c.number === 60;
+    const groups = bulkGroups(own, DEFAULT_BULK_FILTER, bonus);
+    // me-001: the mint copy stays; me-002: the only copy stays; me-003: the slab stays, so the raw one may go
+    expect(groups.map((g) => [g.card.key, g.copies.map((c) => c.valueCents)])).toEqual([
+      ["me-001", [100]],
+      ["me-003", [40]],
+    ]);
+    const loose = bulkGroups(own, { ...DEFAULT_BULK_FILTER, keepOne: false, skipBonus: false }, bonus);
+    expect(loose.map((g) => g.card.key)).toEqual(["me-001", "me-002", "me-003", "me-060"]);
+    expect(bulkGroups(own, { ...DEFAULT_BULK_FILTER, keepOne: false, duplicatesOnly: true }, bonus).length).toBe(2);
+    expect(bulkGroups(own, { ...DEFAULT_BULK_FILTER, keepOne: false, maxValueCents: 60 }, bonus).length).toBe(2);
+    expect(bulkPick(loose, { "me-001": 2, "me-060": 0 }).map((c) => c.valueCents)).toEqual([100, 300]);
+  });
+});
+
 describe("binder", () => {
   const copies = [
     copy("me-003", { acquiredAt: "2026-01-02T10:00:00Z" }),
@@ -128,7 +173,7 @@ describe("binder", () => {
 
   it("shows every card in set and number order with the own copies", () => {
     const entries = binderEntries(ALL, copies, DEFAULT_BINDER_FILTER);
-    expect(entries).toHaveLength(231);
+    expect(entries).toHaveLength(321);
     expect(entries[0]!.stats.cardKey).toBe("me-001");
     expect(entries[77]!.stats.cardKey).toBe("sa-001");
     const tumpli = entries.find((e) => e.stats.cardKey === "me-003")!;
@@ -147,9 +192,11 @@ describe("binder", () => {
   it("filters by set, rarity and ownership", () => {
     const filter = (patch: object) => binderEntries(ALL, copies, { ...DEFAULT_BINDER_FILTER, ...patch });
     expect(filter({ set: "super_apex" })).toHaveLength(77);
-    expect(filter({ rarity: "legendary" })).toHaveLength(6);
+    expect(filter({ rarity: "legendary" })).toHaveLength(8);
+    expect(filter({ rarity: "one_of_one" })).toHaveLength(3);
+    expect(filter({ set: "cosmic_winds" })).toHaveLength(90);
     expect(filter({ ownership: "owned" }).map((e) => e.stats.cardKey)).toEqual(["me-003", "sa-010"]);
-    expect(filter({ ownership: "missing" })).toHaveLength(229);
+    expect(filter({ ownership: "missing" })).toHaveLength(319);
     expect(filter({ ownership: "duplicates" }).map((e) => e.stats.cardKey)).toEqual(["me-003"]);
     expect(filter({ ownership: "owned", set: "prismatic_peak" })).toEqual([]);
   });
@@ -168,6 +215,7 @@ describe("binder", () => {
       ["mystic_energy", 77],
       ["super_apex", 77],
       ["prismatic_peak", 77],
+      ["cosmic_winds", 90],
     ]);
     expect(groupBySet(entries, "value")).toHaveLength(1);
     expect(groupBySet([], "value")).toEqual([]);
@@ -224,8 +272,8 @@ describe("copies", () => {
   });
 
   it("offers the quick sale for loose commons and rares only", () => {
-    expect(quickSellOffer(copy("me-001"), "common")).toBe(500);
-    expect(quickSellOffer(copy("me-001"), "rare")).toBe(500);
+    expect(quickSellOffer(copy("me-001"), "common")).toBe(650);
+    expect(quickSellOffer(copy("me-001"), "rare")).toBe(650);
     expect(quickSellOffer(copy("me-001"), "ultra")).toBeNull();
     expect(quickSellOffer(copy("me-001", { state: "graded", grade: 10 }), "common")).toBeNull();
     expect(quickSellOffer(copy("me-001", { state: "grading" }), "common")).toBeNull();
@@ -407,6 +455,7 @@ describe("profileBinder", () => {
       ["mystic_energy", 2, 77],
       ["super_apex", 1, 77],
       ["prismatic_peak", 0, 77],
+      ["cosmic_winds", 0, 90],
     ]);
     expect(groups[0]!.entries.map((e) => e.card.number)).toEqual(first.map((x) => x.number));
     expect(groups[0]!.entries.filter((e) => e.owned !== null)).toHaveLength(2);

@@ -22,7 +22,7 @@ select tests.set_cfg('nexamon', '{value,pressure,perRun}', '0');
 select public.nexamon_sync();
 
 create or replace function tests.nx_slab_value(p_card text, p_grade double precision) returns bigint language sql security definer as $$
-  select public.nexamon_copy_value_cents((tests.nx(p_card)).value_e4, 'mint', p_grade) $$;
+  select public.nexamon_copy_value_cents((tests.nx(p_card)).value_e4, 'mint', p_grade, p_card) $$;
 grant execute on function tests.nx_slab_value(text, double precision) to public;
 
 -- =============================================================================
@@ -77,11 +77,11 @@ select tests.assert(
   :done = 2 and (tests.nx_copy(:'h1')).grade = 9.5 and (tests.nx_copy(:'h2')).grade = 8.5
   and (select (x ->> 'grade')::double precision from jsonb_array_elements(:'card'::jsonb -> 'copies') x where x ->> 'id' = :'h1') = 9.5
   and (select (x ->> 'value_cents')::bigint from jsonb_array_elements(:'card'::jsonb -> 'copies') x where x ->> 'id' = :'h1')
-      = public.div_round_half_even((tests.nx('sa-021')).value_e4 * 23000::bigint, 1000000)
+      = public.div_round_half_even((tests.nx('sa-021')).value_e4::numeric * public.nexamon_grade_factor_bps(9.5, 'sa-021'), 1000000)
   and :'card'::jsonb -> 'graded' = '[0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0]'::jsonb
   and (select count(*) from public.notifications where player_id = :a and type_key = 'nexamon_graded'
          and title = 'Paket von ASP' and not payload ? 'grade') = 2,
-  'half grades: stored as 9.5 and 8.5, worth 2.3x and 1.4x, counted in their own buckets; the notification keeps the grade secret');
+  'half grades: stored as 9.5 and 8.5, a 9.5 by popularity (1.8x-2.6x), 8.5 1.4x, counted in their own buckets; the notification keeps the grade secret');
 
 -- =============================================================================
 -- C. AI collectors: at or below the value at once (no chance needed), above it up to the condition premium

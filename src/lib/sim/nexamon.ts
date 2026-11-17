@@ -7,7 +7,7 @@
  * rounded half to even (ADR-003). Randomness is passed in (`u` uniform in [0, 1), or `rng` returning such numbers).
  */
 import { BALANCE } from "../../config/balance.ts";
-import type { NexamonCondition } from "../../config/nexamon-rules.ts";
+import type { NexamonCondition, NexamonTierPackRule } from "../../config/nexamon-rules.ts";
 import type { NexamonRarity } from "../../config/nexamon/types.ts";
 import { divRoundHalfEven } from "./money.ts";
 
@@ -33,9 +33,9 @@ export const nexamonCentsFromE4 = (e4: number) => mulDivRound(e4, 1, NEXAMON_E4_
 export function nexamonSlotOdds(slot: number, cfg: Config = BALANCE.nexamon): Record<NexamonRarity, number> {
   const den = cfg.odds.denominator;
   const table = slot === 5 ? cfg.odds.slot5 : slot === 4 ? cfg.odds.slot4 : null;
-  if (!table) return { common: den, rare: 0, ultra: 0, prisma: 0, legendary: 0 };
+  if (!table) return { common: den, rare: 0, ultra: 0, prisma: 0, legendary: 0, one_of_one: 0 };
   const better = table.legendary + table.prisma + table.ultra + table.rare;
-  return { ...table, common: den - better };
+  return { ...table, common: den - better, one_of_one: 0 };
 }
 
 /** The rarity a slot holds for the roll `u`: the best rarities take the lowest numbers. */
@@ -52,13 +52,28 @@ export function nexamonSlotRarity(slot: number, u: number, cfg: Config = BALANCE
 
 /** Expected number of cards of every rarity in one pack (exact fractions of `odds.denominator`). */
 export function nexamonExpectedPerPack(cfg: Config = BALANCE.nexamon): Record<NexamonRarity, number> {
-  const total: Record<NexamonRarity, number> = { common: 0, rare: 0, ultra: 0, prisma: 0, legendary: 0 };
+  const total: Record<NexamonRarity, number> = { common: 0, rare: 0, ultra: 0, prisma: 0, legendary: 0, one_of_one: 0 };
   for (let slot = 1; slot <= cfg.packSize; slot++) {
     const odds = nexamonSlotOdds(slot, cfg);
     for (const rarity of Object.keys(total) as NexamonRarity[]) total[rarity] += odds[rarity] / cfg.odds.denominator;
   }
   return total;
 }
+
+/** Chance per pack of a One of One while at least one of the set is still out there (ADR-174): 1 / packs. */
+export const nexamonOneOfOneChance = (cfg: Config = BALANCE.nexamon): number => 1 / cfg.oneOfOne.packs;
+
+/** Whether the roll `u` hits the One of One chance of slot `oneOfOne.slot`. */
+export const nexamonOneOfOneHit = (u: number, cfg: Config = BALANCE.nexamon): boolean =>
+  Math.floor(clampUnit(u) * cfg.oneOfOne.packs) === 0;
+
+/** Whether the AI may pull, hold or buy cards of this rarity (ADR-174: never a One of One). */
+export const nexamonAiAllowed = (rarity: NexamonRarity, cfg: Config = BALANCE.nexamon): boolean =>
+  !(cfg.ai.excludedRarities as readonly string[]).includes(rarity);
+
+/** Whether a rarity's value moves only by trades between players (no supply-and-demand step, no AI buys). */
+export const nexamonTradeOnly = (rarity: NexamonRarity, cfg: Config = BALANCE.nexamon): boolean =>
+  (cfg.value.tradeOnlyRarities as readonly string[]).includes(rarity);
 
 /** Condition of a pulled card for the roll `u` (worst first in `conditions.order`). */
 export function nexamonRollCondition(u: number, cfg: Config = BALANCE.nexamon): NexamonCondition {
@@ -83,20 +98,78 @@ export interface NexamonPull {
   condition: NexamonCondition;
 }
 
+export interface NexamonPackOptions {
+  /**
+   * One of Ones of the set nobody has pulled yet (ADR-174). Only a player's pack passes them; empty or missing
+   * means the One of One roll is skipped (an AI pack, a set without One of Ones, all three gone).
+   */
+  readonly freeOneOfOnes?: readonly string[];
+  /** The set's own pack composition (`packRules[set]`); missing: the slot table `odds`. */
+  readonly rule?: NexamonTierPackRule | null;
+}
+
+/** The pack rule of a set: its entry in `packRules`, or null for the slot table. */
+export function nexamonPackRule(set: string, cfg: Config = BALANCE.nexamon): NexamonTierPackRule | null {
+  return (cfg.packRules as Readonly<Record<string, NexamonTierPackRule>>)[set] ?? null;
+}
+
+/**
+ * The rarity of every slot under a tier rule: each tier, best first, appears with 1 / packs and then takes min..max
+ * slots from the back; the rest is the base rarity. Two rolls per tier (hit, then count).
+ */
+export function nexamonTierRarities(
+  rule: NexamonTierPackRule,
+  rng: () => number,
+  cfg: Config = BALANCE.nexamon,
+): string[] {
+  const slots: string[] = Array.from({ length: cfg.packSize }, () => rule.base);
+  let free = cfg.packSize;
+  for (const tier of rule.tiers) {
+    const hit = Math.floor(clampUnit(rng()) * Math.max(1, tier.packs)) === 0;
+    const span = Math.max(0, tier.max - tier.min);
+    const count = tier.min + Math.floor(clampUnit(rng()) * (span + 1));
+    if (!hit) continue;
+    for (let i = 0; i < count && free > 0; i++) slots[--free] = tier.rarity;
+  }
+  return slots;
+}
+
+/** Chance per pack that a tier of a tier rule shows up, and how many cards it brings on average. */
+export function nexamonTierOdds(
+  rule: NexamonTierPackRule,
+): { rarity: string; perPack: number; min: number; max: number }[] {
+  return rule.tiers.map((t) => ({ rarity: t.rarity, perPack: 1 / Math.max(1, t.packs), min: t.min, max: t.max }));
+}
+
 /**
  * Opens one pack of a set: `cards` are the cards of that set. Per slot: the rarity (slots 4 and 5 roll), then a
- * card of that rarity (commons never twice in a pack), then its condition.
+ * card of that rarity (commons never twice in a pack), then its condition. With free One of Ones, slot
+ * `oneOfOne.slot` first rolls 1 in `oneOfOne.packs` for one of them (picked uniformly among the free ones).
  */
 export function nexamonOpenPack(
   cards: readonly NexamonPackCard[],
   rng: () => number,
   cfg: Config = BALANCE.nexamon,
+  opts: NexamonPackOptions = {},
 ): NexamonPull[] {
   const used = new Set<string>();
   const pulls: NexamonPull[] = [];
+  const free = opts.freeOneOfOnes ?? [];
+  const tiers = opts.rule ? nexamonTierRarities(opts.rule, rng, cfg) : null;
+  const base = opts.rule?.base ?? "common";
   for (let slot = 1; slot <= cfg.packSize; slot++) {
-    const rarity = slot >= 4 ? nexamonSlotRarity(slot, rng(), cfg) : "common";
-    const pool = cards.filter((c) => c.rarity === rarity && !(rarity === "common" && used.has(c.key)));
+    if (slot === cfg.oneOfOne.slot && free.length > 0 && nexamonOneOfOneHit(rng(), cfg)) {
+      const key = free[Math.floor(clampUnit(rng()) * free.length)]!;
+      used.add(key);
+      pulls.push({ slot, key, rarity: "one_of_one", condition: nexamonRollCondition(rng(), cfg) });
+      continue;
+    }
+    const rarity = tiers
+      ? (tiers[slot - 1] as NexamonRarity)
+      : slot >= 4
+        ? nexamonSlotRarity(slot, rng(), cfg)
+        : "common";
+    const pool = cards.filter((c) => c.rarity === rarity && !(rarity === base && used.has(c.key)));
     if (pool.length === 0) throw new RangeError(`nexamonOpenPack: no ${rarity} card in the set`);
     const card = pool[Math.floor(clampUnit(rng()) * pool.length)]!;
     used.add(card.key);
@@ -112,15 +185,35 @@ export function nexamonConditionBps(condition: NexamonCondition, cfg: Config = B
   return cfg.conditions.valueBps[condition] ?? 10_000;
 }
 
-/** Value factor of a copy: the grade's factor in a slab, else the condition's. */
+/**
+ * The slab factor of a grade (ADR-174): a 10 and a 9.5 depend on the card's popularity, from the low end of
+ * `grading.tenFactorRange` / `nineHalfFactorRange` for the least popular card to the high end for the most popular
+ * (linear, rounded down). Without a popularity the fixed `grading.valueBps` counts. Every other grade is fixed.
+ * Both ranges start above the grade below them, so 8 < 8.5 < 9 < 9.5 < 10 holds for every card.
+ */
+export function nexamonGradeFactorBps(
+  grade: number,
+  popularityBps: number | null = null,
+  cfg: Config = BALANCE.nexamon,
+): number {
+  const index = nexamonGradeIndex(grade, cfg);
+  const number = cfg.grading.grades[index]!;
+  const range = number === 10 ? cfg.grading.tenFactorRange : number === 9.5 ? cfg.grading.nineHalfFactorRange : null;
+  if (!range || popularityBps === null) return cfg.grading.valueBps[index]!;
+  const pop = Math.min(10_000, Math.max(0, Math.trunc(popularityBps)));
+  return range[0] + mulDivFloor(range[1] - range[0], pop, 10_000);
+}
+
+/** Value factor of a copy: the grade's factor in a slab (by the card's popularity, if known), else the condition's. */
 export function nexamonCopyFactorBps(
   condition: NexamonCondition,
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
+  popularityBps: number | null = null,
 ): number {
   if (grade !== null) {
     if (nexamonIsBlackLabel(grade)) return cfg.grading.blackLabel.valueBps;
-    return cfg.grading.valueBps[nexamonGradeIndex(grade, cfg)]!;
+    return nexamonGradeFactorBps(grade, popularityBps, cfg);
   }
   return nexamonConditionBps(condition, cfg);
 }
@@ -131,8 +224,9 @@ export function nexamonCopyValueCents(
   condition: NexamonCondition,
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
+  popularityBps: number | null = null,
 ): number {
-  return mulDivRound(valueE4, nexamonCopyFactorBps(condition, grade, cfg), 10_000 * NEXAMON_E4_PER_CENT);
+  return mulDivRound(valueE4, nexamonCopyFactorBps(condition, grade, cfg, popularityBps), 10_000 * NEXAMON_E4_PER_CENT);
 }
 
 /** The AI's asking price for a copy: its value plus 10 %. */
@@ -145,15 +239,40 @@ export function nexamonMarketFeeCents(priceCents: number, cfg: Config = BALANCE.
   return mulDivFloor(priceCents, cfg.market.feeBps, 10_000);
 }
 
-/** What the AI pays at once for a raw bulk copy; null if the rarity or a slab is not taken. */
+/** The bulk rarities of a set (ADR-174): `quickSell.setRarities[set]`, else `quickSell.rarities`. */
+export function nexamonBulkRarities(set: string | null, cfg: Config = BALANCE.nexamon): readonly string[] {
+  const own = set ? (cfg.quickSell.setRarities as Readonly<Record<string, readonly string[]>>)[set] : undefined;
+  return own ?? (cfg.quickSell.rarities as readonly string[]);
+}
+
+/** Whether a copy is bulk: raw and of a bulk rarity of its set. */
+export const nexamonIsBulk = (
+  rarity: NexamonRarity,
+  grade: number | null,
+  set: string | null = null,
+  cfg: Config = BALANCE.nexamon,
+): boolean => grade === null && nexamonBulkRarities(set, cfg).includes(rarity);
+
+/** What the game pays at once for a raw bulk copy (value minus the bulk fee); null if it is not bulk. */
 export function nexamonQuickSellCents(
   copyValueCents: number,
   rarity: NexamonRarity,
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
+  set: string | null = null,
 ): number | null {
-  if (grade !== null || !(cfg.quickSell.rarities as readonly string[]).includes(rarity)) return null;
+  if (!nexamonIsBulk(rarity, grade, set, cfg)) return null;
   return mulDivFloor(copyValueCents, cfg.quickSell.bps, 10_000);
+}
+
+/** A bulk sale of several copies: their value, the fee and the payout (each copy rounded down, like the server). */
+export function nexamonBulkPayout(
+  copyValuesCents: readonly number[],
+  cfg: Config = BALANCE.nexamon,
+): { valueCents: number; feeCents: number; payoutCents: number } {
+  const valueCents = copyValuesCents.reduce((a, b) => a + b, 0);
+  const payoutCents = copyValuesCents.reduce((a, v) => a + mulDivFloor(v, cfg.quickSell.bps, 10_000), 0);
+  return { valueCents, feeCents: valueCents - payoutCents, payoutCents };
 }
 
 // ---------------------------------------------------------------------------------------------- grading
@@ -383,7 +502,7 @@ export interface NexamonPressureInput {
 
 /** Pressure on the value in basis points, -10 000 (far too many on offer) to +10 000 (wanted and not on offer). */
 export function nexamonPressureBps(i: NexamonPressureInput, cfg: Config = BALANCE.nexamon): number {
-  if (i.population <= 0) return 0;
+  if (i.population <= 0 || nexamonTradeOnly(i.rarity, cfg)) return 0;
   const want = cfg.value.pressure.want[i.rarity];
   const diff = nexamonDemandMilli(i.rarity, i.population, i.recentBuys, cfg) - 1_000 * Math.max(0, i.supply);
   return Math.min(10_000, Math.max(-10_000, Math.trunc((diff * 10) / want)));
@@ -443,6 +562,7 @@ export function nexamonAiBuyChanceBps(
   },
   cfg: Config = BALANCE.nexamon,
 ): number {
+  if (!nexamonAiAllowed(i.rarity, cfg)) return 0;
   const full = Math.min(
     10_000,
     Math.floor((cfg.ai.buyChanceBps * (10_000 + nexamonPopularityBps(i.rarity, i.population, cfg))) / 10_000),
@@ -465,7 +585,7 @@ export function nexamonAiBuyCounts(
   i: { priceCents: number; factorBps: number; valueE4: number; rarity: NexamonRarity; countedInWindow: number },
   cfg: Config = BALANCE.nexamon,
 ): boolean {
-  if (i.countedInWindow >= cfg.ai.buysPerCardWindow[i.rarity]) return false;
+  if (!nexamonAiAllowed(i.rarity, cfg) || i.countedInWindow >= cfg.ai.buysPerCardWindow[i.rarity]) return false;
   const norm = nexamonPricePerCardE4(i.priceCents, i.factorBps);
   return norm > 0 && Math.abs(norm - i.valueE4) * 10_000 <= i.valueE4 * cfg.value.trade.bandBps;
 }
@@ -483,6 +603,7 @@ export function nexamonSeedCopies(
   priceRank: number,
   cfg: Config = BALANCE.nexamon,
 ): number {
+  if (!nexamonAiAllowed(rarity, cfg)) return 0;
   if (rarity === "prisma" && priceRank >= cfg.ai.seedPrismaCards) return 0;
   return cfg.ai.seedCopies[rarity];
 }

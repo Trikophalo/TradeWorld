@@ -1,8 +1,9 @@
 import { BALANCE } from "@/config/balance";
 import {
   NEXAMON_CARDS,
-  NEXAMON_RARITIES,
+  NEXAMON_RARITY_RANK,
   NEXAMON_SETS,
+  nexamonSetRarities,
   nexamonCard,
   type NexamonCard,
   type NexamonRarity,
@@ -24,6 +25,8 @@ import {
   nexamonGradingFeeCents,
   nexamonMarketFeeCents,
   nexamonQuickSellCents,
+  nexamonIsBulk,
+  nexamonPackRule,
   nexamonSlotOdds,
 } from "@/lib/sim/nexamon";
 
@@ -45,21 +48,64 @@ export interface OddsRow {
   perPack: number;
   /** "One in n packs" on average; null for commons (several per pack). */
   oneInPacks: number | null;
+  /**
+   * How the rarity gets into a pack: "slots" (slot 4/5 table), "one_of_one" (slot 5 rolls 1 in n first, each card
+   * once in the game), "tier" (a set's own tier rule: 1 in n packs, min..max cards), "base" (the rest of a tier pack).
+   */
+  kind: "slots" | "one_of_one" | "tier" | "base";
+  /** Tier rule: cards of the tier when it shows up. */
+  min?: number;
+  max?: number;
 }
 
-/** Pull rates of a pack, best rarity first: the two rolling slots and the average per pack. */
-export function packOdds(): OddsRow[] {
+/**
+ * Pull rates of a pack of a set (default: the first set), best rarity first (ADR-174). The slot table for the
+ * classic rarities, a One of One row for a set with One of Ones, a tier rule's rows for a set with its own rule.
+ */
+export function packOdds(set: NexamonSetKey = "mystic_energy"): OddsRow[] {
+  const rarities = nexamonSetRarities(set).sort((a, b) => NEXAMON_RARITY_RANK[b] - NEXAMON_RARITY_RANK[a]);
+  const rule = nexamonPackRule(set);
+  if (rule) {
+    return rarities.map((rarity) => {
+      const tier = rule.tiers.find((x) => x.rarity === rarity);
+      if (!tier) return { rarity, slot4: 0, slot5: 0, denominator: 1, perPack: 0, oneInPacks: null, kind: "base" };
+      return {
+        rarity,
+        slot4: 0,
+        slot5: 0,
+        denominator: tier.packs,
+        perPack: ((tier.min + tier.max) / 2 / tier.packs) * 1,
+        oneInPacks: tier.packs,
+        kind: "tier",
+        min: tier.min,
+        max: tier.max,
+      };
+    });
+  }
   const slot4 = nexamonSlotOdds(4);
   const slot5 = nexamonSlotOdds(5);
   const expected = nexamonExpectedPerPack();
-  return [...NEXAMON_RARITIES].reverse().map((rarity) => ({
-    rarity,
-    slot4: slot4[rarity],
-    slot5: slot5[rarity],
-    denominator: cfg.odds.denominator,
-    perPack: expected[rarity],
-    oneInPacks: rarity === "common" || expected[rarity] <= 0 ? null : Math.round(1 / expected[rarity]),
-  }));
+  return rarities.map((rarity): OddsRow => {
+    if (rarity === "one_of_one")
+      return {
+        rarity,
+        slot4: 0,
+        slot5: 1,
+        denominator: cfg.oneOfOne.packs,
+        perPack: 1 / cfg.oneOfOne.packs,
+        oneInPacks: cfg.oneOfOne.packs,
+        kind: "one_of_one",
+      };
+    return {
+      rarity,
+      slot4: slot4[rarity],
+      slot5: slot5[rarity],
+      denominator: cfg.odds.denominator,
+      perPack: expected[rarity],
+      oneInPacks: rarity === "common" || expected[rarity] <= 0 ? null : Math.round(1 / expected[rarity]),
+      kind: "slots",
+    };
+  });
 }
 
 /** A chance as basis points with two decimals kept (4 of 3600 = 11.11 bps), for `formatChance`. */
@@ -99,7 +145,7 @@ export interface SetContentsGroup {
 export function setContents(set: NexamonSetKey, copies: readonly Pick<NexamonCopy, "cardKey">[]): SetContentsGroup[] {
   const count = new Map<string, number>();
   for (const copy of copies) count.set(copy.cardKey, (count.get(copy.cardKey) ?? 0) + 1);
-  return packOdds().map((odds) => {
+  return packOdds(set).map((odds) => {
     const cards = NEXAMON_CARDS.filter((card) => card.set === set && card.rarity === odds.rarity).map((card) => ({
       card,
       owned: count.get(card.key) ?? 0,
@@ -325,7 +371,11 @@ export interface GradingQuote {
 }
 
 /** Fee, duration and the chance table of ASP for a raw copy. */
-export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">): GradingQuote {
+export function gradingQuote(
+  copy: Pick<NexamonCopy, "condition" | "valueCents">,
+  /** The card's popularity: a 10 and a 9.5 are worth more for a popular card (ADR-174). */
+  popularityBps: number | null = null,
+): GradingQuote {
   const rawBps = nexamonConditionBps(copy.condition);
   const chances: GradeChance[] = [];
   let betterBps = 0;
@@ -333,7 +383,7 @@ export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">
   for (const grade of [NEXAMON_BLACK_LABEL_GRADE, ...[...cfg.grading.grades].reverse()]) {
     const chance = nexamonGradeChanceBps(copy.condition, grade);
     if (chance <= 0) continue;
-    const factorBps = nexamonCopyFactorBps(copy.condition, grade);
+    const factorBps = nexamonCopyFactorBps(copy.condition, grade, cfg, popularityBps);
     chances.push({ grade, chanceBps: chance, factorBps });
     if (factorBps > rawBps) betterBps += chance;
     expected += chance * factorBps;
@@ -468,3 +518,82 @@ export function profileBinder(cards: readonly PlayerNexamonCard[], onlyOwned: bo
     };
   }).filter((group) => group.entries.length > 0);
 }
+
+// ------------------------------------------------------------------------------------------------- bulk
+
+/** Filters of the collection's bulk mode (ADR-174). */
+export interface BulkFilter {
+  set: NexamonSetKey | "all";
+  rarity: NexamonRarity | "all";
+  condition: NexamonCondition | "all";
+  /** Only cards the player owns more than once. */
+  duplicatesOnly: boolean;
+  /** Never sell the best copy of a card (default on). */
+  keepOne: boolean;
+  /** Never sell a card that gives a bonus (default on). */
+  skipBonus: boolean;
+  /** Only copies worth at most this; null: any value. */
+  maxValueCents: number | null;
+}
+export const DEFAULT_BULK_FILTER: BulkFilter = {
+  set: "all",
+  rarity: "all",
+  condition: "all",
+  duplicatesOnly: false,
+  keepOne: true,
+  skipBonus: true,
+  maxValueCents: null,
+};
+
+export interface BulkGroup {
+  card: NexamonCard;
+  /** The copies that may go, cheapest first (the best copy stays when `keepOne`). */
+  copies: NexamonCopy[];
+}
+
+/**
+ * What the bulk mode offers (ADR-174): raw copies of the bulk rarities of their set, not listed and not at ASP,
+ * grouped by card in set and number order, after the player's filters. `hasBonus` says whether a card gives a bonus.
+ */
+export function bulkGroups(
+  copies: readonly NexamonCopy[],
+  filter: BulkFilter,
+  hasBonus: (card: NexamonCard) => boolean,
+): BulkGroup[] {
+  const byCard = new Map<string, NexamonCopy[]>();
+  for (const copy of copies) {
+    const list = byCard.get(copy.cardKey) ?? [];
+    list.push(copy);
+    byCard.set(copy.cardKey, list);
+  }
+  const groups: BulkGroup[] = [];
+  for (const [key, own] of byCard) {
+    const card = nexamonCard(key);
+    if (!card) continue;
+    if (filter.set !== "all" && card.set !== filter.set) continue;
+    if (filter.rarity !== "all" && card.rarity !== filter.rarity) continue;
+    if (filter.duplicatesOnly && own.length < 2) continue;
+    if (filter.skipBonus && hasBonus(card)) continue;
+    const free = own.filter((c) => nexamonIsBulk(card.rarity, c.grade, card.set) && !c.listing && !c.gradingUntil);
+    let pool = [...free].sort((a, b) => a.valueCents - b.valueCents || b.serial - a.serial);
+    // keep the best copy of the card, unless a slab or a listed copy already stays
+    if (filter.keepOne && free.length === own.length) pool = pool.slice(0, -1);
+    pool = pool.filter(
+      (c) =>
+        (filter.condition === "all" || c.condition === filter.condition) &&
+        (filter.maxValueCents === null || c.valueCents <= filter.maxValueCents),
+    );
+    if (pool.length > 0) groups.push({ card, copies: pool });
+  }
+  const order = (c: NexamonCard) => NEXAMON_SETS.indexOf(c.set) * 1_000 + c.number;
+  return groups.sort((a, b) => order(a.card) - order(b.card));
+}
+
+/** The copies a selection (card key -> how many) sells: the cheapest first of every card. */
+export function bulkPick(groups: readonly BulkGroup[], selection: Readonly<Record<string, number>>): NexamonCopy[] {
+  return groups.flatMap((g) => g.copies.slice(0, Math.max(0, Math.min(g.copies.length, selection[g.card.key] ?? 0))));
+}
+
+/** The sets by pack price, cheapest first (shop, market set picker; new sets fall into place by their price). */
+export const setsByPackPrice = (): NexamonSetKey[] =>
+  [...NEXAMON_SETS].sort((a, b) => cfg.sets[a].packPriceCents - cfg.sets[b].packPriceCents);

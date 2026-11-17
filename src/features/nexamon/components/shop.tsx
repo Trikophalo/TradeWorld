@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { NEXAMON_RARITY_COUNTS, type NexamonSetKey } from "@/config/nexamon";
+import { nexamonRarityCount, type NexamonSetKey } from "@/config/nexamon";
 import { NEXAMON_CONDITIONS } from "@/config/nexamon-rules";
 import { BALANCE } from "@/config/balance";
 import { Button } from "@/components/ui/button";
@@ -83,63 +83,65 @@ export function Shop({
       )}
 
       {!overview ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-56 rounded-lg lg:h-112" />
           ))}
         </div>
       ) : (
-        <ul className="grid gap-4 lg:grid-cols-3" data-tour="nexamon-packs">
-          {overview.sets.map((set) => (
-            <li key={set.key}>
-              <button
-                type="button"
-                onClick={() => show(set.key)}
-                data-testid={`buy-${set.key}`}
-                aria-label={t("shop.openPack", {
-                  set: tc(`sets.${set.key}`),
-                  price: formatMoney(set.packPriceCents, { whole: true }),
-                })}
-                className="group flex h-full w-full gap-4 rounded-lg border-2 border-line-1 bg-surface-1 p-5 text-left shadow-1 focus-ring transition duration-fast ease-standard hover:border-line-2 hover:bg-surface-2 active:translate-y-0.5 active:shadow-none lg:flex-col lg:items-center lg:p-6 lg:text-center"
-              >
-                <TiltPack set={set.key} scale={2} className="lg:hidden" />
-                <TiltPack set={set.key} scale={3} className="hidden lg:inline-block" />
-                <span className="flex min-w-0 flex-1 flex-col gap-3 lg:w-full">
-                  <span className="block">
-                    <span className="block font-pixel text-sm text-fg-1 uppercase">{tc(`sets.${set.key}`)}</span>
-                    <span className="mt-1 block nums text-xl font-semibold text-fg-1">
-                      {formatMoney(set.packPriceCents, { whole: true })}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-pretty text-fg-3">
-                      {t("shop.inside", { count: overview.packSize })}
-                    </span>
-                  </span>
-                  <span className="block">
-                    <span className="flex items-baseline justify-between gap-2 text-xs text-fg-2">
-                      <span>{t("shop.progress")}</span>
-                      <span className="nums font-medium text-fg-1" data-testid={`progress-${set.key}`}>
-                        {t("shop.progressValue", { owned: set.ownedDistinct, total: set.cards })}
+        <ul className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4" data-tour="nexamon-packs">
+          {[...overview.sets]
+            .sort((a, b) => a.packPriceCents - b.packPriceCents)
+            .map((set) => (
+              <li key={set.key}>
+                <button
+                  type="button"
+                  onClick={() => show(set.key)}
+                  data-testid={`buy-${set.key}`}
+                  aria-label={t("shop.openPack", {
+                    set: tc(`sets.${set.key}`),
+                    price: formatMoney(set.packPriceCents, { whole: true }),
+                  })}
+                  className="group flex h-full w-full gap-4 rounded-lg border-2 border-line-1 bg-surface-1 p-5 text-left shadow-1 focus-ring transition duration-fast ease-standard hover:border-line-2 hover:bg-surface-2 active:translate-y-0.5 active:shadow-none lg:flex-col lg:items-center lg:p-6 lg:text-center"
+                >
+                  <TiltPack set={set.key} scale={2} className="lg:hidden" />
+                  <TiltPack set={set.key} scale={3} className="hidden lg:inline-block" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-3 lg:w-full">
+                    <span className="block">
+                      <span className="block font-pixel text-sm text-fg-1 uppercase">{tc(`sets.${set.key}`)}</span>
+                      <span className="mt-1 block nums text-xl font-semibold text-fg-1">
+                        {formatMoney(set.packPriceCents, { whole: true })}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-pretty text-fg-3">
+                        {t("shop.inside", { count: overview.packSize })}
                       </span>
                     </span>
-                    <Progress
-                      value={set.cards > 0 ? set.ownedDistinct / set.cards : 0}
-                      label={t("shop.progressLabel", { set: tc(`sets.${set.key}`) })}
-                      size="sm"
-                      tone={set.ownedDistinct >= set.cards ? "gold" : "accent"}
-                      className="mt-1.5"
-                    />
-                    <span className="mt-1.5 block nums text-xs text-fg-3">
-                      {t("shop.opened", { count: set.packsOpened })} ·{" "}
-                      {t("shop.population", { count: formatInteger(set.population) })}
+                    <span className="block">
+                      <span className="flex items-baseline justify-between gap-2 text-xs text-fg-2">
+                        <span>{t("shop.progress")}</span>
+                        <span className="nums font-medium text-fg-1" data-testid={`progress-${set.key}`}>
+                          {t("shop.progressValue", { owned: set.ownedDistinct, total: set.cards })}
+                        </span>
+                      </span>
+                      <Progress
+                        value={set.cards > 0 ? set.ownedDistinct / set.cards : 0}
+                        label={t("shop.progressLabel", { set: tc(`sets.${set.key}`) })}
+                        size="sm"
+                        tone={set.ownedDistinct >= set.cards ? "gold" : "accent"}
+                        className="mt-1.5"
+                      />
+                      <span className="mt-1.5 block nums text-xs text-fg-3">
+                        {t("shop.opened", { count: set.packsOpened })} ·{" "}
+                        {t("shop.population", { count: formatInteger(set.population) })}
+                      </span>
+                    </span>
+                    <span className="mt-auto block label-pixel text-accent transition-transform duration-fast group-hover:translate-x-0.5">
+                      {t("shop.look")} <span aria-hidden>→</span>
                     </span>
                   </span>
-                  <span className="mt-auto block label-pixel text-accent transition-transform duration-fast group-hover:translate-x-0.5">
-                    {t("shop.look")} <span aria-hidden>→</span>
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
+                </button>
+              </li>
+            ))}
         </ul>
       )}
 
@@ -153,6 +155,7 @@ export function Shop({
         onBuy={() => selected && buy(selected)}
         buyState={action.state}
         onFinished={() => setPending(null)}
+        oneOfOnes={overview?.oneOfOnes}
         onClose={() => {
           setSelected(null);
           setPack(null);
@@ -166,6 +169,8 @@ export function Shop({
 function OddsCard({ packSize }: { packSize: number }) {
   const t = useTranslations("nexamon");
   const rows = packOdds();
+  // ADR-174: the One of One row of the set that has them
+  const oneOfOne = packOdds("cosmic_winds").find((row) => row.kind === "one_of_one");
   const weights = BALANCE.nexamon.conditions.weightBps;
   return (
     <Card padding="lg" data-testid="nexamon-odds">
@@ -189,7 +194,12 @@ function OddsCard({ packSize }: { packSize: number }) {
                 <td className="px-2 py-2 sm:px-3">
                   <RarityBadge rarity={row.rarity} short />
                   <span className="mt-0.5 block text-xs text-fg-3">
-                    {t("odds.cardsInSet", { count: NEXAMON_RARITY_COUNTS[row.rarity] })}
+                    {nexamonRarityCount("cosmic_winds", row.rarity) === nexamonRarityCount("mystic_energy", row.rarity)
+                      ? t("odds.cardsInSet", { count: nexamonRarityCount("mystic_energy", row.rarity) })
+                      : t("odds.cardsInSets", {
+                          count: nexamonRarityCount("mystic_energy", row.rarity),
+                          cosmic: nexamonRarityCount("cosmic_winds", row.rarity),
+                        })}
                   </span>
                 </td>
                 <td className="px-1 py-2 text-right nums sm:px-3">
@@ -205,9 +215,31 @@ function OddsCard({ packSize }: { packSize: number }) {
                 </td>
               </tr>
             ))}
+            {oneOfOne && (
+              <tr data-rarity="one_of_one" data-testid="odds-one-of-one">
+                <td className="px-2 py-2 sm:px-3">
+                  <RarityBadge rarity="one_of_one" short />
+                  <span className="mt-0.5 block text-xs text-fg-3">
+                    {t("odds.cardsInSet", { count: nexamonRarityCount("cosmic_winds", "one_of_one") })}
+                  </span>
+                </td>
+                <td className="px-1 py-2 text-right nums sm:px-3">–</td>
+                <td className="px-1 py-2 text-right nums sm:px-3">
+                  {formatChance(chanceBps(oneOfOne.slot5, oneOfOne.denominator))}
+                </td>
+                <td className="px-2 py-2 text-right nums text-xs text-fg-2 sm:px-3 sm:text-sm">
+                  {t("odds.oneOfOne", { count: formatInteger(oneOfOne.denominator) })}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+      {oneOfOne && (
+        <p className="mt-3 text-sm text-pretty text-fg-2">
+          {t("odds.oneOfOneNote", { count: formatInteger(oneOfOne.denominator) })}
+        </p>
+      )}
       <p className="mt-3 text-sm text-pretty text-fg-2">{t("odds.conditionIntro")}</p>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
         {[...NEXAMON_CONDITIONS].reverse().map((condition) => (

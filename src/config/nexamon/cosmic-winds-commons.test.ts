@@ -54,7 +54,7 @@ describe("Cosmic Winds commons", () => {
       ["cw-010", "cw-011", "Kometschwinge"],
       ["cw-020", "cw-021", "Astrogolem"],
       ["cw-030", "cw-031", "Sternwal"],
-      ["cw-040", "cw-041", "Polarlichtschlange"],
+      ["cw-040", "cw-041", "Polarschlange"],
     ];
     for (const [base, next, name] of fixed) {
       expect(byKey.get(base)?.name).toBe(name);

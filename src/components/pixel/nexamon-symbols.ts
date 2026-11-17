@@ -2,7 +2,7 @@ import type { NexamonRarity, NexamonSetKey, NexamonType } from "@/config/nexamon
 import type { PixelArt, PixelGrid } from "./pixel-icon";
 
 /*
- * Original symbols and inks of the Nexamon cards (ADR-165): ten type symbols, three set symbols, five rarity
+ * Original symbols and inks of the Nexamon cards (ADR-165, ADR-174): eleven type symbols, four set symbols, six rarity
  * marks. Everything here is card ink (data), which is why hex colours are allowed.
  */
 
@@ -25,6 +25,16 @@ export interface TypeInk {
 }
 
 export const TYPE_INK: Record<NexamonType, TypeInk> = {
+  // stars and void: midnight violet with starlight
+  cosmic: {
+    deep: "#0d0826",
+    dark: "#2b1d6e",
+    base: "#5640c8",
+    light: "#9f8cff",
+    pale: "#ece6ff",
+    paper: "#ece9f7",
+    paperShade: "#d6d0ec",
+  },
   fire: {
     deep: "#4a120c",
     dark: "#9c2a1a",
@@ -127,6 +137,20 @@ export const GOLD_INK = {
   plate: "#241503",
 } as const;
 
+/**
+ * Inks of the One of One (ADR-174): black and gold with an iridescent sheen that runs from teal through violet to
+ * rose, unlike the rainbow of the prismas and the plain gold of the legendaries.
+ */
+export const ONE_OF_ONE_INK = {
+  black: "#07060c",
+  ink: "#16131f",
+  goldDeep: "#5a3a00",
+  gold: "#e8b630",
+  goldLight: "#ffe38a",
+  white: "#fffaf0",
+  iris: ["#3ff0d0", "#58b4ff", "#9a7cff", "#e070ff", "#ff7ab0"],
+} as const;
+
 /** The seven inks of the prism border, in rainbow order. */
 export const PRISM_INKS = ["#ff5d6c", "#ff9d47", "#ffe45c", "#6fe58c", "#58cfff", "#7d8bff", "#d07dff"] as const;
 
@@ -142,6 +166,8 @@ const TYPE_GLYPH: Record<NexamonType, PixelGrid> = {
   steel: ["#.#.#", ".###.", "##.##", ".###.", "#.#.#"],
   fairy: [".#.#.", "#####", "#####", ".###.", "..#.."],
   dragon: ["#...#", "##.##", ".###.", ".#.#.", "..#.."],
+  // a four-pointed star
+  cosmic: ["..#..", ".###.", "#####", ".###.", "..#.."],
 };
 
 const DISC: PixelGrid = [
@@ -175,6 +201,7 @@ export const TYPE_SYMBOL: Record<NexamonType, PixelArt> = {
   steel: typeSymbol("steel"),
   fairy: typeSymbol("fairy"),
   dragon: typeSymbol("dragon"),
+  cosmic: typeSymbol("cosmic"),
 };
 
 /** The bare glyph of a type in one ink (placeholder artwork, pack fronts). */
@@ -190,6 +217,8 @@ const SET_GLYPH: Record<NexamonSetKey, PixelGrid> = {
   super_apex: ["...#...", "..###..", ".##.##.", "##.#.##", "..###..", ".##.##.", "##...##"],
   // A prism above a peak.
   prismatic_peak: ["...#...", "..#.#..", "...#...", "...#...", "..###..", ".#####.", "#######"],
+  // A ringed planet with a gust of wind.
+  cosmic_winds: ["....##.", "..####.", ".#.##.#", "#.####.", ".####..", "##.....", "......."],
 };
 
 /** Set symbols, seven by seven, in one ink. */
@@ -204,6 +233,8 @@ const RARITY_GLYPH: Record<NexamonRarity, PixelGrid> = {
   ultra: ["..#..", "#####", ".###.", "##.##", "#...#"],
   prisma: ["..r..", "..y..", "bgwyr", "..g..", "..b.."],
   legendary: ["#.#.#", "#.#.#", "#####", "#####", "....."],
+  // "1" in a black diamond with a gold rim
+  one_of_one: ["..g..", ".gkg.", "gkwkg", ".gkg.", "..g.."],
 };
 
 /** Rarity marks, five by five. The prism mark keeps its own colours, the crown is always gold. */
@@ -213,6 +244,8 @@ export function rarityMark(rarity: NexamonRarity, ink: string): PixelArt {
       grid: RARITY_GLYPH.prisma,
       palette: { r: PRISM_INKS[0], y: PRISM_INKS[2], g: PRISM_INKS[3], b: PRISM_INKS[4], w: "#ffffff" },
     };
+  if (rarity === "one_of_one")
+    return { grid: RARITY_GLYPH.one_of_one, palette: { g: GOLD_INK.light, k: ONE_OF_ONE_INK.black, w: "#ffffff" } };
   return { grid: RARITY_GLYPH[rarity], palette: { "#": rarity === "legendary" ? GOLD_INK.light : ink } };
 }
 
@@ -222,4 +255,5 @@ export const SET_INK: Record<NexamonSetKey, { deep: string; dark: string; base: 
     mystic_energy: { deep: "#150b33", dark: "#3a1d7a", base: "#7b3fd4", light: "#35d6c4", pale: "#d9fff6" },
     super_apex: { deep: "#3d0a08", dark: "#9c1a12", base: "#e2401c", light: "#ffa42b", pale: "#fff0b8" },
     prismatic_peak: { deep: "#101a3d", dark: "#27408a", base: "#4f8fe0", light: "#bfe9ff", pale: "#ffffff" },
+    cosmic_winds: { deep: "#04030f", dark: "#1a1450", base: "#3b2f9e", light: "#ff8ad8", pale: "#e8f4ff" },
   };

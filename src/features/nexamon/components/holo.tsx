@@ -54,6 +54,13 @@ const FOILS: Record<NexamonRarity, readonly FoilSpec[]> = {
     { ink: "nexamon-foil-glitter-b", blend: "screen", opacity: 0.7, travel: -7, idle: "nexamon-twinkle-b" },
     { ink: "nexamon-foil-glare", blend: "overlay", opacity: 0.65, travel: -28 },
   ],
+  // ADR-174: black-and-gold with an iridescent sheen that drifts three times slower than any other foil
+  one_of_one: [
+    { ink: "nexamon-foil-iris", blend: "color-dodge", opacity: 0.3, travel: 14, idle: "nexamon-foil-idle-slow" },
+    { ink: "nexamon-foil-gold", blend: "overlay", opacity: 0.35, travel: -12, idle: "nexamon-foil-idle-slow" },
+    { ink: "nexamon-foil-glitter", blend: "screen", opacity: 0.5, travel: 5, idle: "nexamon-twinkle-b" },
+    { ink: "nexamon-foil-glare", blend: "soft-light", opacity: 0.6, travel: -18 },
+  ],
 };
 
 export function FoilLayer({ spec, light, still }: { spec: FoilSpec; light: CardLight; still: boolean }) {

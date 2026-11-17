@@ -31,6 +31,7 @@ const REVEAL_SOUND: Record<NexamonRarity, SoundName> = {
   ultra: "pullUltra",
   prisma: "pullPrisma",
   legendary: "pullLegendary",
+  one_of_one: "pullOneOfOne",
 };
 
 /** Where the shared clock stands: before the start, tearing, revealing slot n, decided. */

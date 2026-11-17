@@ -2134,6 +2134,746 @@ begin
 end;
 $do$;
 
+-- ===== supabase/updates/20261204006500_nexamon_cosmic_schema.sql =====
+-- ===== idempotent copy of migrations/20261204006500_nexamon_cosmic_schema.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6500 · Nexamon: Cosmic Winds and the One of One rarity, schema (ADR-174)
+-- =============================================================================
+-- * nexamon_cards.rarity takes any rarity a set declares (src/config/nexamon/types.ts; 'one_of_one' and, later, a
+--   set's own rarities); a One of One never has a population above 1.
+-- * nexamon_one_of_ones: the registry of pulled One of Ones, one row per card (primary key), written in the same
+--   transaction as the copy. Two pulls of the same card can never both commit.
+-- * Trigger nexamon_copies_ai_guard: a copy of a rarity in ai.excludedRarities never gets an AI owner (pulls,
+--   seeds, AI purchases), whatever path tries it.
+-- * Error keys: nexamon_one_of_one_taken NX270, nexamon_ai_excluded NX271. Notification type nexamon_one_of_one
+--   (everyone hears of a One of One pull).
+-- The catalogue (321 cards with Cosmic Winds) and the rules come from game_config (`pnpm db:config`); nexamon_sync()
+-- mirrors the new set on its next run.
+-- Idempotent: runs unchanged as supabase/updates/20261204006500_nexamon_cosmic_schema.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_old text := $q$    when 'chat_already_member'        then 'NX162'
+$q$;
+begin
+  if position('''nexamon_ai_excluded''' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the error keys nexamon_one_of_one_taken/nexamon_ai_excluded (ADR-174) by hand';
+    end if;
+    execute replace(v_def, v_old, v_old || $q$    when 'nexamon_one_of_one_taken'   then 'NX270'
+    when 'nexamon_ai_excluded'        then 'NX271'
+$q$);
+  end if;
+end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_one_of_one', 'social', 'One of One gezogen', 'Jemand hat eine Nexamon-Karte gezogen, die es nur einmal gibt.',
+        'notif_bell', true, false, false, 302)
+on conflict (key) do nothing;
+
+do $do$
+declare
+  v_name text;
+begin
+  select c.conname into v_name
+    from pg_constraint c
+   where c.conrelid = 'public.nexamon_cards'::regclass and c.contype = 'c'
+     and pg_get_constraintdef(c.oid) like '%rarity%' and pg_get_constraintdef(c.oid) not like '%one_of_one%';
+  if v_name is not null then
+    execute format('alter table public.nexamon_cards drop constraint %I', v_name);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'nexamon_cards_rarity_check2') then
+    alter table public.nexamon_cards add constraint nexamon_cards_rarity_check2
+      check (char_length(rarity) between 1 and 32);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'nexamon_cards_one_of_one_check') then
+    alter table public.nexamon_cards add constraint nexamon_cards_one_of_one_check
+      check (rarity <> 'one_of_one' or population <= 1);
+  end if;
+end;
+$do$;
+
+create table if not exists public.nexamon_one_of_ones (
+  card_key  text primary key references public.nexamon_cards (card_key),
+  copy_id   uuid not null unique references public.nexamon_copies (id),
+  player_id uuid references public.profiles (id) on delete set null,
+  pack_id   uuid,
+  pulled_at timestamptz not null default now()
+);
+create index if not exists nexamon_one_of_ones_player_idx on public.nexamon_one_of_ones (player_id);
+alter table public.nexamon_one_of_ones enable row level security;
+revoke all on public.nexamon_one_of_ones from public, anon, authenticated;
+grant all on public.nexamon_one_of_ones to service_role;
+comment on table public.nexamon_one_of_ones is
+  'Pulled Nexamon One of Ones (ADR-174): one row per card, ever. The primary key makes a second pull impossible; '
+  'player_id is who pulled it (the copy may have changed hands since). Internal (nexamon_open_pack, get_nexamon).';
+
+-- The AI never owns a card of ai.excludedRarities (One of Ones trade only between players).
+create or replace function public.nexamon_copies_ai_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.ai_owner is not null
+     and coalesce(public.nexamon_cfg() #> '{ai,excludedRarities}', '["one_of_one"]'::jsonb)
+         ? (select k.rarity from public.nexamon_cards k where k.card_key = new.card_key) then
+    perform public.api_error('nexamon_ai_excluded');
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists nexamon_copies_ai_guard on public.nexamon_copies;
+create trigger nexamon_copies_ai_guard before insert or update of ai_owner on public.nexamon_copies
+  for each row execute function public.nexamon_copies_ai_guard();
+
+-- ===== supabase/updates/20261204006510_nexamon_one_of_one_pulls.sql =====
+-- ===== idempotent copy of migrations/20261204006510_nexamon_one_of_one_pulls.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6510 · Nexamon: One of One pulls, AI exclusions, trade-only value (ADR-174)
+-- =============================================================================
+-- * nexamon_open_pack(): in a player's pack (never the AI's), slot oneOfOne.slot of a set with One of Ones first
+--   rolls 1 in oneOfOne.packs. On a hit, under an advisory lock, it takes one of the set's One of Ones that is not in
+--   nexamon_one_of_ones yet (uniformly), mints the one copy and registers it; if none is left the slot rolls the
+--   normal table. A One of One pull posts the feed item nexamon_one_of_one and tells every active player
+--   (notification nexamon_one_of_one). Port of nexamonOpenPack (src/lib/sim/nexamon.ts).
+-- * nexamon_rarity_rank(): from game_config.nexamon_rarities.rank (src/config/nexamon/types.ts), so a set's own
+--   rarities rank too; one_of_one above legendary (Pack Battle tie-break).
+-- * A set with an entry in packRules of kind 'tiers' fills its pack by that rule (nexamonTierRarities): every tier,
+--   best first, with 1 / packs and min..max cards from the last slot backwards, the rest the base rarity.
+-- * nexamon_pressure_bps(): 0 for value.tradeOnlyRarities (the value moves only through player trades).
+-- * nexamon_ai_buy_chance_bps(): 0 for ai.excludedRarities (the AI never buys a One of One).
+-- * nexamon_battle_pull(): a One of One counts for the "ultra or better" mission like a legendary.
+-- Idempotent: runs unchanged as supabase/updates/20261204006510_nexamon_one_of_one_pulls.sql.
+
+create or replace function public.nexamon_rarity_rank(p_rarity text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select (g.value #>> array['rank', p_rarity])::integer from public.game_config g where g.key = 'nexamon_rarities'),
+                  array_position(array['common', 'rare', 'ultra', 'prisma', 'legendary', 'one_of_one'], p_rarity) - 1, -1);
+$$;
+
+-- nexamonPressureBps: (demand - supply) / want, -10 000 .. +10 000; a card nobody pulled yet stands still, a
+-- trade-only rarity too
+create or replace function public.nexamon_pressure_bps(p_rarity text, p_population bigint, p_supply bigint, p_recent_buys bigint)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when coalesce(p_population, 0) <= 0
+                   or coalesce(public.nexamon_cfg() #> '{value,tradeOnlyRarities}', '[]'::jsonb) ? p_rarity then 0
+              else least(10000, greatest(-10000,
+                     trunc((public.nexamon_demand_milli(p_rarity, p_population, p_recent_buys) - 1000 * greatest(0, coalesce(p_supply, 0)))::numeric
+                           * 10 / coalesce((public.nexamon_cfg() #>> array['value', 'pressure', 'want', p_rarity])::numeric, 1))))::integer
+         end;
+$$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.nexamon_ai_buy_chance_bps(bigint, bigint, text, double precision, text, bigint)'::regprocedure);
+  v_old text := $t$  if coalesce(p_price, 0) <= 0 then$t$;
+  v_new text := $t$  if coalesce(ai -> 'excludedRarities', '[]'::jsonb) ? p_rarity then
+    return 0;
+  end if;
+  if coalesce(p_price, 0) <= 0 then$t$;
+begin
+  if position('excludedRarities' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'nexamon_ai_buy_chance_bps() has an unexpected shape; exclude ai.excludedRarities (ADR-174) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.nexamon_battle_pull(public.nexamon_battles, uuid, timestamptz)'::regprocedure);
+  v_old text := $t$if r.rarity in ('ultra', 'prisma', 'legendary') then$t$;
+  v_new text := $t$if r.rarity in ('ultra', 'prisma', 'legendary', 'one_of_one') then$t$;
+begin
+  if position('one_of_one' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'nexamon_battle_pull() has an unexpected shape; count One of Ones for the ultra mission (ADR-174) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- One of One for a player's pack: a free card of the set or null (none left, or the roll missed)
+create or replace function public.nexamon_roll_one_of_one(p_set text, p_owner uuid, p_slot integer)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  o     jsonb := coalesce(public.nexamon_cfg() -> 'oneOfOne', '{}'::jsonb);
+  v_key text;
+begin
+  if p_owner is null or p_slot <> coalesce((o ->> 'slot')::integer, 5)
+     or not exists (select 1 from public.nexamon_cards k where k.set_key = p_set and k.rarity = 'one_of_one' and k.in_catalogue) then
+    return null;
+  end if;
+  if random() * greatest(1, coalesce((o ->> 'packs')::integer, 5000)) >= 1 then
+    return null;
+  end if;
+  -- one pull at a time takes a One of One; the registry's primary key backs this up
+  perform pg_advisory_xact_lock(7311651);
+  select k.card_key into v_key
+    from public.nexamon_cards k
+   where k.set_key = p_set and k.rarity = 'one_of_one' and k.in_catalogue and k.population = 0
+     and not exists (select 1 from public.nexamon_one_of_ones x where x.card_key = k.card_key)
+   order by random() limit 1;
+  return v_key;
+end;
+$$;
+
+-- Opens one pack of a set for a player or an AI seller (nexamonOpenPack). -> the pulls in slot order
+create or replace function public.nexamon_open_pack(p_set text, p_owner uuid, p_ai text, p_pack uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_size   integer := coalesce((public.nexamon_cfg() ->> 'packSize')::integer, 5);
+  v_used   text[] := '{}';
+  v_out    jsonb := '[]'::jsonb;
+  v_rarity text;
+  v_key    text;
+  v_cond   text;
+  v_new    boolean;
+  v_copy   uuid;
+  v_nick   text;
+  v_name   text;
+  v_rule   jsonb := public.nexamon_cfg() #> array['packRules', p_set];
+  v_slots  text[];
+  v_base   text := 'common';
+  v_free   integer;
+  v_cnt    integer;
+  v_hit    boolean;
+  k        public.nexamon_cards;
+  s        integer;
+  i        integer;
+  r        record;
+  t        record;
+begin
+  -- a set's own tier rule: the rarity of every slot first (nexamonTierRarities)
+  if v_rule is not null and v_rule ->> 'kind' = 'tiers' then
+    v_base := coalesce(v_rule ->> 'base', 'common');
+    v_slots := array_fill(v_base, array[v_size]);
+    v_free := v_size;
+    for t in select x from jsonb_array_elements(coalesce(v_rule -> 'tiers', '[]'::jsonb)) x loop
+      v_hit := floor(random() * greatest(1, coalesce((t.x ->> 'packs')::integer, 1))) = 0;
+      v_cnt := coalesce((t.x ->> 'min')::integer, 1)
+               + floor(random() * (greatest(0, coalesce((t.x ->> 'max')::integer, 1) - coalesce((t.x ->> 'min')::integer, 1)) + 1))::integer;
+      if v_hit then
+        for i in 1 .. v_cnt loop
+          exit when v_free < 1;
+          v_slots[v_free] := t.x ->> 'rarity';
+          v_free := v_free - 1;
+        end loop;
+      end if;
+    end loop;
+  end if;
+  for s in 1 .. v_size loop
+    v_key := public.nexamon_roll_one_of_one(p_set, p_owner, s);
+    if v_key is not null then
+      v_rarity := 'one_of_one';
+    else
+      v_rarity := case when v_slots is not null then v_slots[s]
+                       when s >= 4 then public.nexamon_slot_rarity(s, random()) else 'common' end;
+      select c.card_key into v_key from public.nexamon_cards c
+       where c.set_key = p_set and c.rarity = v_rarity and c.in_catalogue
+         and (v_rarity <> v_base or c.card_key <> all (v_used))
+       order by random() limit 1;
+    end if;
+    if v_key is null then
+      perform public.api_error('nexamon_unknown');
+    end if;
+    v_used := v_used || v_key;
+    v_cond := public.nexamon_roll_condition(random());
+    v_new := p_owner is not null
+             and not exists (select 1 from public.nexamon_copies x where x.owner_id = p_owner and x.card_key = v_key);
+    v_copy := public.nexamon_mint_copy(v_key, p_owner, p_ai, v_cond, case when p_owner is null then 'ai_pack' else 'pack' end,
+                                       p_pack, p_now);
+    select * into k from public.nexamon_cards where card_key = v_key;
+    v_out := v_out || jsonb_build_object(
+      'slot', s, 'copy_id', v_copy, 'card_key', v_key, 'rarity', v_rarity, 'condition', v_cond, 'is_new', v_new,
+      'serial', k.population, 'population', k.population,
+      'value_cents', public.nexamon_copy_value_cents(k.value_e4, v_cond, null));
+    if v_rarity = 'one_of_one' then
+      begin
+        insert into public.nexamon_one_of_ones (card_key, copy_id, player_id, pack_id, pulled_at)
+        values (v_key, v_copy, p_owner, p_pack, p_now);
+      exception when unique_violation then
+        perform public.api_error('nexamon_one_of_one_taken');
+      end;
+      select p.nickname into v_nick from public.profiles p where p.id = p_owner;
+      v_name := coalesce((select g.value ->> v_key from public.game_config g where g.key = 'nexamon_names'), v_key);
+      perform public.feed_post(p_owner, 'nexamon_one_of_one',
+                               jsonb_build_object('card_key', v_key, 'set', p_set, 'rarity', v_rarity, 'name', v_name,
+                                                  'serial', 1, 'condition', v_cond),
+                               'nexamon:1of1:' || v_key);
+      for r in select p.id from public.profiles p where not p.is_deactivated loop
+        perform public.social_notify(r.id, 'nexamon_one_of_one', 'One of One gezogen!',
+          coalesce(v_nick, '?') || ' hat ' || v_name || ' gezogen. Diese Karte gibt es im ganzen Spiel nur ein einziges Mal.',
+          jsonb_build_object('card_key', v_key, 'set', p_set, 'nickname', v_nick),
+          '/nexamon/' || v_key, 'nexamon:1of1:' || v_key);
+      end loop;
+    elsif p_owner is not null and coalesce(cfg -> 'feedRarities', '[]'::jsonb) ? v_rarity then
+      perform public.feed_post(p_owner, 'nexamon_pull',
+                               jsonb_build_object('card_key', v_key, 'set', p_set, 'rarity', v_rarity, 'serial', k.population,
+                                                  'condition', v_cond),
+                               'nexamon:pull:' || v_copy::text);
+    end if;
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- ===== supabase/updates/20261204006520_nexamon_one_of_one_views.sql =====
+-- ===== idempotent copy of migrations/20261204006520_nexamon_one_of_one_views.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6520 · Nexamon: One of Ones in the overview, collections, the feed and the news (ADR-174)
+-- =============================================================================
+-- * get_nexamon(): 'one_of_ones' lists every One of One of the catalogue with who pulled it (null: still out there).
+-- * nexamon_bonus_recompute(): cards of bonuses.sets.excludeRarities count for no collection ("type", "complete",
+--   "master"); nobody can be asked to own a card that exists once. The card bonus of a One of One stays.
+-- * feed_item_label(): the kind nexamon_one_of_one; news_show_build(): it joins the gossip sources.
+-- Replace-patches with a clear error if an anchor is missing.
+-- Idempotent: runs unchanged as supabase/updates/20261204006520_nexamon_one_of_one_views.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.get_nexamon()'::regprocedure);
+  v_old text := $t$    'server_time', v_now);$t$;
+  v_new text := $t$    'server_time', v_now,
+    'one_of_ones', (select coalesce(jsonb_agg(jsonb_build_object(
+                      'card_key', k.card_key, 'set', k.set_key, 'pulled', x.card_key is not null,
+                      'pulled_by', (select p.nickname from public.profiles p where p.id = x.player_id),
+                      'pulled_at', x.pulled_at) order by k.set_key, k.number), '[]'::jsonb)
+                      from public.nexamon_cards k
+                      left join public.nexamon_one_of_ones x on x.card_key = k.card_key
+                     where k.rarity = 'one_of_one' and k.in_catalogue));$t$;
+begin
+  if position('one_of_ones' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'get_nexamon() has an unexpected shape; add one_of_ones (ADR-174) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def  text := pg_get_functiondef('public.nexamon_bonus_recompute(uuid)'::regprocedure);
+  v_old1 text := $t$from pg_temp.nx_bonus_own o where o.type is not null group by o.set_key, o.type$t$;
+  v_new1 text := $t$from pg_temp.nx_bonus_own o
+     where o.type is not null and not coalesce(b #> '{sets,excludeRarities}', '[]'::jsonb) ? o.rarity
+     group by o.set_key, o.type$t$;
+  v_old2 text := $t$      from pg_temp.nx_bonus_own o group by o.set_key$t$;
+  v_new2 text := $t$      from pg_temp.nx_bonus_own o
+     where not coalesce(b #> '{sets,excludeRarities}', '[]'::jsonb) ? o.rarity
+     group by o.set_key$t$;
+begin
+  if position('excludeRarities' in v_def) = 0 then
+    if position(v_old1 in v_def) = 0 or position(v_old2 in v_def) = 0 then
+      raise exception 'nexamon_bonus_recompute() has an unexpected shape; leave One of Ones out of the collections (ADR-174) by hand';
+    end if;
+    execute replace(replace(v_def, v_old1, v_new1), v_old2, v_new2);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_one_of_one' then 'ONE OF ONE gezogen: ' || coalesce(p_payload ->> 'name', 'eine Nexamon-Karte')
+      || ', die es nur ein einziges Mal gibt'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_one_of_one' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kind nexamon_one_of_one (ADR-174) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_one_of_one',$t$;
+begin
+  if position('nexamon_one_of_one' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_one_of_one (ADR-174) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ===== supabase/updates/20261204006530_nexamon_bulk_and_ai_reset.sql =====
+-- ===== idempotent copy of migrations/20261204006530_nexamon_bulk_and_ai_reset.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6530 · Nexamon: list, take back and sell several copies at once; the AI's offers reset (ADR-174)
+-- =============================================================================
+-- * list_nexamon_cards(p_request_id, p_card_key, p_condition, p_grade, p_count, p_price_cents): lists p_count own
+--   copies of one card at one price per copy. Raw copies of p_condition (p_grade null) or slabs of grade p_grade;
+--   never listed, never at ASP; oldest first (acquired_at, serial). Each copy goes through list_nexamon_card with a
+--   request id derived from p_request_id, so the rules (listing limit, rate limit, missions) stay in one place; the
+--   whole call is one transaction and idempotent by p_request_id. Errors as list_nexamon_card plus
+--   nexamon_not_enough NX272 (fewer matching copies than p_count).
+-- * unlist_nexamon_cards(p_request_id, p_listing_ids): takes several own listings back at once (same rules).
+-- * nexamon_ai_reset(p_now): every ai.listingResetHours (6) all AI listings go; the AI's stock of a card above
+--   ai.stockCap[rarity] is retired (the newest copies, slabs last; deleted, so nexamon_copies stops growing), then
+--   the AI lists its normal amounts again at the current value. Population stays "copies ever pulled" (retired
+--   copies still count, like a card that got lost). Cron nexa-nexamon-ai-reset, hourly; it acts once per period.
+-- Idempotent: runs unchanged as supabase/updates/20261204006530_nexamon_bulk_and_ai_reset.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_old text := $q$    when 'nexamon_ai_excluded'        then 'NX271'
+$q$;
+begin
+  if position('''nexamon_not_enough''' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the error key nexamon_not_enough (ADR-174) by hand';
+    end if;
+    execute replace(v_def, v_old, v_old || $q$    when 'nexamon_not_enough'         then 'NX272'
+$q$);
+  end if;
+end;
+$do$;
+
+alter table public.nexamon_meta add column if not exists ai_reset_at timestamptz;
+
+create or replace function public.list_nexamon_cards(p_request_id uuid, p_card_key text, p_condition text, p_grade numeric,
+                                                     p_count integer, p_price_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m        jsonb := public.nexamon_cfg() -> 'market';
+  v_player uuid;
+  v_replay jsonb;
+  v_ids    uuid[];
+  v_out    jsonb := '[]'::jsonb;
+  v_one    jsonb;
+  i        integer;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_card_key is null or p_count is null or p_count < 1
+     or p_count > coalesce((m ->> 'maxListings')::integer, 30)
+     or (p_grade is null and p_condition is null) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'list_nexamon_cards');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform public.lock_player_accounts(v_player);
+  if (select count(*) from public.nexamon_listings l where l.seller_id = v_player) + p_count
+     > coalesce((m ->> 'maxListings')::integer, 30) then
+    perform public.api_error('nexamon_listing_limit');
+  end if;
+  select array_agg(x.id order by x.acquired_at, x.serial) into v_ids
+    from (select c.id, c.acquired_at, c.serial from public.nexamon_copies c
+           where c.owner_id = v_player and c.card_key = p_card_key and c.grading_until is null
+             and (case when p_grade is null then c.grade is null and c.condition = p_condition else c.grade = p_grade end)
+             and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+           order by c.acquired_at, c.serial
+           limit p_count) x;
+  if coalesce(array_length(v_ids, 1), 0) < p_count then
+    perform public.api_error('nexamon_not_enough');
+  end if;
+  for i in 1 .. p_count loop
+    v_one := public.list_nexamon_card(md5(p_request_id::text || ':' || i)::uuid, v_ids[i], p_price_cents);
+    v_out := v_out || jsonb_build_array(v_one);
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'listings', (select coalesce(jsonb_agg(x -> 'listing'), '[]'::jsonb) from jsonb_array_elements(v_out) x),
+    'copies', (select coalesce(jsonb_agg(x -> 'copy'), '[]'::jsonb) from jsonb_array_elements(v_out) x)));
+end;
+$$;
+comment on function public.list_nexamon_cards(uuid, text, text, numeric, integer, bigint) is
+  'RPC: lists p_count own copies of a card (raw of one condition, or slabs of one grade), oldest first, at one price '
+  'each (ADR-174); errors as list_nexamon_card and nexamon_not_enough.';
+
+create or replace function public.unlist_nexamon_cards(p_request_id uuid, p_listing_ids uuid[])
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_out    jsonb := '[]'::jsonb;
+  i        integer;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_listing_ids is null or coalesce(array_length(p_listing_ids, 1), 0) = 0
+     or array_length(p_listing_ids, 1) > coalesce((public.nexamon_cfg() #>> '{market,maxListings}')::integer, 30) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'unlist_nexamon_cards');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  for i in 1 .. array_length(p_listing_ids, 1) loop
+    v_out := v_out || jsonb_build_array(
+      public.unlist_nexamon_card(md5(p_request_id::text || ':' || i)::uuid, p_listing_ids[i]) -> 'copy');
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('copies', v_out));
+end;
+$$;
+comment on function public.unlist_nexamon_cards(uuid, uuid[]) is
+  'RPC: takes several own listings off the Nexamon market at once (ADR-174); errors as unlist_nexamon_card.';
+
+-- Every ai.listingResetHours: the AI's offers go, its stock above the cap is retired, then it lists again.
+create or replace function public.nexamon_ai_reset(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ai        jsonb := public.nexamon_cfg() -> 'ai';
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  v_hours   integer := coalesce((public.nexamon_cfg() #>> '{ai,listingResetHours}')::integer, 0);
+  v_last    timestamptz;
+  v_deleted integer := 0;
+  v_retired integer := 0;
+  v_listed  integer := 0;
+  r         record;
+begin
+  if v_hours <= 0 then
+    return jsonb_build_object('skipped', 'off');
+  end if;
+  perform pg_advisory_xact_lock(7311652);
+  select m.ai_reset_at into v_last from public.nexamon_meta m where m.id;
+  if v_last is not null and v_now < v_last + make_interval(hours => v_hours) then
+    return jsonb_build_object('skipped', 'not due');
+  end if;
+  delete from public.nexamon_listings where seller_ai is not null;
+  get diagnostics v_deleted = row_count;
+  -- retire the stock above the cap: the newest raw copies first, slabs last
+  with ranked as (
+    select c.id, row_number() over (partition by c.card_key
+                                    order by (c.grade is not null) desc, c.acquired_at, c.serial) as n,
+           coalesce((ai #>> array['stockCap', k.rarity])::integer, 1000000) as cap
+      from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+     where c.ai_owner is not null
+  )
+  delete from public.nexamon_copies c using ranked x where x.id = c.id and x.n > x.cap;
+  get diagnostics v_retired = row_count;
+  for r in select distinct c.card_key from public.nexamon_copies c where c.ai_owner is not null loop
+    v_listed := v_listed + public.nexamon_ai_restock(r.card_key, v_now);
+  end loop;
+  insert into public.nexamon_meta (id, ai_reset_at) values (true, v_now)
+  on conflict (id) do update set ai_reset_at = excluded.ai_reset_at;
+  return jsonb_build_object('deleted', v_deleted, 'retired', v_retired, 'listed', v_listed);
+end;
+$$;
+comment on function public.nexamon_ai_reset(timestamptz) is
+  'Internal (cron nexa-nexamon-ai-reset): every ai.listingResetHours the AI''s listings are removed, its stock above '
+  'ai.stockCap retired and its normal amounts listed again at the current value (ADR-174).';
+
+do $do$
+begin
+  revoke all on function public.nexamon_ai_reset(timestamptz) from public, anon, authenticated;
+  revoke all on function public.list_nexamon_cards(uuid, text, text, numeric, integer, bigint) from public, anon;
+  revoke all on function public.unlist_nexamon_cards(uuid, uuid[]) from public, anon;
+  grant execute on function public.list_nexamon_cards(uuid, text, text, numeric, integer, bigint) to authenticated;
+  grant execute on function public.unlist_nexamon_cards(uuid, uuid[]) to authenticated;
+  revoke all on function public.nexamon_roll_one_of_one(text, uuid, integer) from public, anon, authenticated;
+  revoke all on function public.nexamon_copies_ai_guard() from public, anon, authenticated;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-nexamon-ai-reset';
+    perform cron.schedule('nexa-nexamon-ai-reset', '23 * * * *', 'select public.nexamon_ai_reset()');
+  end if;
+end;
+$do$;
+
+-- ===== supabase/updates/20261204006540_nexamon_bulk_sell.sql =====
+-- ===== idempotent copy of migrations/20261204006540_nexamon_bulk_sell.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6540 · Nexamon: selling bulk to the game (ADR-174)
+-- =============================================================================
+-- * Bulk = raw copies of the bulk rarities of their set (quickSell.setRarities[set], else quickSell.rarities:
+--   common and rare). The game buys them at once for their current value minus quickSell.bps' fee (35 %, the rule
+--   since ADR-174; it was 50 %), paid by the households through the ledger. Every copy sold this way lowers its
+--   card's value by quickSell.dropBps like before (a small push down, never counted as a trade).
+-- * bulk_sell_nexamon(p_request_id, p_copy_ids): the collection's bulk mode; up to quickSell.maxPerCall (500)
+--   copies, rate-limited (quickSell.callsPerMinute), idempotent; the same rules as sell_nexamon_to_ai(), which now
+--   also reads the per-set bulk rarities.
+-- Idempotent: runs unchanged as supabase/updates/20261204006540_nexamon_bulk_sell.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.sell_nexamon_to_ai(uuid, uuid[])'::regprocedure);
+  v_old text := $t$not coalesce(q -> 'rarities', '[]'::jsonb) ? k.rarity$t$;
+  v_new text := $t$not coalesce(q #> array['setRarities', k.set_key], q -> 'rarities', '[]'::jsonb) ? k.rarity$t$;
+begin
+  if position('setRarities' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'sell_nexamon_to_ai() has an unexpected shape; read quickSell.setRarities (ADR-174) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+create or replace function public.bulk_sell_nexamon(p_request_id uuid, p_copy_ids uuid[])
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'bulk_sell_nexamon');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_bulk',
+                               coalesce((public.nexamon_cfg() #>> '{quickSell,callsPerMinute}')::integer, 10), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  return public.request_complete(v_player, p_request_id,
+    public.sell_nexamon_to_ai(md5(p_request_id::text || ':bulk')::uuid, p_copy_ids));
+end;
+$$;
+comment on function public.bulk_sell_nexamon(uuid, uuid[]) is
+  'RPC: sells raw bulk copies to the game at once for their value minus the bulk fee (ADR-174) -> sold, count, '
+  'total_cents; errors as sell_nexamon_to_ai and rate_limited.';
+
+do $do$
+begin
+  revoke all on function public.bulk_sell_nexamon(uuid, uuid[]) from public, anon;
+  grant execute on function public.bulk_sell_nexamon(uuid, uuid[]) to authenticated;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- A 10 is worth 2.5x to 4x, a 9.5 1.8x to 2.6x, by the card's popularity (nexamonGradeFactorBps)
+-- ---------------------------------------------------------------------------
+-- grading.tenFactorRange / nineHalfFactorRange: low end for popularity 0, high end for 10 000, linear, rounded down.
+-- Every function that values a copy with its card at hand (nexamon_copy_value_cents(..., card), and the sale's
+-- factor through nexamon_copy_factor_bps(condition, grade, card)) uses it; grading.valueBps stays the fallback.
+create or replace function public.nexamon_grade_factor_bps(p_grade double precision, p_card text)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  g       jsonb := public.nexamon_cfg() -> 'grading';
+  v_idx   integer := public.nexamon_grade_index(p_grade);
+  v_num   double precision := coalesce((g #>> array['grades', v_idx::text])::double precision, 0);
+  v_range jsonb;
+  v_pop   integer;
+begin
+  v_range := case when v_num = 10 then g -> 'tenFactorRange' when v_num = 9.5 then g -> 'nineHalfFactorRange' end;
+  if v_range is null or p_card is null then
+    return coalesce((g #>> array['valueBps', v_idx::text])::integer, 10000);
+  end if;
+  select public.nexamon_popularity_bps(k.rarity, k.population) into v_pop from public.nexamon_cards k where k.card_key = p_card;
+  if v_pop is null then
+    return coalesce((g #>> array['valueBps', v_idx::text])::integer, 10000);
+  end if;
+  return (v_range ->> 0)::integer
+         + floor(((v_range ->> 1)::bigint - (v_range ->> 0)::bigint) * least(10000, greatest(0, v_pop)) / 10000.0)::integer;
+end;
+$$;
+
+create or replace function public.nexamon_copy_factor_bps(p_condition text, p_grade double precision, p_card text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_grade >= 10.75 and p_card is not null then public.nexamon_black_label_bps(p_card)
+              when p_grade is not null and p_grade < 10.75 then public.nexamon_grade_factor_bps(p_grade, p_card)
+              else public.nexamon_copy_factor_bps(p_condition, p_grade) end;
+$$;
+
+create or replace function public.nexamon_copy_value_cents(p_value_e4 bigint, p_condition text, p_grade double precision, p_card text)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_grade >= 10.75 and p_card is not null
+              then public.div_round_half_even(p_value_e4::numeric * public.nexamon_black_label_bps(p_card), 1000000)
+              when p_grade is not null and p_card is not null
+              then public.div_round_half_even(p_value_e4::numeric * public.nexamon_grade_factor_bps(p_grade, p_card), 1000000)
+              else public.nexamon_copy_value_cents(p_value_e4, p_condition, p_grade) end;
+$$;
+
+-- the sale's factor (price per card) with the card at hand
+do $do$
+declare
+  r     record;
+  v_def text;
+  v_new text;
+begin
+  for r in select p.oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.prosrc like '%nexamon_copy_factor_bps(c.condition, c.grade)%'
+              and p.proname <> 'nexamon_copy_factor_bps' loop
+    v_def := pg_get_functiondef(r.oid);
+    v_new := replace(v_def, 'nexamon_copy_factor_bps(c.condition, c.grade)', 'nexamon_copy_factor_bps(c.condition, c.grade, c.card_key)');
+    execute v_new;
+  end loop;
+  revoke all on function public.nexamon_grade_factor_bps(double precision, text) from public, anon, authenticated;
+  revoke all on function public.nexamon_copy_factor_bps(text, double precision, text) from public, anon, authenticated;
+end;
+$do$;
+
 -- ===== supabase/updates/20261204006600_company_strengths.sql =====
 -- ===== idempotent copy of migrations/20261204006600_company_strengths.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)

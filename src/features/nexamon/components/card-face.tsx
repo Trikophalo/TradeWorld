@@ -2,16 +2,23 @@
 
 import { useTranslations } from "next-intl";
 import { memo, useMemo, type CSSProperties } from "react";
-import { NEXAMON_ART, NEXAMON_CARD_SIZE, nexamonCard, type NexamonArt, type NexamonCard } from "@/config/nexamon";
-import { composeCardBack, composeCardFace, FACE_LAYOUT, type Box } from "@/components/pixel/nexamon-face";
+import {
+  NEXAMON_ART,
+  NEXAMON_CARD_SIZE,
+  nexamonCard,
+  nexamonCardKind,
+  type NexamonArt,
+  type NexamonCard,
+} from "@/config/nexamon";
+import { composeCardBack, composeCardFace, EVENT_LABEL, FACE_LAYOUT, type Box } from "@/components/pixel/nexamon-face";
 import type { Raster } from "@/components/pixel/nexamon-raster";
-import { GOLD_INK, TYPE_INK } from "@/components/pixel/nexamon-symbols";
+import { GOLD_INK, ONE_OF_ONE_INK, TYPE_INK } from "@/components/pixel/nexamon-symbols";
 import { cn } from "@/lib/utils";
 import {
   estimateNumberWidth,
   FACE_TEXT,
   fitText,
-  formatCardNumber,
+  formatSetNumber,
   hpBlockWidth,
   pixelScale,
   roomBeforeNumber,
@@ -42,6 +49,14 @@ function textInks(card: NexamonCard) {
       strip: GOLD_INK.pale,
       halo: GOLD_INK.plate,
       number: GOLD_INK.light,
+    };
+  if (card.rarity === "one_of_one")
+    return {
+      main: ONE_OF_ONE_INK.white,
+      soft: ONE_OF_ONE_INK.goldLight,
+      strip: ONE_OF_ONE_INK.white,
+      halo: ONE_OF_ONE_INK.black,
+      number: ONE_OF_ONE_INK.gold,
     };
   if (card.rarity === "prisma")
     return { main: "#ffffff", soft: ink.pale, strip: "#ffffff", halo: ink.deep, number: "#ffffff" };
@@ -84,6 +99,7 @@ export const NexamonCardFace = memo(function NexamonCardFace({
   const inks = textInks(card);
   const type = t(`types.${card.type}`);
   const full = u >= 3;
+  const event = nexamonCardKind(card) === "event";
 
   const at = (box: Box): CSSProperties => ({
     position: "absolute",
@@ -98,11 +114,10 @@ export const NexamonCardFace = memo(function NexamonCardFace({
       : `${u * 0.34}px 0 0 ${inks.halo}, ${-u * 0.34}px 0 0 ${inks.halo}, 0 ${u * 0.34}px 0 ${inks.halo}, 0 ${-u * 0.34}px 0 ${inks.halo}`;
 
   // Name and attack end before the number to their right: long ones are squeezed, very long ones get smaller.
-  const nameRoom = roomBeforeNumber(
-    layout.name.x,
-    layout.hp.x + layout.hp.w,
-    hpBlockWidth(card.hp, full ? t("hp") : ""),
-  );
+  // an event card ends its name before the "Ereignis" plate
+  const nameRoom = event
+    ? EVENT_LABEL.x - 1 - layout.name.x
+    : roomBeforeNumber(layout.name.x, layout.hp.x + layout.hp.w, hpBlockWidth(card.hp, full ? t("hp") : ""));
   const nameFit = fitText(card.name, FACE_TEXT.name, nameRoom);
   const attackRoom = roomBeforeNumber(
     layout.attackName.x,
@@ -112,21 +127,28 @@ export const NexamonCardFace = memo(function NexamonCardFace({
   const attackFit = fitText(card.attack.name, FACE_TEXT.attack, attackRoom);
 
   const from = card.evolvesFrom ? (evolvesFromName ?? nexamonCard(card.evolvesFrom)?.name ?? null) : null;
-  const stage = t(`stage.${card.stage}`);
+  const stage = event ? type : t(`stage.${card.stage}`);
   const stageLine = layout.strip || !from ? stage : `${stage} · ${t("evolvesShort", { name: from })}`;
   const stageFit = fitText(stageLine.toUpperCase(), FACE_TEXT.stage, layout.stage?.w ?? 0);
-  const stripLine = from
-    ? layout.stage
-      ? t("evolvesFrom", { name: from })
-      : `${stage} · ${t("evolvesFrom", { name: from })}`
-    : layout.stage
-      ? t("typeLine", { type })
-      : `${stage} · ${t("typeLine", { type })}`;
+  const stripLine = event
+    ? t("eventLine", { type })
+    : from
+      ? layout.stage
+        ? t("evolvesFrom", { name: from })
+        : `${stage} · ${t("evolvesFrom", { name: from })}`
+      : layout.stage
+        ? t("typeLine", { type })
+        : `${stage} · ${t("typeLine", { type })}`;
 
   return (
     <div
       role="img"
-      aria-label={t("cardLabel", { name: card.name, type, hp: card.hp, rarity: t(`rarity.${card.rarity}`) })}
+      aria-label={
+        event
+          ? t("eventLabel", { name: card.name, rarity: t(`rarity.${card.rarity}`) })
+          : t("cardLabel", { name: card.name, type, hp: card.hp, rarity: t(`rarity.${card.rarity}`) })
+      }
+      data-kind={event ? "event" : "monster"}
       data-rarity={card.rarity}
       data-card={card.key}
       className={cn("relative isolate shrink-0 select-none", className)}
@@ -167,24 +189,39 @@ export const NexamonCardFace = memo(function NexamonCardFace({
               {card.name}
             </span>
           </p>
-          <p
-            data-part="hp"
-            className="flex items-baseline justify-end font-sans font-extrabold whitespace-nowrap"
-            style={{
-              ...at(layout.hp),
-              fontSize: u * FACE_TEXT.number,
-              lineHeight: `${u * 7}px`,
-              gap: u * FACE_TEXT.hpGap,
-              textShadow: halo,
-            }}
-          >
-            {full && (
-              <span className="font-pixel font-normal" style={{ fontSize: u * FACE_TEXT.hpLabel }}>
-                {t("hp")}
-              </span>
-            )}
-            <span className="nums">{card.hp}</span>
-          </p>
+          {event ? (
+            <p
+              data-part="event"
+              className="overflow-hidden text-center font-pixel whitespace-nowrap uppercase"
+              style={{
+                ...at({ ...EVENT_LABEL, y: Math.round(layout.hp.y) }),
+                fontSize: u * 2.6,
+                lineHeight: `${u * EVENT_LABEL.h}px`,
+                color: card.rarity === "one_of_one" ? ONE_OF_ONE_INK.gold : TYPE_INK[card.type].pale,
+              }}
+            >
+              {t("event")}
+            </p>
+          ) : (
+            <p
+              data-part="hp"
+              className="flex items-baseline justify-end font-sans font-extrabold whitespace-nowrap"
+              style={{
+                ...at(layout.hp),
+                fontSize: u * FACE_TEXT.number,
+                lineHeight: `${u * 7}px`,
+                gap: u * FACE_TEXT.hpGap,
+                textShadow: halo,
+              }}
+            >
+              {full && (
+                <span className="font-pixel font-normal" style={{ fontSize: u * FACE_TEXT.hpLabel }}>
+                  {t("hp")}
+                </span>
+              )}
+              <span className="nums">{card.hp}</span>
+            </p>
+          )}
           {full && layout.strip && (
             <p
               className="overflow-hidden text-center font-sans font-semibold whitespace-nowrap"
@@ -239,7 +276,7 @@ export const NexamonCardFace = memo(function NexamonCardFace({
             className="font-sans nums font-bold whitespace-nowrap"
             style={{ ...at(layout.number), fontSize: u * 3, lineHeight: `${u * 5}px`, color: inks.number }}
           >
-            {formatCardNumber(card.number)}
+            {formatSetNumber(card)}
           </p>
         </div>
       )}

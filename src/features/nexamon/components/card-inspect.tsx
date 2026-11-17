@@ -23,7 +23,7 @@ import { formatBps, formatInteger, formatMoney } from "@/lib/format";
 import { NEXAMON_BLACK_LABEL_GRADE, nexamonGradeChanceBps } from "@/lib/sim/nexamon";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
-import { formatCardNumber } from "../lib";
+import { formatSetNumber } from "../lib";
 import { useNexamonCard } from "../hooks";
 import {
   buyableListings,
@@ -130,7 +130,7 @@ function Neighbours({ card }: { card: CardData }) {
           ‹
         </span>
       )}
-      <span className="nums text-xs text-fg-3">{formatCardNumber(card.number)}</span>
+      <span className="nums text-xs text-fg-3">{formatSetNumber(card)}</span>
       {next ? (
         <Link href={`/nexamon/${next.key}`} className={link} aria-label={t("inspect.next", { name: next.name })}>
           <span aria-hidden>›</span>
@@ -182,7 +182,7 @@ function Inspect({ card, details }: { card: CardData; details: NexamonCardDetail
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <RarityBadge rarity={card.rarity} />
             <SetIcon set={card.set} label />
-            <span className="nums text-sm text-fg-2">{formatCardNumber(card.number)}</span>
+            <span className="nums text-sm text-fg-2">{formatSetNumber(card)}</span>
             <TypeIcon type={card.type} label />
           </p>
           {details?.card.bonus && (

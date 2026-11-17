@@ -2,7 +2,7 @@ import type { NexamonArt, NexamonCard } from "@/config/nexamon/types";
 import { bayer } from "./nexamon-raster";
 
 /*
- * Five sample cards with artwork, one per rarity, for the showcase on /dev/ui and the tests (ADR-165). They are
+ * Six sample cards with artwork, one per rarity (the One of One since ADR-174), and an event card, for the showcase on /dev/ui and the tests (ADR-165). They are
  * fixtures of the renderer and never part of the catalogue: the real cards live in src/config/nexamon.
  * The artworks are drawn by code (blobs with three tones, light from the top left, an ink outline) and come out
  * as the same character grids the catalogue uses.
@@ -813,6 +813,57 @@ function aurodrak(): NexamonArt {
   return bg.art(palette);
 }
 
+/**
+ * A spiral galaxy, full art (72 x 100) or window size: a white-hot core, two arms that wind out through violet and
+ * rose, dust lanes and a field of stars. Used by the One of One and the event sample.
+ */
+function galaxy(width: number, height: number, seed: number): NexamonArt {
+  const palette = {
+    a: "#04030c",
+    b: "#0c0a26",
+    c: "#22185c",
+    d: "#4a2f9e",
+    e: "#9a6cff",
+    f: "#ff8ad8",
+    g: "#ffd9f2",
+    w: "#ffffff",
+    s: "#bfe9ff",
+  };
+  const rand = rng(seed);
+  const cx = width / 2;
+  const cy = height / 2;
+  const scale = Math.min(width, height) / 72;
+  const grid: string[] = [];
+  for (let y = 0; y < height; y++) {
+    let row = "";
+    for (let x = 0; x < width; x++) {
+      const dx = (x - cx) / scale;
+      const dy = ((y - cy) / scale) * 1.15;
+      const d = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+      const arm = Math.cos(2 * angle - d * 0.19);
+      const power = Math.max(0, 1 - d / 34) * (0.55 + 0.45 * arm) + Math.max(0, 1 - d / 7) * 0.9;
+      const t = bayer(x, y) * 0.12;
+      let ch = d > 30 ? "a" : "b";
+      if (power > 0.95) ch = "w";
+      else if (power > 0.78 + t) ch = "g";
+      else if (power > 0.6 + t) ch = "f";
+      else if (power > 0.42 + t) ch = "e";
+      else if (power > 0.26 + t) ch = "d";
+      else if (power > 0.12 + t) ch = "c";
+      row += ch;
+    }
+    grid.push(row);
+  }
+  for (let i = 0; i < (width * height) / 60; i++) {
+    const x = Math.floor(rand() * width);
+    const y = Math.floor(rand() * height);
+    const row = grid[y]!;
+    if (row[x] === "a" || row[x] === "b") grid[y] = row.slice(0, x) + (rand() > 0.7 ? "w" : "s") + row.slice(x + 1);
+  }
+  return { width, height, palette, grid };
+}
+
 const card = (
   number: number,
   rarity: NexamonCard["rarity"],
@@ -877,7 +928,32 @@ export const NEXAMON_SAMPLE_CARDS: readonly NexamonCard[] = [
     attack: { name: "Sonnenhort", damage: 200, text: "Dieses Nexamon kann im nächsten Zug nicht angreifen." },
     flavor: "Der erste Drache hütet kein Gold. Er ist das Gold, und die Sonne ist sein Nest.",
   }),
+  card(90, "one_of_one", {
+    set: "cosmic_winds",
+    name: "Urwirbel",
+    type: "cosmic",
+    hp: 300,
+    stage: 0,
+    evolvesFrom: null,
+    attack: { name: "Erster Atem", damage: 250, text: "Alle Karten im Spiel drehen sich einmal um sich selbst." },
+    flavor: "Bevor es Sterne gab, gab es den Wind, der sie zusammenblies. Es gibt ihn genau einmal.",
+  }),
 ];
+
+/** A sample event card (ADR-174): no HP, an effect instead of an attack. */
+export const NEXAMON_SAMPLE_EVENT: NexamonCard = {
+  ...card(9, "common", {
+    set: "cosmic_winds",
+    name: "Spiralgalaxie",
+    type: "cosmic",
+    hp: 0,
+    stage: 0,
+    evolvesFrom: null,
+    attack: { name: "Gravitationssog", damage: 0, text: "Ziehe eine Karte. Dein Gegner zieht keine." },
+    flavor: "Hundert Milliarden Sonnen, und alle drehen sich um dasselbe dunkle Herz.",
+  }),
+  kind: "event",
+};
 
 /** Names of the cards the samples evolve from (the catalogue resolves these by key). */
 export const NEXAMON_SAMPLE_EVOLVES: Readonly<Record<string, string>> = {
@@ -896,6 +972,8 @@ export function nexamonSampleArt(): Readonly<Record<string, NexamonArt>> {
     "demo-066": voltaquila(),
     "demo-073": lunafalter(),
     "demo-077": aurodrak(),
+    "demo-090": galaxy(72, 100, 90),
+    "demo-009": galaxy(60, 40, 9),
   };
   return artCache;
 }

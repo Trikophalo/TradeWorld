@@ -16,7 +16,7 @@ import { GOLD_INK } from "@/components/pixel/nexamon-symbols";
 import {
   clampGrade,
   fitTextScale,
-  formatCardNumber,
+  formatSetNumber,
   formatGrade,
   formatSerial,
   gradeNumber,
@@ -82,7 +82,7 @@ export function NexamonSlab({
   const tier = slabTier(grade);
   const gold = tier === "gold";
   const black = tier === "black";
-  const rasters = composeSlab(grade);
+  const rasters = composeSlab(grade, card.rarity === "one_of_one");
   const l = SLAB_LABEL;
   const brand = black ? BLACK_LABEL_INK.white : gold ? GOLD_INK.dark : ASP_INK.brand;
   const onBand = black ? BLACK_LABEL_INK.black : gold ? GOLD_INK.deep : "#ffffff";
@@ -147,7 +147,7 @@ export function NexamonSlab({
               className="overflow-hidden font-sans nums font-semibold whitespace-nowrap"
               style={{ ...at(l.x + 21, l.y + 11, 36, 4), fontSize: u * 2.6, lineHeight: `${u * 4}px` }}
             >
-              {t(`sets.${card.set}`)} · {formatCardNumber(card.number)}
+              {t(`sets.${card.set}`)} · {formatSetNumber(card)}
             </p>
             <p
               className="overflow-hidden font-pixel whitespace-nowrap uppercase"

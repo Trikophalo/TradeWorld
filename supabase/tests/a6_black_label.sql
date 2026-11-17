@@ -46,9 +46,9 @@ select tests.assert(
   public.nexamon_copy_factor_bps('mint', 11) = 100000 and public.nexamon_copy_factor_bps('mint', 10) = 40000
   and public.nexamon_copy_factor_bps('poor', 11) = 100000
   and tests.nx_value('sa-001', 'mint', 11) = 10 * tests.nx_value('sa-001', 'mint')
-  and tests.nx_value('sa-001', 'mint', 10) = 4 * tests.nx_value('sa-001', 'mint')
+  and tests.nx_value('sa-001', 'mint', 10) between 2.5 * tests.nx_value('sa-001', 'mint') - 1 and 4 * tests.nx_value('sa-001', 'mint') + 1
   and tests.nx_value('sa-001', 'mint') = public.div_round_half_even((tests.nx('sa-001')).value_e4, 100),
-  'nexamon_copy_factor_bps(): a Black Label is worth ten times the card, a plain 10 four times');
+  'nexamon_copy_factor_bps(): a Black Label is worth ten times the card, a plain 10 2.5 to 4 times by popularity (ADR-174)');
 -- the configured chances are honoured; never more than the chance for a 10
 select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '{"mint": 20000}');
 select public.nexamon_roll_asp_grade('mint', 0.84) as r_nine, public.nexamon_roll_asp_grade('mint', 0.86) as r_all,

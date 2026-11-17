@@ -8,14 +8,15 @@
  * The Nexamon catalogue (ADR-165) gets its own row "nexamon_cards": key, set, number, rarity and start price of
  * every card from src/config/nexamon (artwork and texts stay in the client). The card names get the row
  * "nexamon_names" (key -> name): the news show names cards in its stories (ADR-169). The card types get the row
- * "nexamon_types" (key -> type) for the card bonuses (ADR-171).
+ * "nexamon_types" (key -> type) for the card bonuses (ADR-171). "nexamon_rarities" holds the rank of every rarity and the
+ * rarity layout of every set (ADR-174).
  *
  * Run with `pnpm db:config` after every change to balance.ts or to the Nexamon catalogue.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BALANCE } from "../src/config/balance";
-import { NEXAMON_CARDS } from "../src/config/nexamon";
+import { NEXAMON_CARDS, NEXAMON_RARITY_RANK, NEXAMON_SET_LAYOUT } from "../src/config/nexamon";
 
 /** Sections players may read (fees, tax, vault, unlocks). Simulation parameters stay server-only. */
 const PUBLIC_KEYS = ["time", "economy", "trading", "bonds", "company", "careers", "progression", "lifestyle"];
@@ -41,6 +42,11 @@ rows.push(
 const nexamonTypes = Object.fromEntries(NEXAMON_CARDS.map(({ key, type }) => [key, type]));
 rows.push(
   `  ('nexamon_types', ${quote(JSON.stringify(nexamonTypes))}::jsonb, 'Nexamon card types for the card bonuses (ADR-171)')`,
+);
+// ADR-174: rank of every rarity (Pack Battle tie-break, sorting) and the rarity layout of every set
+const nexamonRarities = { rank: NEXAMON_RARITY_RANK, layout: NEXAMON_SET_LAYOUT };
+rows.push(
+  `  ('nexamon_rarities', ${quote(JSON.stringify(nexamonRarities))}::jsonb, 'Nexamon rarity ranks and set layouts (ADR-174)')`,
 );
 const nexamonNames = Object.fromEntries(NEXAMON_CARDS.map(({ key, name }) => [key, name]));
 rows.push(

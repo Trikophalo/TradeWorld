@@ -117,6 +117,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   über Tage guter Stunden, zahlen dafür ab 50 Punkten einen Umsatzbonus von 2 % bis 15 %. Controlling ist in fünf
   Bereiche mit Sprungleiste geordnet; Strategie und CEO-Auszahlung melden nur noch Erfolg, wenn der Server sie übernimmt,
   und eine hängende Stundenabrechnung steht mit der Fehlermeldung im Dashboard.
+
+- **Cosmic Winds (ADR-174):** Das vierte Nexamon-Set für 5.000 € je Pack: kosmische Monster, Ereigniskarten und drei
+  One of Ones, die es nur ein einziges Mal gibt (1 in 5.000 Packs). Der Markt zeigt erst die Sets, mehrere gleiche
+  Karten stellst du auf einmal ein, und Bulk verkaufst du in der Sammlung direkt an das Spiel (35 % Gebühr).
+
 - **Pack Battles und Live-Öffnen (ADR-172):** Im Collectibles-Tab stehen deine Freunde als Figuren. Fordere einen zum
   Pack Battle heraus: beide zahlen ein Pack vom gleichen Set, wer mehr Wert zieht, bekommt alle zehn Karten. Über
   „Live“ schaust du anderen beim Öffnen zu und schickst Emojis; abschalten geht in den Einstellungen.

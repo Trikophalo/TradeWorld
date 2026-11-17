@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { BALANCE } from "@/config/balance";
-import { NEXAMON_SET_SIZE, NEXAMON_SETS } from "@/config/nexamon";
+import { NEXAMON_CARDS, NEXAMON_SETS, type NexamonSetKey } from "@/config/nexamon";
 import { DISCLOSURE } from "@/config/disclosure";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -63,6 +63,8 @@ function Hub() {
   }, [tab, rawTab, remembered.tab, remember]);
   const view: MarketView = params.get("view") === "mine" ? "mine" : "all";
   const cardKey = params.get("card");
+  const rawSet = params.get("set");
+  const marketSet = (NEXAMON_SETS as readonly string[]).includes(rawSet ?? "") ? (rawSet as NexamonSetKey) : null;
   // Finn shows the packs on the first visit; only where they are on the screen.
   useVisitTour("visit_nexamon", tab === "shop");
   const overview = useNexamonOverview();
@@ -71,7 +73,7 @@ function Hub() {
   const fresh = collection.data ? splitGraded(collection.data.copies, revealed).fresh.length : 0;
   const grading = overview.data?.collection.grading ?? 0;
 
-  const go = (next: { tab?: NexamonTab; view?: MarketView; card?: string | null }) => {
+  const go = (next: { tab?: NexamonTab; view?: MarketView; card?: string | null; set?: NexamonSetKey | null }) => {
     const query = new URLSearchParams();
     const nextTab = next.tab ?? tab;
     query.set("tab", nextTab);
@@ -80,6 +82,8 @@ function Hub() {
       const nextCard = next.card !== undefined ? next.card : next.tab ? null : cardKey;
       if (nextView === "mine") query.set("view", "mine");
       if (nextCard) query.set("card", nextCard);
+      const nextSet = next.set !== undefined ? next.set : next.tab ? null : marketSet;
+      if (nextSet) query.set("set", nextSet);
     }
     router.replace(`/nexamon?${query.toString()}`, { scroll: false });
   };
@@ -152,6 +156,8 @@ function Hub() {
               onViewChange={(next) => go({ view: next })}
               cardKey={cardKey}
               onCardChange={(next) => go({ card: next })}
+              setKey={marketSet}
+              onSetChange={(next) => go({ set: next, card: null })}
             />
           )}
           {tab === "grading" && <GradingDesk overview={overview.data} collection={collection.data} />}
@@ -182,7 +188,7 @@ function Teaser() {
           ))}
         </ul>
         <ul className="mt-4 space-y-1.5 text-sm text-pretty text-fg-2">
-          <li>{t("locked.point1", { sets: NEXAMON_SETS.length, cards: NEXAMON_SET_SIZE })}</li>
+          <li>{t("locked.point1", { sets: NEXAMON_SETS.length, cards: NEXAMON_CARDS.length })}</li>
           <li>
             {t("locked.point2", {
               best: formatFactor(BALANCE.nexamon.grading.valueBps.at(-1)!),

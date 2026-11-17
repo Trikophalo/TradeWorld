@@ -484,6 +484,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Im Collectibles-Tab stehen deine Freunde als Figuren.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-9fb9962c",
+        title: "Cosmic Winds",
+        text: "Das vierte Nexamon-Set für 5.000 € je Pack: kosmische Monster, Ereigniskarten und drei One of Ones, die es nur ein einziges Mal gibt (1 in 5.000…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-9dc576aa",
         title: "Stärken der Firma",
         text: "Ganz oben im Firmen-Dashboard zeigt ein Netz sechs Stärken.",

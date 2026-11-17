@@ -3,7 +3,18 @@ import { BALANCE } from "../../config/balance.ts";
 import { NEXAMON_CONDITIONS, type NexamonCondition } from "../../config/nexamon-rules.ts";
 import { NEXAMON_RARITIES, placeholderSet, type NexamonRarity } from "../../config/nexamon/types.ts";
 import {
+  nexamonAiAllowed,
   nexamonAiAskCents,
+  nexamonOneOfOneChance,
+  nexamonBulkPayout,
+  nexamonBulkRarities,
+  nexamonIsBulk,
+  nexamonOneOfOneHit,
+  nexamonPackRule,
+  nexamonGradeFactorBps,
+  nexamonTierOdds,
+  nexamonTierRarities,
+  nexamonTradeOnly,
   nexamonAiBuyChanceBps,
   nexamonAiBuyCounts,
   nexamonAiExpectedMinutes,
@@ -54,9 +65,23 @@ describe("Nexamon packs (ADR-165)", () => {
   it("has the exact slot odds: slots 1-3 common, slot 4 ultra/rare, slot 5 legendary/prisma/ultra/rare", () => {
     expect(DEN).toBe(3600);
     for (const slot of [1, 2, 3])
-      expect(nexamonSlotOdds(slot)).toEqual({ common: 3600, rare: 0, ultra: 0, prisma: 0, legendary: 0 });
-    expect(nexamonSlotOdds(4)).toEqual({ common: 2550, rare: 900, ultra: 150, prisma: 0, legendary: 0 });
-    expect(nexamonSlotOdds(5)).toEqual({ common: 2501, rare: 900, ultra: 150, prisma: 45, legendary: 4 });
+      expect(nexamonSlotOdds(slot)).toEqual({
+        common: 3600,
+        rare: 0,
+        ultra: 0,
+        prisma: 0,
+        legendary: 0,
+        one_of_one: 0,
+      });
+    expect(nexamonSlotOdds(4)).toEqual({ common: 2550, rare: 900, ultra: 150, prisma: 0, legendary: 0, one_of_one: 0 });
+    expect(nexamonSlotOdds(5)).toEqual({
+      common: 2501,
+      rare: 900,
+      ultra: 150,
+      prisma: 45,
+      legendary: 4,
+      one_of_one: 0,
+    });
     for (const slot of [1, 2, 3, 4, 5])
       expect(Object.values(nexamonSlotOdds(slot)).reduce((a, b) => a + b, 0)).toBe(DEN);
   });
@@ -128,7 +153,14 @@ describe("Nexamon packs (ADR-165)", () => {
   it("pulls at the stated rates over many packs (statistical, seeded)", () => {
     const rng = createRng(20261204);
     const packs = 360_000;
-    const count: Record<NexamonRarity, number> = { common: 0, rare: 0, ultra: 0, prisma: 0, legendary: 0 };
+    const count: Record<NexamonRarity, number> = {
+      common: 0,
+      rare: 0,
+      ultra: 0,
+      prisma: 0,
+      legendary: 0,
+      one_of_one: 0,
+    };
     const perCard = new Map<string, number>();
     const conditions: Record<string, number> = {};
     for (let i = 0; i < packs; i++) {
@@ -162,6 +194,102 @@ describe("Nexamon packs (ADR-165)", () => {
     for (const condition of NEXAMON_CONDITIONS)
       near(conditions[condition] ?? 0, cfg.conditions.weightBps[condition] / 10_000, total);
   }, 60_000);
+
+  it("rolls a One of One in slot 5 at 1 in 5 000 only while one is free (ADR-174)", () => {
+    expect(nexamonOneOfOneChance()).toBe(1 / 5_000);
+    expect(nexamonOneOfOneHit(0)).toBe(true);
+    expect(nexamonOneOfOneHit(1 / 5_000)).toBe(false);
+    const cosmic = placeholderSet("cosmic_winds");
+    const free = cosmic.filter((c) => c.rarity === "one_of_one").map((c) => c.key);
+    expect(free).toEqual(["cw-088", "cw-089", "cw-090"]);
+    // forced hit: the first roll of slot 5 is 0
+    const rolls = [...Array<number>(9).fill(0.5), 0, 0.7, 0.5];
+    const pack = nexamonOpenPack(cosmic, () => rolls.shift() ?? 0.5, cfg, { freeOneOfOnes: free });
+    expect(pack[4]).toMatchObject({ slot: 5, rarity: "one_of_one", key: "cw-090" });
+    // without free One of Ones the rarity table never yields one
+    const rng = createRng(5);
+    for (let i = 0; i < 2_000; i++)
+      for (const pull of nexamonOpenPack(cosmic, rng.next)) expect(pull.rarity).not.toBe("one_of_one");
+    // statistical: about 1 in 5 000 with free cards
+    const rng2 = createRng(174);
+    let hits = 0;
+    for (let i = 0; i < 100_000; i++)
+      if (nexamonOpenPack(cosmic, rng2.next, cfg, { freeOneOfOnes: free })[4]!.rarity === "one_of_one") hits++;
+    expect(hits).toBeGreaterThanOrEqual(8);
+    expect(hits).toBeLessThanOrEqual(35);
+  }, 60_000);
+
+  it("fills a pack by a set's own tier rule (ADR-174: the shape Titans Revenge uses)", () => {
+    // stand-in rarities: "common" as the base, three tiers above
+    const rule = {
+      kind: "tiers" as const,
+      base: "common",
+      tiers: [
+        { rarity: "legendary", packs: 500, min: 1, max: 1 },
+        { rarity: "prisma", packs: 50, min: 1, max: 1 },
+        { rarity: "rare", packs: 5, min: 1, max: 2 },
+      ],
+    };
+    expect(nexamonPackRule("mystic_energy")).toBeNull();
+    // all tiers hit (roll 0), counts at their max (roll ~1): back to front legendary, prisma, rare, rare
+    const sure = [0, 0.99, 0, 0.99, 0, 0.99];
+    expect(nexamonTierRarities(rule, () => sure.shift() ?? 0.5)).toEqual([
+      "common",
+      "rare",
+      "rare",
+      "prisma",
+      "legendary",
+    ]);
+    expect(nexamonTierRarities(rule, () => 0.5)).toEqual(Array(5).fill("common"));
+    const rng = createRng(175);
+    const seen: Record<string, number> = {};
+    const packs = 50_000;
+    for (let i = 0; i < packs; i++) {
+      const pulls = nexamonOpenPack(SET, rng.next, cfg, { rule });
+      expect(new Set(pulls.filter((p) => p.rarity === "common").map((p) => p.key)).size).toBe(
+        pulls.filter((p) => p.rarity === "common").length,
+      );
+      for (const p of new Set(pulls.map((x) => x.rarity))) seen[p] = (seen[p] ?? 0) + 1;
+    }
+    const near = (got: number, p: number) =>
+      expect(Math.abs(got - packs * p)).toBeLessThan(5 * Math.sqrt(packs * p * (1 - p)));
+    near(seen.rare ?? 0, 1 / 5);
+    near(seen.prisma ?? 0, 1 / 50);
+    expect(nexamonTierOdds(rule).map((t) => t.perPack)).toEqual([1 / 500, 1 / 50, 1 / 5]);
+  }, 60_000);
+
+  it("values a 10 at 2.5x to 4x and a 9.5 at 1.8x to 2.6x by popularity, the ladder always in order (ADR-174)", () => {
+    expect(nexamonGradeFactorBps(10, 0)).toBe(25_000);
+    expect(nexamonGradeFactorBps(10, 10_000)).toBe(40_000);
+    expect(nexamonGradeFactorBps(10, 5_000)).toBe(32_500);
+    expect(nexamonGradeFactorBps(9.5, 0)).toBe(18_000);
+    expect(nexamonGradeFactorBps(9.5, 10_000)).toBe(26_000);
+    expect(nexamonGradeFactorBps(10)).toBe(40_000);
+    expect(nexamonGradeFactorBps(9, 9_000)).toBe(17_000);
+    for (let pop = 0; pop <= 10_000; pop += 250) {
+      const ladder = [8, 8.5, 9, 9.5, 10].map((g) => nexamonGradeFactorBps(g, pop));
+      for (let i = 1; i < ladder.length; i++) expect(ladder[i]!).toBeGreaterThan(ladder[i - 1]!);
+    }
+    expect(nexamonCopyValueCents(1_000_000, "mint", 10, cfg, 0)).toBe(25_000);
+  });
+
+  it("keeps the AI away from One of Ones and their value trade-only", () => {
+    expect(nexamonAiAllowed("one_of_one")).toBe(false);
+    expect(nexamonAiAllowed("legendary")).toBe(true);
+    expect(nexamonSeedCopies("one_of_one", 0)).toBe(0);
+    expect(nexamonTradeOnly("one_of_one")).toBe(true);
+    expect(nexamonPressureBps({ rarity: "one_of_one", population: 1, supply: 0, recentBuys: 5 })).toBe(0);
+    expect(
+      nexamonAiBuyChanceBps({
+        priceCents: 1,
+        copyValueCents: 100,
+        condition: "mint",
+        grade: null,
+        rarity: "one_of_one",
+        population: 1,
+      }),
+    ).toBe(0);
+  });
 
   it("refuses a set without the needed rarity", () => {
     expect(() =>
@@ -559,11 +687,15 @@ describe("Nexamon AI and fees (ADR-165)", () => {
       expect(cfg.ai.listedPerCard[rarity]).toBeLessThanOrEqual(cfg.ai.seedCopies[rarity]);
   });
 
-  it("takes 5 % from a selling player and pays half the value for bulk", () => {
+  it("takes 5 % from a selling player and 35 % from bulk sold to the game (ADR-174)", () => {
     expect(nexamonMarketFeeCents(10_000)).toBe(500);
     expect(nexamonMarketFeeCents(19)).toBe(0);
-    expect(nexamonQuickSellCents(1_001, "common", null)).toBe(500);
-    expect(nexamonQuickSellCents(1_000, "rare", null)).toBe(500);
+    expect(nexamonQuickSellCents(1_001, "common", null)).toBe(650);
+    expect(nexamonQuickSellCents(1_000, "rare", null)).toBe(650);
+    expect(nexamonQuickSellCents(1_000, "rare", null, cfg, "cosmic_winds")).toBe(650);
+    expect(nexamonIsBulk("one_of_one", null, "cosmic_winds")).toBe(false);
+    expect(nexamonBulkRarities("super_apex")).toEqual(["common", "rare"]);
+    expect(nexamonBulkPayout([1_001, 1_000, 3])).toEqual({ valueCents: 2_004, feeCents: 703, payoutCents: 1_301 });
     expect(nexamonQuickSellCents(1_000, "ultra", null)).toBeNull();
     expect(nexamonQuickSellCents(1_000, "common", 9)).toBeNull();
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_CARDS, nexamonCard } from "@/config/nexamon";
-import { nexamonAiAskCents, nexamonGradingFeeCents } from "@/lib/sim/nexamon";
+import { nexamonAiAskCents, nexamonGradeFactorBps, nexamonGradingFeeCents } from "@/lib/sim/nexamon";
 import { createRng } from "@/lib/sim/rng";
 import { GameError } from "../types";
 import { createNexamonEngine, demoOtherCopies, type DemoNexamonState } from "./nexamon";
@@ -79,7 +79,13 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(overview.sets.map((s) => [s.key, s.packPriceCents, s.cards])).toEqual([
       ["mystic_energy", 20_000, 77],
       ["super_apex", 100_000, 77],
+      ["cosmic_winds", 500_000, 90],
       ["prismatic_peak", 1_000_000, 77],
+    ]);
+    expect(overview.oneOfOnes.map((x) => [x.cardKey, x.pulled])).toEqual([
+      ["cw-088", false],
+      ["cw-089", false],
+      ["cw-090", false],
     ]);
     expect(await key(engine.buyNexamonPack("r1", "mystic_energy"))).toBe("nexamon_locked");
     expect(await key(engine.nexamonCollection())).toBe("nexamon_locked");
@@ -89,15 +95,16 @@ describe("Nexamon in the demo (ADR-165)", () => {
   it("starts with the AI's stock: every card listed 10 % above its start price, no legendary, few prismas", async () => {
     const { engine } = setup();
     const { cards } = await engine.nexamonCollection();
-    expect(cards).toHaveLength(231);
+    expect(cards).toHaveLength(321);
     for (const card of cards) {
       expect(card.valueCents).toBe(nexamonCard(card.cardKey)!.startPriceCents);
       expect(card.listed).toBe(Math.min(card.population, cfg.ai.listedPerCard[card.rarity]));
       if (card.rarity === "legendary") expect(card.population).toBe(0);
     }
-    expect(cards.filter((c) => c.rarity === "prisma" && c.population > 0)).toHaveLength(6);
+    expect(cards.filter((c) => c.rarity === "prisma" && c.population > 0)).toHaveLength(8);
+    expect(cards.filter((c) => c.rarity === "one_of_one" && c.population > 0)).toHaveLength(0);
     const market = await engine.nexamonMarket({ sort: "price_asc" });
-    expect(market.total).toBe(3 * (50 * 4 + 10 * 3 + 10 * 2 + 2));
+    expect(market.total).toBe(3 * (50 * 4 + 10 * 3 + 10 * 2 + 2) + (50 * 4 + 15 * 3 + 15 * 2 + 2));
     expect(market.listings).toHaveLength(cfg.market.pageSize);
     for (const listing of market.listings) {
       expect(listing.sellerAi).toBe(true);
@@ -253,9 +260,11 @@ describe("Nexamon in the demo (ADR-165)", () => {
     const details = await engine.nexamonCard(ultra.cardKey);
     const slab = details.copies.find((c) => c.id === ultra.copyId)!;
     expect(slab).toMatchObject({ state: "graded", grade: 10, condition: "mint" });
-    // The slab is worth four times the market value, rounded once from the e4 value: the card's value in whole
-    // cents times three can be off by the rounding (at most 1.5 cents).
-    expect(Math.abs(slab.valueCents - details.card.valueCents * 4)).toBeLessThanOrEqual(2);
+    // ADR-174: a 10 is worth 2.5x to 4x by the card's popularity, rounded once from the e4 value
+    const factor = nexamonGradeFactorBps(10, details.card.popularityBps);
+    expect(factor).toBeGreaterThanOrEqual(25_000);
+    expect(factor).toBeLessThanOrEqual(40_000);
+    expect(Math.abs(slab.valueCents - (details.card.valueCents * factor) / 10_000)).toBeLessThanOrEqual(2);
     expect(details.graded[11]).toBe(1);
     expect(await key(engine.gradeNexamonCard("g3", ultra.copyId))).toBe("nexamon_not_raw");
     expect(await key(engine.sellNexamonToAi("q0", [ultra.copyId]))).toBe("nexamon_not_sellable");
@@ -310,7 +319,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect((await engine.nexamonCard(ultra.cardKey)).blackLabels).toBe(0);
   });
 
-  it("sells bulk to the AI at half the value; better cards go over the market", async () => {
+  it("sells bulk to the AI at the value minus the 35 % bulk fee; better cards go over the market", async () => {
     const { engine, world } = setup();
     world.rolls.push(...packRolls(0, 0.9));
     const pack = await engine.buyNexamonPack("r1", "mystic_energy");
@@ -322,7 +331,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
       commons.map((c) => c.copyId),
     );
     expect(sold.count).toBe(commons.length);
-    expect(sold.totalCents).toBe(commons.reduce((sum, c) => sum + Math.floor(c.valueCents * 0.5), 0));
+    expect(sold.totalCents).toBe(commons.reduce((sum, c) => sum + Math.floor((c.valueCents * 6_500) / 10_000), 0));
     expect(world.cash).toBe(cash + sold.totalCents);
     const after = (await engine.nexamonCard(commons[0]!.cardKey)).card;
     expect(after.owned).toBe(0);
@@ -368,6 +377,28 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect((await engine.nexamonCard(card.key)).card.valueCents).toBe(card.startPriceCents);
   });
 
+  it("pulls each One of One of Cosmic Winds only once (ADR-174)", async () => {
+    const { engine, world } = setup(10, 10_000_000);
+    // slots 1-3: card and condition; slot 4: rarity, card, condition; slot 5: the One of One roll hits (0)
+    const sure = () => [...Array<number>(9).fill(0.5), 0, 0, 0.5];
+    world.rolls.push(...sure());
+    const first = await engine.buyNexamonPack("c1", "cosmic_winds");
+    expect(first.priceCents).toBe(500_000);
+    expect(first.cards[4]).toMatchObject({ rarity: "one_of_one", cardKey: "cw-088", serial: 1 });
+    world.rolls.push(...sure());
+    const second = await engine.buyNexamonPack("c2", "cosmic_winds");
+    expect(second.cards[4]).toMatchObject({ rarity: "one_of_one", cardKey: "cw-089" });
+    const overview = await engine.nexamon();
+    expect(overview.oneOfOnes.map((x) => [x.cardKey, x.pulled, x.pulledBy])).toEqual([
+      ["cw-088", true, "Demo"],
+      ["cw-089", true, "Demo"],
+      ["cw-090", false, null],
+    ]);
+    // AI packs never hold one
+    const { cards } = await engine.nexamonCollection("cosmic_winds");
+    expect(cards.find((c) => c.cardKey === "cw-090")!.population).toBe(0);
+  });
+
   describe("a player's collectibles on their profile", () => {
     it("shows the own collection: one row per card with its best copy, most valuable first", async () => {
       const { engine, world } = setup();
@@ -382,7 +413,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
       expect(own.summary).toEqual({
         copies: 10,
         distinct: new Set(copies.map((c) => c.cardKey)).size,
-        total: 231,
+        total: 321,
         valueCents: copies.reduce((sum, c) => sum + c.valueCents, 0),
         graded: 0,
         tens: 0,
@@ -404,6 +435,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
       expect(own.sets.map((s) => [s.key, s.cards, s.distinct, s.copies])).toEqual([
         ["mystic_energy", 77, 5, 10],
         ["super_apex", 77, 0, 0],
+        ["cosmic_winds", 90, 0, 0],
         ["prismatic_peak", 77, 0, 0],
       ]);
       // by the own name it is the same answer
