@@ -451,7 +451,7 @@ const SAMPLE_GAMES = [
     },
   },
   { game: "sizes", taskKey: "parcel_sizes", puzzle: { sizes: [70, 40, 100, 55, 85, 30] } },
-  { game: "conveyor", taskKey: "belt_sort", puzzle: { items: [0, 1, 2, 0], every_ms: 1500, travel_ms: 7000 } },
+  { game: "conveyor", taskKey: "belt_sort", puzzle: { items: [0, 1, 2, 0], every_ms: 6000, travel_ms: 60000 } },
 ] as const;
 
 /** Autopilot and the last hour (ADR-180). */
@@ -492,7 +492,12 @@ function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
       <div className="flex items-center justify-between gap-2">
         <p className="label-pixel text-fg-3">Minispiel „{sample.game}“ (ADR-144, ADR-173, ADR-186)</p>
         {(sample.game === "catch" || sample.game === "conveyor") && (
-          <Button size="sm" variant="ghost" onClick={() => setRound((r) => r + 1)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid={`sample-restart-${sample.game}`}
+            onClick={() => setRound((r) => r + 1)}
+          >
             Neu
           </Button>
         )}

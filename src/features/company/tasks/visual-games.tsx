@@ -731,18 +731,15 @@ export function RebuildGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) 
           );
         })}
       </div>
-      {!showing && (
-        <div
-          data-drop="tray"
-          className="flex min-h-14 flex-wrap justify-center gap-1.5 rounded-md bg-surface-1 p-2"
-          aria-label={t("rebuildTray", { count: left.length })}
-        >
-          {left.map((k) => goods(k, false))}
-          {left.length === 0 && (
-            <span className="self-center text-2xs text-fg-3">{t("rebuildTray", { count: 0 })}</span>
-          )}
-        </div>
-      )}
+      {/* the tray stands there from the start (no jump when the layout hides); its goods wait until then */}
+      <div
+        data-drop="tray"
+        className="flex min-h-14 flex-wrap justify-center gap-1.5 rounded-md bg-surface-1 p-2"
+        aria-label={t("rebuildTray", { count: left.length })}
+      >
+        {left.map((k) => goods(k, false))}
+        {left.length === 0 && <span className="self-center text-2xs text-fg-3">{t("rebuildTray", { count: 0 })}</span>}
+      </div>
       <Button block disabled={disabled || showing} onClick={() => onAnswer({ layout })}>
         {t("done")}
       </Button>
@@ -1020,7 +1017,7 @@ function Parcel({
       animate={{ x: offset.x, y: offset.y }}
       transition={dragging ? { duration: 0 } : SPRING.snappy}
       className={cn(
-        "relative grid size-full min-h-11 cursor-grab touch-none place-items-end justify-center pb-1 focus-ring select-none active:cursor-grabbing",
+        "relative flex size-full min-h-11 cursor-grab touch-none items-end justify-center px-0.5 pb-1 focus-ring select-none active:cursor-grabbing",
         dragging && "z-10",
       )}
     >
@@ -1069,17 +1066,7 @@ export function ConveyorGame({ taskKey, puzzle, disabled, onAnswer }: GameProps)
   const sent = useRef(false);
   const [selected, setSelected] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (disabled) return;
-    const t0 = performance.now();
-    let raf = 0;
-    const tick = () => {
-      setNow(performance.now() - t0);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [disabled]);
+  const t0 = useRef<number | null>(null);
 
   const progress = (k: number) => {
     const b = belt[k]!;
@@ -1090,6 +1077,18 @@ export function ConveyorGame({ taskKey, puzzle, disabled, onAnswer }: GameProps)
   // goods that ran off the belt are missed (-1)
   const state = bins.map((v, k) => (v === -2 && belt[k]!.held === null && progress(k) >= 1 ? -1 : v));
   const finished = state.every((v) => v !== -2);
+  // the belt clock runs until every good is sorted or gone
+  useEffect(() => {
+    if (disabled || finished) return;
+    let raf = 0;
+    const tick = () => {
+      t0.current ??= performance.now();
+      setNow(performance.now() - t0.current);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [disabled, finished]);
   useEffect(() => {
     if (!finished || sent.current) return;
     sent.current = true;
@@ -1115,13 +1114,14 @@ export function ConveyorGame({ taskKey, puzzle, disabled, onAnswer }: GameProps)
         className="relative h-20 overflow-hidden rounded-md border-y-4 border-line-2 bg-surface-3"
         data-testid="conveyor-belt"
       >
-        {onBelt.map((k) => {
+        {/* the good furthest along lies on top, so it is the one a finger grabs */}
+        {[...onBelt].reverse().map((k) => {
           const p = Math.min(1, progress(k));
           const held = drag?.k === k;
           return (
             <div
               key={k}
-              className="absolute top-1/2 left-0 w-full"
+              className="pointer-events-none absolute top-1/2 left-0 w-full"
               style={{ transform: `translateX(calc(${p} * (100% - 5rem))) translateY(-50%)` }}
             >
               <button
@@ -1172,7 +1172,7 @@ export function ConveyorGame({ taskKey, puzzle, disabled, onAnswer }: GameProps)
                 }}
                 style={{ transform: held ? `translate(${drag.dx}px, ${drag.dy}px) scale(1.06)` : undefined }}
                 className={cn(
-                  "relative grid h-14 w-20 cursor-grab touch-none place-items-center rounded-md border-2 px-1 text-center text-2xs font-semibold shadow-1 focus-ring select-none active:cursor-grabbing",
+                  "pointer-events-auto relative grid h-14 w-20 cursor-grab touch-none place-items-center rounded-md border-2 px-1 text-center text-2xs font-semibold shadow-1 focus-ring select-none active:cursor-grabbing",
                   held && "z-10 shadow-2",
                   selected === k ? "border-accent bg-accent-soft text-fg-1" : KIND_TILE[items[k]! % KIND_TILE.length],
                 )}
