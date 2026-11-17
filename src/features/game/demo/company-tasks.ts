@@ -1,7 +1,22 @@
 import { BALANCE } from "@/config/balance";
-import { aiMinutes, generatePuzzle, gradeAnswer, taskResultCents, type TaskSolution } from "@/lib/sim/company-tasks";
+import {
+  autopilotChanceBps,
+  autopilotMood,
+  autopilotSucceeds,
+  taskPayFactorBps,
+  taskRewardCents,
+  type TaskMode,
+} from "@/lib/sim/company-autopilot";
+import { aiMinutes, generatePuzzle, gradeAnswer, type TaskSolution } from "@/lib/sim/company-tasks";
 import { upgradeEffects, type UpgradeLevels } from "@/lib/sim/upgrades";
-import { GameError, type CompanyTasks, type GameEngine, type NewsFeedItem, type StockNewsItem } from "../types";
+import {
+  GameError,
+  type CompanyAutopilot,
+  type CompanyTasks,
+  type GameEngine,
+  type NewsFeedItem,
+  type StockNewsItem,
+} from "../types";
 
 /*
  * Company tasks in the offline demo (ADR-129): the founder alone plus the AI workers, same numbers as the server.
@@ -31,6 +46,11 @@ export interface DemoTasksState {
   tasks: DemoTask[];
   autoAi: boolean;
   lastCreatedAt: number | null;
+  /** Autopilot (ADR-180). */
+  autopilot?: {
+    on: boolean;
+    log: { at: number; key: string; success: boolean; resultCents: number; chanceBps: number }[];
+  };
 }
 
 export interface CompanyTasksHost {
@@ -54,6 +74,10 @@ export interface CompanyTasksHost {
   state(): DemoTasksState | undefined;
   setState(s: DemoTasksState): void;
   idempotent<T>(requestId: string, run: () => T): T;
+  /** ADR-180: the six strengths (overall and team, 0..100), awareness from solved tasks, the last hour. */
+  strengths?(): { overall: number; team: number } | null;
+  boostAwareness?(add: number): void;
+  lastHour?(): CompanyAutopilot["lastHour"];
   now(): number;
   random(): number;
 }
@@ -72,6 +96,8 @@ export function createCompanyTasksEngine(
   | "submitCompanyTask"
   | "setJobSupervisor"
   | "setCompanyTasksAutoAi"
+  | "companyAutopilot"
+  | "setCompanyAutopilot"
   | "newsFeed"
 > {
   const load = (): DemoTasksState => host.state() ?? { seq: 0, tasks: [], autoAi: true, lastCreatedAt: null };
@@ -97,17 +123,34 @@ export function createCompanyTasksEngine(
     c.taskMomentum = Math.min(1 + m.maxBps / 10_000, Math.max(1, (c.taskMomentum ?? 1) + delta / 10_000));
   }
 
-  function resolve(s: DemoTasksState, t: DemoTask, score: number | null, byAi: boolean, now: number) {
+  const payFactor = () => taskPayFactorBps(host.strengths?.()?.overall ?? 0, cfg);
+  const chance = () => autopilotChanceBps(autopilotMood(host.strengths?.()?.team ?? 0), cfg);
+
+  function resolve(s: DemoTasksState, t: DemoTask, score: number | null, mode: TaskMode, now: number) {
     const e = effects();
-    const result = taskResultCents(t.valueCents, score, byAi, cfg, {
-      payBonusBps: e.taskPayBonusBps,
-      penaltyDiscountBps: e.taskPenaltyDiscountBps,
-    });
+    const byAi = mode !== "manual";
+    // ADR-180: the strengths raise the pay, the autopilot pays its share (same as company_task_resolve)
+    const result = taskRewardCents(
+      t.valueCents,
+      score,
+      mode,
+      {
+        payFactorBps: payFactor(),
+        chanceBps: t.aiChanceBps,
+        payBonusBps: e.taskPayBonusBps,
+        penaltyDiscountBps: e.taskPenaltyDiscountBps,
+      },
+      cfg,
+    );
     t.status = score !== null && score >= cfg.passScoreBps ? "success" : score === null ? "missed" : "failure";
     t.scoreBps = score;
     t.resultCents = result;
     t.resolvedAt = now;
     applyMomentum(score, byAi);
+    if (t.status === "success") {
+      const a = BALANCE.startups.awareness;
+      host.boostAwareness?.(a.taskGain * (byAi ? a.taskAiShareBps / 10_000 : 1));
+    }
     host.addCompanyCash(result);
     host.news(`task_${t.status}`, {
       task: t.key,
@@ -119,6 +162,63 @@ export function createCompanyTasksEngine(
     s.tasks = s.tasks.slice(-40);
   }
 
+  /** The autopilot (ADR-180): open tasks that waited delayMinutes, at most maxPerDay per day. */
+  function runAutopilot(s: DemoTasksState, now: number) {
+    const ap = s.autopilot;
+    if (!ap?.on) return;
+    const a = cfg.autopilot;
+    const day0 = new Date(now);
+    day0.setHours(0, 0, 0, 0);
+    let left = a.maxPerDay - ap.log.filter((l) => l.at >= day0.getTime()).length;
+    for (const t of s.tasks) {
+      if (left <= 0) break;
+      if (t.status !== "open" || t.dueAt <= now || t.createdAt > now - a.delayMinutes * 60_000) continue;
+      const c = chance();
+      const ok = autopilotSucceeds(c, host.random());
+      t.assigneeAi = true;
+      t.aiChanceBps = c;
+      resolve(s, t, ok ? 10_000 : 0, "autopilot", now);
+      ap.log = [{ at: now, key: t.key, success: ok, resultCents: t.resultCents, chanceBps: c }, ...ap.log].slice(
+        0,
+        200,
+      );
+      left -= 1;
+    }
+  }
+
+  function autopilotState(s: DemoTasksState): CompanyAutopilot {
+    const now = host.now();
+    const day0 = new Date(now);
+    day0.setHours(0, 0, 0, 0);
+    const log = s.autopilot?.log ?? [];
+    const today = log.filter((l) => l.at >= day0.getTime());
+    const st = host.strengths?.();
+    return {
+      on: s.autopilot?.on ?? false,
+      canToggle: true,
+      mood: autopilotMood(st?.team ?? 0),
+      chanceBps: chance(),
+      rewardBps: cfg.autopilot.rewardBps,
+      failPenaltyBps: cfg.autopilot.failPenaltyBps,
+      maxPerDay: cfg.autopilot.maxPerDay,
+      everyMinutes: cfg.autopilot.everyMinutes,
+      payFactorBps: payFactor(),
+      today: {
+        done: today.length,
+        success: today.filter((l) => l.success).length,
+        cents: today.reduce((sum, l) => sum + l.resultCents, 0),
+      },
+      log: log.slice(0, cfg.autopilot.logLimit).map((l) => ({
+        at: new Date(l.at).toISOString(),
+        key: l.key,
+        success: l.success,
+        resultCents: l.resultCents,
+        chanceBps: l.chanceBps,
+      })),
+      lastHour: host.lastHour?.() ?? null,
+    };
+  }
+
   /** AI results, deadlines, auto AI and a new task when the board is short. */
   function tick(): DemoTasksState {
     const c = company();
@@ -127,11 +227,11 @@ export function createCompanyTasksEngine(
     for (const t of s.tasks) {
       if (t.status === "ai" && t.aiDoneAt !== null && t.aiDoneAt <= now) {
         const ok = t.aiDoneAt <= t.dueAt && host.random() * 10_000 < t.aiChanceBps;
-        resolve(s, t, ok ? 10_000 : 0, true, now);
+        resolve(s, t, ok ? 10_000 : 0, "ai", now);
       }
       if (t.status === "playing" && t.openedAt !== null) {
         const g = cfg.games[defOf(t.key)?.game ?? "math"];
-        if (t.openedAt + (g.seconds + cfg.graceSeconds + 60) * 1000 <= now) resolve(s, t, 0, false, now);
+        if (t.openedAt + (g.seconds + cfg.graceSeconds + 60) * 1000 <= now) resolve(s, t, 0, "manual", now);
       }
       if (
         t.status === "open" &&
@@ -142,8 +242,9 @@ export function createCompanyTasksEngine(
       ) {
         toAi(s, t, now);
       }
-      if ((t.status === "open" || t.status === "assigned") && t.dueAt <= now) resolve(s, t, null, false, now);
+      if ((t.status === "open" || t.status === "assigned") && t.dueAt <= now) resolve(s, t, null, "manual", now);
     }
+    runAutopilot(s, now);
     const active = s.tasks.filter((t) => ["open", "assigned", "playing", "ai"].includes(t.status));
     const target = Math.min(cfg.board.max, cfg.board.base + Math.floor((1 + c.aiWorkers) / cfg.board.membersPerTask));
     if (
@@ -282,6 +383,18 @@ export function createCompanyTasksEngine(
     async companyTasks() {
       return state(tick());
     },
+    async companyAutopilot() {
+      return autopilotState(tick());
+    },
+    setCompanyAutopilot: (requestId, on) =>
+      Promise.resolve().then(() =>
+        host.idempotent(requestId, () => {
+          const s = tick();
+          s.autopilot = { on, log: s.autopilot?.log ?? [] };
+          host.setState(s);
+          return autopilotState(s);
+        }),
+      ),
     delegateCompanyTask: (requestId, taskId, to) =>
       Promise.resolve().then(() =>
         host.idempotent(requestId, () => {
@@ -337,7 +450,7 @@ export function createCompanyTasksEngine(
           if (t.status !== "playing") throw new GameError("task_closed");
           const late = host.now() - t.openedAt > (cfg.games[def.game].seconds + cfg.graceSeconds) * 1000;
           const score = late ? 0 : gradeAnswer(def.game, t.solution, answer);
-          resolve(s, t, score, false, host.now());
+          resolve(s, t, score, "manual", host.now());
           host.setState(s);
           const status = t.status as DemoTask["status"] as "success" | "failure" | "missed";
           return {

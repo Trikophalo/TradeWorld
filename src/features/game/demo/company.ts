@@ -56,6 +56,7 @@ import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } 
 import {
   GameError,
   type CampaignKind,
+  type CompanyAutopilot,
   type ChatMessage,
   type CloseCompanyResult,
   type Dissolution,
@@ -1408,7 +1409,7 @@ export interface DemoListedStock {
 }
 
 /** Strengths (ADR-176) in the demo: replayed from the kept hours with the same rules as the server. */
-function demoStrengths(company: DemoCompanyState): MyCompany["strengths"] {
+export function demoStrengths(company: DemoCompanyState): MyCompany["strengths"] {
   const cfg = BALANCE.companyHealth.strengths;
   let scores = EMPTY_STRENGTHS;
   for (const h of company.hours ?? []) {
@@ -1438,5 +1439,24 @@ function demoStrengths(company: DemoCompanyState): MyCompany["strengths"] {
     rewardBps: strengthsRewardBps(scores, cfg),
     next: strengthsNextReward(scores, cfg),
     closeError: null,
+  };
+}
+
+/** The last closed hour for the autopilot card (ADR-180), shaped like get_company_autopilot.last_hour. */
+export function demoLastHour(company: DemoCompanyState | null): CompanyAutopilot["lastHour"] {
+  const h = company?.hours?.at(-1);
+  if (!company || !h) return null;
+  return {
+    hourStart: new Date(h.at).toISOString(),
+    revenueCents: h.revenueCents,
+    profitCents: h.profitCents,
+    demandCents: h.demandCents,
+    capacityCents: h.capacityCents,
+    aiWorkers: company.aiWorkers,
+    aiWagesDueCents: h.aiWagesCents,
+    aiUtilizationBps: h.aiUtilizationBps ?? null,
+    awarenessBefore: h.awarenessBefore ?? null,
+    awarenessAfter: h.awarenessAfter ?? null,
+    awarenessParts: h.awarenessParts ?? null,
   };
 }

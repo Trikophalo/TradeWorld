@@ -1130,6 +1130,17 @@ select tests.login_as('authenticated', :fx_ta) is null as ok \gset
 select public.submit_company_task(gen_random_uuid(), :fx_t2, jsonb_build_object('value', :'fx_tv'::int));
 \o
 reset role;
+-- autopilot (ADR-180): one logged result, then on and off again
+insert into public.company_autopilot_log (company_id, task_id, task_key, success, result_cents, chance_bps)
+values (:'fx_tco', null, 'pay_invoices', true, 12345, 9000);
+select tests.login_as('authenticated', :fx_ta) is null as ok \gset
+\o :fixture_dir/set_company_autopilot.json
+select public.set_company_autopilot(gen_random_uuid(), true);
+\o :fixture_dir/get_company_autopilot.json
+select public.get_company_autopilot();
+\o
+select public.set_company_autopilot(gen_random_uuid(), false) is not null as ok \gset
+reset role;
 select tests.login_as('authenticated', :fx_tb) is null as ok \gset
 \o :fixture_dir/get_company_tasks.json
 select public.get_company_tasks();

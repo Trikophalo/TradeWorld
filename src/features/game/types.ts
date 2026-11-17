@@ -1396,6 +1396,37 @@ export interface CompanyTasks {
   }[];
 }
 
+/** Autopilot of the company tasks and the last hour's economy (ADR-180). */
+export interface CompanyAutopilot {
+  on: boolean;
+  canToggle: boolean;
+  /** Employee mood 0..1 (Team strength, or satisfaction when listed). */
+  mood: number;
+  /** Success chance in bps, 6 000..12 000; above 10 000 the rest is a reward bonus. */
+  chanceBps: number;
+  rewardBps: number;
+  failPenaltyBps: number;
+  maxPerDay: number;
+  everyMinutes: number;
+  /** Task pay factor from the six strengths (bps). */
+  payFactorBps: number;
+  today: { done: number; success: number; cents: number };
+  log: { at: string; key: string; success: boolean; resultCents: number; chanceBps: number }[];
+  lastHour: {
+    hourStart: string;
+    revenueCents: number;
+    profitCents: number;
+    demandCents: number;
+    capacityCents: number;
+    aiWorkers: number;
+    aiWagesDueCents: number;
+    aiUtilizationBps: number | null;
+    awarenessBefore: number | null;
+    awarenessAfter: number | null;
+    awarenessParts: { wordOfMouth: number; marketing: number; decay: number; extra: number; cap: number } | null;
+  } | null;
+}
+
 export interface CompanyTaskPlay {
   id: number;
   key: string;
@@ -2329,6 +2360,8 @@ export interface GameEngine extends BattleEngine, NexamonEngine, PackBattleEngin
   submitCompanyTask(requestId: string, taskId: number, answer: Record<string, unknown>): Promise<CompanyTaskResult>;
   setJobSupervisor(requestId: string, nickname: string, supervisor: string | null): Promise<CompanyTasks>;
   setCompanyTasksAutoAi(requestId: string, on: boolean): Promise<CompanyTasks>;
+  companyAutopilot(): Promise<CompanyAutopilot>;
+  setCompanyAutopilot(requestId: string, on: boolean): Promise<CompanyAutopilot>;
   newsFeed(kind: NewsFeedKind, limit: number): Promise<NewsFeedItem[]>;
   snapshot(): Promise<MarketSnapshot>;
   /** A stock page was opened (ADR-145); counts once per stock within the cooldown. */

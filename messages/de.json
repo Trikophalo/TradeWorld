@@ -9248,7 +9248,9 @@
       "moodYellow": "Unter {green} Punkten leidet die Arbeit. Kapazität aktuell: {capacity}. Benefits oder eine Aktion helfen.",
       "moodRed": "Stimmung im Keller: Kapazität {capacity}, und KI-Kräfte kündigen von selbst. Jetzt gegensteuern.",
       "reputationEffects": "Nachfrage {demand} · fairer Kurs {price} · Auszahlungsquote {payout}",
-      "cashAllFree": "alles frei verfügbar"
+      "cashAllFree": "alles frei verfügbar",
+      "detailsSection": "Erweitert",
+      "detailsSummary": "Laufende Timer, die acht Faktoren im Detail, Wert des Teams und das Büro"
     },
     "todo": {
       "title": "Zu erledigen",
@@ -9268,7 +9270,11 @@
       "applications": "{count, plural, one {# Bewerbung} other {# Bewerbungen}}",
       "tasks": "{count, plural, one {# offene Aufgabe} other {# offene Aufgaben}}",
       "subscription": "Zeichnung läuft",
-      "ipo": "Börsengang möglich"
+      "ipo": "Börsengang möglich",
+      "marketing": "Marketing einstellen: ohne Werbung wächst die Bekanntheit kaum",
+      "aiIdle": "{count, plural, one {# KI-Kraft hat} other {# KI-Kräfte haben}} zu wenig zu tun",
+      "soldOut": "Ausverkauft: mehr Hände einstellen",
+      "autopilot": "Autopilot für die Nacht einschalten"
     },
     "timers": {
       "title": "Was gerade läuft",
@@ -9646,6 +9652,28 @@
       "totalCosts": "Lohnkosten gesamt",
       "totalNet": "Bleibt",
       "hint": "Ein Monat sind hier {days} Tage. Leistung: Umsatz der letzten 24 Stunden × {days}, aufgeteilt nach dem Anteil an der Produktivität des Teams. Kosten: Spieler bekommen höchstens {hours} bezahlte Stunden am Tag, KI-Kräfte jede Betriebsstunde. Wareneinsatz und Fixkosten sind nicht abgezogen."
+    },
+    "pulse": {
+      "title": "Was die letzte Stunde sagt",
+      "awarenessUp": "Bekanntheit +{total} Punkte: +{marketing} durch Marketing, +{word} durch Mundpropaganda, +{extra} durch Aufgaben, −{decay} vergessen.",
+      "awarenessDown": "Bekanntheit −{total} Punkte: −{decay} vergessen, nur +{marketing} durch Marketing und +{word} durch Mundpropaganda. Mehr Marketing hilft.",
+      "awarenessCap": "Die Bekanntheit steht an der Obergrenze deiner Stufe. Weiter geht es erst mit dem Fachwissen der nächsten Stufe.",
+      "aiBusy": "{count, plural, one {Deine KI-Kraft ist voll ausgelastet und bringt mehr ein, als sie kostet.} other {Deine # KI-Kräfte sind voll ausgelastet und bringen mehr ein, als sie kosten.}}",
+      "aiPartly": "{idle} von {count} KI-Kräften haben zu wenig zu tun (zu wenig Nachfrage). Im Leerlauf kostet eine KI-Kraft nur {standby} % ihres Lohns.",
+      "aiIdle": "Zu wenig Nachfrage: {count, plural, one {deine KI-Kraft steht still und kostet} other {deine # KI-Kräfte stehen still und kosten je}} {standby} % des Lohns. Erst Bekanntheit aufbauen, dann einstellen.",
+      "soldOut": "Ausverkauft: Es wollten mehr Kunden kaufen, als dein Team schafft. Mehr KI-Kräfte verkaufen mehr."
+    },
+    "autopilot": {
+      "title": "Autopilot",
+      "intro": "Erledigt alle Firmenaufgaben ohne Minispiel, auch nachts. Bringt {reward} % dessen, was du selbst schaffst.",
+      "chance": "Erfolgschance",
+      "mood": "Stimmung im Team: {mood} %",
+      "bonus": "Sicherer Erfolg, dazu +{bonus} % Lohn",
+      "today": "Heute",
+      "todayCount": "{done, plural, =0 {noch keine Aufgabe} one {# Aufgabe} other {# Aufgaben}}, {success} erfolgreich",
+      "rules": "Höchstens {perDay} Aufgaben am Tag. Daneben kostet {penalty} % des Werts. Deine Stärken zahlen ×{pay} auf jede gelöste Aufgabe. Je besser die Stimmung, desto sicherer der Erfolg (60 bis 120 %).",
+      "onToast": "Autopilot an. Er übernimmt ab jetzt alle Aufgaben.",
+      "offToast": "Autopilot aus."
     }
   },
   "nexamonLive": {

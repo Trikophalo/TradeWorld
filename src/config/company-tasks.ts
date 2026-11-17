@@ -622,6 +622,29 @@ export const COMPANY_TASK_RULES = {
     maxBps: 6_000,
   },
   historyLimit: 15,
+  /**
+   * Autopilot (ADR-180): while on, the server takes every open task that has waited delayMinutes and resolves it
+   * without a mini-game. Chance = baseChanceBps + (maxChanceBps - baseChanceBps) x mood (0..1); above 10 000 the task
+   * always succeeds and the part above 100 % becomes an extra reward multiplier. Success pays rewardBps of what a
+   * perfect manual run pays, failure costs failPenaltyBps of the value. Without anyone active a new task comes every
+   * everyMinutes; at most maxPerDay autopilot tasks per Berlin day. The morning summary goes out from summaryHour.
+   */
+  autopilot: {
+    baseChanceBps: 6_000,
+    maxChanceBps: 12_000,
+    rewardBps: 7_000,
+    failPenaltyBps: 3_000,
+    delayMinutes: 3,
+    everyMinutes: 60,
+    maxPerDay: 24,
+    summaryHour: 7,
+    logLimit: 15,
+  },
+  /**
+   * Task pay with the six strengths (ADR-180): minBps at overall 0 up to maxBps at overall 100, linear, on every
+   * successful task (manual, AI, autopilot). Steeper than companyHealthPayFactor (1.00..1.15), so it is noticeable.
+   */
+  strengthPay: { minBps: 9_000, maxBps: 15_000 },
 } as const;
 
 /** Funny filler news for the news tab (ADR-129); texts in messages/de.json (funNews.items). */
