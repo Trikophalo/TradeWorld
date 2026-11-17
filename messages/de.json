@@ -3241,6 +3241,7 @@
         "coin_closed": "hat den Coin {name} ({ticker}) eingestellt.",
         "accessory_bought": "trägt jetzt etwas Legendäres: {name}.",
         "nexamon_pull": "hat {rarity, select, uranium {eine Uranium-Karte} other {eine legendäre Nexamon-Karte}} gezogen: {name} (Nummer {serial}).",
+        "nexamon_big_pull": "hat eine Karte mit riesigem Wert gezogen: {name} – Wert {value}!",
         "nexamon_battle_won": "hat ein Pack Battle gegen {other} gewonnen und Karten für {value} abgeräumt.",
         "nexamon_battle_big": "hat im Pack Battle gegen {other} groß abgeräumt: Karten für {value}.",
         "nexamon_black_label": "hat bei ASP ein Black Label geholt: {name} (Nummer {serial}).",

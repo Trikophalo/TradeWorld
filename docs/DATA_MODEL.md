@@ -8122,3 +8122,13 @@ drivers, at, history: [{hour_start, value, target}]}` (letzte 48 Stunden) und `c
 - `place_order` (Sofort-Orders): führt genau diesen Plan aus, jede Menge ganz. Ergebnis zusätzlich
   `requested_quantity_e6`, `unfilled_quantity_e6`, `limited_by` (`supply` oder null), `impact_bps`.
   `trading.maxOrderQuantity` ist nur noch eine technische Schranke. Limit-Orders unverändert.
+
+## Nachtrag: Große Nexamon-Züge für alle (ADR-190)
+
+- `nexamon_big_pull_broadcasts` (neu, nur über Funktionen): `player_id` (PK), `tx_id`, `broadcast_at`, `dedupe_key`,
+  `cards` (jsonb). Letzte Rundmeldung je Zieher: Sperre `nexamon.bigPullNotifySeconds`, mehrere große Züge einer
+  Transaktion landen in derselben Nachricht.
+- Trigger `nexamon_big_pull_notify` (AFTER INSERT auf `nexamon_copies`): Kopie eines Spielers aus einem Pack
+  (`source = 'pack'`, `pack_id` gesetzt) mit Wert über `nexamon.bigPullNotifyCents` → Benachrichtigung
+  `nexamon_big_pull` an alle anderen aktiven Spieler (Link `/nexamon/<card_key>`) und Feed-Eintrag `nexamon_big_pull`
+  (nicht für `feedRarities`). One of Ones, KI-Züge und unveröffentlichte Sets nie.

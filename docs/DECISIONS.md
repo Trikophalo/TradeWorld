@@ -4436,3 +4436,18 @@ entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awaren
 
 **Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
 Anzeige-Grenzen der Garage.
+
+## ADR-190: Große Nexamon-Züge sind Nachrichten für alle — `Annahme`
+
+**Kontext.** Der Owner: „Wenn einer eine Karte über 100k wert zieht, bekommen alle die Benachrichtigung.“
+
+**Entscheidung.** Ein Trigger nach dem Einfügen in `nexamon_copies` (statt die lange `nexamon_open_pack()` per
+Textersatz zu flicken) erkennt jeden Zug eines Spielers aus einem Pack (gekauft, mehrere, versiegelt, Pack Battle):
+Wert zum Zugzeitpunkt (Kopie inkl. Zustand) über `nexamon.bigPullNotifyCents` (100.000 €) → Benachrichtigung
+`nexamon_big_pull` an alle anderen aktiven Spieler, Feed-Eintrag für die Freunde. One of Ones melden sich schon selbst
+(keine Doppelung), die KI nie. Höchstens eine Rundmeldung je Zieher in `bigPullNotifySeconds` (60 s); mehrere große
+Züge derselben Transaktion (eine Öffnung, ein Mehrfachkauf) werden zu einer Nachricht („… hat 2 Karten über
+100.000 € gezogen, darunter …“) zusammengefasst.
+
+**Folgen.** Neue Tabelle `nexamon_big_pull_broadcasts`, neuer Benachrichtigungstyp (abschaltbar), Feed-Art
+`nexamon_big_pull`. Test `supabase/tests/c8_big_pull.sql`.

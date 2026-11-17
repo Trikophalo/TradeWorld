@@ -64,6 +64,7 @@ const ICONS: Record<string, PixelArt> = {
   board_revolt: UI_ICONS.markets,
   research_done: UI_ICONS.upgrade,
   nexamon_pull: UI_ICONS.nexamon,
+  nexamon_big_pull: UI_ICONS.nexamon,
   nexamon_black_label: UI_ICONS.nexamon,
   nexamon_battle_won: UI_ICONS.nexamon,
   nexamon_battle_big: UI_ICONS.nexamon,
@@ -159,6 +160,11 @@ function useFeedText() {
         return t("nexamon_master_set", { name: str(p.name) });
       case "nexamon_hype":
         return t("nexamon_hype", { name: nexamonCard(str(p.card_key))?.name ?? str(p.name) });
+      case "nexamon_big_pull":
+        return t("nexamon_big_pull", {
+          name: nexamonCard(str(p.card_key))?.name ?? str(p.name),
+          value: formatMoney(n(p.value_cents)),
+        });
       case "nexamon_pull":
         return t("nexamon_pull", {
           name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key),
@@ -258,7 +264,7 @@ export function FeedRow({ item, compact }: { item: FeedItem; compact?: boolean }
           </Link>{" "}
           {item.isMe && <span className="label-pixel text-accent">{t("you")} </span>}
           {text(item)}
-          {(item.kind === "nexamon_pull" || item.kind === "nexamon_black_label") &&
+          {(item.kind === "nexamon_pull" || item.kind === "nexamon_big_pull" || item.kind === "nexamon_black_label") &&
             nexamonCard(str(item.payload.card_key)) && (
               <>
                 {" "}

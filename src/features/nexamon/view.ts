@@ -496,6 +496,8 @@ export const revealKey = (copy: Pick<NexamonCopy, "id" | "gradedAt">): string =>
 export function nexamonNotificationLink(typeKey: string, link: string | null): string | null {
   if (typeKey === "nexamon_graded") return "/nexamon?tab=grading";
   if (typeKey === "nexamon_sale") return "/nexamon?tab=market&view=mine";
+  // A big pull of another player (ADR-190) links to the card page; without one, the collectibles.
+  if (typeKey === "nexamon_big_pull") return link ?? "/nexamon";
   return link;
 }
 
