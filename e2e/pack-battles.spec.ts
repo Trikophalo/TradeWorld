@@ -106,3 +106,40 @@ test("presence strip, a pack battle against a demo friend and the live spectator
   await expect(spect).not.toHaveAttribute("data-shown", "0", { timeout: 20_000 });
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/spectate-${info.project.name}.png` });
 });
+
+test("a four-player pack battle over three packs (ADR-192)", async ({ page }, info) => {
+  test.setTimeout(150_000);
+  await preparePlayer(page);
+  await page.goto("/nexamon");
+  await expect(page.getByTestId("nexamon-lobby")).toBeVisible();
+  await page.getByTestId("battle-create").click();
+  await page.getByRole("radio", { name: "4 Spieler" }).click();
+  await page.getByTestId("challenge-set-super_apex").click();
+  await page.getByTestId("challenge-set-mystic_energy").click();
+  await expect(page.getByTestId("lineup-item")).toHaveCount(3);
+  // reorder and remove: the lineup keeps its order, the total follows it
+  await page.getByTestId("lineup-up").nth(1).click();
+  await expect(page.getByTestId("lineup-item").first()).toHaveAttribute("data-set", "super_apex");
+  await page.getByTestId("lineup-remove").nth(2).click();
+  await expect(page.getByTestId("lineup-item")).toHaveCount(2);
+  await page.getByTestId("challenge-set-mystic_energy").click();
+  await expect(page.getByTestId("lineup-item")).toHaveCount(3);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-create-${info.project.name}.png` });
+  await page.getByTestId("challenge-send").click();
+  const view = page.getByTestId("battle-view");
+  await expect(view).toBeVisible({ timeout: 15_000 });
+  await expect(view).toHaveAttribute("data-players", "4");
+  await expect(page.getByTestId("lobby-seat")).toHaveCount(4);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-lobby-${info.project.name}.png` });
+  await expect(view).toHaveAttribute("data-phase", "revealing", { timeout: 30_000 });
+  await expect(page.getByTestId("battle-seat")).toHaveCount(4);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-battle-${info.project.name}.png` });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await expect(page.getByTestId("battle-summary")).toBeVisible({ timeout: 60_000 });
+  for (const seat of await page.getByTestId("battle-seat").all())
+    await expect(seat).toHaveAttribute("data-shown", "15");
+  await expect(page.getByTestId("battle-ranking").locator("li")).toHaveCount(4);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-end-${info.project.name}.png` });
+  await page.getByTestId("battle-done").click();
+});

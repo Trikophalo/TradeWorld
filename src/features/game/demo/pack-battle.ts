@@ -1,7 +1,13 @@
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_CARDS, NEXAMON_SETS, type NexamonSetKey } from "@/config/nexamon";
 import { nexamonOpenPack, nexamonCopyValueCents, nexamonE4FromCents, nexamonSetReleased } from "@/lib/sim/nexamon";
-import { battleKnownSlots, battleTimeline, decideBattle } from "@/lib/sim/nexamon-battle";
+import {
+  decideMultiBattle,
+  multiBattleTimeline,
+  multiKnownCards,
+  packBattleCostCents,
+  packBattleLineupOk,
+} from "@/lib/sim/nexamon-battle";
 import { createRng } from "@/lib/sim/rng";
 import type { NexamonPull } from "../nexamon-types";
 import type {
@@ -42,10 +48,12 @@ export interface PackBattleHost {
   friends(): DemoLobbyFriend[];
   cashCents(): number;
   pay(cents: number): void;
+  /** ADR-192: every seat opens the lineup; seat 0 is the demo player; `decide` picks the winning seat. */
   rollPacks(
-    set: NexamonSetKey,
-    iWin: (mine: NexamonPull[], theirs: NexamonPull[]) => boolean,
-  ): { mine: NexamonPull[]; theirs: NexamonPull[]; won: boolean };
+    sets: readonly NexamonSetKey[],
+    seats: number,
+    decide: (pulls: NexamonPull[][]) => number,
+  ): { pulls: NexamonPull[][]; winner: number };
   feed(kind: string, payload: Record<string, unknown>): void;
   notify(typeKey: string, title: string, body: string | null, link: string | null): void;
   idempotent<T>(requestId: string, run: () => T): T;
@@ -60,21 +68,27 @@ export const DEMO_COLLECTORS: readonly DemoLobbyFriend[] = [
   { nickname: "Ayla", level: 21, avatarKey: "scientist", accessories: [] },
 ];
 
+/** A made-up friend takes the next free seat this long after the one before (ADR-192). */
+const JOIN_MS = ACCEPT_MS;
+
 interface DemoBattle {
   id: string;
-  set: NexamonSetKey;
-  opponent: NexamonFigure;
+  mode: "duel" | "multi";
+  packs: NexamonSetKey[];
+  size: number;
+  /** Seat 1.. in order: who will join (invited friends first). */
+  joiners: NexamonFigure[];
   status: "pending" | "declined" | "expired" | "cancelled" | "aborted" | "accepted";
   priceCents: number;
   createdAt: number;
   expiresAt: number;
   acceptedAt: number | null;
-  mine: NexamonShownPull[];
-  theirs: NexamonShownPull[];
-  won: boolean | null;
+  cards: NexamonShownPull[][];
+  winnerSeat: number | null;
   tieBreak: "value" | "rarest" | "coin" | null;
   seed: number;
   abortReason: string | null;
+  refunded: boolean;
 }
 
 interface OwnLive {
@@ -89,14 +103,19 @@ interface OwnLive {
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
-const shown = (p: NexamonPull): NexamonShownPull => ({
-  slot: p.slot,
-  cardKey: p.cardKey,
-  rarity: p.rarity,
-  condition: p.condition,
-  serial: p.serial,
-  valueCents: p.valueCents,
-});
+const shown = (p: NexamonPull): NexamonShownPull => {
+  const pack = Math.floor((p.slot - 1) / cfg.packSize) + 1;
+  return {
+    slot: p.slot - (pack - 1) * cfg.packSize,
+    cardKey: p.cardKey,
+    rarity: p.rarity,
+    condition: p.condition,
+    serial: p.serial,
+    valueCents: p.valueCents,
+    pack,
+    idx: p.slot,
+  };
+};
 
 export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine & {
   /** The demo's own pack purchase: becomes a live opening. */
@@ -131,6 +150,8 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
         rng.next,
       ).map((pull): NexamonShownPull => ({
         slot: pull.slot,
+        pack: 1,
+        idx: pull.slot,
         cardKey: pull.key,
         rarity: pull.rarity,
         condition: pull.condition,
@@ -157,61 +178,76 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
     };
   }
 
+  /** How many seats are taken at `now` (the creator plus made-up friends joining one by one). */
+  const taken = (b: DemoBattle, now: number) =>
+    Math.min(b.size, 1 + Math.max(0, Math.floor((now - b.createdAt) / JOIN_MS)));
+  const fullAt = (b: DemoBattle) => b.createdAt + (b.size - 1) * JOIN_MS;
+  const timeline = (b: DemoBattle) =>
+    b.acceptedAt !== null ? multiBattleTimeline(b.acceptedAt, b.packs.length) : null;
+
+  function refund(b: DemoBattle) {
+    if (b.refunded) return;
+    b.refunded = true;
+    host.pay(-b.priceCents);
+  }
+
   function settle(b: DemoBattle, now: number) {
-    if (b.status === "pending" && now >= b.createdAt + ACCEPT_MS && now < b.expiresAt)
-      accept(b, b.createdAt + ACCEPT_MS);
-    if (b.status === "pending" && now >= b.expiresAt) b.status = "expired";
+    if (b.status === "pending" && now >= fullAt(b) && fullAt(b) < b.expiresAt) accept(b, fullAt(b));
+    if (b.status === "pending" && now >= b.expiresAt) {
+      b.status = "expired";
+      refund(b);
+    }
   }
 
   function accept(b: DemoBattle, at: number) {
-    if (host.cashCents() < b.priceCents) {
-      b.status = "aborted";
-      b.abortReason = "challenger_funds";
-      host.notify(
-        "nexamon_battle",
-        "Pack Battle abgebrochen",
-        "Für das Pack Battle hat dein Geld nicht mehr gereicht.",
-        "/nexamon",
-      );
-      return;
-    }
-    host.pay(b.priceCents);
     b.seed = Math.floor(host.random() * 2_147_483_647);
-    const rolled = host.rollPacks(b.set, (mine, theirs) => {
-      const d = decideBattle(mine, theirs, b.seed);
+    const rolled = host.rollPacks(b.packs, b.size, (pulls) => {
+      const d = decideMultiBattle(pulls, b.seed);
       b.tieBreak = d.tieBreak;
-      return d.winner === "challenger";
+      return d.winner;
     });
-    b.mine = rolled.mine.map(shown);
-    b.theirs = rolled.theirs.map(shown);
-    b.won = rolled.won;
+    b.cards = rolled.pulls.map((seat) => seat.map(shown));
+    b.winnerSeat = rolled.winner;
     b.status = "accepted";
     b.acceptedAt = at;
-    if (rolled.won) {
+    if (rolled.winner === 0) {
       host.feed("nexamon_battle_won", {
-        set: b.set,
-        other: b.opponent.nickname,
-        total_cents: [...b.mine, ...b.theirs].reduce((s, p) => s + p.valueCents, 0),
-        cards: 10,
+        set: b.packs[0],
+        other: b.joiners.map((j) => j.nickname).join(", "),
+        total_cents: b.cards.flat().reduce((s, p) => s + p.valueCents, 0),
+        cards: b.cards.flat().length,
+        packs: b.packs.length,
+        players: b.size,
       });
     }
   }
 
   function battleJson(b: DemoBattle, now: number): NexamonBattle {
     settle(b, now);
-    const t = b.acceptedAt !== null ? battleTimeline(b.acceptedAt) : null;
-    const known = t ? battleKnownSlots(t.startsAt, now) : 0;
+    const t = timeline(b);
+    const known = t ? multiKnownCards(t.startsAt, now, b.packs.length) : 0;
     const decided = t !== null && now >= t.decideAt - cfg.battles.leadMs;
-    const mine = b.mine.filter((p) => p.slot <= known);
-    const theirs = b.theirs.filter((p) => p.slot <= known);
+    const seatCount = b.status === "accepted" ? b.size : b.status === "pending" ? taken(b, now) : 1;
+    const figures = [host.me(), ...b.joiners].slice(0, seatCount);
+    const seats = figures.map((player, seat) => {
+      const cards = (b.cards[seat] ?? []).filter((p) => p.idx <= known);
+      return { seat, player, isMe: seat === 0, cards, cents: cards.reduce((s, p) => s + p.valueCents, 0) };
+    });
     const status = b.status === "accepted" ? (t && now >= t.endsAt ? "done" : "running") : b.status;
+    const winnerSeat = decided ? b.winnerSeat : null;
     return {
       id: b.id,
-      set: b.set,
+      set: b.packs[0]!,
       status,
       priceCents: b.priceCents,
+      mode: b.mode,
+      size: b.size,
+      packs: b.packs.map((set) => ({ set, priceCents: cfg.sets[set].packPriceCents })),
+      seats,
+      mySeat: 0,
+      winnerSeat,
       challenger: host.me(),
-      opponent: b.opponent,
+      opponent: figures[1] ?? null,
       me: "challenger",
       createdAt: iso(b.createdAt),
       expiresAt: iso(b.expiresAt),
@@ -221,11 +257,11 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
       endsAt: t ? iso(t.endsAt) : null,
       tearMs: cfg.battles.tearMs,
       slotMs: cfg.battles.slotMs,
-      challengerCards: mine,
-      opponentCards: theirs,
-      challengerCents: mine.reduce((s, p) => s + p.valueCents, 0),
-      opponentCents: theirs.reduce((s, p) => s + p.valueCents, 0),
-      winner: decided ? (b.won ? "challenger" : "opponent") : null,
+      challengerCards: seats[0]?.cards ?? [],
+      opponentCards: seats[1]?.cards ?? [],
+      challengerCents: seats[0]?.cents ?? 0,
+      opponentCents: seats[1]?.cents ?? 0,
+      winner: winnerSeat === 0 ? "challenger" : winnerSeat === 1 ? "opponent" : null,
       tieBreak: decided ? b.tieBreak : null,
       coinSeed: decided ? b.seed : null,
       abortReason: b.abortReason,
@@ -240,8 +276,67 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
     battles.filter(
       (b) =>
         (b.status === "pending" && b.expiresAt > now) ||
-        (b.status === "accepted" && b.acceptedAt !== null && battleTimeline(b.acceptedAt).endsAt > now),
+        (b.status === "accepted" && b.acceptedAt !== null && timeline(b)!.endsAt > now),
     );
+
+  /** ADR-192: the demo player's lobby; made-up friends (invited first) take the seats one by one. */
+  function create(
+    requestId: string,
+    sets: NexamonSetKey[],
+    size: number,
+    invite: string[],
+    mode: "duel" | "multi",
+  ): NexamonBattle {
+    requireUnlock();
+    if (!requestId || !packBattleLineupOk(sets, size) || invite.length > size - 1)
+      throw new GameError("invalid_argument");
+    return host.idempotent(requestId, () => {
+      const now = host.now();
+      if (sets.some((set) => !(NEXAMON_SETS as readonly string[]).includes(set)))
+        throw new GameError("nexamon_unknown");
+      if (sets.some((set) => !nexamonSetReleased(set, now))) throw new GameError("nexamon_set_not_released");
+      const friends = lobbyFriends();
+      const invited = invite.map((nick) => {
+        if (nick.toLowerCase() === host.me().nickname.toLowerCase()) throw new GameError("nexamon_battle_self");
+        const f = friends.find((x) => x.nickname.toLowerCase() === nick.toLowerCase());
+        if (!f) throw new GameError("nexamon_battle_not_here");
+        return f;
+      });
+      battles.forEach((b) => settle(b, now));
+      if (open(now).length > 0) throw new GameError("nexamon_battle_busy");
+      if (lastChallengeAt + cfg.battles.cooldownSeconds * 1000 > now) throw new GameError("nexamon_battle_cooldown");
+      if (battles.filter((b) => b.acceptedAt !== null && b.acceptedAt > now - 3_600_000).length >= cfg.battles.perHour)
+        throw new GameError("nexamon_battle_limit");
+      const price = packBattleCostCents(sets);
+      if (host.cashCents() < price) throw new GameError("insufficient_funds");
+      host.pay(price);
+      lastChallengeAt = now;
+      const rest = friends.filter((f) => !invited.includes(f));
+      const joiners = [...invited, ...rest, ...DEMO_COLLECTORS.filter((c) => !friends.includes(c))]
+        .slice(0, size - 1)
+        .map((f) => ({ nickname: f.nickname, level: f.level, avatarKey: f.avatarKey, accessories: f.accessories }));
+      const b: DemoBattle = {
+        id: `battle-${nextId++}`,
+        mode,
+        packs: [...sets],
+        size: Math.min(size, joiners.length + 1),
+        joiners,
+        status: "pending",
+        priceCents: price,
+        createdAt: now,
+        expiresAt: now + (mode === "duel" ? cfg.battles.challengeSeconds : cfg.packBattle.lobbySeconds) * 1000,
+        acceptedAt: null,
+        cards: [],
+        winnerSeat: null,
+        tieBreak: null,
+        seed: 0,
+        abortReason: null,
+        refunded: false,
+      };
+      battles.push(b);
+      return battleJson(b, now);
+    });
+  }
 
   /** Made-up viewers react to the own pack now and then. */
   function ownReactions(live: OwnLive, now: number): NexamonLiveReaction[] {
@@ -284,6 +379,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
           battleId: null,
           player: live.friend,
           opponent: null,
+          players: null,
           isMe: false,
           startedAt: iso(live.startedAt),
           endsAt: iso(live.endsAt),
@@ -293,13 +389,14 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
         sessions.push({
           id: `live-${b.id}`,
           kind: "battle",
-          set: b.set,
+          set: b.packs[0]!,
           battleId: b.id,
           player: host.me(),
-          opponent: b.opponent,
+          opponent: b.joiners[0] ?? null,
+          players: [host.me(), ...b.joiners],
           isMe: true,
           startedAt: iso(b.acceptedAt!),
-          endsAt: iso(battleTimeline(b.acceptedAt!).endsAt),
+          endsAt: iso(timeline(b)!.endsAt),
           viewers: 2,
         });
       for (const o of own.filter((x) => allowWatch && x.startedAt + OWN_LIVE_MS > now))
@@ -310,6 +407,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
           battleId: null,
           player: host.me(),
           opponent: null,
+          players: null,
           isMe: true,
           startedAt: iso(o.startedAt),
           endsAt: iso(o.startedAt + OWN_LIVE_MS),
@@ -323,10 +421,11 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
           accessories: f.accessories,
           isFriend: true,
           opening: live?.friend.nickname === f.nickname,
-          battling: running.some((b) => b.opponent.nickname === f.nickname),
+          battling: running.some((b) => b.joiners.some((j) => j.nickname === f.nickname)),
         })),
         live: sessions,
         battles: running.map((b) => battleJson(b, now)),
+        openBattles: [],
         limits: {
           perHour: cfg.battles.perHour,
           used: battles.filter((b) => b.acceptedAt !== null && b.acceptedAt > now - 3_600_000).length,
@@ -341,49 +440,17 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
     },
 
     async challengeNexamonBattle(requestId, nickname, set) {
-      requireUnlock();
-      if (!requestId || !nickname) throw new GameError("invalid_argument");
-      return host.idempotent(requestId, () => {
-        const now = host.now();
-        if (!(NEXAMON_SETS as readonly string[]).includes(set)) throw new GameError("nexamon_unknown");
-        if (!nexamonSetReleased(set, now)) throw new GameError("nexamon_set_not_released");
-        if (nickname.toLowerCase() === host.me().nickname.toLowerCase()) throw new GameError("nexamon_battle_self");
-        const friend = lobbyFriends().find((f) => f.nickname.toLowerCase() === nickname.toLowerCase());
-        if (!friend) throw new GameError("nexamon_battle_not_here");
-        battles.forEach((b) => settle(b, now));
-        if (open(now).length > 0) throw new GameError("nexamon_battle_busy");
-        if (lastChallengeAt + cfg.battles.cooldownSeconds * 1000 > now) throw new GameError("nexamon_battle_cooldown");
-        if (
-          battles.filter((b) => b.acceptedAt !== null && b.acceptedAt > now - 3_600_000).length >= cfg.battles.perHour
-        )
-          throw new GameError("nexamon_battle_limit");
-        const price = cfg.sets[set].packPriceCents;
-        if (host.cashCents() < price) throw new GameError("insufficient_funds");
-        lastChallengeAt = now;
-        const b: DemoBattle = {
-          id: `battle-${nextId++}`,
-          set,
-          opponent: {
-            nickname: friend.nickname,
-            level: friend.level,
-            avatarKey: friend.avatarKey,
-            accessories: friend.accessories,
-          },
-          status: "pending",
-          priceCents: price,
-          createdAt: now,
-          expiresAt: now + cfg.battles.challengeSeconds * 1000,
-          acceptedAt: null,
-          mine: [],
-          theirs: [],
-          won: null,
-          tieBreak: null,
-          seed: 0,
-          abortReason: null,
-        };
-        battles.push(b);
-        return battleJson(b, now);
-      });
+      if (!nickname) throw new GameError("invalid_argument");
+      return create(requestId, [set], 2, [nickname], "duel");
+    },
+
+    async createNexamonPackBattle(requestId, sets, size, invite) {
+      return create(requestId, sets, size, invite, "multi");
+    },
+
+    async joinNexamonPackBattle() {
+      // the made-up friends never open lobbies of their own
+      throw new GameError("nexamon_battle_unknown");
     },
 
     async respondNexamonBattle() {
@@ -399,6 +466,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
         settle(b, now);
         if (b.status !== "pending") throw new GameError("nexamon_battle_closed");
         b.status = "cancelled";
+        refund(b);
         return battleJson(b, now);
       });
     },
@@ -426,6 +494,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
           battleId: null,
           player: live.friend,
           opponent: null,
+          players: null,
           isMe: false,
           startedAt: iso(live.startedAt),
           endsAt: iso(live.endsAt),
@@ -447,6 +516,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
         battleId: null,
         player: host.me(),
         opponent: null,
+        players: null,
         isMe: true,
         startedAt: iso(mine.startedAt),
         endsAt: iso(mine.startedAt + OWN_LIVE_MS),

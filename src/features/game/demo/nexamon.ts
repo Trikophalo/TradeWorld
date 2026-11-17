@@ -266,14 +266,15 @@ export interface DemoBattlePacks {
    * is what was paid back then (0 for a prize).
    */
   demoOpenSealedPack(requestId: string, set: NexamonSetKey, priceCents: number): Promise<NexamonPackResult>;
+  /**
+   * ADR-192: every seat opens the same lineup (`sets` in order); seat 0 is the demo player. `decide` picks the
+   * winning seat, who keeps all copies.
+   */
   demoBattlePacks(
-    set: NexamonSetKey,
-    iWin: (mine: NexamonPull[], theirs: NexamonPull[]) => boolean,
-  ): {
-    mine: NexamonPull[];
-    theirs: NexamonPull[];
-    won: boolean;
-  };
+    sets: readonly NexamonSetKey[],
+    seats: number,
+    decide: (pulls: NexamonPull[][]) => number,
+  ): { pulls: NexamonPull[][]; winner: number };
 }
 
 export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBattlePacks {
@@ -1365,49 +1366,50 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         return { packId, set, priceCents, cards, packsOpened: s.packs[set]! };
       }),
 
-    demoBattlePacks(set, iWin) {
+    demoBattlePacks(sets, seats, decide) {
       requireUnlock();
       const s = tick();
       const now = host.now();
       const roll = (mine: boolean) => {
         const copies: DemoCopy[] = [];
-        const pulls = openPlayerPack(s, set).map((pull): NexamonPull => {
-          if (pull.rarity === "one_of_one") (s.oneOfOnes ??= {})[pull.key] = now;
-          const serial = mint(s, pull.key, now);
-          const copy: DemoCopy = {
-            id: `nx-${s.nextId++}`,
-            cardKey: pull.key,
-            serial,
-            condition: pull.condition,
-            grade: null,
-            gradingUntil: null,
-            gradedAt: null,
-            acquiredAt: now,
-            listing: null,
-          };
-          copies.push(copy);
-          if (mine && pull.rarity !== "common") host.track("nexamon_rares");
-          return {
-            slot: pull.slot,
-            copyId: copy.id,
-            cardKey: pull.key,
-            rarity: pull.rarity,
-            condition: pull.condition,
-            isNew: mine && !s.copies.some((c) => c.cardKey === pull.key),
-            serial,
-            population: serial,
-            valueCents: copyValue(s, copy),
-          };
-        });
+        const pulls = sets.flatMap((set, packIndex) =>
+          openPlayerPack(s, set).map((pull): NexamonPull => {
+            if (pull.rarity === "one_of_one") (s.oneOfOnes ??= {})[pull.key] = now;
+            const serial = mint(s, pull.key, now);
+            const copy: DemoCopy = {
+              id: `nx-${s.nextId++}`,
+              cardKey: pull.key,
+              serial,
+              condition: pull.condition,
+              grade: null,
+              gradingUntil: null,
+              gradedAt: null,
+              acquiredAt: now,
+              listing: null,
+            };
+            copies.push(copy);
+            if (mine && pull.rarity !== "common") host.track("nexamon_rares");
+            return {
+              slot: pull.slot + packIndex * cfg.packSize,
+              copyId: copy.id,
+              cardKey: pull.key,
+              rarity: pull.rarity,
+              condition: pull.condition,
+              isNew: mine && !s.copies.some((c) => c.cardKey === pull.key),
+              serial,
+              population: serial,
+              valueCents: copyValue(s, copy),
+            };
+          }),
+        );
         return { pulls, copies };
       };
-      const mine = roll(true);
-      const theirs = roll(false);
-      const won = iWin(mine.pulls, theirs.pulls);
-      if (won) s.copies.push(...mine.copies, ...theirs.copies);
-      host.track("nexamon_packs");
+      const rolled = Array.from({ length: seats }, (_, i) => roll(i === 0));
+      const winner = decide(rolled.map((r) => r.pulls));
+      if (winner === 0) s.copies.push(...rolled.flatMap((r) => r.copies));
+      for (let i = 0; i < sets.length; i++) host.track("nexamon_packs");
       host.setState(s);
-      return { mine: mine.pulls, theirs: theirs.pulls, won };
+      return { pulls: rolled.map((r) => r.pulls), winner };
     },
 
     async nexamonBonuses(): Promise<NexamonBonuses> {

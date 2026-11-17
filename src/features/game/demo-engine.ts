@@ -1523,7 +1523,7 @@ const packBattles = createPackBattleEngine({
     p().cashCents -= cents;
     persist();
   },
-  rollPacks: (set, iWin) => nexamon.demoBattlePacks(set, iWin),
+  rollPacks: (sets, seats, decide) => nexamon.demoBattlePacks(sets, seats, decide),
   feed: feedPost,
   notify: (typeKey, title, body, link) => socialRef?.notify(typeKey, title, body, link),
   idempotent,

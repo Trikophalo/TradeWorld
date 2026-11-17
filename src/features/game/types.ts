@@ -2336,6 +2336,9 @@ export const GAME_ERROR_KEYS = [
   // ADR-182
   "nexamon_set_not_released",
   "nexamon_not_enough",
+  // ADR-192
+  "nexamon_battle_full",
+  "nexamon_battle_joined",
   "not_listed",
   "item_unknown",
   "item_locked",

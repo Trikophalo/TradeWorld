@@ -8,57 +8,31 @@ import { Popover } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_SETS, type NexamonSetKey } from "@/config/nexamon";
+import { nexamonSetReleased } from "@/lib/sim/nexamon";
+import { packBattleCostCents } from "@/lib/sim/nexamon-battle";
 import { Badge } from "@/components/ui/badge";
-import { Button, type ButtonState } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Countdown } from "@/components/ui/countdown";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { PlazaGround } from "@/components/ui/plaza-ground";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "@/components/ui/toast";
-import { useGameErrorText } from "@/features/game/errors";
+import { Segmented } from "@/components/ui/segmented";
 import type { NexamonBattle, NexamonLiveSession, NexamonLobbyPlayer } from "@/features/game/pack-battle-types";
 import { engine, useGame } from "@/features/game/store";
 import { formatMoney } from "@/lib/format";
-import { haptic } from "@/lib/haptics";
 import { DURATION, EASE } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { useMountTime } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { NexamonPack } from "../components/pack";
-import { useNexamonRefresh } from "../hooks";
 import { BattleView } from "./battle-view";
-import { useLobbyRefresh, useNexamonLobby } from "./hooks";
+import { LineupStrip, useBattleAction } from "./battle-lobby";
+import { useNexamonLobby } from "./hooks";
 import { SpectatorView } from "./spectator-view";
 
 const cfg = BALANCE.nexamon;
-
-/** Runs a battle action with button state and an error toast. */
-function useBattleAction() {
-  const errorText = useGameErrorText();
-  const refreshLobby = useLobbyRefresh();
-  const refreshCards = useNexamonRefresh();
-  const [state, setState] = useState<ButtonState>("idle");
-  const run = async (action: (requestId: string) => Promise<NexamonBattle>, errorTitle: string) => {
-    setState("loading");
-    try {
-      const battle = await action(crypto.randomUUID());
-      setState("success");
-      haptic("success");
-      window.setTimeout(() => setState("idle"), 900);
-      return battle;
-    } catch (error) {
-      setState("idle");
-      toast.error(errorTitle, errorText(error));
-      return null;
-    } finally {
-      void refreshLobby();
-      void refreshCards();
-    }
-  };
-  return { state, run };
-}
 
 /**
  * Who is on the Collectibles tab (ADR-172): friends as their dressed pixel figures on a small square, badges for
@@ -73,7 +47,8 @@ export function NexamonLobbyStrip() {
   const [battleId, setBattleId] = useState<string | null>(null);
   const [liveId, setLiveId] = useState<string | null>(null);
   const [liveOpen, setLiveOpen] = useState(false);
-  const [challenge, setChallenge] = useState<NexamonLobbyPlayer | null>(null);
+  // ADR-192: the create sheet; `invite` is the friend it was opened for (null = an open lobby)
+  const [create, setCreate] = useState<{ invite: NexamonLobbyPlayer | null } | null>(null);
   const seenBattles = useRef(new Set<string>());
 
   // a battle from a notification link, then every own battle as soon as it runs
@@ -97,11 +72,22 @@ export function NexamonLobbyStrip() {
   const data = lobby.data;
   const others = data.live.filter((l) => !l.isMe);
   const pending = data.battles.filter((b) => b.status === "pending");
+  const busy = data.battles.length > 0;
 
   return (
     <Card padding="none" className="overflow-hidden" data-testid="nexamon-lobby">
       <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2">
         <h2 className="font-pixel text-xs text-fg-1 uppercase">{t("lobby.title")}</h2>
+        <span className="ml-auto" />
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={busy}
+          onClick={() => setCreate({ invite: null })}
+          data-testid="battle-create"
+        >
+          {t("lobby.create")}
+        </Button>
         <Button
           variant={others.length > 0 ? "loss" : "secondary"}
           size="sm"
@@ -126,15 +112,27 @@ export function NexamonLobbyStrip() {
             className="flex flex-wrap justify-center gap-x-3 gap-y-2 px-3 pt-2 pb-3"
           >
             {data.players.map((player, i) => (
-              <LobbyFigure key={player.nickname} player={player} index={i} onChallenge={() => setChallenge(player)} />
+              <LobbyFigure
+                key={player.nickname}
+                player={player}
+                index={i}
+                onChallenge={() => setCreate({ invite: player })}
+              />
             ))}
           </ul>
         )}
       </div>
-      {pending.length > 0 && (
+      {(pending.length > 0 || data.openBattles.length > 0) && (
         <div className="space-y-2 border-t-2 border-line-1 bg-surface-1 px-4 py-3">
-          {pending.map((b) => (
-            <PendingBanner key={b.id} battle={b} onOpen={() => setBattleId(b.id)} />
+          {pending.map((b) =>
+            b.mode === "multi" ? (
+              <LobbyBanner key={b.id} battle={b} onOpen={() => setBattleId(b.id)} />
+            ) : (
+              <PendingBanner key={b.id} battle={b} onOpen={() => setBattleId(b.id)} />
+            ),
+          )}
+          {data.openBattles.map((b) => (
+            <LobbyBanner key={b.id} battle={b} invited={b.invited} onOpen={() => setBattleId(b.id)} />
           ))}
         </div>
       )}
@@ -148,7 +146,14 @@ export function NexamonLobbyStrip() {
           </div>
         ))}
 
-      <ChallengeSheet player={challenge} onClose={() => setChallenge(null)} limits={data.limits} />
+      <CreateBattleSheet
+        open={create !== null}
+        invite={create?.invite ?? null}
+        friends={data.players}
+        onClose={() => setCreate(null)}
+        onCreated={(id) => setBattleId(id)}
+        limits={data.limits}
+      />
       <LiveSheet
         open={liveOpen}
         onOpenChange={setLiveOpen}
@@ -247,81 +252,286 @@ function LobbyFigure({
   );
 }
 
-function ChallengeSheet({
-  player,
+const SIZES = ["2", "3", "4"] as const;
+
+/**
+ * A new Pack Battle (ADR-192): the lineup (packs of any released set, in order: add, move, remove), the number of
+ * players (2-4) and friends to invite; the running total is the stake per player. Opened from a friend's figure,
+ * that friend is invited.
+ */
+function CreateBattleSheet({
+  open,
+  invite,
+  friends,
   onClose,
+  onCreated,
   limits,
 }: {
-  player: NexamonLobbyPlayer | null;
+  open: boolean;
+  invite: NexamonLobbyPlayer | null;
+  friends: NexamonLobbyPlayer[];
   onClose: () => void;
+  onCreated: (battleId: string) => void;
   limits: { perHour: number; used: number; cooldownUntil: string | null };
 }) {
   const t = useTranslations("nexamonLive");
   const cash = useGame((s) => s.portfolio?.cashCents ?? 0);
-  const [set, setSet] = useState<NexamonSetKey>(NEXAMON_SETS[0]);
+  const mountedAt = useMountTime();
+  const [lineup, setLineup] = useState<NexamonSetKey[]>([NEXAMON_SETS[0]]);
+  const [size, setSize] = useState<(typeof SIZES)[number]>("2");
+  const [invited, setInvited] = useState<string[]>([]);
   const { state, run } = useBattleAction();
-  const price = cfg.sets[set].packPriceCents;
+  const opened = useRef<string | null>(null);
+  // a fresh sheet per opening: one pack, two players, the friend it was opened for
+  const key = open ? (invite?.nickname ?? "") : null;
+  if (opened.current !== key) {
+    opened.current = key;
+    if (open) {
+      setLineup([NEXAMON_SETS[0]]);
+      setSize("2");
+      setInvited(invite ? [invite.nickname] : []);
+    }
+  }
+  const players = Number(size);
+  const available = NEXAMON_SETS.filter((set) => mountedAt === null || nexamonSetReleased(set, mountedAt));
+  const price = packBattleCostCents(lineup);
+  const maxPacks = cfg.packBattle.maxPacks;
   const short = cash < price;
   const full = limits.used >= limits.perHour;
+  const invites = invited.slice(0, players - 1);
+  const move = (from: number, to: number) =>
+    setLineup((l) => {
+      if (to < 0 || to >= l.length) return l;
+      const next = [...l];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item!);
+      return next;
+    });
   return (
     <Sheet
-      open={player !== null}
-      onOpenChange={(open) => !open && onClose()}
-      title={t("challenge.title", { name: player?.nickname ?? "" })}
-      description={t("challenge.text")}
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={invite ? t("challenge.title", { name: invite.nickname }) : t("create.title")}
+      description={t("create.text")}
       footer={
         <Button
           block
           size="lg"
           state={state}
-          disabled={short || full}
+          disabled={short || full || lineup.length === 0}
           data-testid="challenge-send"
           onClick={async () => {
-            if (!player) return;
             const battle = await run(
-              (id) => engine.challengeNexamonBattle(id, player.nickname, set),
+              (id) => engine.createNexamonPackBattle(id, lineup, players, invites),
               t("challenge.error"),
             );
             if (battle) {
               void playSound("battleJoin");
               onClose();
+              onCreated(battle.id);
             }
           }}
         >
-          {t("challenge.send", { price: formatMoney(price, { whole: true }) })}
+          {t("create.send", { price: formatMoney(price, { whole: true }) })}
         </Button>
       }
     >
-      <div className="space-y-3" role="radiogroup" aria-label={t("challenge.setLabel")}>
-        {NEXAMON_SETS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="radio"
-            aria-checked={set === key}
-            onClick={() => setSet(key)}
-            data-testid={`challenge-set-${key}`}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-md border-2 p-2 text-left focus-ring transition duration-fast ease-standard hover:bg-surface-2 active:scale-[0.99]",
-              set === key ? "border-accent bg-accent-soft" : "border-line-1 bg-surface-1",
-            )}
-          >
-            <NexamonPack set={key} scale={1} sheen={false} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-fg-1">{t(`sets.${key}`)}</span>
-              <span className="block nums text-xs text-fg-2">
-                {t("challenge.each", { price: formatMoney(cfg.sets[key].packPriceCents, { whole: true }) })}
-              </span>
+      <div className="space-y-4">
+        <section className="space-y-2">
+          <h3 className="label-pixel text-fg-3">{t("create.players")}</h3>
+          <Segmented
+            value={size}
+            onValueChange={setSize}
+            options={SIZES.map((v) => ({ value: v, label: t("create.playerCount", { count: Number(v) }) }))}
+            label={t("create.players")}
+            block
+          />
+        </section>
+
+        <section className="space-y-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="label-pixel text-fg-3">{t("create.lineup", { count: lineup.length, max: maxPacks })}</h3>
+            <span className="nums text-sm font-semibold text-fg-1" data-testid="lineup-total" data-cents={price}>
+              {t("create.total", { price: formatMoney(price, { whole: true }) })}
             </span>
-          </button>
-        ))}
+          </div>
+          {lineup.length === 0 ? (
+            <p className="rounded-md border-2 border-dashed border-line-1 p-3 text-center text-xs text-fg-3">
+              {t("create.empty")}
+            </p>
+          ) : (
+            <ol className="space-y-1" data-testid="lineup">
+              {lineup.map((set, i) => (
+                <li
+                  key={`${i}-${set}`}
+                  className="flex items-center gap-2 rounded-md border-2 border-line-1 bg-surface-1 p-1.5"
+                  data-testid="lineup-item"
+                  data-set={set}
+                >
+                  <span className="w-5 text-center nums text-xs text-fg-3">{i + 1}</span>
+                  <NexamonPack set={set} scale={1} sheen={false} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-fg-1">{t(`sets.${set}`)}</span>
+                    <span className="block nums text-xs text-fg-2">
+                      {formatMoney(cfg.sets[set].packPriceCents, { whole: true })}
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t("create.up")}
+                    disabled={i === 0}
+                    onClick={() => move(i, i - 1)}
+                    data-testid="lineup-up"
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t("create.down")}
+                    disabled={i === lineup.length - 1}
+                    onClick={() => move(i, i + 1)}
+                    data-testid="lineup-down"
+                  >
+                    ↓
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t("create.remove")}
+                    onClick={() => setLineup((l) => l.filter((_, k) => k !== i))}
+                    data-testid="lineup-remove"
+                  >
+                    ✕
+                  </Button>
+                </li>
+              ))}
+            </ol>
+          )}
+          <div className="grid grid-cols-2 gap-2" aria-label={t("challenge.setLabel")}>
+            {available.map((set) => (
+              <button
+                key={set}
+                type="button"
+                disabled={lineup.length >= maxPacks}
+                onClick={() => setLineup((l) => (l.length >= maxPacks ? l : [...l, set]))}
+                data-testid={`challenge-set-${set}`}
+                className="flex min-w-0 items-center gap-2 rounded-md border-2 border-line-1 bg-surface-1 p-1.5 text-left focus-ring transition duration-fast ease-standard hover:bg-surface-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span aria-hidden className="font-pixel text-sm text-accent">
+                  +
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-semibold text-fg-1">{t(`sets.${set}`)}</span>
+                  <span className="block nums text-2xs text-fg-2">
+                    {formatMoney(cfg.sets[set].packPriceCents, { whole: true })}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {lineup.length >= maxPacks && (
+            <p className="text-xs text-fg-3">{t("create.maxPacks", { count: maxPacks })}</p>
+          )}
+        </section>
+
+        {friends.length > 0 && (
+          <section className="space-y-2">
+            <h3 className="label-pixel text-fg-3">{t("create.invite", { count: players - 1 })}</h3>
+            <div className="flex flex-wrap gap-2">
+              {friends.map((f) => {
+                const on = invites.includes(f.nickname);
+                return (
+                  <button
+                    key={f.nickname}
+                    type="button"
+                    aria-pressed={on}
+                    disabled={!on && (invites.length >= players - 1 || f.battling)}
+                    onClick={() =>
+                      setInvited((list) => (on ? list.filter((n) => n !== f.nickname) : [...invites, f.nickname]))
+                    }
+                    data-testid="invite-friend"
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-pill border-2 py-0.5 pr-3 pl-1 text-xs focus-ring transition duration-fast ease-standard active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50",
+                      on
+                        ? "border-accent bg-accent-soft text-fg-1"
+                        : "border-line-1 bg-surface-1 text-fg-2 hover:bg-surface-2",
+                    )}
+                  >
+                    <PlayerFigure avatarKey={f.avatarKey} accessories={f.accessories} scale={1} />
+                    {f.nickname}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <p className="text-xs text-pretty text-fg-3">
-          {t("challenge.rules", { seconds: cfg.battles.challengeSeconds })}
+          {t("create.rules", {
+            seconds: cfg.packBattle.lobbySeconds,
+            pot: formatMoney(price * players, { whole: true }),
+          })}
         </p>
         {short && <p className="text-xs text-warn">{t("challenge.short")}</p>}
         {full && <p className="text-xs text-warn">{t("challenge.full", { count: limits.perHour })}</p>}
       </div>
     </Sheet>
+  );
+}
+
+/** An open lobby (own or a friend's) as a banner: seats taken, the lineup, join or open. */
+function LobbyBanner({
+  battle: b,
+  invited = false,
+  onOpen,
+}: {
+  battle: NexamonBattle;
+  invited?: boolean;
+  onOpen: () => void;
+}) {
+  const t = useTranslations("nexamonLive");
+  const join = useBattleAction();
+  const mine = b.mySeat !== null;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2"
+      data-testid={mine ? "battle-lobby-own" : "battle-lobby-open"}
+      data-invited={invited ? "true" : "false"}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-fg-1">
+          {mine
+            ? t("pending.lobbyOwn", { taken: b.seats.length, size: b.size })
+            : t(invited ? "pending.lobbyInvited" : "pending.lobbyOpen", {
+                name: b.challenger.nickname,
+                packs: b.packs.length,
+                size: b.size,
+                price: formatMoney(b.priceCents, { whole: true }),
+              })}{" "}
+          <Countdown target={Date.parse(b.expiresAt)} className="text-xs text-fg-3" />
+        </p>
+        <LineupStrip battle={b} className="mt-1" />
+      </div>
+      {!mine && (
+        <Button
+          size="sm"
+          variant="gain"
+          state={join.state}
+          data-testid="battle-join"
+          onClick={async () => {
+            const r = await join.run((id) => engine.joinNexamonPackBattle(id, b.id), t("lobbyView.joinError"));
+            if (r) onOpen();
+          }}
+        >
+          {t("lobbyView.join", { price: formatMoney(b.priceCents, { whole: true }) })}
+        </Button>
+      )}
+      <Button size="sm" variant="secondary" onClick={onOpen} data-testid="battle-lobby-open-view">
+        {t("pending.view")}
+      </Button>
+    </div>
   );
 }
 
@@ -339,7 +549,7 @@ function PendingBanner({ battle: b, onOpen }: { battle: NexamonBattle; onOpen: (
               set: t(`sets.${b.set}`),
               price: formatMoney(b.priceCents, { whole: true }),
             })
-          : t("pending.outgoing", { name: b.opponent.nickname })}{" "}
+          : t("pending.outgoing", { name: b.opponent?.nickname ?? "" })}{" "}
         <Countdown target={Date.parse(b.expiresAt)} className="text-xs text-fg-3" />
       </p>
       {incoming ? (
@@ -410,15 +620,16 @@ function LiveSheet({
                 data-kind={s.kind}
                 className="flex w-full items-center gap-3 rounded-md border-2 border-line-1 bg-surface-1 p-2 text-left focus-ring transition duration-fast ease-standard hover:bg-surface-2 active:scale-[0.99]"
               >
-                <PlayerFigure avatarKey={s.player.avatarKey} accessories={s.player.accessories} scale={1} />
-                {s.opponent && (
-                  <PlayerFigure avatarKey={s.opponent.avatarKey} accessories={s.opponent.accessories} scale={1} />
-                )}
+                {(s.players ?? [s.player, ...(s.opponent ? [s.opponent] : [])]).map((f) => (
+                  <PlayerFigure key={f.nickname} avatarKey={f.avatarKey} accessories={f.accessories} scale={1} />
+                ))}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-fg-1">
-                    {s.kind === "battle" && s.opponent
-                      ? t("live.battle", { a: s.player.nickname, b: s.opponent.nickname })
-                      : t("live.pack", { name: s.player.nickname })}
+                    {s.kind === "battle" && s.players && s.players.length > 2
+                      ? t("live.battleMany", { names: s.players.map((f) => f.nickname).join(", ") })
+                      : s.kind === "battle" && s.opponent
+                        ? t("live.battle", { a: s.player.nickname, b: s.opponent.nickname })
+                        : t("live.pack", { name: s.player.nickname })}
                   </span>
                   <span className="block text-xs text-fg-3">{t(`sets.${s.set}`)}</span>
                 </span>
