@@ -300,17 +300,22 @@ export const NEXAMON_RULES = {
     },
     maxPacksPerRun: 5,
     /**
-     * AI collectors buy players' listings (ADR-165). At or below the copy's value they always buy, on the next run of
-     * the minute job (only the households' daily budget per set stops them). Above the value they pay a premium for a
-     * good copy: at most value x (1 + premium), the premium by condition for a raw copy and by grade for a slab
-     * (order of `grading.grades`, the Black Label its own). Up there the chance per minute is `buyChanceBps`
-     * x (1 + popularity) just above the value, falling linearly to `atMaxChanceBps` of it at the maximum.
+     * AI collectors buy players' listings (ADR-165, ADR-195). At or below the copy's value (the value the UI shows,
+     * condition or grade included) they always buy, on the next run of the minute job, whatever the price: no
+     * budget stops these buys, only the households' cash. Above the value they pay at most value x (1 + premium),
+     * the premium by condition for a raw copy and by grade for a slab (order of `grading.grades`, the Black Label its
+     * own), never more than `maxPremiumBps` (+15 %). Up there the chance per minute is `buyChanceBps` x
+     * (`buyChanceMinShareBps` + the rest x popularity: 4 % of it for an unpopular card, all of it for the most
+     * popular), and it falls linearly to `atMaxChanceBps` of
+     * it at the maximum. Only these premium buys count against `dailyBudgetPacks`.
      */
-    buyChanceBps: 3_000,
+    buyChanceBps: 100,
+    buyChanceMinShareBps: 400,
     atMaxChanceBps: 2_000,
+    maxPremiumBps: 1_500,
     premiumBps: { poor: 0, good: 300, near_mint: 800, mint: 1_200 },
     gradePremiumBps: [0, 0, 0, 0, 0, 0, 0, 500, 700, 1_000, 1_200, 1_500],
-    blackLabelPremiumBps: 2_000,
+    blackLabelPremiumBps: 1_500,
     /**
      * An AI buy moves the card's value (aiBuyBumpBps) only if its price per card lies within `value.trade.bandBps`
      * of the value and the card had fewer than this many such counted AI buys in `buyWindowDays`; else it still
@@ -330,7 +335,7 @@ export const NEXAMON_RULES = {
     },
     buyWindowDays: 1,
     maxBuysPerRun: 100,
-    /** Budget per set and Berlin day: this many pack prices. */
+    /** Budget per set and Berlin day for buys above the value (ADR-195): this many pack prices. */
     dailyBudgetPacks: 300,
     /**
      * Rarities the AI never pulls, holds or buys (ADR-174): One of Ones change hands only between players, and so do

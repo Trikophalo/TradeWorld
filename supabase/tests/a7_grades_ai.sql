@@ -116,6 +116,7 @@ select tests.assert(
   'without any chance; above the value only by chance (off here)');
 -- the condition premium: near mint up to +8 %, poor nothing, mint up to +12 %
 select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '10000');
+select tests.set_cfg('nexamon', '{ai,buyChanceMinShareBps}', '10000');
 select tests.set_cfg('nexamon', '{ai,atMaxChanceBps}', '10000');
 select tests.nx_give(:a, 'sa-023', 'poor') as p2 \gset
 select tests.nx_give(:a, 'sa-022', 'mint') as m2 \gset
@@ -142,9 +143,9 @@ select public.nexamon_ai_buy_chance_bps(11200, 10000, 'mint', null, 'common', 10
        public.nexamon_ai_premium_bps('good', null) as pr_good, public.nexamon_ai_premium_bps('mint', 8.5) as pr_85 \gset
 select tests.assert(
   :ch_low = 10000 and :ch_mid = 10000 and :ch_max = 10000 and :ch_value = 10000
-  and :ch_real > 0 and :ch_real < 3000 and :ch_ten > 0 and :ch_ten_over = 0 and :ch_black > 0
+  and :ch_real > 0 and :ch_real < 3000 and :ch_ten > 0 and :ch_ten_over = 0 and :ch_black = 0
   and :pr_good = 300 and :pr_85 = 700,
-  'nexamon_ai_buy_chance_bps(): certain at the value, falling above it, 0 above the premium (10: +15 %, Black Label: +20 %)');
+  'nexamon_ai_buy_chance_bps(): certain at the value, falling above it, 0 above the premium (10 and Black Label: +15 %, ADR-195)');
 select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 
 -- =============================================================================
@@ -181,14 +182,20 @@ select tests.assert(
   and (select count(*) from public.nexamon_sales where card_key = 'sa-026' and kind = 'ai_buy' and counted) = 1,
   'both copies sell at once, but only buysPerCardWindow AI buys per card and window lift the value');
 select tests.set_cfg('nexamon', '{ai}', :'nx_cfg'::jsonb -> 'ai');
--- no budget, no purchase
+-- no budget: a listing above the value waits; at the value it still sells (ADR-195)
 select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
+select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '10000');
+select tests.set_cfg('nexamon', '{ai,buyChanceMinShareBps}', '10000');
+select tests.set_cfg('nexamon', '{ai,atMaxChanceBps}', '10000');
 select tests.nx_give(:a, 'sa-027', 'mint') as nb \gset
+select tests.nx_give(:a, 'sa-027', 'mint') as nb2 \gset
 select tests.login_as('authenticated', :a);
-select public.list_nexamon_card(gen_random_uuid(), :'nb', tests.nx_value('sa-027', 'mint')) is not null as ok \gset
+select public.list_nexamon_card(gen_random_uuid(), :'nb', tests.nx_value('sa-027', 'mint') * 105 / 100) is not null as ok \gset
+select public.list_nexamon_card(gen_random_uuid(), :'nb2', tests.nx_value('sa-027', 'mint')) is not null as ok \gset
 reset role;
 select public.nexamon_run_due() is not null as ok \gset
-select tests.assert(tests.nx_listing(:'nb') is not null, 'the households'' daily budget per set still stops the AI');
+select tests.assert(tests.nx_listing(:'nb') is not null and tests.nx_listing(:'nb2') is null,
+  'the households'' daily budget per set stops buys above the value only; at the value the AI buys (ADR-195)');
 
 update public.game_config set value = :'nx_cfg'::jsonb where key = 'nexamon';
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after half grades and AI collectors');

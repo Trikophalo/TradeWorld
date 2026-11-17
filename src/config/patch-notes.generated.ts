@@ -598,6 +598,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Fertigkeiten für Firmen",
         text: "Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-f8a47106",
+        title: "KI kauft auch teure Karten",
+        text: "Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab.",
+      },
     ],
   },
   {
