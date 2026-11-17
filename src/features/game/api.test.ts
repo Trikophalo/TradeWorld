@@ -153,4 +153,12 @@ describe("RPC contract", () => {
     const limit = RPC_SCHEMAS.place_order.parse(JSON.parse(readFileSync(dir + "place_order_limit.json", "utf8")));
     expect(limit.status).toBe("open");
   });
+
+  it("the order preview is the fill plan (ADR-189)", () => {
+    const q = RPC_SCHEMAS.quote_order.parse(JSON.parse(readFileSync(dir + "quote_order.json", "utf8")));
+    expect(q.fill_quantity_e6).toBeGreaterThan(0);
+    expect(q.net_cents).toBeLessThanOrEqual(100_000);
+    expect(q.net_cents).toBe(q.gross_cents + q.fee_cents);
+    expect(q.limited_by).toBeNull();
+  });
 });

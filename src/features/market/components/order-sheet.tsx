@@ -10,14 +10,15 @@ import { Field } from "@/components/ui/input";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
-import { useGame, useSecurity } from "@/features/game/store";
-import type { OrderSide, OrderType } from "@/features/game/types";
+import { engine, useGame, useSecurity } from "@/features/game/store";
+import type { OrderQuote, OrderSide, OrderType } from "@/features/game/types";
 import { emitTutorial } from "@/features/tutorial/store";
-import { formatMoney, formatPrice, formatShares } from "@/lib/format";
+import { formatBps, formatMoney, formatPrice, formatShares } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { DURATION, EASE } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
@@ -42,6 +43,11 @@ const money = (value: number) => formatMoney(Math.round(value));
 /** A sale with this much realized profit gets confetti. */
 const BIG_WIN_CENTS = 100_000;
 const TAX_BPS = BALANCE.trading.capitalGainsTaxBps;
+/** ADR-189: from this price move the sheet warns with the exact amount. */
+const HIGH_IMPACT_BPS = BALANCE.trading.highImpactWarnBps;
+const MAX_MOVE_BPS = BALANCE.trading.priceImpact.maxImpactBpsPerOrder;
+/** Wait this long after the last keystroke before asking the server for the exact fill. */
+const QUOTE_DELAY_MS = 250;
 const MARKS = [0.25, 0.5, 0.75, 1] as const;
 
 /** Euro text with German formatting but without the currency sign, for input fields. */
@@ -67,8 +73,10 @@ export interface OrderSheetProps {
  * an amount in euros (default, like a neo-broker) or a number of shares,
  * fractions allowed (ADR-040), by typing, by quick buttons or with the slider.
  * Market orders fill at once (the only kind, ADR-117). Limit orders would wait in the order
- * book. Confirmation is "hold to buy", so nothing happens by accident. The
- * estimate is only a preview; the server decides price and quantity.
+ * book. Confirmation is "hold to buy", so nothing happens by accident. For
+ * market orders the sheet shows the server's exact fill plan (`quote_order`,
+ * ADR-189): average price, price impact, what is paid or received, and how much
+ * of a large order fills now. Confirming executes that plan.
  */
 export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const t = useTranslations("order");
@@ -138,13 +146,48 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const estimatedGain = !buying && position ? value - valueCents(quantityE6, position.avgPriceE4) - ORDER_FEE_CENTS : 0;
   const estimatedTax = estimatedGain > 0 ? Math.round((Math.max(0, estimatedGain - lossPot) * TAX_BPS) / 10_000) : 0;
 
+  // ADR-189: the exact fill plan from the server for the current input (market orders).
+  const sellAllNow = !buying && heldE6 > 0 && quantityE6 >= heldE6 * 0.999;
+  const quoteInput =
+    open && type === "market" && quantityE6 > 0 && !inputError
+      ? mode === "amount" && !sellAllNow
+        ? { amountCents }
+        : { quantityE6: sellAllNow ? heldE6 : quantityE6 }
+      : null;
+  const quoteKey = quoteInput ? `${ticker}|${shown}|${JSON.stringify(quoteInput)}` : null;
+  const [quote, setQuote] = useState<{ key: string; value: OrderQuote } | null>(null);
+  useEffect(() => {
+    if (!quoteKey || !quoteInput) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      engine
+        .quoteOrder({ ticker, side: shown, ...quoteInput })
+        .then((value) => {
+          if (live) setQuote({ key: quoteKey, value });
+        })
+        .catch(() => undefined);
+    }, QUOTE_DELAY_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+    // The key holds every input the quote depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey]);
+  const plan = quote && quote.key === quoteKey ? quote.value : null;
+  const quoting = quoteKey !== null && plan === null;
+  const shownValue = plan ? plan.grossCents : value;
+  const shownTax = plan ? plan.taxCents : estimatedTax;
+  const shownTotal = plan ? plan.netCents : Math.max(0, total - estimatedTax);
+
   const problem =
     inputError ??
     (type === "limit" && !limitPrice ? t("limitError") : null) ??
     (text.trim() && value < MIN_ORDER_CENTS ? t("tooSmall") : null) ??
     (buying && total > cash ? t("insufficient") : null) ??
     (!buying && quantityE6 > heldE6 * 1.001 ? t("insufficientShares") : null);
-  const ready = !!security && !problem && quantityE6 > 0;
+  const ready =
+    !!security && !problem && quantityE6 > 0 && (type !== "market" || (plan !== null && plan.fillQuantityE6 > 0));
 
   // Slider position from the current input, and input from the slider.
   const ratio =
@@ -180,12 +223,17 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
     try {
       // Selling (almost) everything sells everything: no tiny rest stays behind.
       const sellAll = !buying && quantityE6 >= heldE6 * 0.999;
+      // A capped order executes exactly the previewed part (ADR-189).
       const result = await placeOrder({
         requestId: requestId.current,
         ticker,
         side: shown,
         type,
-        ...(mode === "amount" && !sellAll ? { amountCents } : { quantityE6: sellAll ? heldE6 : quantityE6 }),
+        ...(plan?.limitedBy
+          ? { quantityE6: plan.fillQuantityE6 }
+          : mode === "amount" && !sellAll
+            ? { amountCents }
+            : { quantityE6: sellAll ? heldE6 : quantityE6 }),
         limitPriceE4: type === "limit" ? limitPrice : null,
       });
       emitTutorial("order-confirmed");
@@ -205,6 +253,13 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
           }),
         ];
         if (result.taxCents > 0) lines.push(t("filledTax", { tax: formatMoney(result.taxCents) }));
+        if ((result.unfilledQuantityE6 ?? 0) > 0)
+          lines.push(
+            t("filledPartial", {
+              filled: formatShares(result.filledQuantityE6),
+              requested: formatShares(result.requestedQuantityE6 ?? result.quantityE6),
+            }),
+          );
         if (result.xpAwarded > 0) lines.push(t("filledXp", { xp: result.xpAwarded }));
         toast.success(t(buying ? "boughtTitle" : "soldTitle"), lines.join(" · "), { silent: true });
         if ((result.realizedPnlCents ?? 0) >= BIG_WIN_CENTS && anchor.current) {
@@ -348,31 +403,80 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
           {problem ?? summary}
         </p>
 
+        {plan && plan.fillQuantityE6 === 0 && (
+          <p role="alert" data-testid="order-nothing" className="rounded-md bg-loss-soft px-3 py-2 text-sm text-loss">
+            {t("nothingFills")}
+          </p>
+        )}
+        {plan && plan.fillQuantityE6 > 0 && plan.limitedBy && (
+          <p role="alert" data-testid="order-limited" className="rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">
+            {t(plan.limitedBy === "band" ? "limitedBand" : "limitedImpact", {
+              filled: formatShares(plan.fillQuantityE6),
+              requested: formatShares(plan.requestedQuantityE6),
+              cap: formatBps(MAX_MOVE_BPS),
+            })}
+          </p>
+        )}
+        {plan && plan.fillQuantityE6 > 0 && Math.abs(plan.impactBps) >= HIGH_IMPACT_BPS && (
+          <p data-testid="order-high-impact" className="rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">
+            {t(buying ? "highImpactBuy" : "highImpactSell", {
+              impact: formatBps(Math.abs(plan.impactBps)),
+              amount: formatMoney(plan.netCents),
+            })}
+          </p>
+        )}
+
         <dl className="space-y-3 text-fg-2">
           <div className="flex justify-between">
             <dt>{t(type === "limit" ? "limitPrice" : buying ? "priceAsk" : "priceBid")}</dt>
             <dd className="nums text-fg-1">{formatPrice(price)}</dd>
           </div>
+          {type === "market" && quantityE6 > 0 && (
+            <>
+              <div className="flex justify-between">
+                <dt>{t("avgPrice")}</dt>
+                <dd className="nums text-fg-1">
+                  {plan ? formatPrice(plan.avgPriceE4) : <Skeleton className="h-5 w-20" />}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>{t("impact")}</dt>
+                <dd
+                  data-testid="order-impact"
+                  className={cn(
+                    "nums",
+                    plan && Math.abs(plan.impactBps) >= HIGH_IMPACT_BPS ? "text-warn" : "text-fg-1",
+                  )}
+                >
+                  {plan ? (
+                    `${plan.impactBps > 0 ? "+" : plan.impactBps < 0 ? "−" : ""}${formatBps(Math.abs(plan.impactBps))}`
+                  ) : (
+                    <Skeleton className="h-5 w-14" />
+                  )}
+                </dd>
+              </div>
+            </>
+          )}
           <div className="flex justify-between">
-            <dt>{t("value", { quantity: formatShares(quantityE6) })}</dt>
+            <dt>{t("value", { quantity: formatShares(plan ? plan.fillQuantityE6 : quantityE6) })}</dt>
             <dd className="text-fg-1">
-              <NumberTicker value={value} format={money} />
+              <NumberTicker value={shownValue} format={money} />
             </dd>
           </div>
           <div className="flex justify-between">
             <dt>{t("fee")}</dt>
             <dd className="nums text-fg-1">{formatMoney(ORDER_FEE_CENTS)}</dd>
           </div>
-          {!buying && estimatedTax > 0 && (
+          {!buying && shownTax > 0 && (
             <div className="flex justify-between">
               <dt>{t("taxEstimate")}</dt>
-              <dd className="nums text-fg-1">−{formatMoney(estimatedTax)}</dd>
+              <dd className="nums text-fg-1">−{formatMoney(shownTax)}</dd>
             </div>
           )}
           <div className="flex justify-between border-t border-line-1 pt-3 text-base font-semibold text-fg-1">
-            <dt>{t(buying ? "total" : "proceeds")}</dt>
-            <dd>
-              <NumberTicker value={Math.max(0, total - estimatedTax)} format={money} />
+            <dt>{type === "market" ? t(buying ? "payAbout" : "receiveAbout") : t(buying ? "total" : "proceeds")}</dt>
+            <dd data-testid="order-net" aria-busy={quoting || undefined}>
+              {quoting ? <Skeleton className="h-6 w-24" /> : <NumberTicker value={shownTotal} format={money} />}
             </dd>
           </div>
           <div className="flex justify-between text-sm text-fg-3">

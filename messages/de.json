@@ -321,7 +321,18 @@
     "pickHint": "Wähle mit dem Regler oder tippe einen Betrag ein.",
     "slider": "Menge wählen",
     "tooSmall": "Eine Order muss mindestens 1 € wert sein.",
-    "holdLimit": "Halten: Limit setzen"
+    "holdLimit": "Halten: Limit setzen",
+    "avgPrice": "Ø Ausführungskurs",
+    "impact": "Kursauswirkung",
+    "receiveAbout": "Du erhältst ca.",
+    "payAbout": "Du zahlst ca.",
+    "quoting": "Berechne Ausführung …",
+    "limitedImpact": "Nur {filled} von {requested} Stück werden jetzt ausgeführt: Mehr würde den Kurs um über {cap} bewegen. Den Rest kannst du ab dem nächsten Kurs-Takt handeln.",
+    "limitedBand": "Nur {filled} von {requested} Stück werden jetzt ausgeführt: Darüber hinaus würde die Aktie ihre Tagesgrenze überschreiten.",
+    "highImpactSell": "Große Order: Sie drückt den Kurs um {impact}. Du erhältst ca. {amount}, nicht Stückzahl × Kurs.",
+    "highImpactBuy": "Große Order: Sie hebt den Kurs um {impact}. Du zahlst ca. {amount}.",
+    "nothingFills": "Jetzt wird nichts ausgeführt: Der Kurs hat sich in dieser Minute schon zu stark bewegt oder die Tagesgrenze ist erreicht.",
+    "filledPartial": "{filled} von {requested} Stück ausgeführt"
   },
   "company": {
     "title": "Unternehmen",
@@ -905,6 +916,8 @@
     "interview_not_found": "Dieses Interview gibt es nicht.",
     "interview_text_invalid": "Die Antwort ist zu lang oder enthält Wörter, die hier nicht gehen.",
     "interview_closed": "Das Interview ist schon vorbei.",
+    "order_impact_limit": "Diese Order würde den Kurs in dieser Minute zu stark bewegen. Warte auf den nächsten Kurs-Takt und versuche es dann mit einer kleineren Menge.",
+    "price_band_limit": "Die Aktie hat heute ihre Tagesgrenze erreicht. Weiter verkaufen oder kaufen geht erst ab dem nächsten Handelstag.",
     "insider_cooldown": "Insiderregel: Nach einer Entnahme aus deiner Firma kannst du ihre Aktie 24 Stunden lang nicht kaufen.",
     "capital_increase_cooldown": "Eine Kapitalerhöhung geht höchstens einmal am Tag.",
     "issue_proceeds_locked": "Das Geld aus dem Börsengang oder der Kapitalerhöhung gehört drei Tage lang der Firma und kann noch nicht entnommen werden.",

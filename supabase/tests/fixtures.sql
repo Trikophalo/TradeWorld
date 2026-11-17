@@ -23,6 +23,8 @@ select public.get_my_missions() is not null as ok \gset
 select public.complete_tutorial(gen_random_uuid());
 \o :fixture_dir/claim_vault.json
 select public.claim_vault(gen_random_uuid());
+\o :fixture_dir/quote_order.json
+select public.quote_order('VLT', 'buy', null, 100000);
 \o :fixture_dir/place_order_market.json
 select public.place_order(gen_random_uuid(), 'VLT', 'buy', 'market', 5000000);
 \o :fixture_dir/place_order_limit.json

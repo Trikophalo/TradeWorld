@@ -4170,3 +4170,80 @@ Funktionskarte: `docs/FIRMA_ANALYSE.md`.
 **Offen.** Ob auf Live eine Firma an einem Nebenschritt scheiterte, zeigt nach dem Deploy
 `select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
 aus Spec 6.6) bleibt unbenutzt.
+
+## ADR-189: Die Vorschau ist die Ausführung, eine Order bewegt den Kurs höchstens 15 % — `Annahme`
+
+Vorgabe des Besitzers: „Wenn man Aktien verkauft, bekommt man manchmal nur die Hälfte. Ich habe gerade für über 100k
+verkauft und nur 50k bekommen. Beim Kaufen ist der Fehler auch ab einer bestimmten Zahl.“ Umsatzzeile:
+„58.877,583251 × 0,8489 € · Gebühr 1,00 € · G/V −46.202,24 €“; die Order-Maske zeigte vorher über 100.000 €.
+
+**Ursache (nachgestellt auf der lokalen Datenbank, `supabase/tests/c7_order_fill.sql`, Abschnitt B):**
+
+- Die Order-Maske rechnete **Stückzahl × Geld-/Briefkurs** (58.877,58 × 1,63 € ≈ 96.000 €) und kannte die
+  Kursauswirkung nicht.
+- Der Server füllt seit ADR-126 entlang der Spieler-Tiefe: Für Pennystocks (alle Spieleraktien) bewegen 1.000 € den
+  Kurs um 1 % (`playerImpact.depthCentsPer100Bps.penny`). Eine Order zahlt im Schnitt die halbe eigene Bewegung.
+  96.000 € bewegen den Kurs um 96 %, der Durchschnitt liegt also 48 % unter dem Geldkurs: 1,63 € → 0,848 €,
+  Erlös 49.916 € (Live: 0,8489 €, 49.981 €). Es gab **keine Grenze**: `maxImpactBpsPerOrder` stand in der
+  Konfiguration, galt aber nur in der alten TS-Schätzung, nicht in `place_order`. Ab rund 200.000 € wäre der Kurs bis
+  auf den Mindestpreis gefallen.
+- Der Kauf hat dasselbe Problem nach oben (100.000 € in eine Spieleraktie: Ø +50 %). Der Kurs vor dem Verkauf war also
+  nicht schon gefallen; **die Order selbst** hat ihn von 1,63 € auf 0,85 € im Schnitt gedrückt.
+- Nicht die Ursache: Steuer (25 % nur auf Gewinne, Gründeraktien werden nicht anders besteuert; beim Verkauf mit
+  Verlust 0 €), das Tagesband aus ADR-170 (begrenzt den Takt-Kurs, nicht die Ausführung) und die Buchung (der Verkäufer
+  bekommt genau Brutto − Gebühr − Steuer auf `player_cash`, die Gebühr geht an den Staat).
+
+**Entscheidung:**
+
+- **Ein Plan für Vorschau und Ausführung:** `market_order_plan()` (SQL) = `planMarketOrder()` (`src/lib/sim/order-fill.ts`).
+  `quote_order(ticker, side, menge | betrag)` liefert ihn samt Gebühr und Steuer (FIFO-Lose, Verlusttopf wie
+  `execute_fill`) für die Maske; `place_order` führt bei Sofort-Orders genau diesen Plan aus. Beträge werden entlang des
+  Preispfads gelöst (quadratische Gleichung), ein Kauf gibt nie mehr als den Betrag aus.
+- **Höchstens 15 % je Order:** Der Preis der letzten Aktie entfernt sich höchstens `priceImpact.maxImpactBpsPerOrder`
+  (1.500 bps) vom Geld-/Briefkurs, der Durchschnitt also höchstens 7,5 %. Bei Spieleraktien bleibt die letzte Aktie
+  außerdem im Tagesband (ADR-170). Was darüber hinausginge, wird **nicht ausgeführt**: Ergebnis mit
+  `requested_quantity_e6`, `unfilled_quantity_e6`, `limited_by` (`impact` oder `band`) und `impact_bps`. Geht gar
+  nichts mehr (Grenze in diesem Takt schon erreicht oder Kurs am Band), lehnt der Server mit `order_impact_limit` bzw.
+  `price_band_limit` ab. Der ausstehende Spielerfluss des Takts zählt mit, Aufteilen in kleine Orders umgeht die Grenze
+  also nicht; im nächsten Takt geht es zum neuen Kurs weiter.
+- **Die Maske zeigt den Plan:** Ø Ausführungskurs, Kursauswirkung (±%), „Du erhältst ca. X €“ / „Du zahlst ca. X €“.
+  Ab 5 % Kursauswirkung (`trading.highImpactWarnBps`) ein Warnhinweis mit dem genauen Betrag, bei einer Teilausführung
+  „Nur N von M Stück werden jetzt ausgeführt …“. Bestätigt wird erst, wenn der Plan da ist; eine begrenzte Order schickt
+  genau die angezeigte Stückzahl. Limit-Orders bleiben unverändert (im Spiel ausgeblendet, ADR-117).
+- Verworfen: die Spieler-Tiefe allgemein erhöhen (ADR-120/126/170 bauen darauf, Pumpen würde wieder billig), nur warnen
+  ohne Grenze (ein Halteknopf schützt nicht vor −50 %), Rest als offene Order liegen lassen (Sofort-Orders sollen sofort
+  fertig sein).
+
+**Zahlen vorher/nachher** (Spieleraktie, Geldkurs 1,63 €, `c7_order_fill.sql`):
+
+| Order                                | vorher                               | nachher                                                                                     |
+| ------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Verkauf 58.877,58 Stück (≈ 96.000 €) | Ø 0,848 €, 49.916 €, Maske: 96.000 € | 9.202,45 Stück zu Ø 1,5078 €, 13.874 € (Maske = Buchung), Rest 49.675 Stück bleibt im Depot |
+| gleich danach noch einmal            | noch tiefer                          | abgelehnt (`order_impact_limit`), Hinweis in der Maske                                      |
+| Kauf 100.000 € Pennystock (KI)       | Ø +50 %                              | 16.125 € zu Ø +7,5 %, Rest nicht ausgeführt                                                 |
+| Kauf 100.000 € Midcap (ALM)          | Ø +10 %                              | 80.624 € zu Ø +7,5 %                                                                        |
+| Kauf 100.000 € Blue Chip (BRZ)       | Ø +2,4 %                             | unverändert, ganz ausgeführt, Kursauswirkung +4,9 % angezeigt                               |
+
+Folgen: Wer eine große Position in einer Spieleraktie hat, verkauft sie über mehrere Takte, jeweils zu höchstens 7,5 %
+Abschlag, statt in einem Rutsch zur Hälfte. Mit 4 Spielern gilt die Grenze je Takt für alle zusammen (gemeinsamer
+Spielerfluss). Tests: `src/lib/sim/order-fill.test.ts`, `supabase/tests/c7_order_fill.sql`, `e2e/order-fill.spec.ts`.
+
+**Entschädigung:** Die Verkäufe mit großer Kursauswirkung findet auf Live (nur lesend):
+
+```sql
+select t.executed_at, p.nickname, s.ticker, t.quantity_e6 / 1e6 as stueck, t.price_e4 / 1e4 as kurs,
+       q.prev_close_e4 / 1e4 as vortag, t.gross_cents / 100.0 as brutto, t.fee_cents / 100.0 as gebuehr,
+       t.tax_cents / 100.0 as steuer, t.realized_pnl_cents / 100.0 as gv,
+       (select e.amount_cents / 100.0 from public.ledger_entries e
+          join public.ledger_accounts a on a.id = e.account_id
+         where e.transaction_id = t.ledger_transaction_id and a.owner_player_id = o.player_id
+           and a.kind = 'player_cash') as gutschrift
+  from public.trades t
+  join public.orders o on o.id = t.order_id
+  join public.profiles p on p.id = o.player_id
+  join public.securities s on s.id = o.security_id
+  left join public.security_quotes q on q.security_id = s.id
+ where o.side = 'sell' and t.gross_cents >= 1000000
+ order by t.executed_at desc
+ limit 50;
+```
