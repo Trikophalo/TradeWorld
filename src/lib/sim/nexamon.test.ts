@@ -5,6 +5,7 @@ import { NEXAMON_RARITIES, placeholderSet, type NexamonRarity } from "../../conf
 import {
   nexamonAiAllowed,
   nexamonAiAskCents,
+  nexamonAiSlabHoldMs,
   nexamonOneOfOneChance,
   nexamonBulkPayout,
   nexamonBulkRarities,
@@ -706,5 +707,15 @@ describe("Nexamon AI and fees (ADR-165)", () => {
     expect(cfg.sets.super_apex).toEqual({ name: "Nexamon: Super Apex", packPriceCents: 100_000 });
     expect(cfg.sets.prismatic_peak).toEqual({ name: "Nexamon: Prismatic Peak", packPriceCents: 1_000_000 });
     expect(BALANCE.progression.unlocks.find((u) => u.key === "nexamon")?.level).toBe(10);
+  });
+});
+
+describe("nexamonAiSlabHoldMs", () => {
+  it("holds a slab between minHours and maxHours, mostly short", () => {
+    const h = BALANCE.nexamon.ai.slabHold;
+    expect(nexamonAiSlabHoldMs(0)).toBe(h.minHours * 3_600_000);
+    expect(nexamonAiSlabHoldMs(1)).toBe(h.maxHours * 3_600_000);
+    expect(nexamonAiSlabHoldMs(0.5)).toBeLessThan(((h.minHours + h.maxHours) / 2) * 3_600_000);
+    expect(nexamonAiSlabHoldMs(0.5) % 1000).toBe(0);
   });
 });

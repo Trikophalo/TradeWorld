@@ -513,6 +513,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Kritiker für NFTs",
         text: "Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit Stärke und Schwäche, der Markt als kleines Abzeichen).",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-b37900d5",
+        title: "Slabs bleiben im Umlauf",
+        text: "Bewertete Karten, die die KI kauft, verschwinden nie; sie behält sie eine Weile (1 bis 72 h) und bietet sie dann zum aktuellen Wert wieder am Markt…",
+      },
     ],
   },
   {

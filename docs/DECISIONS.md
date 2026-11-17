@@ -3078,6 +3078,13 @@ Menge, Image …), acht sinnvolle Punkte, die man mit Mira angehen kann.
   nach Katalog; gebremst wird über die begrenzte KI-Nachfrage und fallende Werte bei wachsendem Angebot. KI-Budget,
   Booster-Takt der KI und Notenfaktoren sind die Stellschrauben.
 
+- **Nachtrag (Slabs bleiben im Umlauf):** Bewertete Kopien (jede Note, halbe Noten und Black Label) verschwinden nie.
+  Kauft die KI einen Slab (oder bekommt ihn auf anderem Weg, etwa von einem gelöschten Konto), wird er Lagerbestand
+  eines KI-Verkäufers mit einer Haltezeit `ai.slabHold` (1 + 71 · u² Stunden, meist unter einem Tag, manche mehrere
+  Tage; `nexamon_copies.ai_hold_until`, Zufall aus der Kopie abgeleitet). Bis dahin ist er nirgends zu sehen. Danach
+  listet ihn die KI zum aktuellen Wert plus KI-Aufschlag (`askBps`), spätestens beim nächsten Sechs-Stunden-Reset;
+  das Lagerlimit `stockCap` und der Reset entfernen nur noch ungradete Kopien. Die Demo rechnet dasselbe.
+
 ## ADR-166: Bezahlbare Missionen und einmal am Tag neu würfeln — `Annahme`
 
 Wunsch des Owners: Missionen sperren oft aus, weil sie mit dem aktuellen Geld kaum zu schaffen sind oder man erst

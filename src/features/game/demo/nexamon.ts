@@ -3,6 +3,7 @@ import { NEXAMON_CARDS, NEXAMON_SETS, nexamonCard, type NexamonRarity, type Nexa
 import type { NexamonCondition } from "@/config/nexamon-rules";
 import {
   nexamonAiAskCents,
+  nexamonAiSlabHoldMs,
   nexamonAiBuyChanceBps,
   nexamonAiBuyCounts,
   nexamonCentsFromE4,
@@ -84,6 +85,8 @@ interface DemoCard {
   firstPulledAt: number | null;
   /** The AI's copies; the first ai.listedPerCard are on offer. */
   ai: { serial: number; condition: NexamonCondition }[];
+  /** Slabs the AI bought (ADR-165): never retired, listed again from `holdUntil` on at its ask. */
+  slabs?: { serial: number; condition: NexamonCondition; grade: number; holdUntil: number }[];
 }
 
 interface DemoCopy {
@@ -576,8 +579,15 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           counted,
         });
         s.copies = s.copies.filter((c) => c.id !== copy.id);
-        if (copy.grade === null && state.ai.length < AI_STOCK_CAP)
-          state.ai.push({ serial: copy.serial, condition: copy.condition });
+        if (copy.grade !== null)
+          // graded copies never leave circulation: the AI holds the slab for a while, then lists it again
+          (state.slabs ??= []).push({
+            serial: copy.serial,
+            condition: copy.condition,
+            grade: copy.grade,
+            holdUntil: now + nexamonAiSlabHoldMs(host.random()),
+          });
+        else if (state.ai.length < AI_STOCK_CAP) state.ai.push({ serial: copy.serial, condition: copy.condition });
         host.notify("nexamon_sale", "Nexamon-Karte verkauft", `${buyer} hat deine Karte gekauft.`, "/nexamon");
         host.track("nexamon_sold");
       }
@@ -677,7 +687,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
   }
 
   /** All open listings: the AI's (priced 10 % above value, following it) and the player's own. */
-  function listings(s: DemoNexamonState): NexamonListing[] {
+  function listings(s: DemoNexamonState, now: number): NexamonListing[] {
     const out: NexamonListing[] = [];
     for (const card of NEXAMON_CARDS) {
       const state = s.cards[card.key]!;
@@ -698,6 +708,27 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           sellerAi: true,
           mine: false,
           listedAt: iso(state.firstPulledAt ?? 0),
+        });
+      }
+      // held slabs show nowhere until their hold time has passed
+      for (const slab of state.slabs ?? []) {
+        if (slab.holdUntil > now) continue;
+        const value = copyValue(s, { cardKey: card.key, condition: slab.condition, grade: slab.grade });
+        out.push({
+          id: aiListingId(card.key, slab.serial),
+          copyId: aiListingId(card.key, slab.serial),
+          cardKey: card.key,
+          set: card.set,
+          rarity: card.rarity,
+          serial: slab.serial,
+          condition: slab.condition,
+          grade: slab.grade,
+          priceCents: nexamonAiAskCents(value),
+          valueCents: value,
+          seller: sellerOf(card.number + slab.serial),
+          sellerAi: true,
+          mine: false,
+          listedAt: iso(slab.holdUntil),
         });
       }
     }
@@ -899,7 +930,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         hype: (s.hype?.[cardKey]?.points ?? [])
           .slice(-cfg.blackLabelHype.historyPoints)
           .map(([at, factorBps, jumpBps]) => ({ at: iso(at), factorBps, jumpBps })),
-        listings: listings(s)
+        listings: listings(s, now)
           .filter((l) => l.cardKey === cardKey)
           .sort((a, b) => a.priceCents - b.priceCents)
           .slice(0, 30),
@@ -928,7 +959,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
       const seller = query.seller ?? "all";
       const page = Math.max(1, Math.floor(query.page ?? 1));
       const size = cfg.market.pageSize;
-      const all = listings(s).filter(
+      const all = listings(s, host.now()).filter(
         (l) =>
           (query.set == null || l.set === query.set) &&
           (query.rarity == null || l.rarity === query.rarity) &&
@@ -1077,7 +1108,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         if (s.copies.filter((c) => c.listing).length >= cfg.market.maxListings)
           throw new GameError("nexamon_listing_limit");
         copy.listing = { id: `l-${copy.id}-${s.nextId++}`, priceCents, listedAt: now };
-        return { listing: listings(s).find((l) => l.id === copy.listing!.id)!, copy: toCopy(s, copy) };
+        return { listing: listings(s, now).find((l) => l.id === copy.listing!.id)!, copy: toCopy(s, copy) };
       }),
 
     unlistNexamonCard: (requestId, listingId) =>
@@ -1112,7 +1143,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           .slice(0, count);
         if (pick.length < count) throw new GameError("nexamon_not_enough");
         for (const copy of pick) copy.listing = { id: `l-${copy.id}-${s.nextId++}`, priceCents, listedAt: now };
-        const all = listings(s);
+        const all = listings(s, now);
         return {
           listings: pick.map((c) => all.find((l) => l.id === c.listing!.id)!),
           copies: pick.map((c) => toCopy(s, c)),
@@ -1133,7 +1164,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     buyNexamonListing: (requestId, listingId, priceCents) =>
       write(requestId, (s, now) => {
         if (s.copies.some((c) => c.listing?.id === listingId)) throw new GameError("nexamon_own_listing");
-        const listing = listings(s).find((l) => l.id === listingId);
+        const listing = listings(s, now).find((l) => l.id === listingId);
         if (!listing) throw new GameError("nexamon_not_listed");
         if (listing.priceCents !== priceCents) throw new GameError("nexamon_price_changed");
         if (host.cashCents() < listing.priceCents) throw new GameError("insufficient_funds");
@@ -1153,15 +1184,16 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         };
         const counted = nexamonSaleCounts(input);
         state.ai = state.ai.filter((x) => x.serial !== listing.serial);
+        if (state.slabs) state.slabs = state.slabs.filter((x) => x.serial !== listing.serial);
         if (counted) setValue(s, listing.cardKey, nexamonValueAfterSale(input), now, true);
         const copy: DemoCopy = {
           id: `nx-${s.nextId++}`,
           cardKey: listing.cardKey,
           serial: listing.serial,
           condition: listing.condition,
-          grade: null,
+          grade: listing.grade,
           gradingUntil: null,
-          gradedAt: null,
+          gradedAt: listing.grade === null ? null : now,
           acquiredAt: now,
           listing: null,
         };
@@ -1171,7 +1203,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           at: now,
           priceCents: listing.priceCents,
           condition: listing.condition,
-          grade: null,
+          grade: listing.grade,
           kind: "market",
           seller: listing.seller,
           buyer: host.nickname(),

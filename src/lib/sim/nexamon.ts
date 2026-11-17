@@ -229,6 +229,16 @@ export function nexamonCopyValueCents(
   return mulDivRound(valueE4, nexamonCopyFactorBps(condition, grade, cfg, popularityBps), 10_000 * NEXAMON_E4_PER_CENT);
 }
 
+/**
+ * How long the AI holds a slab before it lists it again (ADR-165): minHours + (maxHours - minHours) x u^skewPow, in
+ * whole seconds, as ms. `u` is uniform in [0, 1).
+ */
+export function nexamonAiSlabHoldMs(u: number, cfg: Config = BALANCE.nexamon): number {
+  const h = cfg.ai.slabHold;
+  const x = Math.min(1, Math.max(0, u));
+  return Math.round((h.minHours + (h.maxHours - h.minHours) * Math.pow(x, h.skewPow)) * 3600) * 1000;
+}
+
 /** The AI's asking price for a copy: its value plus 10 %. */
 export function nexamonAiAskCents(copyValueCents: number, cfg: Config = BALANCE.nexamon): number {
   return Math.max(cfg.market.minPriceCents, mulDivRound(copyValueCents, cfg.ai.askBps, 10_000));
