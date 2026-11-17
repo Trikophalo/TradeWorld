@@ -12,7 +12,7 @@ import {
   strokeRect,
   type Raster,
 } from "./nexamon-raster";
-import { GOLD_INK, PRISM_INKS, SET_INK } from "./nexamon-symbols";
+import { GOLD_INK, ONE_OF_ONE_INK, PRISM_INKS, SET_INK } from "./nexamon-symbols";
 
 /*
  * Booster packs and the grading slab as pixel art (ADR-165). A pack is drawn once and then split along a jagged
@@ -29,6 +29,7 @@ export const SET_TITLE: Record<NexamonSetKey, string> = {
   mystic_energy: "MYSTIC ENERGY",
   super_apex: "SUPER APEX",
   prismatic_peak: "PRISMATIC PEAK",
+  cosmic_winds: "COSMIC WINDS",
 };
 
 function rng(seed: number): () => number {
@@ -145,6 +146,64 @@ function drawPeak(r: Raster): void {
   fillRect(r, top.x - 4, top.y - 1, 9, 1, ink.deep);
 }
 
+/**
+ * Cosmic Winds (ADR-174): a deep-space foil. A pink and blue nebula drifts across the black, a ringed planet hangs
+ * in the middle with its ring in front, solar wind streams past in long dashes and a comet cuts the upper corner.
+ */
+function drawCosmic(r: Raster): void {
+  const ink = SET_INK.cosmic_winds;
+  ditherRect(r, 0, 0, PW, PH, [ink.deep, ink.deep, "#0a0824", ink.dark, "#0a0824"]);
+  // Nebula: two soft clouds, pink to the left, blue to the right, dithered so they stay pixel art.
+  for (let y = 22; y < 100; y++)
+    for (let x = 0; x < PW; x++) {
+      const pink = 1 - Math.hypot((x - 18) / 26, (y - 70) / 20);
+      const blue = 1 - Math.hypot((x - 58) / 24, (y - 44) / 22);
+      const t = bayer(x, y);
+      if (pink > t * 0.9 + 0.05) setPixel(r, x, y, pink > 0.6 ? "#ff8ad8" : "#7a2f8f", pink > 0.6 ? 0.55 : 0.6);
+      if (blue > t * 0.9 + 0.05) setPixel(r, x, y, blue > 0.6 ? "#7fd4ff" : "#22408f", blue > 0.6 ? 0.5 : 0.6);
+    }
+  const rand = rng(41);
+  for (let i = 0; i < 60; i++)
+    star(r, 2 + Math.floor(rand() * (PW - 4)), 22 + Math.floor(rand() * 74), "#d8d0ff", rand() > 0.85);
+  // Solar wind: long dashes that sweep down to the right.
+  for (let i = 0; i < 9; i++) {
+    const y0 = 30 + i * 8;
+    for (let k = 0; k < 26; k++) {
+      const x = ((i * 23 + k) % (PW + 20)) - 10;
+      if (k % 9 > 5) continue;
+      setPixel(r, x, y0 + Math.floor(k / 6), ink.pale, 0.55 - k * 0.015);
+    }
+  }
+  // The planet: a shaded sphere with bands, light from the upper left.
+  const cx = 38;
+  const cy = 60;
+  const radius = 17;
+  for (let y = -radius; y <= radius; y++)
+    for (let x = -radius; x <= radius; x++) {
+      const d = Math.hypot(x, y);
+      if (d > radius) continue;
+      const light = (-x - y) / (radius * 1.6) + 0.5 - d / (radius * 3);
+      const band = Math.sin((y + x * 0.2) * 0.7) > 0.4;
+      const stops = ["#140d3d", ink.dark, ink.base, "#8f7cff", "#d9d2ff"];
+      const idx = Math.max(0, Math.min(4, Math.floor((light + bayer(cx + x, cy + y) * 0.25) * 4)));
+      setPixel(r, cx + x, cy + y, band && idx > 0 ? stops[idx - 1]! : stops[idx]!);
+    }
+  // The ring: an ellipse, behind the planet at the top, in front at the bottom, in the iridescent One of One inks.
+  for (let a = 0; a < 360; a += 1) {
+    const rad = (a * Math.PI) / 180;
+    const x = Math.round(cx + Math.cos(rad) * 31);
+    const y = Math.round(cy + Math.sin(rad) * 7 - Math.cos(rad) * 4);
+    const behind = Math.sin(rad) < 0 && Math.hypot(x - cx, y - cy) < radius;
+    if (behind) continue;
+    const hex = ONE_OF_ONE_INK.iris[Math.floor(a / 24) % ONE_OF_ONE_INK.iris.length]!;
+    setPixel(r, x, y, hex);
+    setPixel(r, x, y + 1, hex, 0.5);
+  }
+  // A comet in the upper right corner, its tail streaming back.
+  for (let k = 0; k < 18; k++) setPixel(r, 66 - k, 27 + Math.floor(k / 2), k < 3 ? "#ffffff" : "#bfe9ff", 1 - k / 20);
+  fillRect(r, 65, 26, 2, 2, "#ffffff");
+}
+
 export interface PackRasters {
   /** The sealed pack. */
   full: Raster;
@@ -167,6 +226,7 @@ export function composePack(set: NexamonSetKey): PackRasters {
   const full = createRaster(PW, PH);
   if (set === "mystic_energy") drawMystic(full);
   else if (set === "super_apex") drawApex(full);
+  else if (set === "cosmic_winds") drawCosmic(full);
   else drawPeak(full);
 
   // Title band and set name.
@@ -174,7 +234,14 @@ export function composePack(set: NexamonSetKey): PackRasters {
   fillRect(full, 0, CRIMP + 3, PW, 1, ink.pale, 0.7);
   fillRect(full, 0, CRIMP + 18, PW, 1, ink.pale, 0.7);
   drawMicroTextCentered(full, "NEXAMON", PW / 2 + 1, CRIMP + 7, ink.deep, 2);
-  drawMicroTextCentered(full, "NEXAMON", PW / 2, CRIMP + 6, set === "prismatic_peak" ? "#ffffff" : "#ffe25c", 2);
+  drawMicroTextCentered(
+    full,
+    "NEXAMON",
+    PW / 2,
+    CRIMP + 6,
+    set === "prismatic_peak" || set === "cosmic_winds" ? "#ffffff" : "#ffe25c",
+    2,
+  );
   fillRect(full, 0, PH - CRIMP - 13, PW, 9, ink.deep, 0.7);
   fillRect(full, 0, PH - CRIMP - 13, PW, 1, ink.pale, 0.6);
   const title = SET_TITLE[set];
@@ -183,6 +250,12 @@ export function composePack(set: NexamonSetKey): PackRasters {
     let x = Math.round(PW / 2 - microTextWidth(title) / 2);
     [...title].forEach((ch, i) => {
       x = drawMicroText(full, ch, x, PH - CRIMP - 11, PRISM_INKS[i % PRISM_INKS.length]!) + 0;
+    });
+  } else if (set === "cosmic_winds") {
+    // The iridescent run of the One of Ones, letter by letter.
+    let x = Math.round(PW / 2 - microTextWidth(title) / 2);
+    [...title].forEach((ch, i) => {
+      x = drawMicroText(full, ch, x, PH - CRIMP - 11, ONE_OF_ONE_INK.iris[i % ONE_OF_ONE_INK.iris.length]!);
     });
   } else drawMicroTextCentered(full, title, PW / 2, PH - CRIMP - 11, ink.pale);
 
@@ -270,17 +343,18 @@ function drawAspEmblem(r: Raster, x: number, y: number, tier: SlabTier): void {
   );
 }
 
-const slabCache = new Map<SlabTier, { front: Raster; back: Raster }>();
+const slabCache = new Map<string, { front: Raster; back: Raster }>();
 
 /**
  * The plastic case of a graded card, front and back. A grade of 10 gets the gold label, the Black Label (11) a
  * black one with silver print.
  */
-export function composeSlab(grade: number): { front: Raster; back: Raster } {
+export function composeSlab(grade: number, oneOfOne = false): { front: Raster; back: Raster } {
   const tier = slabTier(grade);
   const gold = tier === "gold";
   const black = tier === "black";
-  const hit = slabCache.get(tier);
+  const cacheKey = oneOfOne ? `${tier}:1of1` : tier;
+  const hit = slabCache.get(cacheKey);
   if (hit) return hit;
   const { width: w, height: h } = SLAB_SIZE;
   const build = (back: boolean): Raster => {
@@ -319,6 +393,13 @@ export function composeSlab(grade: number): { front: Raster; back: Raster } {
       setPixel(r, l.x + 1, l.y + 6, BLACK_LABEL_INK.white);
       setPixel(r, l.x + l.w - 2, l.y + l.h - 4, BLACK_LABEL_INK.white);
     }
+    // A One of One (ADR-174): an iridescent line under the band and above the foot of the label.
+    if (oneOfOne)
+      for (let x = l.x; x < l.x + l.w; x++) {
+        const iris = ONE_OF_ONE_INK.iris;
+        setPixel(r, x, l.y + 5, iris[Math.floor((x - l.x) / 5) % iris.length]!);
+        setPixel(r, x, l.y + l.h - 3, iris[(Math.floor((x - l.x) / 5) + 2) % iris.length]!);
+      }
     strokeRect(r, l.x - 1, l.y - 1, l.w + 2, l.h + 2, "#5f7690", 0.8);
     if (back) {
       drawAspEmblem(r, l.x + 4, l.y + 6, tier);
@@ -337,7 +418,7 @@ export function composeSlab(grade: number): { front: Raster; back: Raster } {
     return r;
   };
   const out = { front: build(false), back: build(true) };
-  slabCache.set(tier, out);
+  slabCache.set(cacheKey, out);
   return out;
 }
 
