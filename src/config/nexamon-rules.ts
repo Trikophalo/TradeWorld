@@ -225,7 +225,7 @@ export const NEXAMON_RULES = {
    * Pulling a card of these rarities is news for the friends (feed kind nexamon_pull). A Black Label always is
    * (feed kind nexamon_black_label).
    */
-  feedRarities: ["legendary", "one_of_one"],
+  feedRarities: ["legendary"],
   /**
    * Who is on the Collectibles tab (ADR-172): the page asks every `pingSeconds`; a player counts as there for
    * `presenceSeconds` after the last ask. At most `maxPlayers` figures are shown.
