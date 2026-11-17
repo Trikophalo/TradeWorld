@@ -578,6 +578,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Bulk verkaufen aufgeräumt",
         text: "Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-6bf69bdf",
+        title: "News-Aktionen",
+        text: "Ab und zu kündigt Mr. Doodle Dangle in der Show eine Aktion für alle an, 15 Minuten lang: ein Booster-Set 20 % günstiger, ein Gratis-NFT oder eine…",
+      },
     ],
   },
   {

@@ -8123,6 +8123,26 @@ drivers, at, history: [{hour_start, value, target}]}` (letzte 48 Stunden) und `c
   `requested_quantity_e6`, `unfilled_quantity_e6`, `limited_by` (`supply` oder null), `impact_bps`.
   `trading.maxOrderQuantity` ist nur noch eine technische Schranke. Limit-Orders unverändert.
 
+## Nachtrag: News-Aktionen (ADR-193)
+
+- `news_promos` (neu, RLS an, lesbar für angemeldete Spieler, Schreiben nur über Funktionen): `id`, `kind`
+  (`pack_sale`, `free_nft`, `tax_return`), `show_id` (eindeutig), `set_key` (nur `pack_sale`), `bps` (Rabatt bzw.
+  Anteil), `starts_at`, `ends_at`, `headline`, `body`. Höchstens eine läuft.
+- `news_promo_claims` (neu, RLS an, nur eigene Zeilen lesbar): `promo_id` + `player_id` (PK), `amount_cents` (erlassene
+  Gebühr bzw. Erstattung), `revenue_cents`, `ref_id` (NFT), `created_at`.
+- Trigger `news_shows_promo` (BEFORE UPDATE OF status auf `news_shows`, `scheduled` → `aired`): `news_promo_draw()`
+  legt mit `newsPromos.chanceBps` eine Aktion an, hängt das Segment `promo` an, schreibt die Nachricht und die
+  Benachrichtigung `news_promo` (einmal je Spieler).
+- Intern: `news_promos_cfg`, `news_promo_active(now)`, `news_promo_pack_price(set, price, now)`,
+  `news_promo_tax(player, now)`, `news_promo_draw(show, now, roll, pick)`.
+- RPC `get_news_promo()` → `{now, promo: {id, kind, set, bps, starts_at, ends_at, headline, text, claimed,
+claimed_cents, tax: {owner, revenue_cents, refund_cents, cap_cents, share_bps} | null} | null}`.
+- RPC `file_news_tax_return(p_request_id)` → `{promo_id, refund_cents, revenue_cents}`; Buchung `tax_refund` von
+  `treasury` an `player_cash`. Fehler `news_promo_inactive`, `news_promo_claimed`, `news_promo_no_company`,
+  `tax_nothing_due`.
+- Neu definiert: `buy_nexamon_pack`, `buy_nexamon_sealed_pack` (Preis über `news_promo_pack_price`), `create_artwork`
+  (Gratis-NFT, Antwort zusätzlich `free`).
+
 ## Nachtrag: Große Nexamon-Züge für alle (ADR-190)
 
 - `nexamon_big_pull_broadcasts` (neu, nur über Funktionen): `player_id` (PK), `tx_id`, `broadcast_at`, `dedupe_key`,
