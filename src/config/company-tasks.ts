@@ -681,7 +681,7 @@ export const COMPANY_TASK_RULES = {
     /** A 4 x 4 shelf: every row, column and 2 x 2 box holds each of 4 goods once; fill the gaps. */
     shelf: { seconds: 60, blanks: 7 },
     /** ADR-186: a size x size sliding puzzle, scrambled by `scramble` slides (never straight back); every tile counts. */
-    tiles: { seconds: 90, size: 3, scramble: 14, minWrong: 5, maxMoves: 400 },
+    tiles: { seconds: 120, size: 3, scramble: 6, minWrong: 2, maxMoves: 400 },
     /** items crates in kinds colours and kinds shapes; shelve them by colour or by shape (the puzzle says which). */
     bins: { seconds: 40, items: 8, kinds: 3 },
     /**
