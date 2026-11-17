@@ -5,7 +5,7 @@
  */
 import type { MoveBranch } from "./company-moves.ts";
 
-/** Every task game; eight came with ADR-173, the last five with ADR-180. */
+/** Every task game; eight came with ADR-173, five with ADR-180, the last nine (drag and see) with ADR-186. */
 export const TASK_GAMES = [
   "pick",
   "count",
@@ -30,8 +30,57 @@ export const TASK_GAMES = [
   "offer",
   "pattern",
   "shelf",
+  "tiles",
+  "bins",
+  "untangle",
+  "odd",
+  "rebuild",
+  "align",
+  "pipes",
+  "sizes",
+  "conveyor",
 ] as const;
 export type TaskGame = (typeof TASK_GAMES)[number];
+/**
+ * What a game asks of the player (ADR-186): calc = maths, numbers and reading/typing, drag = pushing, sliding and
+ * turning pieces, visual = looking, spotting and remembering. The draw weights favour drag and visual games.
+ */
+export type TaskGameKind = "calc" | "drag" | "visual";
+export const TASK_GAME_KINDS: Readonly<Record<TaskGame, TaskGameKind>> = {
+  pick: "visual",
+  count: "calc",
+  sort: "drag",
+  order: "calc",
+  seq: "visual",
+  math: "calc",
+  slider: "drag",
+  rotate: "drag",
+  match: "drag",
+  path: "drag",
+  memory: "visual",
+  timing: "visual",
+  diff: "visual",
+  quick: "calc",
+  route: "visual",
+  haggle: "calc",
+  pack: "calc",
+  catch: "visual",
+  restock: "calc",
+  receipts: "calc",
+  offer: "calc",
+  pattern: "calc",
+  shelf: "visual",
+  tiles: "drag",
+  bins: "drag",
+  untangle: "drag",
+  odd: "visual",
+  rebuild: "drag",
+  align: "drag",
+  pipes: "drag",
+  sizes: "drag",
+  conveyor: "drag",
+};
+
 export type TaskMathOp = "mul" | "add" | "sub" | "pct";
 
 export interface CompanyTaskConfig {
@@ -53,9 +102,11 @@ export interface CompanyTaskConfig {
   readonly op?: TaskMathOp;
   readonly a?: readonly [number, number];
   readonly b?: readonly [number, number];
+  /** Draw weight (ADR-186), filled in by taskWeight() for game_config; higher comes up more often. */
+  readonly weight?: number;
 }
 
-export const COMPANY_TASKS: readonly CompanyTaskConfig[] = [
+const CATALOGUE: readonly CompanyTaskConfig[] = [
   { key: "pay_invoices", product: "*", branch: "finance", game: "sort", factor: 1.0, minutes: 45 },
   {
     key: "payroll_check",
@@ -543,6 +594,37 @@ export const COMPANY_TASKS: readonly CompanyTaskConfig[] = [
   { key: "best_customer", product: "*", branch: "sales", game: "offer", factor: 1.0, minutes: 45 },
   { key: "sales_forecast", product: "*", branch: "management", game: "pattern", factor: 1.1, minutes: 45 },
   { key: "shelf_order", product: "*", branch: "logistics", game: "shelf", factor: 1.2, minutes: 50 },
+  // ADR-186: nine drag and see games, one task for everyone and one per product
+  { key: "shipment_tiles", product: "*", branch: "logistics", game: "tiles", factor: 1.1, minutes: 50 },
+  { key: "crate_shelves", product: "*", branch: "logistics", game: "bins", factor: 0.9, minutes: 45 },
+  { key: "cable_mess", product: "*", branch: "it", game: "untangle", factor: 1.0, minutes: 45 },
+  { key: "defect_spot", product: "*", branch: "craft", game: "odd", factor: 0.9, minutes: 40 },
+  { key: "desk_layout", product: "*", branch: "management", game: "rebuild", factor: 0.9, minutes: 45 },
+  { key: "line_setup", product: "*", branch: "craft", game: "align", factor: 0.9, minutes: 45 },
+  { key: "pipe_fix", product: "*", branch: "craft", game: "pipes", factor: 1.1, minutes: 45 },
+  { key: "parcel_sizes", product: "*", branch: "logistics", game: "sizes", factor: 0.8, minutes: 40 },
+  { key: "belt_sort", product: "*", branch: "logistics", game: "conveyor", factor: 1.0, minutes: 40 },
+  { key: "network_map", product: "security_software", branch: "it", game: "untangle", factor: 1.1, minutes: 45 },
+  { key: "screen_layout", product: "mobile_app", branch: "it", game: "rebuild", factor: 1.0, minutes: 45 },
+  { key: "data_pipeline", product: "cloud_platform", branch: "it", game: "pipes", factor: 1.2, minutes: 45 },
+  { key: "file_stacks", product: "legal_tech", branch: "law", game: "sizes", factor: 0.9, minutes: 40 },
+  { key: "fake_note", product: "fintech", branch: "finance", game: "odd", factor: 1.1, minutes: 40 },
+  { key: "parcel_belt", product: "online_shop", branch: "logistics", game: "conveyor", factor: 1.1, minutes: 40 },
+  { key: "fabric_bins", product: "fashion", branch: "craft", game: "bins", factor: 1.0, minutes: 45 },
+  { key: "bad_apple", product: "delicatessen", branch: "logistics", game: "odd", factor: 1.0, minutes: 40 },
+  { key: "store_layout", product: "franchise", branch: "management", game: "rebuild", factor: 1.0, minutes: 45 },
+  { key: "panel_mount", product: "solar", branch: "craft", game: "align", factor: 1.1, minutes: 45 },
+  { key: "grid_switch", product: "grid_service", branch: "craft", game: "pipes", factor: 1.2, minutes: 45 },
+  { key: "cell_sizes", product: "energy_storage", branch: "science", game: "sizes", factor: 1.0, minutes: 40 },
+  { key: "trade_lines", product: "energy_trading", branch: "finance", game: "untangle", factor: 1.1, minutes: 45 },
+  { key: "pill_belt", product: "generics", branch: "science", game: "conveyor", factor: 1.1, minutes: 40 },
+  { key: "gel_tiles", product: "biotech", branch: "science", game: "tiles", factor: 1.2, minutes: 50 },
+  { key: "device_parts", product: "medtech", branch: "craft", game: "align", factor: 1.1, minutes: 45 },
+  { key: "form_bins", product: "regulatory", branch: "law", game: "bins", factor: 1.0, minutes: 45 },
+  { key: "sort_hub", product: "courier", branch: "logistics", game: "conveyor", factor: 1.1, minutes: 40 },
+  { key: "pallet_bins", product: "warehouse", branch: "logistics", game: "bins", factor: 1.0, minutes: 45 },
+  { key: "container_yard", product: "freight", branch: "logistics", game: "tiles", factor: 1.2, minutes: 50 },
+  { key: "room_rebuild", product: "moving", branch: "logistics", game: "rebuild", factor: 1.0, minutes: 45 },
 ];
 
 /** Rules for company tasks (ADR-129). Money in cents, rates in basis points. */
@@ -598,7 +680,37 @@ export const COMPANY_TASK_RULES = {
     pattern: { seconds: 40, rounds: 3, shown: 4 },
     /** A 4 x 4 shelf: every row, column and 2 x 2 box holds each of 4 goods once; fill the gaps. */
     shelf: { seconds: 60, blanks: 7 },
+    /** ADR-186: a size x size sliding puzzle, scrambled by `scramble` slides (never straight back); every tile counts. */
+    tiles: { seconds: 90, size: 3, scramble: 14, minWrong: 5, maxMoves: 400 },
+    /** items crates in kinds colours and kinds shapes; shelve them by colour or by shape (the puzzle says which). */
+    bins: { seconds: 40, items: 8, kinds: 3 },
+    /**
+     * nodes on a grid x grid board, a ring of cables plus chords that can lie without crossings; the nodes start
+     * swapped so at least minCrossings pairs cross. Every pair still meeting costs stepBps.
+     */
+    untangle: { seconds: 60, grid: 6, nodes: 6, chords: 2, minCrossings: 2, stepBps: 2_000 },
+    /** rounds of cells equal goods (kinds shapes) with one faulty one (flaws kinds of fault); tap it. */
+    odd: { seconds: 40, rounds: 3, cells: 16, kinds: 4, flaws: 3 },
+    /** Remember where items goods stand on a size x size shelf for showSeconds, then put them back. */
+    rebuild: { seconds: 60, size: 3, items: 4, showSeconds: 5 },
+    /** parts of kinds shapes onto the matching outline of slots stations on the line. */
+    align: { seconds: 40, kinds: 6, slots: 6, parts: 4 },
+    /**
+     * Turn the pipes of a size x size field until the route from the left to the right edge is closed (full marks);
+     * otherwise the share of the route's pipes that point right, times openBps. minWrong route pipes start wrong.
+     */
+    pipes: { seconds: 60, size: 4, minWrong: 4, openBps: 5_000 },
+    /** items parcels of min..max % size (at least minGap apart), dragged from small to big; every right place counts. */
+    sizes: { seconds: 40, items: 6, min: 30, max: 100, minGap: 8 },
+    /** items goods of kinds kinds run along a belt (one every everyMs, travelMs long); right bin +1, wrong −1, missed 0. */
+    conveyor: { seconds: 45, items: 10, kinds: 3, everyMs: 2_400, travelMs: 5_600 },
   },
+  /**
+   * Draw mix (ADR-186): a task's weight is kindWeight[kind of its game] x productWeight for the company's own
+   * product (genericWeight for tasks every company has). Maths and typing (calc) come up rarely, drag and see games
+   * most of the time; the share of calc tasks stays at most maxCalcShareBps for every product (test).
+   */
+  mix: { kindWeight: { calc: 1, drag: 4, visual: 3 }, genericWeight: 1, productWeight: 2, maxCalcShareBps: 2_000 },
   /** AI workers do delegated tasks, but slowly and less well. */
   ai: {
     minutes: 12,
@@ -667,6 +779,15 @@ export const COMPANY_TASK_RULES = {
    */
   strengthPay: { minBps: 9_000, maxBps: 15_000 },
 } as const;
+
+/** Draw weight of a task (ADR-186): kind of its game x own product or generic. */
+export function taskWeight(task: Pick<CompanyTaskConfig, "game" | "product">, rules = COMPANY_TASK_RULES): number {
+  const m = rules.mix;
+  return m.kindWeight[TASK_GAME_KINDS[task.game]] * (task.product === "*" ? m.genericWeight : m.productWeight);
+}
+
+/** The task catalogue with its draw weights (ADR-186); keys stay stable, players' history refers to them. */
+export const COMPANY_TASKS: readonly CompanyTaskConfig[] = CATALOGUE.map((t) => ({ ...t, weight: taskWeight(t) }));
 
 /** Funny filler news for the news tab (ADR-129); texts in messages/de.json (funNews.items). */
 export const FUN_NEWS = {
