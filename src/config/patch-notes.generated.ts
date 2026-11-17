@@ -463,6 +463,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Neue Themen in den Nachrichten",
         text: "Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-ac96c020",
+        title: "CEO-Interviews",
+        text: "Mr. Doodle Dangle bittet Chefs manchmal zum Interview.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-1f3a2872",
+        title: "Mehr Firmenalltag",
+        text: "Acht neue Minispiele für Firmenaufgaben (Paare finden, Stempel im Takt, Fehlersuche, Kopfrechnen, Tour planen, Verhandeln, Einpacken, Zugreifen) und…",
+      },
     ],
   },
   {

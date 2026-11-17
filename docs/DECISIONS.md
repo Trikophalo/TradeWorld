@@ -3529,3 +3529,46 @@ Auktionen von Spielern bekamen von der KI gar keine Gebote. Jetzt:
 - Demo: Kapitalerhöhungen rechnen mit demselben KI-Faktor und derselben Sperre; Sammler-Angebote laufen nach zwei
   Stunden aus, der Handel unter Sammlern hat dieselbe Stundengrenze. Insiderregel, Tagesband und Auktionsgebote der
   Sammler gibt es nur auf dem Server (die Demo handelt die eigene Aktie nicht, ihre Auktionen haben eigene Bieter).
+
+## ADR-173: Mehr Minispiele, mehr Geschäftszüge, CEO-Interviews — `Annahme`
+
+Vorgaben: „Mehr Minigames zu den Firmenaufgaben hinzufügen“, „Mehr Firmen-Geschäftszüge hinzufügen“ und „Man soll im
+Unternehmen als CEO manchmal Interviews random bekommen. Diese werden dann bei den News ausgespielt. Man kann beim
+Interview selber antworten.“
+
+**Minispiele (ergänzt ADR-129, ADR-144):** acht neue Spiele, je mit reiner Bewertung in `src/lib/sim/company-tasks.ts`
+und derselben in `company_task_grade()` (Migration 6400), 16 neue Aufgaben in acht Abteilungen:
+`memory` (Paare aufdecken, Fehlgriff −5 %), `timing` (Zeiger in der Zone stoppen, wie `slider` bewertet), `diff`
+(abweichende Felder antippen, wie `pick`), `quick` (fünf Summen mit drei Antworten), `route` (kürzeste Rundtour über
+vier Stationen, jedes Umwegfeld −10 %), `haggle` (drei Verhandlungsrunden: beste Antwort voll, mittlere halb),
+`pack` (Wert unter einem Gewichtslimit, Optimum per Brute Force) und `catch` (gute Kacheln antippen, solange sie
+auftauchen). Alle Ziele sind Knöpfe (Tastatur, Daumen); Bewegung nur über `transform`/`opacity`, bei reduzierter
+Bewegung läuft der Zeiger halb so schnell in groben Schritten. Die Puzzles verraten die Lösung dem Client wie bei
+`seq`; das bleibt bewusst so (kleine Beträge, Server bewertet und begrenzt die Zeit).
+
+**Geschäftszüge (ergänzt ADR-127):** 15 neue Züge aus der bestehenden Risikotabelle (safe/normal/risky, Kosten =
+Stufenbasis × Faktor 0,7–2,0, Ruhezeit = Dauer × 2), quer durch alle Abteilungen. Neu sind zwei optionale Felder:
+`minTier` (ab Kleinunternehmen, GmbH oder AG) und `listedOnly` (nur börsennotiert); `company_moves_state()` blendet
+den Rest aus (Migration 6410), `start_company_move()` antwortet dafür `move_unknown`. Neue Züge haben eigene
+Erfolgs- und Misserfolgszeilen im Verlauf. Der Erwartungswert bleibt der der Risikostufe (Tabelle in BALANCING).
+
+**CEO-Interviews:** Tabelle `company_interviews` (nur über RPCs), Konfiguration und Fragenpool in
+`src/config/interviews.ts` (Serverkonfiguration `interviews`, wie die Skripte der Sendung).
+
+- Anfrage: stündlich würfelt jede aktive Firma (Gründer in den letzten 48 h aktiv) 1/24 ihrer Tageschance:
+  25 % + Stufe (0/10/25/40 %) + börsennotiert 30 % + Ereignis 25 % (Skandal in einer Sendung, Kündigungen, Verlust),
+  höchstens 90 %; höchstens eine Anfrage in 20 h. Benachrichtigung `company_interview`, Karte „Interviewanfrage“ auf
+  dem Dashboard, gültig 6 h.
+- Fragen: drei aus 22, davon höchstens zwei zur Lage (Gewinn, Verlust, Börse, Stimmung, Kündigungen, Skandal,
+  Größe, allein, bekannt, unbekannt), der Rest allgemein und manche frech. Jede hat drei Schnellantworten (gut,
+  mittel, schlecht).
+- Antworten: frei (höchstens 240 Zeichen, Wortfilter `text_has_profanity`) oder per Schnellantwort. Die Mini-KI
+  bewertet jede Antwort mit −2..+2 (gute und schlechte Wörter, Länge; Schnellantwort +1/0/−1). Summe × 0,6 Punkte
+  Bekanntheit, höchstens ±3 Punkte; börsennotiert zusätzlich Ruf × 0,5, höchstens ±3. „Kein Kommentar“ −0,8 Punkte
+  (Ruf −0,5), verpasst −1,2 (Ruf −1). Die Wirkung gilt sofort, damit sie nicht davon abhängt, ob die Sendung läuft.
+- Sendung: `news_show_interviews()` gibt der nächsten Sendung ein Interview: je Frage ein Segment `interview`
+  (Frage, Antwort, bissige Reaktion, Stimmung nach Urteil, Figur des CEO auf dem Schirm) oder ein „kein
+  Kommentar“-Segment; `news_show_start()` markiert es einmal als gesendet und legt es im Feed unter Firmen ab.
+- Demo: das erste Interview kommt sofort, sobald die Demo-Firma existiert; danach per Zufall wie auf dem Server.
+- Annahmen: Claude bewertet Interviews (noch) nicht; die Spalte `judge` ist dafür vorgesehen, die Mini-KI ist
+  Rückfallebene und derzeit allein aktiv.

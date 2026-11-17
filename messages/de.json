@@ -5015,10 +5015,8 @@
         "desc": "Ein Video kann viele neue Nutzer bringen."
       },
       "hackathon": {
-        "name": "Hackathon",
-        "desc": "Ein Wochenende Pizza und Code. Entweder entsteht Großes oder nur Müdigkeit.",
-        "ok": "Beim Hackathon von {company} entstand ein Feature, das alle sofort wollen.",
-        "fail": "Der Hackathon von {company} endete mit drei halbfertigen Apps und viel leerem Pizzakarton."
+        "name": "Hackathon gewinnen",
+        "desc": "Preisgeld für die beste App des Wochenendes."
       },
       "migrate_customer": {
         "name": "Kunden in die Cloud umziehen",
@@ -5559,6 +5557,12 @@
         "desc": "Die App gibt es bald auch auf Französisch, Spanisch und Polnisch.",
         "ok": "Die übersetzte App von {company} stürmt die Charts in drei neuen Ländern.",
         "fail": "In der übersetzten App von {company} heißt der Kaufen-Knopf jetzt „Kartoffel“."
+      },
+      "innovation_sprint": {
+        "name": "Innovationssprint",
+        "desc": "Ein Wochenende Pizza und Code. Entweder entsteht Großes oder nur Müdigkeit.",
+        "ok": "Beim Innovationssprint von {company} entstand ein Feature, das alle sofort wollen.",
+        "fail": "Der Innovationssprint von {company} endete mit drei halbfertigen Apps und viel leerem Pizzakarton."
       }
     },
     "tierOnly": "Ab {tier}",

@@ -1,11 +1,38 @@
 {
   "applications": [
     {
-      "id": "5151ac30-c929-4510-a62d-46318a377adf",
+      "id": "ced1f31b-fe93-425b-97f3-f0f955778e04",
       "status": "declined",
       "message": null,
       "posting": {
-        "id": "1ae0c98b-9180-4ef8-aa52-96b1a714eb81",
+        "id": "1237cb3a-29d9-4770-bbe0-35f286b04f06",
+        "tier": "intern",
+        "title": null,
+        "company": {
+          "id": "1188056d-8ee9-0848-9146-e3115adc3792",
+          "logo": null,
+          "name": "Sonnenkern Fusion",
+          "color": "#FF5E5B",
+          "is_ai": true,
+          "sector": "energy",
+          "ticker": "FSN"
+        },
+        "required": [{ "branch": "management", "min_score": 0 }],
+        "title_key": "management_intern",
+        "required_skills": []
+      },
+      "created_at": "2026-11-17T00:07:00.55883+00:00",
+      "updated_at": "2026-11-17T00:07:00.561359+00:00",
+      "offer_expires_at": "2026-11-19T00:07:00.55883+00:00",
+      "salary_wish_cents_per_hour": 15000,
+      "offer_salary_cents_per_hour": 15000
+    },
+    {
+      "id": "6743fb21-e82f-4624-b75b-2199154aeac3",
+      "status": "offered",
+      "message": "Ich lerne schnell.",
+      "posting": {
+        "id": "25a4f66d-dbe8-4932-a09d-4ec880d4f5fc",
         "tier": "junior",
         "title": null,
         "company": {
@@ -21,36 +48,9 @@
         "title_key": "it_junior",
         "required_skills": []
       },
-      "created_at": "2026-11-16T19:43:53.11617+00:00",
-      "updated_at": "2026-11-16T19:43:53.121447+00:00",
-      "offer_expires_at": "2026-11-18T19:43:53.11617+00:00",
-      "salary_wish_cents_per_hour": 32700,
-      "offer_salary_cents_per_hour": 32700
-    },
-    {
-      "id": "bd1ebb71-1db8-4e7f-b22a-04786f8a4462",
-      "status": "offered",
-      "message": "Ich lerne schnell.",
-      "posting": {
-        "id": "0d3b934d-a390-4599-b13d-b098770c8afc",
-        "tier": "junior",
-        "title": null,
-        "company": {
-          "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
-          "logo": null,
-          "name": "KlarSoft AG",
-          "color": "#4C8DFF",
-          "is_ai": true,
-          "sector": "tech",
-          "ticker": "KLS"
-        },
-        "required": [{ "branch": "it", "min_score": 2 }],
-        "title_key": "it_junior",
-        "required_skills": []
-      },
-      "created_at": "2026-11-16T19:43:53.109786+00:00",
-      "updated_at": "2026-11-16T19:43:53.109786+00:00",
-      "offer_expires_at": "2026-11-18T19:43:53.109786+00:00",
+      "created_at": "2026-11-17T00:07:00.55492+00:00",
+      "updated_at": "2026-11-17T00:07:00.55492+00:00",
+      "offer_expires_at": "2026-11-19T00:07:00.55492+00:00",
       "salary_wish_cents_per_hour": 32700,
       "offer_salary_cents_per_hour": 32700
     }

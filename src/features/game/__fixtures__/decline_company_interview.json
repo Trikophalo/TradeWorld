@@ -1,0 +1,37 @@
+{
+  "interview": {
+    "id": 6,
+    "status": "declined",
+    "answers": null,
+    "company": "Fixture Werke",
+    "aired_at": null,
+    "questions": [
+      {
+        "text": "Sie machen bei Fixture Werke alles allein. Reden Sie in der Mittagspause mit dem Drucker?",
+        "quick": [
+          "Noch, aber bald stelle ich die ersten Leute ein.",
+          "Der Drucker ist ein guter Zuhörer.",
+          "Ich brauche niemanden."
+        ]
+      },
+      {
+        "text": "Fixture Werke ist inzwischen riesig. Wollen Sie eigentlich die ganze Stadt kaufen?",
+        "quick": ["Wir wollen besser werden, nicht nur größer.", "Nur die schönen Ecken.", "Ja. Und danach das Land."]
+      },
+      {
+        "text": "Sie haben zehn Sekunden: Warum sollen unsere Zuschauer bei Fixture Werke kaufen?",
+        "quick": [
+          "Beste Qualität zum fairen Preis, mit Service.",
+          "Weil es da ist.",
+          "Weil die anderen noch schlechter sind."
+        ]
+      }
+    ],
+    "expires_at": "2026-11-17T06:07:05.277687+00:00",
+    "reputation": 0,
+    "answered_at": "2026-11-17T00:07:05.280847+00:00",
+    "requested_at": "2026-11-17T00:07:05.277687+00:00",
+    "awareness_bps": -80
+  },
+  "max_chars": 240
+}

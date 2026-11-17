@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Mehr Firmenalltag (ADR-173):** Acht neue Minispiele für Firmenaufgaben (Paare finden, Stempel im Takt, Fehlersuche,
+  Kopfrechnen, Tour planen, Verhandeln, Einpacken, Zugreifen) und 15 neue Geschäftszüge, manche erst ab GmbH, AG oder an der Börse.
+- **CEO-Interviews (ADR-173):** Mr. Doodle Dangle bittet Chefs manchmal zum Interview. Drei Fragen zur Lage deiner Firma,
+  frei oder per Schnellantwort beantwortet; die nächste Sendung spielt es samt Kommentar aus, „kein Kommentar“ kostet etwas.
+
 - **Neue Themen in den Nachrichten (ADR-169):** Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt
   samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte Trades, Miete, Outfits, Battles,
   Schläfer. Dazu Nachrufe, Werbung und Horoskope; jede Sendung bringt drei Themen, die nicht direkt wiederkommen.

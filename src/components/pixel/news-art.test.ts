@@ -65,6 +65,7 @@ describe("news studio art", () => {
         "crypto",
         "gossip",
         "hype",
+        "interview",
         "intro",
         "loser",
         "nft",

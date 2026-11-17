@@ -7867,6 +7867,24 @@ ist `cards`, `tax`, `corp`, `gossip` oder `ramble`. Im Nachrichten-Feed landen `
 Neue Konfiguration: `newsShow.topics` (Anzahl, Plätze, Schwellen, Liste) und die Zeile `game_config.nexamon_names`
 (Kartenschlüssel → Name).
 
+## Nachtrag: Minispiele, Geschäftszüge, CEO-Interviews (ADR-173)
+
+- `company_tasks.game` erlaubt zusätzlich `memory`, `timing`, `diff`, `quick`, `route`, `haggle`, `pack`, `catch`
+  (Migration 6400); Hilfen `company_task_tour_length`, `company_task_route_best`, `company_task_pack_best` (intern).
+- Geschäftszüge: optionale Felder `minTier` und `listedOnly` in `game_config.companyMoves.moves` (Migration 6410).
+- `company_interviews` (RLS an, kein Clientzugriff): `company_id`, `ceo_id`, `status` (requested, answered,
+  declined, expired), `questions` (Texte, Schnellantworten mit Ton, gute Wörter), `answers` (Text, Urteil, Punkte,
+  Reaktion), `score`, `awareness_bps`, `reputation_delta`, `judge` (mini/claude), `requested_at`, `expires_at`,
+  `answered_at`, `aired_at`, `show_id`. Höchstens eine offene Anfrage je Firma. `company_interview_rolls`: letzter
+  stündlicher Wurf je Firma.
+- RPCs: `get_company_interview()` → `{max_chars, interview: {id, status, company, requested_at, expires_at,
+answered_at, aired_at, questions: [{text, quick[]}], answers: [{text, verdict, reaction}] | null, awareness_bps,
+reputation} | null}`; `answer_company_interview(p_request_id, p_interview_id, p_answers [{text}|{quick}])` und
+  `decline_company_interview(p_request_id, p_interview_id)` liefern dasselbe. Fehler `interview_not_found` (NX260),
+  `interview_text_invalid` (NX261), `interview_closed` (NX262).
+- Intern: `company_interviews_run_due()` (pg_cron `nexa-company-interviews`, stündlich), `company_interview_request()`,
+  `news_show_interviews()`; Apply-Typ `interview` in `news_show_start()`. Benachrichtigungstyp `company_interview`.
+
 ## Nachtrag: Kein Geld aus der eigenen Aktie, NFT-Sammler den ganzen Tag (ADR-170)
 
 Migrationen `20261204006100_stock_pump.sql` und `20261204006110_nft_cadence.sql` (Kopien in `supabase/updates/`).

@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-16T19:43:59.325941+00:00",
+  "now": "2026-11-17T00:07:05.659154+00:00",
   "chat": [
     {
-      "at": "2026-11-16T19:43:59.321642+00:00",
+      "at": "2026-11-17T00:07:05.654309+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,46 +11,61 @@
     }
   ],
   "show": {
-    "id": 7,
+    "id": 11,
     "writer": "mini",
-    "airs_at": "2026-11-16T19:00:00+00:00",
+    "airs_at": "2026-11-17T00:00:00+00:00",
     "segments": [
       {
-        "kind": "loser",
-        "mood": "smug",
-        "text": "82.960 € futsch, 7,7 % Minus: Esc_Frida schreibt heute Börsengeschichte, leider die falsche. Selbst der Tresor hat sich aus Scham kurz geschlossen. Das Trostpflaster kommt per Eilbote.",
-        "figure": { "nickname": "Esc_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "+500 € Trostpflaster" }],
-        "headline": "Wo ist das Geld von Esc_Frida?"
+        "kind": "interview",
+        "mood": "crying",
+        "text": "Kein Kommentar von Clara Werke. Ceo_Clara, ich nehme das persönlich. Und meine Krawatte auch.",
+        "figure": { "nickname": "Ceo_Clara", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −0,8 %" }],
+        "headline": "Clara Werke: kein Kommentar"
       },
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Fixture_Anleger. Auch ein blindes Huhn findet mal ein Korn, aber immerhin.",
-        "figure": { "nickname": "Fixture_Anleger", "avatar_key": "rookie", "accessories": [] },
+        "text": "Bitte festhalten: Level 15 erreicht, und zwar bei Erika_Ereignis. Ich bin fast stolz. Fast.",
+        "figure": { "nickname": "Erika_Ereignis", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Applaus für Fixture_Anleger"
+        "headline": "Applaus für Erika_Ereignis"
       },
       {
-        "kind": "hype",
-        "mood": "laughing",
-        "text": "Unfassbar, aber wahr: Bodenständig ist der Renner. Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. „Teppiche für Büros“ geht weg wie warme Semmeln. Floor_Frida soll vor Freude geweint haben.",
-        "figure": { "nickname": "Floor_Frida", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +19,1 %" }],
-        "headline": "Alle wollen Bodenständig"
+        "kind": "gossip",
+        "mood": "smug",
+        "text": "Im News-Battle mit 3 Teilnehmern hat Topic_Anna alle anderen hinter sich gelassen. Ruhm vergeht, aber der Screenshot bleibt.",
+        "figure": { "nickname": "Topic_Anna", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Battle-Sieg: Topic_Anna"
+      },
+      {
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Das Netz zerreißt Sven Teile. Das Qualitätssiegel an der Wand stellte sich als Kinderzeichnung heraus. Seitdem will niemand mehr „Teile auf Abruf“. Sven_Liefert hat das Firmenhandy im Fluss versenkt.",
+        "figure": { "nickname": "Sven_Liefert", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −20,4 %" }],
+        "headline": "Shitstorm über Sven Teile"
       },
       {
         "kind": "nft",
-        "mood": "laughing",
-        "text": "Kunstmarkt, oder was man dafür hält: „Neon Nacht“ von Nina_Neon ging für 30.000 € an Ben_Bieter. Wer das kauft, kauft auch Luft in Dosen.",
-        "figure": { "nickname": "Nina_Neon", "avatar_key": "rookie", "accessories": [] },
+        "mood": "shocked",
+        "text": "Aus der Welt der bunten Kästchen: Vera Vermeer hat sich „Abendrot über der Börse“ von einem Unbekannten für 9.876.543 € gegönnt. Die Künstlerseele jubelt, der Geldbeutel des Käufers ruft die Polizei.",
         "effects": [],
-        "headline": "30.000 € für ein paar Pixel"
+        "headline": "„Abendrot über der Börse“ wechselt den Besitzer"
+      },
+      {
+        "kind": "cards",
+        "mood": "shocked",
+        "text": "Das Bewertungsinstitut ASP hat gesprochen: Mondqualle von Topic_Cleo bekommt die 10. Die Prüfung hat 123 € gekostet. Ein Mann mit Lupe und weißen Handschuhen hat genickt. Mehr Anerkennung gibt es in diesem Land nicht.",
+        "figure": { "nickname": "Topic_Cleo", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Eine 10 für Topic_Cleo"
       },
       {
         "kind": "winner",
-        "mood": "shocked",
-        "text": "11376,8 % Plus, 1.137.684 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Der Rest schaut zu und heult leise ins Depot.",
+        "mood": "proud",
+        "text": "10670,7 % Plus, 1.067.069 € Gewinn: Fixture_Neu zeigt dem Rest, wie es geht. Bitte nicht nachmachen, ihr könnt das nicht.",
         "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
         "effects": [],
         "headline": "Fixture_Neu schwimmt im Geld"
@@ -58,58 +73,45 @@
       {
         "kind": "gossip",
         "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Xp_Profi meldet: Level 20 erreicht. Meine Schwiegermutter hat es vorausgesagt, und die liegt sonst immer falsch.",
-        "figure": { "nickname": "Xp_Profi", "avatar_key": "rookie", "accessories": [] },
+        "text": "Ich fasse es nicht, aber es stimmt. Aw_Werbung meldet: Laut Werke gegründet. Dafür gibt es von mir ein ehrliches Schulterklopfen, mit der Faust.",
+        "figure": { "nickname": "Aw_Werbung", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Na so was: Xp_Profi"
-      },
-      {
-        "kind": "scandal",
-        "mood": "angry",
-        "text": "Bei Gegenwind Energie brennt die Hütte. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Fritz_Gegenwind spricht von einem Missverständnis. Zur Erinnerung, das Geschäftsmodell lautet: „Ideen für alle“.",
-        "figure": { "nickname": "Fritz_Gegenwind", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −17 %" }],
-        "headline": "Gegenwind Energie: Chef Fritz_Gegenwind unter Beschuss"
+        "headline": "Na so was: Aw_Werbung"
       },
       {
         "kind": "ramble",
-        "mood": "smug",
-        "text": "Völlig anderes Thema: Thomas Gottschalk soll das Sparschwein geschlachtet und alles in Talwerk gesteckt haben. Die Info stammt aus einer Gruppe, in die ich versehentlich eingeladen wurde. Der Kurs macht 4,2 % nach oben.",
-        "effects": [{ "tone": "gain", "label": "TAL +4,2 %" }],
-        "headline": "Thomas Gottschalk steigt bei Talwerk ein"
+        "mood": "confused",
+        "text": "Das Institut für angewandte Ratlosigkeit hat geforscht. Ergebnis: Im Schnitt wird ein Geheimtipp 400-mal weitergegeben, bevor er jemanden erreicht, der ihn glaubt. Die Studie hat ein Vermögen gekostet.",
+        "effects": [],
+        "headline": "Neue Studie schockiert niemanden"
+      },
+      {
+        "kind": "scandal",
+        "mood": "shocked",
+        "text": "Peinlich für Fixture_Gmbh: Die Gewerbeaufsicht fand vierzig leere Pizzakartons, einen schlafenden Buchhalter und null Qualitätskontrolle. „Maschinen nach Maß“ klang auf dem Papier besser. Das Image von Fixture Werke ist im Eimer.",
+        "figure": { "nickname": "Fixture_Gmbh", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −16 %" }],
+        "headline": "Kunden fliehen vor Fixture Werke"
       },
       {
         "kind": "tasks",
         "mood": "proud",
-        "text": "Die Leute haben gemerkt, dass Sparen keinen Spaß macht. Offene Aufgaben bringen 33,5 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
-        "effects": [{ "tone": "gain", "label": "Aufgaben +33,5 %" }],
+        "text": "Die Kundschaft hat Geld und keine Ahnung, wohin damit. Offene Aufgaben bringen 39,2 % mehr. Wer jetzt Pause macht, ist selbst schuld.",
+        "effects": [{ "tone": "gain", "label": "Aufgaben +39,2 %" }],
         "headline": "Kunden zahlen jeden Preis"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Volta Energie AG geht bald nach unten. Garantie gibt es keine. Haftung übernehme ich grundsätzlich nie.",
-        "effects": [{ "tone": "neutral", "label": "VLT ↓ Tipp" }],
-        "headline": "Der heiße Draht: Volta Energie AG"
+        "text": "Aus gewöhnlich gut betrunkenen Kreisen höre ich: Frachtpilot geht bald nach oben. Ich selbst handle nie nach meinen Tipps, aus Gründen.",
+        "effects": [{ "tone": "neutral", "label": "FPT ↑ Tipp" }],
+        "headline": "Der heiße Draht: Frachtpilot"
       }
     ],
-    "started_at": "2026-11-16T19:43:59.325941+00:00"
+    "started_at": "2026-11-17T00:07:05.659154+00:00"
   },
-  "viewers": 18,
-  "audience": [
-    { "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Anna", "avatar_key": "rookie", "accessories": ["laurel_wreath"] },
-    { "me": false, "friend": false, "nickname": "Bat_Bruno", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Clara", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd1", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd10", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd11", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd2", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd3", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd4", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd5", "avatar_key": "rookie", "accessories": [] },
-    { "me": false, "friend": false, "nickname": "Bat_Crowd6", "avatar_key": "rookie", "accessories": [] }
-  ],
+  "viewers": 1,
+  "audience": [{ "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] }],
   "upcoming": null,
-  "next_airs_at": "2026-11-16T20:00:00+00:00"
+  "next_airs_at": "2026-11-17T01:00:00+00:00"
 }

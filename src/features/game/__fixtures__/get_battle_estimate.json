@@ -1,9 +1,9 @@
 {
-  "now": "2026-11-16T19:43:59.577931+00:00",
+  "now": "2026-11-17T00:07:05.859973+00:00",
   "battle": {
-    "id": 26,
+    "id": 27,
     "kind": "estimate",
-    "seed": 4272378146,
+    "seed": 4179667837,
     "prize": { "kind": "money", "cents": 525000 },
     "joined": true,
     "params": {
@@ -46,35 +46,35 @@
         {
           "lost": [],
           "mine": { "value": null, "choice": null, "pressed": false },
-          "unit": "Tsd.",
+          "unit": "€",
           "round": 0,
-          "value": 30,
+          "value": 0.44,
           "correct": null,
-          "ends_at": "2026-11-16T19:43:58.567348+00:00",
+          "ends_at": "2026-11-17T00:07:04.850063+00:00",
           "options": null,
           "results": [],
-          "decimals": 0,
-          "opens_at": "2026-11-16T19:43:42.567348+00:00",
-          "question": "Wie viele Zähne hat ein Hai im Leben (etwa, in Tausend)?",
-          "closes_at": "2026-11-16T19:43:54.567348+00:00"
+          "decimals": 2,
+          "opens_at": "2026-11-17T00:06:48.850063+00:00",
+          "question": "Was kostet eine Aktie von QuantenSprung Labs (QSL) gerade?",
+          "closes_at": "2026-11-17T00:07:00.850063+00:00"
         },
         {
           "mine": { "value": null, "choice": 2, "pressed": true },
-          "unit": "Knochen",
+          "unit": "m",
           "round": 1,
-          "ends_at": "2026-11-16T19:44:14.567348+00:00",
+          "ends_at": "2026-11-17T00:07:20.850063+00:00",
           "options": null,
           "decimals": 0,
-          "opens_at": "2026-11-16T19:43:58.567348+00:00",
-          "question": "Wie viele Knochen hat ein erwachsener Mensch?",
-          "closes_at": "2026-11-16T19:44:10.567348+00:00"
+          "opens_at": "2026-11-17T00:07:04.850063+00:00",
+          "question": "Wie hoch ist der Eiffelturm (mit Antenne) in Metern?",
+          "closes_at": "2026-11-17T00:07:16.850063+00:00"
         }
       ],
       "hearts": [1, 1, 1],
       "points": [0, 0, 0]
     },
     "status": "running",
-    "ends_at": "2026-11-16T19:45:29.547489+00:00",
+    "ends_at": "2026-11-17T00:08:35.833285+00:00",
     "players": [
       {
         "me": true,
@@ -104,8 +104,8 @@
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T19:43:59.483284+00:00",
-    "started_at": "2026-11-16T19:43:42.567348+00:00",
+    "opened_at": "2026-11-17T00:07:05.792822+00:00",
+    "started_at": "2026-11-17T00:06:48.850063+00:00",
     "finished_at": null,
     "max_players": 10,
     "min_players": 3,
@@ -113,115 +113,23 @@
     "countdown_ends_at": null
   },
   "recent": {
-    "id": 25,
-    "kind": "auction",
-    "seed": 17,
-    "prize": { "xp": 2900, "kind": "xp" },
+    "id": 26,
+    "kind": "quiz",
+    "seed": 4711,
+    "prize": { "xp": 0, "kind": "xp" },
     "joined": false,
-    "params": {
-      "h": 9,
-      "w": 11,
-      "tps": 20,
-      "game": { "budget": 1000, "rounds": 2, "answerMs": 10000, "revealMs": 3500 },
-      "spawns": [
-        [1, 1],
-        [9, 7],
-        [9, 1],
-        [1, 7],
-        [5, 1],
-        [5, 7],
-        [1, 4],
-        [9, 4],
-        [3, 4],
-        [7, 4]
-      ],
-      "tickMs": 50,
-      "graceMs": 1000,
-      "stepTicks": 4,
-      "aheadTicks": 10,
-      "checkEveryMs": 1000,
-      "disconnectTicks": 80
-    },
-    "result": {
-      "out": [-1, -1, -1],
-      "paid": true,
-      "prize": { "xp": 2900, "kind": "xp" },
-      "score": [400, 0, 0],
-      "capped": false,
-      "ranking": [0, 2, 1],
-      "end_tick": null,
-      "winner_slot": 0
-    },
-    "rounds": {
-      "out": [-1, -1, -1],
-      "done": true,
-      "list": [
-        {
-          "icon": "gold_bar",
-          "lost": [],
-          "mine": { "value": null, "choice": null, "pressed": false },
-          "unit": null,
-          "round": 0,
-          "value": null,
-          "budget": null,
-          "budgets": [0, 1000, 1000],
-          "correct": null,
-          "ends_at": "2026-11-16T19:43:29.860353+00:00",
-          "options": null,
-          "results": [
-            { "ms": 2, "slot": 0, "right": true, "value": 400, "points": 300 },
-            { "ms": 1008, "slot": 1, "right": false, "value": 400, "points": 0 }
-          ],
-          "decimals": null,
-          "opens_at": "2026-11-16T19:43:16.360353+00:00",
-          "question": "Goldbarren",
-          "closes_at": "2026-11-16T19:43:26.360353+00:00",
-          "item_points": 300
-        },
-        {
-          "icon": "duck",
-          "lost": [],
-          "mine": { "value": null, "choice": null, "pressed": false },
-          "unit": null,
-          "round": 1,
-          "value": null,
-          "budget": null,
-          "budgets": [0, 1000, 1000],
-          "correct": null,
-          "ends_at": "2026-11-16T19:43:43.360353+00:00",
-          "options": null,
-          "results": [
-            { "ms": 519, "slot": 0, "right": true, "value": 600, "points": 100 },
-            { "ms": 529, "slot": 1, "right": false, "value": 0, "points": 0 }
-          ],
-          "decimals": null,
-          "opens_at": "2026-11-16T19:43:29.860353+00:00",
-          "question": "Gummiente",
-          "closes_at": "2026-11-16T19:43:39.860353+00:00",
-          "item_points": 100
-        }
-      ],
-      "hearts": [1, 1, 1],
-      "points": [400, 0, 0]
-    },
+    "params": {},
+    "result": null,
+    "rounds": null,
     "status": "finished",
-    "ends_at": "2026-11-16T19:46:16.360353+00:00",
+    "ends_at": null,
     "players": [
       {
         "me": false,
         "left": false,
         "rank": 1,
-        "slot": 0,
-        "nickname": "Bg_Anna",
-        "avatar_key": "rookie",
-        "accessories": []
-      },
-      {
-        "me": false,
-        "left": false,
-        "rank": 3,
-        "slot": 1,
-        "nickname": "Bg_Bruno",
+        "slot": null,
+        "nickname": "Topic_Anna",
         "avatar_key": "rookie",
         "accessories": []
       },
@@ -229,22 +137,31 @@
         "me": false,
         "left": false,
         "rank": 2,
-        "slot": 2,
-        "nickname": "Bg_Clara",
+        "slot": null,
+        "nickname": "Topic_Bert",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 3,
+        "slot": null,
+        "nickname": "Topic_Cleo",
         "avatar_key": "rookie",
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T19:43:44.360353+00:00",
-    "started_at": "2026-11-16T19:43:16.360353+00:00",
-    "finished_at": "2026-11-16T19:43:44.397723+00:00",
+    "opened_at": "2026-11-17T00:06:37.711561+00:00",
+    "started_at": null,
+    "finished_at": "2026-11-17T00:06:37.711561+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 3,
     "countdown_ends_at": null
   },
-  "viewers": 20,
+  "viewers": 3,
   "per_hour": 1000,
-  "next_round_at": "2026-11-16T20:00:00+00:00",
+  "next_round_at": "2026-11-17T01:00:00+00:00",
   "played_this_hour": 6
 }

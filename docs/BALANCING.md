@@ -1351,6 +1351,44 @@ Aktionen 50–1.000 € + 15–500 € je Kopf für +3 … +15 Punkte sofort.
 - Gier: 100 % Auszahlung → Ruf 15 → Nachfrage −14 %; bei 5.000 € Umsatz sind das 700 € je Stunde, mehr als die
   Auszahlung über die freien 30 % hinaus einbringt, sobald die Marge unter 50 % liegt.
 
+## Nachtrag: Minispiele, Geschäftszüge, CEO-Interviews (ADR-173)
+
+| Spiel  | Zeit | Inhalt                           | Bewertung                        |
+| ------ | ---- | -------------------------------- | -------------------------------- |
+| memory | 45 s | 4 Paare                          | Paare / 4, je Fehlgriff −500 bps |
+| timing | 30 s | 3 Runden, Zone 12..88            | ±5 voll, ±15 halb                |
+| diff   | 35 s | 12 Felder, 3–5 Fehler            | wie pick                         |
+| quick  | 40 s | 5 Summen, 3 Antworten            | Anteil richtig                   |
+| route  | 45 s | 6×6, Depot + 4 Stationen         | 10 000 − 1 000 je Umwegfeld      |
+| haggle | 60 s | 3 Runden                         | beste 10 000, mittlere 5 000     |
+| pack   | 40 s | 6 Teile, Limit 50 % des Gewichts | Wert / Optimum, zu schwer 0      |
+| catch  | 25 s | 12 Kacheln, je 1,1 s             | wie pick                         |
+
+Neue Geschäftszüge (Kosten = Basis der Stufe × Faktor; Erwartungswert der Stufe: safe 1,13, normal 1,14,
+risky 1,10 der Kosten):
+
+| Zug                 | Bereich    | Art       | Risiko | Faktor | Min. | Bedingung           |
+| ------------------- | ---------- | --------- | ------ | ------ | ---- | ------------------- |
+| customer_survey     | management | quality   | safe   | 0,7    | 25   | –                   |
+| trade_fair          | sales      | awareness | normal | 1,4    | 45   | ab Kleinunternehmen |
+| supplier_switch     | logistics  | cash      | normal | 1,1    | 35   | –                   |
+| innovation_sprint   | it         | quality   | risky  | 1,0    | 40   | –                   |
+| craft_masterclass   | craft      | quality   | safe   | 0,8    | 30   | –                   |
+| factoring           | finance    | cash      | safe   | 1,0    | 20   | ab Kleinunternehmen |
+| patent_filing       | law        | quality   | normal | 1,3    | 50   | ab GmbH             |
+| lab_partnership     | science    | quality   | normal | 1,5    | 55   | ab GmbH             |
+| small_acquisition   | management | cash      | risky  | 2,0    | 60   | ab GmbH             |
+| tv_commercial       | sales      | awareness | risky  | 2,0    | 60   | AG                  |
+| bond_issue          | finance    | cash      | normal | 1,8    | 60   | AG                  |
+| capital_markets_day | management | awareness | normal | 1,6    | 50   | börsennotiert       |
+| buyback_signal      | finance    | cash      | risky  | 1,5    | 45   | börsennotiert       |
+| green_label         | law        | awareness | safe   | 0,9    | 30   | nur Solar           |
+| app_localization    | it         | cash      | normal | 1,2    | 40   | nur Mobile App      |
+
+CEO-Interviews (`interviews`): Tageschance 2 500 bps + Stufe 0/1 000/2 500/4 000 + Börse 3 000 + Ereignis 2 500,
+höchstens 9 000, stündlich 1/24 davon; Sperre 20 h, Ablauf 6 h. Je Punkt 60 bps Bekanntheit (höchstens ±300) und
+0,5 Ruf (höchstens ±3); kein Kommentar −80 bps / −0,5, verpasst −120 bps / −1.
+
 ## Nachtrag: Kein Geld aus der eigenen Aktie, NFT-Sammler den ganzen Tag (ADR-170)
 
 | Wert                                | Schlüssel                                    | Stand                                                       |

@@ -1179,7 +1179,15 @@ export const COMPANY_MOVES: readonly CompanyMoveConfig[] = [
     costFactor: 1.1,
     minutes: 35,
   },
-  { key: "hackathon", product: "*", branch: "it", kind: "quality", risk: "risky", costFactor: 1.0, minutes: 40 },
+  {
+    key: "innovation_sprint",
+    product: "*",
+    branch: "it",
+    kind: "quality",
+    risk: "risky",
+    costFactor: 1.0,
+    minutes: 40,
+  },
   {
     key: "craft_masterclass",
     product: "*",
