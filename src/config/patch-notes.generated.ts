@@ -578,6 +578,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Bulk verkaufen aufgeräumt",
         text: "Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-38c36423",
+        title: "Pack Battles mit mehreren Packs und bis zu vier Spielern",
+        text: "Stell bis zu zehn Packs in beliebiger Reihenfolge zusammen, wähle 2, 3 oder 4 Spieler und lade Freunde ein.",
+      },
     ],
   },
   {

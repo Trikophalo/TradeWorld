@@ -113,6 +113,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Pack Battles mit mehreren Packs und bis zu vier Spielern (ADR-192):** Stell bis zu zehn Packs in beliebiger Reihenfolge zusammen, wähle 2, 3 oder 4 Spieler und lade Freunde ein. Alle öffnen dieselben Packs, wer insgesamt mehr Wert zieht, bekommt alle Karten. Wird das Battle nicht voll oder sagst du ab, gibt es den Einsatz komplett zurück.
 - **Bulk verkaufen aufgeräumt:** Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste. Neu: „Alles unter … € auswählen“ wählt jede Karte unter deinem Betrag, auf Wunsch bleibt von jeder eine übrig.
 
 - **Große Züge für alle (ADR-190):** Zieht jemand eine Nexamon-Karte mit mehr als 100.000 € Wert, bekommen alle anderen eine Nachricht mit Link zur Karte.

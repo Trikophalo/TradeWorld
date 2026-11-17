@@ -4452,6 +4452,44 @@ Züge derselben Transaktion (eine Öffnung, ein Mehrfachkauf) werden zu einer Na
 **Folgen.** Neue Tabelle `nexamon_big_pull_broadcasts`, neuer Benachrichtigungstyp (abschaltbar), Feed-Art
 `nexamon_big_pull`. Test `supabase/tests/c8_big_pull.sql`.
 
+## ADR-192: Pack Battles mit mehreren Packs und bis zu vier Spielern — `Annahme`
+
+**Kontext.** Der Owner: „Man soll beim Pack Battle auch mehrere Packs auswählen können. Man soll das sogar mit bis zu 4
+spielen.“ Bisher (ADR-172) forderte ein Spieler genau einen Freund zu genau einem Pack heraus; gezahlt wurde erst beim
+Annehmen.
+
+**Entscheidung.**
+
+- _Lobby statt Herausforderung:_ `create_nexamon_pack_battle(request_id, sets[], size, invite[])` legt ein Battle mit
+  einer Pack-Reihe (1 bis `nexamon.packBattle.maxPacks` = 10 Packs, beliebige veröffentlichte Sets, Reihenfolge wie
+  gewählt) für `size` Spieler (2 bis `maxPlayers` = 4) an. Der Einsatz pro Spieler ist die Summe der Packpreise.
+  Eingeladene Freunde bekommen eine Benachrichtigung; jeder Freund des Gastgebers sieht die offene Lobby im
+  Collectibles-Tab (`nexamon_lobby.open_battles`) und kann mit `join_nexamon_pack_battle` beitreten.
+- _Zahlen beim Platznehmen:_ Wer sich setzt, zahlt sofort auf das neue Treuhandkonto `nexamon_battle_escrow`. So kann
+  niemand zwischen Beitritt und Start pleitegehen, und der Abbruch ist eine einfache Rückbuchung. Beim Start geht der
+  Einsatz an die Haushalte (wie beim Packkauf). Absage durch den Gastgeber (`cancel_nexamon_battle`) oder eine Lobby,
+  die nach `packBattle.lobbySeconds` (120 s) nicht voll ist, bucht jedem Platz den vollen Einsatz zurück (Trigger auf
+  den Statuswechsel, ein Schlüssel je Platz, Summe 0). Abgelaufene Lobbys räumt der Cron-Job `nexa-nexamon-pack-battles`
+  und jeder Lobby-Aufruf ab.
+- _Start, wenn voll:_ Der letzte Platz startet das Battle sofort. Jeder öffnet dieselbe Reihe Pack für Pack
+  (`nexamon_open_pack`, Missionen, große Züge melden sich wie bisher). Die gemeinsame Uhr läuft je Pack: Reißen
+  (`tearMs`), dann eine Karte je `slotMs`, danach das nächste Pack (`multiRevealAt`); bei einem Pack ist das genau der
+  alte Ablauf.
+- _Gewinner wie bisher:_ höchster Gesamtwert über alle Packs; Gleichstand unter den Besten: deren seltenste Karte; dann
+  der Münzwurf `coin_seed % Anzahl` unter den noch Gleichen in Sitzreihenfolge (bei zwei Spielern identisch mit
+  `decideBattle`). Der Gewinner bekommt alle Karten aller Plätze.
+- _Daten:_ `nexamon_battles` bekommt `mode` (`duel`/`multi`), `size`, `packs`, `winner_seat`; `opponent_id` darf leer
+  sein, solange die Lobby wartet. Neue Tabellen `nexamon_battle_seats` und `nexamon_battle_invites`. Die alten RPCs
+  (`challenge_`/`respond_nexamon_battle`) bleiben für Duelle unverändert; `respond` lehnt Lobby-Battles ab. Die
+  Oberfläche nutzt nur noch die Lobby (auch das Duell „1 Pack, 2 Spieler“). Die KI tritt nie bei.
+- _Oberfläche:_ Pack-Auswahl mit Hinzufügen, Verschieben, Entfernen und laufender Summe, Spielerzahl 2/3/4, Einladen
+  von Freunden; Lobby mit bis zu vier Plätzen; Live-Aufdeckung Pack für Pack mit laufender Summe je Spieler (Handy: 2×2,
+  ab `lg` nebeneinander), Ergebnis mit Rangliste.
+
+**Folgen.** Fehler `nexamon_battle_full` NX311 und `nexamon_battle_joined` NX312. Ein Battle mit zehn Packs dauert gut
+zwei Minuten. Das Stundenlimit `battles.perHour` und die Abklingzeit gelten pro gestartetem Battle wie bisher. Test
+`supabase/tests/c9_pack_battle_multi.sql`, Formeln in `src/lib/sim/nexamon-battle.ts`.
+
 ## ADR-186: Mehr Schiebe- und Sehaufgaben, weniger Rechnen und Tippen bei den Firmenaufgaben — `Annahme`
 
 **Kontext.** Der Owner: „Weniger Rechen- und Schreibaufgaben bitte bei den Unternehmensaufgaben. Mehr Schiebe- und
