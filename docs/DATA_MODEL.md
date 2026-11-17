@@ -8200,3 +8200,17 @@ claimed_cents, tax: {owner, revenue_cents, refund_cents, cap_cents, share_bps} |
 | `learn_company_skill(p_request_id, p_key)` | wie oben plus `learned_key`, `learned_level`; idempotent. Fehler `skill_locked`, `locked` (Schulung läuft), `insufficient_funds`, `invalid_argument` (unbekannt oder Höchststufe), `company_not_found`                                               |
 
 Ledger: `company_costs` „Fertigkeit: Schulung“, Schlüssel `company_skill:<firma>:<request>`.
+
+## Nachtrag: Frisch gezogene Karten sofort an das Spiel (ADR-196)
+
+- RPC `instant_sell_nexamon(p_request_id, p_copy_ids)` → `{ sold: [{ copy_id, card_key, price_cents }], count,
+total_cents }`: eigene rohe Kopien aus einem Pack (`source = 'pack'`), höchstens `instantSell.windowSeconds` alt
+  (`created_at`), nicht angeboten, nie bewertet oder verkauft, Set erschienen; je Kopie `instantSell.payoutBps` des
+  Werts samt Zustand, „half even“. Idempotent, höchstens `instantSell.maxPerCall` Kopien, Rate-Limit `nexamon_instant`.
+  Fehler wie `sell_nexamon_to_ai` plus `rate_limited`.
+- Ledger: `nexamon_sale` „Frisch gezogene Nexamon-Karten an das Spiel verkauft“ von `households` an `player_cash`,
+  Schlüssel `nexamon:instant:<spieler>:<request>`; danach `loan_withhold` wie beim Bulk.
+- Verkaufszeile `nexamon_sales.kind = 'quick'`, Wertabschlag `quickSell.dropBps` je Kopie wie beim Bulk.
+- `nexamon_copies.ai_owner = instantSell.vaultOwner` („NEXA-Tresor“): der Tresor des Spiels für Seltenheiten aus
+  `ai.excludedRarities`; `nexamon_copies_ai_guard` lässt ihn zu, `nexamon_ai_reset()` mustert ihn nie aus.
+- Bulk (`bulk_sell_nexamon`): `quickSell.bps` jetzt 8 000 (20 % Gebühr).

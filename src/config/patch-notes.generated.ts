@@ -598,6 +598,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Fertigkeiten für Firmen",
         text: "Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-27c07659",
+        title: "Karten sofort verkaufen",
+        text: "Nach jedem Pack-Opening und jedem gewonnenen Pack Battle kannst du die gezogenen Karten direkt für 90 % ihres Werts an das Spiel verkaufen, alle auf…",
+      },
     ],
   },
   {
