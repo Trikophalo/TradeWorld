@@ -33,12 +33,12 @@ const rarity = (n: number): YinYangRarity => (n <= 100 ? "ultra" : n <= 108 ? "p
 // prettier-ignore
 const ROWS: readonly Row[] = [
   // ultra rare
-  [85, "monster", "Ryukoga", "dragon", 180, 2, 21, "Drachenkaskade", 150, "Wirf eine Münze. Bei Kopf trifft der Angriff auch die Bank des Gegners.", "Hundert Jahre schwamm er gegen den Strom. Am Wasserfall wurden ihm Hörner geschenkt.", 1_850_000],
+  [85, "monster", "Ryukoga", "water", 180, 2, 21, "Drachenkaskade", 150, "Wirf eine Münze. Bei Kopf trifft der Angriff auch die Bank des Gegners.", "Hundert Jahre schwamm er gegen den Strom. Am Wasserfall wurden ihm Hörner geschenkt.", 1_850_000],
   [86, "monster", "Kyubira", "fire", 130, 0, null, "Fuchsfeuerreigen", 110, "", "Tanzt nachts auf Schreindächern. Wer seinen Lichtern folgt, findet heim oder nie wieder.", 420_000],
   [87, "monster", "Onigara", "dark", 150, 0, null, "Maskenzorn", 130, "Der Gegner kann im nächsten Zug nicht angreifen.", "Eine Maske ohne Gesicht dahinter. Im Gewitter lacht sie lauter als der Donner.", 365_000],
   [88, "monster", "Bamburo", "grass", 140, 0, null, "Bambussprung", 120, "", "Springt so leise durch den Hain, dass nur die Halme sich verneigen.", 248_000],
   [89, "monster", "Raitenko", "electric", 140, 0, null, "Donnerheulen", 120, "Wirf eine Münze. Bei Kopf ist der Gegner gelähmt.", "Sein Heulen ruft den Blitz. Bergbauern zählen die Sekunden bis zum Echo.", 296_000],
-  [90, "warrior", "Mugenro", "steel", 170, 2, 31, "Klinge ohne Ende", 160, "", "Er zog das Schwert nur einmal im Leben. Die Ahornblätter fallen seitdem in zwei Hälften.", 2_150_000],
+  [90, "warrior", "Mugenro", "dark", 170, 2, 31, "Klinge ohne Ende", 160, "", "Er zog das Schwert nur einmal im Leben. Die Ahornblätter fallen seitdem in zwei Hälften.", 2_150_000],
   [91, "monster", "Jagamori", "psychic", 150, 0, null, "Nebelumschlingung", 110, "Der Gegner ist verwirrt.", "Hütet den Inselschrein seit tausend Wintern. Opfergaben nimmt es nur bei Vollmond an.", 512_000],
   [92, "monster", "Kamegaku", "rock", 190, 0, null, "Inselbeben", 100, "", "Auf seinem Panzer wachsen Kiefern und ein Tempel. Die Mönche merken nur, dass er reist.", 188_000],
   [93, "monster", "Yamaga", "fairy", 130, 0, null, "Laternenstaub", 100, "Heile 30 Schaden bei deinem Nexamon.", "Sammelt das Licht vergessener Laternen und trägt es auf den Flügeln zum Mond.", 214_000],
@@ -50,7 +50,7 @@ const ROWS: readonly Row[] = [
   [99, "warrior", "Hanakiri", "fairy", 130, 0, null, "Blütenschnitt", 140, "", "Zwei Klingen, ein Atemzug. Wenn die Blüten fallen, ist der Kampf längst vorbei.", 1_120_000],
   [100, "monster", "Yoroiden", "steel", 160, 0, null, "Geisterrüstung", 130, "", "Eine leere Rüstung, die noch Wache hält. Ihr Herr ist lange fort, ihr Eid nicht.", 455_000],
   // prisma illustration rare
-  [101, "monster", "Hakuzuru", "fairy", 190, 2, 41, "Mondflug", 160, "Heile 50 Schaden bei jedem deiner Nexamon.", "Wenn der Kranichgeist über den See zieht, bleibt das Mondlicht kurz auf dem Wasser stehen.", 14_800_000],
+  [101, "monster", "Hakuzuru", "psychic", 190, 2, 41, "Mondflug", 160, "Heile 50 Schaden bei jedem deiner Nexamon.", "Wenn der Kranichgeist über den See zieht, bleibt das Mondlicht kurz auf dem Wasser stehen.", 14_800_000],
   [102, "warrior", "Blutmondduell", "dark", 180, 0, null, "Gekreuzte Klingen", 180, "Dieses Nexamon erhält 30 Schaden.", "Zwei Schwerter, eine Brücke, ein roter Mond. Nur einer geht ans andere Ufer.", 18_600_000],
   [103, "warrior", "Takiyomi", "water", 170, 0, null, "Wasserfallgebet", 150, "", "Er betet unter dem Fall, bis das Rauschen leiser ist als seine Gedanken.", 9_200_000],
   [104, "warrior", "Wogenbrecher", "water", 180, 0, null, "Wellenbrecher", 170, "", "Die Welle ist hundertmal größer als er. Er hat trotzdem nicht vor zu weichen.", 21_400_000],
