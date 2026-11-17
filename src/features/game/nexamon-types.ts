@@ -387,6 +387,11 @@ export interface NexamonEngine {
   sellNexamonToAi(requestId: string, copyIds: string[]): Promise<NexamonQuickSellResult>;
   /** ADR-174: the collection's bulk mode: raw bulk copies to the game for their value minus the bulk fee. */
   bulkSellNexamon(requestId: string, copyIds: string[]): Promise<NexamonQuickSellResult>;
+  /**
+   * ADR-196: right after a pack opening or a won Pack Battle, sells exactly those fresh pulls to the game for 90 % of
+   * their value (any rarity, within `instantSell.windowSeconds`).
+   */
+  instantSellNexamon(requestId: string, copyIds: string[]): Promise<NexamonQuickSellResult>;
   /** Sends a raw copy to ASP: half its value, back after an hour with a grade. */
   gradeNexamonCard(requestId: string, copyId: string): Promise<NexamonGradeResult>;
   /** Cracks a slab: the raw card with its condition comes back, no refund. */

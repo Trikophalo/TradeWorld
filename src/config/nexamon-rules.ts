@@ -364,17 +364,31 @@ export const NEXAMON_RULES = {
   },
   /**
    * Bulk (ADR-174): raw copies of the bulk rarities (`rarities`, or per set `setRarities[set]`, e.g. Titans Revenge's
-   * iron) can be sold to the game at once for `bps` of their value (a 35 % fee, since ADR-174; before 50 %), from the
+   * iron) can be sold to the game at once for `bps` of their value (a 20 % fee since ADR-196; 35 % since ADR-174, before 50 %), from the
    * households. Every copy sold this way lowers its card's value by `dropBps`. Up to `maxPerCall` copies per call and
    * `callsPerMinute` calls of the collection's bulk mode per minute.
    */
   quickSell: {
     rarities: ["common", "rare"],
     setRarities: { titans_revenge: ["iron"] } as Readonly<Record<string, readonly string[]>>,
-    bps: 6_500,
+    bps: 8_000,
     maxPerCall: 500,
     callsPerMinute: 10,
     dropBps: 25,
+  },
+  /**
+   * Instant sell (ADR-196): right after a pack opening or a won Pack Battle, the freshly pulled copies (raw, from a
+   * pack, at most `windowSeconds` old, never graded, listed or sold) can be sold to the game for `payoutBps` of their
+   * value incl. condition (rounded half-even per copy), any rarity, from the households. Every copy lowers its card's
+   * value by `quickSell.dropBps` like the bulk sale. Rarities the AI may not hold (`ai.excludedRarities`) go to the
+   * game's vault (`vaultOwner`), which never lists them. Up to `maxPerCall` copies, `callsPerMinute` calls per minute.
+   */
+  instantSell: {
+    windowSeconds: 900,
+    payoutBps: 9_000,
+    maxPerCall: 200,
+    callsPerMinute: 20,
+    vaultOwner: "NEXA-Tresor",
   },
   /**
    * Pulling a card of these rarities is news for the friends (feed kind nexamon_pull). A Black Label always is

@@ -317,8 +317,8 @@ describe("copies", () => {
   });
 
   it("offers the quick sale for loose commons and rares only", () => {
-    expect(quickSellOffer(copy("me-001"), "common")).toBe(650);
-    expect(quickSellOffer(copy("me-001"), "rare")).toBe(650);
+    expect(quickSellOffer(copy("me-001"), "common")).toBe(800);
+    expect(quickSellOffer(copy("me-001"), "rare")).toBe(800);
     expect(quickSellOffer(copy("me-001"), "ultra")).toBeNull();
     expect(quickSellOffer(copy("me-001", { state: "graded", grade: 10 }), "common")).toBeNull();
     expect(quickSellOffer(copy("me-001", { state: "grading" }), "common")).toBeNull();

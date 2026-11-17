@@ -1524,6 +1524,10 @@ select public.unlist_nexamon_cards(gen_random_uuid(), :'fx_nxls'::uuid[]);
 \o :fixture_dir/bulk_sell_nexamon.json
 select public.bulk_sell_nexamon(gen_random_uuid(), array[(:'fx_nb'::jsonb #>> '{1,copy_id}')::uuid]);
 \o
+-- ADR-196: a fresh pull sold to the game at once
+\o :fixture_dir/instant_sell_nexamon.json
+select public.instant_sell_nexamon(gen_random_uuid(), array[(:'fx_nb'::jsonb #>> '{2,copy_id}')::uuid]);
+\o
 reset role;
 update public.nexamon_copies set grading_until = public.game_now() - interval '1 second' where id = :'fx_nx2';
 select tests.login_as('authenticated', :fx_h) is null as ok \gset

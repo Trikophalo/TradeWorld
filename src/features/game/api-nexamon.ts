@@ -290,6 +290,7 @@ export const NEXAMON_RPC_SCHEMAS = {
   buy_nexamon_listing: boughtSchema,
   sell_nexamon_to_ai: quickSoldSchema,
   bulk_sell_nexamon: quickSoldSchema,
+  instant_sell_nexamon: quickSoldSchema,
   grade_nexamon_card: gradingSchema,
   crack_nexamon_slab: crackedSchema,
   get_nexamon_bonuses: bonusesSchema,
@@ -521,6 +522,14 @@ export const liveNexamonEngine: NexamonEngine = {
   },
   async bulkSellNexamon(requestId, copyIds) {
     const r = await rpc("bulk_sell_nexamon", { p_request_id: requestId, p_copy_ids: copyIds }, quickSoldSchema);
+    return {
+      sold: r.sold.map((s) => ({ copyId: s.copy_id, cardKey: s.card_key, priceCents: s.price_cents })),
+      count: r.count,
+      totalCents: r.total_cents,
+    };
+  },
+  async instantSellNexamon(requestId, copyIds) {
+    const r = await rpc("instant_sell_nexamon", { p_request_id: requestId, p_copy_ids: copyIds }, quickSoldSchema);
     return {
       sold: r.sold.map((s) => ({ copyId: s.copy_id, cardKey: s.card_key, priceCents: s.price_cents })),
       count: r.count,
