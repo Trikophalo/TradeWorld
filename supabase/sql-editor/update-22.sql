@@ -1504,11 +1504,20 @@ revoke all on function public.company_autopilot_chance_bps(uuid) from public, an
 -- game rules come with game_config (companyTasks.tasks, companyTasks.games).
 -- Idempotent: runs unchanged as supabase/updates/20261204006920_task_games_five.sql.
 
-alter table public.company_tasks drop constraint if exists company_tasks_game_check;
-alter table public.company_tasks add constraint company_tasks_game_check
-  check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path',
-                  'memory', 'timing', 'diff', 'quick', 'route', 'haggle', 'pack', 'catch',
-                  'restock', 'receipts', 'offer', 'pattern', 'shelf'));
+-- (update copy only: skipped once 7600 widened the check for its nine games, or rows of those games would fail it;
+--  7600 sets the full one again further down)
+do $do$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'company_tasks_game_check'
+                    and pg_get_constraintdef(oid) like '%conveyor%') then
+    alter table public.company_tasks drop constraint if exists company_tasks_game_check;
+    alter table public.company_tasks add constraint company_tasks_game_check
+      check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path',
+                      'memory', 'timing', 'diff', 'quick', 'route', 'haggle', 'pack', 'catch',
+                      'restock', 'receipts', 'offer', 'pattern', 'shelf'));
+  end if;
+end;
+$do$;
 
 create or replace function public.company_task_puzzle_more(p_task jsonb)
 returns jsonb
