@@ -1682,6 +1682,11 @@ export interface MyCompany {
   }[];
   /** Share of every profitable hour paid to the founder automatically (ADR-086). */
   founderPayoutBps: number;
+  /**
+   * Strengths (ADR-176): six slow scores the server moves every closed hour, the revenue bonus they pay and the last
+   * failure of the hourly close; null on servers before 6600.
+   */
+  strengths: CompanyStrengths | null;
   /** Running marketing campaign (ADR-097), null when none runs. */
   campaign: CompanyCampaign | null;
   /** Current price of each campaign, from the last hour's demand; null on servers before M4j. */
@@ -2564,4 +2569,17 @@ export interface GameEngine extends BattleEngine, NexamonEngine, PackBattleEngin
     playerJobId: string,
     skillKey: string,
   ): Promise<{ costCents: number; salaryCentsPerHour: number }>;
+}
+
+/** Company strengths (ADR-176), see src/lib/sim/company-strengths.ts. */
+export interface CompanyStrengths {
+  scores: Record<"awareness" | "quality" | "delivery" | "margin" | "team" | "finance", number>;
+  overall: number;
+  /** Closed hours that moved the scores. */
+  hours: number;
+  /** Bonus on every hour's revenue now (bps). */
+  rewardBps: number;
+  next: { at: number; bps: number } | null;
+  /** The hourly close of this company fails (job_runs): when, why, how often. */
+  closeError: { at: string; error: string; failures: number } | null;
 }

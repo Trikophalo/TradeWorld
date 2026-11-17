@@ -135,8 +135,12 @@ select tests.assert(
         where j.job_name = 'company_hours' and j.run_key = :'bco'),
   'player_companies_run_due(): one company whose close raises is skipped and logged, the other closes all nine hours');
 -- the nine hours cross at least one quarter end: the company report does not wait for the market's quarter close
+-- (a fresh database has no quarter that ended in the last nine hours at every time of day: then there is nothing to
+--  report and the check holds trivially; before ADR-176 this made verify_local.sh, and with it the deploy, fail by
+--  the clock)
 select tests.assert(
-  (select count(*) from public.player_company_reports where company_id = :'aco') >= 1
+  not exists (select 1 from a1_quarters)
+  or (select count(*) from public.player_company_reports where company_id = :'aco') >= 1
   and exists (select 1 from public.game_quarters gq join public.player_company_reports r on r.game_quarter_id = gq.id
                where r.company_id = :'aco' and gq.status <> 'closed'),
   'quarter report of a company: written from its own hours although the market quarter is not closed yet');

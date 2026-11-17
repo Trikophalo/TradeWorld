@@ -72,18 +72,53 @@ export function ControllingTab({
   const owned = (kinds: string[]) =>
     listed?.items.filter((i) => kinds.includes(i.kind) && (i.status === "active" || i.status === "paused")).length ?? 0;
 
+  const tg = useTranslations("hq.controlling.groups");
+  const groups = [
+    { id: "sell", icon: UI_ICONS.star },
+    { id: "run", icon: UI_ICONS.briefcase },
+    { id: "money", icon: UI_ICONS.portfolio },
+    ...(listed ? [{ id: "listed" as const, icon: UI_ICONS.search }] : []),
+    { id: "brand", icon: UI_ICONS.art },
+  ] as const;
+  const jump = (id: string) =>
+    document.getElementById(`group-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   return (
-    <div className="space-y-4" data-testid="company-controlling">
+    <div className="space-y-6" data-testid="company-controlling">
+      {/* In-page navigation (ADR-176): the levers are grouped; the chips stay in reach while scrolling. */}
+      <nav
+        aria-label={tg("nav")}
+        className="sticky top-(--topbar-height) z-10 -mx-4 flex flex-wrap gap-1.5 border-b-2 border-line-1 bg-bg/88 px-4 py-2 backdrop-blur-lg lg:mx-0 lg:rounded-md lg:border-2"
+        data-testid="controlling-nav"
+      >
+        {groups.map((g) => (
+          <Button
+            key={g.id}
+            size="sm"
+            variant="ghost"
+            onClick={() => jump(g.id)}
+            data-testid={`controlling-chip-${g.id}`}
+          >
+            <PixelIcon {...g.icon} scale={1} />
+            {tg(g.id)}
+          </Button>
+        ))}
+      </nav>
+
       {listed && <UpkeepSummary listed={listed} />}
       {listedPending && <Skeleton className="h-48 w-full rounded-lg" />}
-      <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5" data-testid="company-overview">
-        <div className="space-y-4">
+
+      <div className="space-y-6" data-testid="company-overview">
+        <Group id="sell" icon={UI_ICONS.star} title={tg("sell")} text={tg("sellText")}>
           <CollapsibleSection
             {...section("profit")}
             title={t("sections.profit")}
             summary={t("sections.profitSummary")}
             icon={<PixelIcon {...UI_ICONS.star} scale={2} />}
           >
+            {listed && <RestrictionNotes restrictions={listed.restrictions} only={["price"]} />}
+            <StrategyCard company={company} />
+            <MarketCard company={company} />
             <ProfitCoach
               company={company}
               onNavigate={(to) => {
@@ -91,10 +126,30 @@ export function ControllingTab({
                 go({ tab: "controlling", section: "marketing", target: "company-controls" });
               }}
             />
-            {listed && <RestrictionNotes restrictions={listed.restrictions} only={["price"]} />}
-            <StrategyCard company={company} />
-            <MarketCard company={company} />
           </CollapsibleSection>
+          <div className="space-y-4">
+            <CollapsibleSection
+              {...section("marketing")}
+              title={t("sections.marketing")}
+              summary={t("sections.marketingSummary", { amount: money(company.marketingCentsPerQuarter) })}
+              icon={<PixelIcon {...UI_ICONS.bell} scale={2} />}
+            >
+              <MarketingBudgetCard company={company} />
+              <CampaignCard company={company} />
+            </CollapsibleSection>
+            <CollapsibleSection
+              {...section("moves")}
+              title={ts("moves")}
+              summary={ts("movesSummary")}
+              icon={<PixelIcon {...UI_ICONS.deal} scale={2} />}
+            >
+              <CompanyMovesCard />
+              <PitchCard kind="move" />
+            </CollapsibleSection>
+          </div>
+        </Group>
+
+        <Group id="run" icon={UI_ICONS.briefcase} title={tg("run")} text={tg("runText")}>
           <CollapsibleSection
             {...section("business")}
             title={t("sections.business")}
@@ -105,26 +160,6 @@ export function ControllingTab({
             <ProfitRoutes company={company} />
             <StaffLink company={company} onTeam={toStaff} />
           </CollapsibleSection>
-          <CollapsibleSection
-            {...section("marketing")}
-            title={t("sections.marketing")}
-            summary={t("sections.marketingSummary", { amount: money(company.marketingCentsPerQuarter) })}
-            icon={<PixelIcon {...UI_ICONS.bell} scale={2} />}
-          >
-            <MarketingBudgetCard company={company} />
-            <CampaignCard company={company} />
-          </CollapsibleSection>
-          <CollapsibleSection
-            {...section("moves")}
-            title={ts("moves")}
-            summary={ts("movesSummary")}
-            icon={<PixelIcon {...UI_ICONS.deal} scale={2} />}
-          >
-            <CompanyMovesCard />
-            <PitchCard kind="move" />
-          </CollapsibleSection>
-        </div>
-        <div className="space-y-4">
           <CollapsibleSection
             {...section("expansion")}
             title={t("sections.expansion")}
@@ -139,6 +174,9 @@ export function ControllingTab({
             <ExpansionCard company={company} />
             <UpgradeCard company={company} />
           </CollapsibleSection>
+        </Group>
+
+        <Group id="money" icon={UI_ICONS.portfolio} title={tg("money")} text={tg("moneyText")}>
           <CollapsibleSection
             {...section("money")}
             title={t("sections.money")}
@@ -152,20 +190,74 @@ export function ControllingTab({
               restrictions={listed?.restrictions}
             />
             {listed && <RestrictionNotes restrictions={listed.restrictions} only={["payout"]} />}
-            <PayoutCard company={company} />
+            {/* Remounts when the stored share changes, so the slider never shows an unsaved value as saved. */}
+            <PayoutCard key={company.founderPayoutBps} company={company} />
             <PayFactorNote company={company} />
           </CollapsibleSection>
-          <CollapsibleSection
-            {...section("capital")}
-            title={t("sections.capital")}
-            summary={t(isListed ? "sections.capitalListed" : "sections.capitalSummary")}
-            icon={<PixelIcon {...UI_ICONS.markets} scale={2} />}
-          >
-            <ListingCard company={company} />
-            {!company.listing && !company.canGoPublic && (
-              <p className="text-sm text-pretty text-fg-3">{t("capitalHint")}</p>
+          <div className="space-y-4">
+            <CollapsibleSection
+              {...section("capital")}
+              title={t("sections.capital")}
+              summary={t(isListed ? "sections.capitalListed" : "sections.capitalSummary")}
+              icon={<PixelIcon {...UI_ICONS.markets} scale={2} />}
+            >
+              <ListingCard company={company} />
+              {!company.listing && !company.canGoPublic && (
+                <p className="text-sm text-pretty text-fg-3">{t("capitalHint")}</p>
+              )}
+            </CollapsibleSection>
+            {listed && (
+              <CollapsibleSection
+                {...section("dividends")}
+                title={t("sections.dividends")}
+                summary={t("sections.dividendsSummary", { amount: money(listed.dividends.maxCents) })}
+                icon={<PixelIcon {...UI_ICONS.gift} scale={2} />}
+              >
+                <DividendCard listed={listed} />
+              </CollapsibleSection>
             )}
-          </CollapsibleSection>
+          </div>
+        </Group>
+
+        {listed && (
+          <Group
+            id="listed"
+            icon={UI_ICONS.search}
+            title={tg("listed")}
+            text={tg("listedText")}
+            testId="controlling-listed"
+          >
+            <CollapsibleSection
+              {...section("research")}
+              title={tk("research")}
+              summary={t("sections.researchSummary", { done: researchDone, total: research.length })}
+              icon={<PixelIcon {...UI_ICONS.search} scale={2} />}
+            >
+              <p className="text-sm text-pretty text-fg-3">{t("researchIntro")}</p>
+              <ResearchTree listed={listed} />
+            </CollapsibleSection>
+            <CollapsibleSection
+              {...section("growth")}
+              title={t("sections.growth")}
+              summary={t("sections.growthSummary", {
+                count: owned(["product", "region", "machine", "acquisition", "licence"]),
+              })}
+              icon={<PixelIcon {...UI_ICONS.company} scale={2} />}
+            >
+              {(["product", "region", "machine", "acquisition", "licence"] as const).map((kind) => (
+                <div key={kind} className="space-y-2">
+                  <div>
+                    <p className="font-semibold text-fg-1">{tk(kind)}</p>
+                    <p className="text-xs text-pretty text-fg-3">{t(`kindHints.${kind}`)}</p>
+                  </div>
+                  <ItemList listed={listed} kinds={[kind]} />
+                </div>
+              ))}
+            </CollapsibleSection>
+          </Group>
+        )}
+
+        <Group id="brand" icon={UI_ICONS.art} title={tg("brand")} text={tg("brandText")}>
           <CollapsibleSection
             {...section("brand")}
             title={t("sections.brand")}
@@ -191,53 +283,49 @@ export function ControllingTab({
               </div>
             </Card>
           </CollapsibleSection>
-        </div>
-      </div>
-
-      {listed && (
-        <div className="space-y-4" data-testid="controlling-listed">
-          <CollapsibleSection
-            {...section("research")}
-            title={tk("research")}
-            summary={t("sections.researchSummary", { done: researchDone, total: research.length })}
-            icon={<PixelIcon {...UI_ICONS.search} scale={2} />}
-          >
-            <p className="text-sm text-pretty text-fg-3">{t("researchIntro")}</p>
-            <ResearchTree listed={listed} />
-          </CollapsibleSection>
-          <CollapsibleSection
-            {...section("growth")}
-            title={t("sections.growth")}
-            summary={t("sections.growthSummary", {
-              count: owned(["product", "region", "machine", "acquisition", "licence"]),
-            })}
-            icon={<PixelIcon {...UI_ICONS.company} scale={2} />}
-          >
-            {(["product", "region", "machine", "acquisition", "licence"] as const).map((kind) => (
-              <div key={kind} className="space-y-2">
-                <div>
-                  <p className="font-semibold text-fg-1">{tk(kind)}</p>
-                  <p className="text-xs text-pretty text-fg-3">{t(`kindHints.${kind}`)}</p>
-                </div>
-                <ItemList listed={listed} kinds={[kind]} />
-              </div>
-            ))}
-          </CollapsibleSection>
-          <CollapsibleSection
-            {...section("dividends")}
-            title={t("sections.dividends")}
-            summary={t("sections.dividendsSummary", { amount: money(listed.dividends.maxCents) })}
-            icon={<PixelIcon {...UI_ICONS.gift} scale={2} />}
-          >
-            <DividendCard listed={listed} />
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {/* Closing the company stays plainly visible, not folded away (ADR-147). */}
-      <div id="section-company" className="scroll-mt-24">
-        <DangerZone company={company} />
+          {/* Closing the company stays plainly visible, not folded away (ADR-147). */}
+          <div id="section-company" className="scroll-mt-24">
+            <DangerZone company={company} />
+          </div>
+        </Group>
       </div>
     </div>
+  );
+}
+
+/** A group of levers: icon, title and one line on top, its sections side by side from lg. */
+function Group({
+  id,
+  icon,
+  title,
+  text,
+  testId,
+  children,
+}: {
+  id: string;
+  icon: (typeof UI_ICONS)[keyof typeof UI_ICONS];
+  title: string;
+  text: string;
+  testId?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={`group-${id}`}
+      aria-labelledby={`group-${id}-title`}
+      className="scroll-mt-32 space-y-3"
+      data-testid={testId}
+    >
+      <header className="flex items-start gap-3 border-b-2 border-line-1 pb-2">
+        <PixelIcon {...icon} scale={2} />
+        <div className="min-w-0">
+          <h2 id={`group-${id}-title`} className="font-semibold text-fg-1">
+            {title}
+          </h2>
+          <p className="text-xs text-pretty text-fg-3">{text}</p>
+        </div>
+      </header>
+      <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5">{children}</div>
+    </section>
   );
 }
