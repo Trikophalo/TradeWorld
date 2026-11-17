@@ -1685,3 +1685,13 @@ select public.file_news_tax_return(gen_random_uuid());
 \o
 reset role;
 delete from public.news_promos;
+
+-- Fertigkeiten (ADR-194) ---------------------------------------------------------------------------------------------
+insert into public.player_skills (player_id, skill_key) values (:fx_g, 'it_data') on conflict do nothing;
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_company_skills.json
+select public.get_company_skills();
+\o :fixture_dir/learn_company_skill.json
+select public.learn_company_skill(gen_random_uuid(), 'data_analysis');
+\o
+reset role;

@@ -29,6 +29,7 @@ import { useCompanyEvent, useCompanyRefresh } from "../hooks";
 import { COMPANY_MOVES_KEY } from "../components/company-moves";
 import { COMPANY_AUTOPILOT_KEY, useCompanyAutopilot } from "../components/autopilot-card";
 import { INTERVIEW_KEY } from "../components/interview-card";
+import { COMPANY_SKILLS_KEY } from "../components/company-skills";
 import type { CompanySection } from "../tabs";
 import {
   aiTurn,
@@ -173,6 +174,14 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
     refetchInterval: 60_000,
     enabled: founder && interviews,
   });
+  // ADR-194: the Fertigkeiten, so Mira can point to one that can be learned now
+  const skillsOn = useDisclosed("companySkills");
+  const skills = useQuery({
+    queryKey: COMPANY_SKILLS_KEY,
+    queryFn: () => engine.companySkills(),
+    refetchInterval: 60_000,
+    enabled: founder && skillsOn,
+  });
   const now = useClock();
   return useMemo(() => {
     // The founder's Mira also needs the moves and the orders before she speaks.
@@ -202,6 +211,7 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
       company: founder ? company : null,
       autopilot: founder ? (autopilot.data ?? null) : null,
       interview: founder && interviews ? (interview.data?.interview ?? null) : null,
+      skills: founder && skillsOn ? (skills.data ?? null) : null,
       // a minute is precise enough for deadlines, and keeps the briefing ids stable
       now: Math.floor(now / 60_000) * 60_000,
     };
@@ -218,6 +228,8 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
     autopilot.data,
     interview.data,
     interviews,
+    skills.data,
+    skillsOn,
     now,
   ]);
 }
@@ -227,6 +239,7 @@ function useNames(): MiraNames {
   const tm = useTranslations("companyMoves");
   const tn = useTranslations("skills.nodes");
   const tl = useTranslations("listed.items");
+  const tc = useTranslations("companySkills.items");
   const health = useHealthText();
   return useMemo(
     () => ({
@@ -249,8 +262,12 @@ function useNames(): MiraNames {
           return tl.has(path) ? tl(path) : key;
         },
       },
+      companySkill: (key: string) => {
+        const path = `${key}.name` as Parameters<typeof tc>[0];
+        return tc.has(path) ? tc(path) : key;
+      },
     }),
-    [text, tm, tn, tl, health],
+    [text, tm, tn, tl, tc, health],
   );
 }
 

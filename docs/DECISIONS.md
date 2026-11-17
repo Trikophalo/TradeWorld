@@ -4437,6 +4437,49 @@ entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awaren
 **Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
 Anzeige-Grenzen der Garage.
 
+## ADR-194: Fertigkeiten der Spielerfirmen, freigeschaltet durch den Skilltree — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: Im Unternehmen soll es die Sektion „Fertigkeiten“ geben. Man fördert dort Dinge wie
+„Daten analysieren“, braucht dafür aber die passende Fähigkeit im Skilltree (z. B. „Datenanalyse“). Zu jedem Bereich
+des Skilltrees gibt es Fertigkeiten; sie heben Gewinn und damit den Aktienkurs.
+
+**Entscheidung.**
+
+- **Neun Fertigkeiten, mindestens eine je Bereich** (`src/config/company-skills.ts`, Laufzeit `game_config`
+  „companySkills“), je fünf Stufen. Jede Stufe nennt genau eine Fähigkeit des Bereichs, nie leichter als die vorige:
+
+  | Fertigkeit              | Bereich      | Stufen brauchen                                                                  | Wirkung je Stufe     |
+  | ----------------------- | ------------ | -------------------------------------------------------------------------------- | -------------------- |
+  | Daten analysieren       | IT           | Datenanalyse, Machine Learning, Datenbanken, KI, Big Data                        | Nachfrage +1 %       |
+  | Prozesse automatisieren | IT           | Programmierung, DevOps, Cloud, Testing, IT-Meister                               | Kapazität +1,5 %     |
+  | Kosten im Griff         | Finanzen     | Buchhaltung, Controlling, Budgetierung, Corporate Finance, Finanz-Meister        | Fixkosten −2 %       |
+  | Verträge verhandeln     | Recht        | Vertragsrecht, Steuerrecht, Gesellschaftsrecht, Kapitalmarktrecht, Recht-Meister | Wareneinsatz −1 %    |
+  | Handwerk & Fertigung    | Handwerk     | Mechanik, Ingenieurwesen, Fertigung, CNC, Handwerk-Meister                       | Qualität +0,6 Punkte |
+  | Kampagnen schärfen      | Vertrieb     | Marketing, Marke, SEO, Growth, Vertrieb-Meister                                  | Nachfrage +1 %       |
+  | Team führen             | Management   | Teamführung, Personal, Agil, Betrieb, Management-Meister                         | Kapazität +1 %       |
+  | Forschen & Testen       | Wissenschaft | Physik, Labor, Statistik, Werkstoffe, Wissenschaft-Meister                       | Qualität +0,6 Punkte |
+  | Lieferkette optimieren  | Logistik     | Einkauf, Supply Chain, Strategie, Global, Logistik-Meister                       | Wareneinsatz −1 %    |
+
+- **Wer die Fähigkeit haben muss:** der Gründer **oder** ein Spieler mit aktivem Job in der Firma
+  (`company_held_skills`). Geprüft wird beim Lernen; eine gelernte Stufe bleibt, auch wenn der Mitarbeiter geht.
+- **Kosten:** Firmengeld 1 000 / 3 000 / 8 000 / 20 000 / 50 000 € je Stufe (Ledger Firmenkasse → Haushalte, Summe 0,
+  offene Rechnungen zuerst), dazu Schulung 1 / 2 / 4 / 8 / 12 Spielstunden; bis dahin zählt die Stufe eine niedriger.
+  Während einer Schulung keine weitere Stufe derselben Fertigkeit (`locked`).
+- **Wirkung in der Abschlussstunde:** `company_skills_hour_effect` liefert gedeckelte Faktoren; `listed_hour_effect`
+  (vollständig neu definiert, sonst unverändert) multipliziert sie in seine Terme (Nachfrage, Kapazität, Wareneinsatz,
+  Fixkosten, Qualität). `player_company_close_hour` bleibt unangetastet. Mehr Gewinn hebt über den bestehenden Pfad
+  (`listed_hour_after`, fairer Wert) den Kurs börsennotierter Firmen; kein direkter Kursschreiber. Bekanntheit und Ruf
+  bewegen Fertigkeiten nicht.
+- **Deckel je Art:** Nachfrage +10 %, Kapazität +10 %, Wareneinsatz −8 %, Fixkosten −10 %, Qualität +0,05.
+- **Oberfläche:** Bereich „Fertigkeiten“ in der Karte „Wachstum“ (Controlling, ADR-187), `Reveal` mit `companySkills`
+  (Level 3). Kachel auf dem Dashboard führt dorthin. Gesperrte Stufe nennt die fehlende Fähigkeit mit Link
+  `/career/skills?skill=<key>`; im Skilltree zeigt jede Fähigkeit, welche Fertigkeit sie freischaltet. Mira kennt die
+  gelernten Stufen und weist auf eine jetzt lernbare Fertigkeit hin.
+
+**Folgen.** Ein voll ausgebauter Betrieb verdient spürbar, aber begrenzt mehr (alle Deckel zusammen grob +20 bis
++30 % Gewinn je Stunde, je nach Kostenstruktur). Mit vier Spielern: Mitarbeiter mit passenden Fähigkeiten werden für
+Gründer wertvoller. Die Demo bildet Lernen und Preise nach, die Wirkung rechnet nur der Server.
+
 ## ADR-193: News-Aktionen aus der Live-Show — `Annahme`
 
 **Kontext.** Der Owner: „Es soll bei den News immer mal wieder eine Aktion kommen“: Booster eines Sets 15 Minuten

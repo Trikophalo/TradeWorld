@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { BOOK } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SkillPointGuide } from "@/features/career/components/skill-guide";
 import { SkillTree } from "@/features/career/components/skill-tree";
 
@@ -15,7 +17,10 @@ export default async function SkillsPage() {
   return (
     <Page>
       <PageHeader title={t("title")} intro={t("intro")} art={BOOK} />
-      <SkillTree />
+      {/* ?skill=<key> opens one skill (ADR-194), read with useSearchParams */}
+      <Suspense fallback={<Skeleton className="h-[70dvh] w-full rounded-lg" />}>
+        <SkillTree />
+      </Suspense>
       <SkillPointGuide />
     </Page>
   );

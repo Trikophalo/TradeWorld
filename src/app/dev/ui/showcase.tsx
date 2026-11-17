@@ -51,13 +51,14 @@ import { StatBars } from "@/features/crypto/components/coin-detail";
 import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
+import { CompanySkillsCard } from "@/features/company/components/company-skills";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
 import { FirmSection, InfoTip, SectionNav, SubSection } from "@/features/company/components/firm-layout";
 import { ReputationCard } from "@/features/company/components/reputation-card";
 import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
 import { InterviewCard } from "@/features/company/components/interview-card";
 import { NewsPromoCard, TaxPromoCard } from "@/features/news/promo/promo-card";
-import type { NewsPromo } from "@/features/game/types";
+import type { CompanySkillsState, NewsPromo } from "@/features/game/types";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AutopilotCard } from "@/features/company/components/autopilot-card";
@@ -299,6 +300,32 @@ function NewsPromoShowcase() {
     </Demo>
   );
 }
+
+/** Fertigkeiten (ADR-194): one learned, one in training, one locked, one at the maximum. */
+const SAMPLE_COMPANY_SKILLS: CompanySkillsState = {
+  freeCashCents: 1_200_000,
+  skills: BALANCE.companySkills.skills.map((s, i) => {
+    const level = [2, 1, 0, 5, 0, 0, 0, 0, 0][i] ?? 0;
+    const max = BALANCE.companySkills.maxLevel;
+    return {
+      key: s.key,
+      branch: s.branch,
+      effect: s.effect,
+      level,
+      maxLevel: max,
+      trainingUntil: i === 1 ? "2099-01-01T12:00:00Z" : null,
+      requires: [...s.requires],
+      nextRequires: level < max ? (s.requires[level] ?? null) : null,
+      missing: level < max && i !== 0 && i !== 4 ? (s.requires[level] ?? null) : null,
+      nextCostCents: level < max ? (BALANCE.companySkills.costCentsByLevel[level] ?? null) : null,
+      nextHours: level < max ? (BALANCE.companySkills.trainingHoursByLevel[level] ?? null) : null,
+      effectBps: s.perLevelBps * level,
+      nextEffectBps: level < max ? s.perLevelBps * (level + 1) : null,
+    };
+  }),
+  totalBps: { demand: 200, capacity: 0, cogs: 500, fixed: 0, quality: 0 },
+  capBps: { ...BALANCE.companySkills.capBps },
+};
 
 const SAMPLE_INTERVIEW = {
   maxChars: 240,
@@ -1237,6 +1264,7 @@ export function Showcase() {
           <SampleGame key={sample.game} sample={sample} />
         ))}
         <InterviewCard preview={SAMPLE_INTERVIEW} />
+        <CompanySkillsCard preview={SAMPLE_COMPANY_SKILLS} />
         <NewsPromoShowcase />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />

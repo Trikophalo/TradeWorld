@@ -44,6 +44,8 @@ export const DISCLOSURE = {
   companyListed: 9,
   /** CEO interviews of NEXA Nachrichten (ADR-173): once the news show and a company are in reach. */
   companyInterview: 3,
+  /** Fertigkeiten of the own company (ADR-194): with the company, after the tutorial. */
+  companySkills: 3,
   /** News-Aktionen of the live show (ADR-193): the news tab section and the toast, after the tutorial. */
   newsPromo: 2,
 } as const;

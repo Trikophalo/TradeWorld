@@ -2471,6 +2471,34 @@ export interface NewsTaxReturnResult {
   revenueCents: number;
 }
 
+/** Fertigkeiten of player companies (ADR-194). */
+export type CompanySkillEffect = "demand" | "capacity" | "cogs" | "fixed" | "quality";
+export interface CompanySkill {
+  key: string;
+  branch: string;
+  effect: CompanySkillEffect;
+  level: number;
+  maxLevel: number;
+  /** End of the training of the last level; until then it counts one level lower. */
+  trainingUntil: string | null;
+  /** Skill of the map every level needs (index 0 = level 1). */
+  requires: string[];
+  nextRequires: string | null;
+  /** The skill of the map nobody in the company holds yet, or null. */
+  missing: string | null;
+  nextCostCents: number | null;
+  nextHours: number | null;
+  effectBps: number;
+  nextEffectBps: number | null;
+}
+export interface CompanySkillsState {
+  freeCashCents: number;
+  skills: CompanySkill[];
+  /** Capped sum of the working levels (basis points per kind). */
+  totalBps: Record<CompanySkillEffect, number>;
+  capBps: Record<CompanySkillEffect, number>;
+}
+
 /** CEO interviews of NEXA Nachrichten (ADR-173). */
 export type InterviewVerdict = "good" | "ok" | "bad" | "none";
 export interface CompanyInterview {
@@ -2503,6 +2531,9 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   answerCompanyInterview(requestId: string, id: number, answers: InterviewAnswer[]): Promise<CompanyInterviewState>;
   declineCompanyInterview(requestId: string, id: number): Promise<CompanyInterviewState>;
   newsShow(): Promise<NewsShowState>;
+  /** Fertigkeiten of the own company (ADR-194). */
+  companySkills(): Promise<CompanySkillsState>;
+  learnCompanySkill(requestId: string, key: string): Promise<CompanySkillsState>;
   /** The running News-Aktion, if any (ADR-193). */
   newsPromo(): Promise<NewsPromoState>;
   fileNewsTaxReturn(requestId: string): Promise<NewsTaxReturnResult>;

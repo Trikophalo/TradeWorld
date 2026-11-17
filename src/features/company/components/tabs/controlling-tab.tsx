@@ -28,6 +28,8 @@ import {
 } from "../company-parts";
 import type { HireRequest } from "../employer";
 import { FirmSection, FoldBlock, MergedCard, SectionNav, SubSection, type Pane } from "../firm-layout";
+import { Reveal } from "@/features/progression/components/reveal";
+import { CompanySkillsCard } from "../company-skills";
 import { GrowthAndExpansion } from "../growth-expansion";
 import { ListingCard } from "../listing";
 import { PitchCard } from "../pitch-card";
@@ -242,6 +244,17 @@ export function ControllingTab({
           />
           <UpgradeCard company={company} />
         </div>
+      ),
+    },
+    // Fertigkeiten (ADR-194): what the company itself gets better at, opened by the skill map
+    {
+      id: "skills",
+      label: tw("skills"),
+      description: t("sub.skills"),
+      content: (
+        <Reveal feature="companySkills">
+          <CompanySkillsCard />
+        </Reveal>
       ),
     },
     ...(listed

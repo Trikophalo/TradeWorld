@@ -44,6 +44,7 @@ export const ADVICE_RULES = [
   "strengths",
   "skill",
   "interview",
+  "companySkills",
   "ipo",
 ] as const;
 export type AdviceRule = (typeof ADVICE_RULES)[number];
@@ -614,6 +615,26 @@ export function adviceList(state: MiraState, names: MiraNames, facts: CompanyFac
         },
       ],
       options: [open("interview", names)],
+    });
+  }
+
+  // 14b. A Fertigkeit can be learned now (ADR-194): the skill is held and the cash is there.
+  if (f.founder && f.skills?.learnable) {
+    push({
+      rule: "companySkills",
+      id: `advice:companySkills:${f.skills.learnable.key}:${f.skills.levels}`,
+      urgent: false,
+      impactCents: 0,
+      lines: [
+        {
+          key: "advice.companySkills",
+          values: {
+            skill: names.companySkill?.(f.skills.learnable.key) ?? f.skills.learnable.key,
+            amount: money(f.skills.learnable.costCents),
+          },
+        },
+      ],
+      options: [open("skills", names)],
     });
   }
 

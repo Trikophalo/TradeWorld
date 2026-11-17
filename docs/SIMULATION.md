@@ -1140,3 +1140,16 @@ landet in `company_awareness_log` (Quelle je Stunde). TS und SQL stimmen in `awa
 (ganzzahlig), `slideTiles`, `pipesFlow`/`pipesConnected`. `src/lib/sim/company-task-mix.ts`: `pickWeightedTask`
 (Wahrscheinlichkeit Gewicht/Summe, wie `company_tasks_run_due`) und `taskMix` (Anteil je Art). SQL und TS stimmen auf
 den Fällen in `supabase/tests/task_games_visual_cases.inc` überein.
+
+## Nachtrag: Fertigkeiten der Firmen (ADR-194)
+
+Formeln in `src/lib/sim/company-skills.ts`, gespiegelt in `company_skills_hour_effect` (Migration 8300). Je Art wird
+Σ `perLevelBps` × wirksame Stufe gebildet und gedeckelt (`capBps`). Wirksam ist die Stufe, solange `ready_at` nicht
+nach dem Stundenbeginn liegt, sonst eine darunter.
+
+- Nachfrage × (1 + d / 10 000), Kapazität × (1 + c / 10 000)
+- Wareneinsatz × (1 − g / 10 000), Fixkosten × (1 − f / 10 000)
+- Qualität + q / 10 000 (nur für die Stunde, nicht gespeichert)
+
+Die Faktoren werden in `listed_hour_effect` mit den Termen der Börsenfirma bzw. dem Ruf-Faktor privater Firmen
+multipliziert; die Abschlussstunde nutzt sie unverändert.

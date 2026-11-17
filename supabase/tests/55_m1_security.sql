@@ -111,7 +111,9 @@ select tests.assert(
           -- order preview (ADR-189)
           || array['quote_order', 'get_company_awareness']
           -- News-Aktionen (ADR-193)
-          || array['get_news_promo', 'file_news_tax_return']) x),
+          || array['get_news_promo', 'file_news_tax_return']
+          -- Fertigkeiten of player companies (ADR-194)
+          || array['get_company_skills', 'learn_company_skill']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

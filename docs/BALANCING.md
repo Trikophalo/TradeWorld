@@ -1582,3 +1582,12 @@ Gemessen (Garage, Median-Markt, vorgeschlagenes Marketing 500 €/Quartal): 3 % 
 (Gleichgewicht knapp 55 % bei 60 % Grenze); mit einer Aufgabe je Stunde und einem Flyer am Tag 42 % nach 24 h und die
 Grenze nach drei Tagen; ohne Marketing nur Mundpropaganda (7 % nach einer Woche). Tabelle in ADR-188.
 `scripts/company-harness.ts` (Kleinunternehmen mit 3 KI): 43 % nach 24 h, 64 % nach 72 h; Gewinne wie in ADR-180.
+
+## Fertigkeiten der Firmen (ADR-194)
+
+`companySkills` in `src/config/company-skills.ts`: fünf Stufen, Kosten 1 000 / 3 000 / 8 000 / 20 000 / 50 000 €,
+Schulung 1 / 2 / 4 / 8 / 12 h. Je Stufe: Daten analysieren und Kampagnen Nachfrage +1 %, Automatisieren Kapazität
++1,5 %, Team führen Kapazität +1 %, Kosten im Griff Fixkosten −2 %, Verträge und Lieferkette Wareneinsatz −1 %,
+Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazität +10 %, Wareneinsatz −8 %, Fixkosten
+−10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
+von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
