@@ -59,8 +59,9 @@ import { InterviewCard } from "@/features/company/components/interview-card";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AutopilotCard } from "@/features/company/components/autopilot-card";
+import { AwarenessBreakdown } from "@/features/company/awareness/awareness-breakdown";
 import { PulseCard } from "@/features/company/components/pulse-card";
-import type { CompanyAutopilot, MyCompany } from "@/features/game/types";
+import type { CompanyAutopilot, CompanyAwareness, MyCompany } from "@/features/game/types";
 import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
@@ -69,6 +70,7 @@ import { FriendCodeCard } from "@/features/friends/components/friend-code";
 import { NewsAudienceDemo } from "@/features/news/show/audience-demo";
 import { NewsStudioDemo } from "@/features/news/show/studio-demo";
 import { StockNewsCard } from "@/features/news/stock-news";
+import { StockFiguresCard } from "@/features/market/components/stock-figures";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { PatchNotesButton, PatchNotesList } from "@/features/patch-notes/components/patch-notes";
 import { usePatchNotesSeen } from "@/features/patch-notes/seen";
@@ -389,6 +391,26 @@ const SAMPLE_GAMES = [
 ] as const;
 
 /** Autopilot and the last hour (ADR-180). */
+/** ADR-188: a garage of stage 1 with marketing, a solved task since the last hour. */
+const SAMPLE_AWARENESS: CompanyAwareness = {
+  awareness: 0.33,
+  cap: 0.65,
+  floor: 0.02,
+  tier: "garage",
+  stage: 1,
+  expansionLevel: 0,
+  tierCap: 0.6,
+  perStage: 0.05,
+  perExpansionLevel: 0.03,
+  strength: 48,
+  lastHour: {
+    hourStart: "2026-11-17T09:00:00.000Z",
+    parts: { marketing: 0.012, word_of_mouth: 0.0012, tasks: 0.005, decay: -0.0012 },
+  },
+  since: { tasks: 0.005, campaign: 0.03 },
+  history: [],
+};
+
 const SAMPLE_AUTOPILOT: CompanyAutopilot = {
   on: true,
   canToggle: true,
@@ -639,6 +661,7 @@ export function Showcase() {
         </Card>
         <FriendCodeCard />
         <StockNewsCard />
+        <StockFiguresCard ticker="VLT" />
       </Section>
 
       <Section id="buttons" title={t("buttons")} className="grid gap-4 lg:grid-cols-2">
@@ -1095,6 +1118,7 @@ export function Showcase() {
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
         <AutopilotCard preview={SAMPLE_AUTOPILOT} />
+        <AwarenessBreakdown preview={SAMPLE_AWARENESS} />
         <PulseCard lastHour={SAMPLE_AUTOPILOT.lastHour} />
         {SAMPLE_GAMES.map((sample) => (
           <SampleGame key={sample.game} sample={sample} />

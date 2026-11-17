@@ -113,7 +113,20 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
-- **Firma übersichtlicher (ADR-187):** Das Dashboard zeigt nur Zahlen und Grafiken, ein Tipp führt zum passenden Hebel; alles Fällige steht in einer Liste „Zu erledigen“, das Controlling in fünf Karten statt endlos langer Seite, Mira auf jedem Tab, Stärken und „Wo es fehlt“ in einer Ansicht, Wachstum und Ausbau als ein Weg (gekaufte Plätze bleiben nach neuer Rechtsform und Börsengang erhalten, ADR-188), Geschäftszüge, Bewerbungen und „Was jeder leistet“ aufklappbar.
+- **Firma übersichtlicher (ADR-187):** Das Dashboard zeigt nur Zahlen und Grafiken, ein Tipp führt zum passenden Hebel; alles Fällige steht in einer Liste „Zu erledigen“, das Controlling in fünf Karten statt endlos langer Seite, Mira auf jedem Tab, Stärken und „Wo es fehlt“ in einer Ansicht, Wachstum und Ausbau als ein Weg (gekaufte Plätze bleiben nach neuer Rechtsform und Börsengang erhalten, ADR-191), Geschäftszüge, Bewerbungen und „Was jeder leistet“ aufklappbar.
+
+- **Bulk verkaufen aufgeräumt:** Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste. Neu: „Alles unter … € auswählen“ wählt jede Karte unter deinem Betrag, auf Wunsch bleibt von jeder eine übrig.
+
+- **Große Züge für alle (ADR-190):** Zieht jemand eine Nexamon-Karte mit mehr als 100.000 € Wert, bekommen alle anderen eine Nachricht mit Link zur Karte.
+
+- **Umsätze an der Börse (ADR-184):** Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.
+
+- **Mira kennt jetzt deine Zahlen (ADR-185):** Sie rät nur noch zu Dingen, die gerade gehen, sagt, was sie je Stunde
+  bringen, und beantwortet „Was soll ich tun?“, „Warum Verlust?“, „Mehr Umsatz?“, Ruf, Stärken und einen Lagebericht.
+
+- **Was du siehst, bekommst du (ADR-189):** Die Order-Maske zeigt vor dem Bestätigen den echten Ausführungskurs, die Kursauswirkung und „Du erhältst ca. …“; Orders jeder Größe werden ganz ausgeführt und bewegen den Kurs höchstens um 10 %, statt zum halben Preis zu verkaufen.
+
+- **Bekanntheit neu (ADR-188):** Marketing wirkt jede Stunde sichtbar (eine Garage kommt mit normalem Budget in einem Tag auf rund 30 %), Aufgaben und Kampagnen springen sofort, die Obergrenze steht dabei (Garage 60 %, steigt mit Ausbau), und die Stärke „Bekanntheit“ folgt dem Wert in Stunden statt Tagen.
 - **Firma aufgeräumt (ADR-183):** klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter
   dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je Punkt sagt, was zu tun ist.
 - **Ruf für jede Firma:** Qualität, faire Preise, bezahlte Löhne und Kampagnen heben ihn jede Stunde, er bewegt die Nachfrage.

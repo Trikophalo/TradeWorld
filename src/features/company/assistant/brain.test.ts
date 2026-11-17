@@ -508,8 +508,8 @@ describe("Mira and the company's health", () => {
     });
     expect(healthSteps("team", s, healthNames).map((o) => o.action)).toEqual([
       { type: "hireAi", count: 1, skill: "sales" },
-      { type: "open", tab: "team" },
-      { type: "open", tab: "team", section: "training" },
+      // ADR-185: the trainings only show once the team is big enough; without the company that is unknown
+      { type: "open", section: "team" },
     ]);
     expect(healthSteps("momentum", s, healthNames).map((o) => o.action.type)).toEqual(["plan", "play", "autoAi"]);
   });

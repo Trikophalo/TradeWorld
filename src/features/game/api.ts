@@ -13,6 +13,7 @@ import { DEAL_RPC_SCHEMAS, liveDealEngine } from "./api-deals";
 import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { RENTAL_RPC_SCHEMAS, liveRentalEngine } from "./api-rentals";
 import { TASK_RPC_SCHEMAS, liveTaskEngine } from "./api-tasks";
+import { AWARENESS_RPC_SCHEMAS, liveAwarenessEngine } from "./api-awareness";
 import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
@@ -30,9 +31,11 @@ import {
   type GameEngine,
   type MarketSnapshot,
   type OrderBook,
+  type OrderQuote,
   type OrderResult,
   type Portfolio,
   type SecurityDetails,
+  type StockFigures,
   type CompanyMoves,
   type MissionsState,
 } from "./types";
@@ -107,6 +110,27 @@ const detailsSchema = z.object({
   net_income_cents: nnum,
   margin_bps: nnum,
   news: z.array(z.object({ published_at: iso, headline: z.string(), body: z.string().nullable() })),
+});
+
+const stockFiguresSchema = z.object({
+  figures: z.array(
+    z.object({
+      ticker: z.string(),
+      company_kind: z.enum(["ai", "player"]),
+      period: z.enum(["day", "quarter"]),
+      revenue_cents: num,
+      profit_cents: num,
+      prev_revenue_cents: nnum,
+      hours: nnum,
+      last_hour_at: iso.nullable(),
+      last_hour_revenue_cents: nnum,
+      game_year: nnum,
+      quarter: nnum,
+      reputation: nnum,
+      awareness_bps: nnum,
+      history: z.array(num),
+    }),
+  ),
 });
 
 const portfolioSchema = z.object({
@@ -197,6 +221,26 @@ const orderResultSchema = z.object({
   xp_awarded: num.default(0),
   level: num.default(1),
   xp_total: num.default(0),
+  requested_quantity_e6: num.optional(),
+  unfilled_quantity_e6: num.optional(),
+  limited_by: z.enum(["supply"]).nullable().optional(),
+  impact_bps: num.optional(),
+});
+
+const orderQuoteSchema = z.object({
+  touch_e4: num,
+  requested_quantity_e6: num,
+  fill_quantity_e6: num,
+  unfilled_quantity_e6: num,
+  avg_price_e4: num,
+  last_price_e4: num,
+  gross_cents: num,
+  fee_cents: num,
+  tax_cents: num,
+  net_cents: num,
+  slippage_bps: num,
+  impact_bps: num,
+  limited_by: z.enum(["supply"]).nullable(),
 });
 
 const progressSchema = z.object({ xp_awarded: num, level: num, xp_total: num });
@@ -494,8 +538,10 @@ export const RPC_SCHEMAS = {
   get_candles: z.array(candleSchema),
   get_order_book: bookSchema,
   get_security_details: detailsSchema,
+  get_stock_revenue: stockFiguresSchema,
   get_my_portfolio: portfolioSchema,
   place_order: orderResultSchema,
+  quote_order: orderQuoteSchema,
   cancel_order: z.object({ order_id: z.string(), status: z.literal("cancelled") }),
   claim_vault: z.object({ claimed_cents: num, cash_cents: num }),
   complete_tutorial: progressSchema,
@@ -518,6 +564,7 @@ export const RPC_SCHEMAS = {
   ...PROPERTY_RPC_SCHEMAS,
   ...RENTAL_RPC_SCHEMAS,
   ...TASK_RPC_SCHEMAS,
+  ...AWARENESS_RPC_SCHEMAS,
   ...PITCH_RPC_SCHEMAS,
   ...PROTEST_RPC_SCHEMAS,
   ...TOUR_RPC_SCHEMAS,
@@ -547,6 +594,7 @@ export const RPC_SCHEMAS = {
 
 export const liveEngine: GameEngine = {
   ...liveTaskEngine,
+  ...liveAwarenessEngine,
   ...livePitchEngine,
   ...liveProtestEngine,
   ...liveTourEngine,
@@ -766,6 +814,26 @@ export const liveEngine: GameEngine = {
     };
   },
 
+  async stockFigures(ticker): Promise<StockFigures[]> {
+    const r = await rpc("get_stock_revenue", ticker ? { p_ticker: ticker } : {}, stockFiguresSchema);
+    return r.figures.map((f) => ({
+      ticker: f.ticker,
+      companyKind: f.company_kind,
+      period: f.period,
+      revenueCents: f.revenue_cents,
+      profitCents: f.profit_cents,
+      prevRevenueCents: f.prev_revenue_cents,
+      hours: f.hours,
+      lastHourAt: f.last_hour_at,
+      lastHourRevenueCents: f.last_hour_revenue_cents,
+      gameYear: f.game_year,
+      quarter: f.quarter,
+      reputation: f.reputation,
+      awarenessBps: f.awareness_bps,
+      history: f.history,
+    }));
+  },
+
   async portfolio(): Promise<Portfolio> {
     const p = await rpc("get_my_portfolio", {}, portfolioSchema);
     return {
@@ -865,6 +933,38 @@ export const liveEngine: GameEngine = {
       xpAwarded: r.xp_awarded,
       level: r.level,
       xpTotal: r.xp_total,
+      requestedQuantityE6: r.requested_quantity_e6,
+      unfilledQuantityE6: r.unfilled_quantity_e6,
+      limitedBy: r.limited_by ?? null,
+      impactBps: r.impact_bps,
+    };
+  },
+
+  async quoteOrder(input): Promise<OrderQuote> {
+    const r = await rpc(
+      "quote_order",
+      {
+        p_ticker: input.ticker,
+        p_side: input.side,
+        p_quantity_e6: input.quantityE6 ?? null,
+        p_amount_cents: input.amountCents ?? null,
+      },
+      orderQuoteSchema,
+    );
+    return {
+      touchE4: r.touch_e4,
+      requestedQuantityE6: r.requested_quantity_e6,
+      fillQuantityE6: r.fill_quantity_e6,
+      unfilledQuantityE6: r.unfilled_quantity_e6,
+      avgPriceE4: r.avg_price_e4,
+      lastPriceE4: r.last_price_e4,
+      grossCents: r.gross_cents,
+      feeCents: r.fee_cents,
+      taxCents: r.tax_cents,
+      netCents: r.net_cents,
+      slippageBps: r.slippage_bps,
+      impactBps: r.impact_bps,
+      limitedBy: r.limited_by,
     };
   },
 

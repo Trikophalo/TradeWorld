@@ -1,4 +1,5 @@
 import { BALANCE } from "@/config/balance";
+import { awarenessAdd, awarenessCap } from "@/lib/sim/awareness";
 import {
   MAX_QUANTITY_E6,
   MIN_ORDER_CENTS,
@@ -10,6 +11,7 @@ import {
 import { DEMO_COMPANIES, DEMO_INDEX, type DemoCompany } from "@/lib/demo/market";
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { withholdIncome } from "@/lib/sim/insolvency";
+import { planMarketOrder, type FillPlan } from "@/lib/sim/order-fill";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
 import { needsFullTimeFounder } from "@/lib/sim/startup";
 import { popularityScore, viewCounts } from "@/lib/sim/popularity";
@@ -71,6 +73,7 @@ import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deal
 import { tagFromUniform } from "@/lib/player-tag";
 import {
   createCompanyEngine,
+  demoAwareness,
   demoLastHour,
   demoStrengths,
   type DemoCompanyState,
@@ -99,6 +102,7 @@ import {
   type RichList,
   type RichListEntry,
   type Security,
+  type StockFigures,
   type Session,
   type Trade,
 } from "./types";
@@ -487,6 +491,29 @@ function fillPriceE4(ticker: string, side: OrderInput["side"], quantityE6: numbe
     : Math.max(1, Math.round(q.bid * (1 - impact / 10_000)));
 }
 
+/** The fill plan of a market order (ADR-189), the same function the preview shows. */
+function demoPlan(
+  ticker: string,
+  side: OrderInput["side"],
+  quantityE6: number | null,
+  amountCents: number | null,
+): FillPlan {
+  const q = quote(ticker);
+  return planMarketOrder({
+    side,
+    touchE4: side === "buy" ? q.ask : q.bid,
+    slope: impactBps(ticker, QUANTITY_SCALE) / 10_000,
+    pendingShares: 0,
+    quantityE6,
+    amountCents,
+    feeCents: trading.orderFeeCents,
+    maxMoveBps: trading.maxTickReturnBps,
+    bandLowE4: null,
+    bandHighE4: null,
+    minPriceE4: trading.minPriceE4,
+  });
+}
+
 function level(): number {
   return levelFromTotalXp(p().xpTotal);
 }
@@ -592,6 +619,57 @@ function securityOf(ticker: string): Security {
     // The demo has no profile page for the own company; its stock links to the company tab instead.
     companyId: info.company && !own ? `demo-company-${ticker}` : null,
     popularity: info.company ? popularityOf(ticker) : 0,
+  };
+}
+
+/**
+ * Business figures at the stock exchange (ADR-184): the own listed company from its kept hours, the AI companies a
+ * steady quarter derived from their size (like `details`), slightly different per quarter.
+ */
+function demoStockFigures(c: DemoCompany, withHistory: boolean): StockFigures {
+  const own = ownStock()?.ticker === c.ticker ? p().company : null;
+  if (own) {
+    const now = Date.now();
+    const all = own.hours ?? [];
+    const day = all.filter((h) => h.at >= now - DAY);
+    const prev = all.filter((h) => h.at >= now - 2 * DAY && h.at < now - DAY);
+    const sum = (hours: typeof all) => hours.reduce((total, h) => total + h.revenueCents, 0);
+    const last = all.at(-1);
+    return {
+      ticker: c.ticker,
+      companyKind: "player",
+      period: "day",
+      revenueCents: sum(day),
+      profitCents: day.reduce((total, h) => total + h.profitCents, 0),
+      prevRevenueCents: prev.length > 0 && day.length > 0 ? Math.round((sum(prev) * day.length) / prev.length) : null,
+      hours: day.length,
+      lastHourAt: last ? new Date(last.at).toISOString() : null,
+      lastHourRevenueCents: last?.revenueCents ?? null,
+      gameYear: null,
+      quarter: null,
+      reputation: Math.round(own.reputation ?? 50),
+      awarenessBps: Math.round(own.awareness * 10_000),
+      history: withHistory ? day.slice(-24).map((h) => h.revenueCents) : [],
+    };
+  }
+  const seed = [...c.ticker].reduce((total, ch) => total + ch.charCodeAt(0), 0);
+  const quarterRevenue = (i: number) => Math.round((c.marketCapCents / 9) * (1 + (((seed * (i + 3)) % 13) - 6) / 100));
+  const history = Array.from({ length: 8 }, (_, i) => quarterRevenue(i));
+  return {
+    ticker: c.ticker,
+    companyKind: "ai",
+    period: "quarter",
+    revenueCents: history[7]!,
+    profitCents: Math.round(c.marketCapCents / 70),
+    prevRevenueCents: history[6]!,
+    hours: null,
+    lastHourAt: null,
+    lastHourRevenueCents: null,
+    gameYear: null,
+    quarter: null,
+    reputation: null,
+    awarenessBps: null,
+    history: withHistory ? history : [],
   };
 }
 
@@ -1640,9 +1718,10 @@ const companyTasks = createCompanyTasksEngine({
   boostAwareness: (add) => {
     const c = p().company;
     if (!c) return;
-    const next = Math.min(Math.max(c.awareness, 1), c.awareness + add);
-    c.awarenessBoost = (c.awarenessBoost ?? 0) + (next - c.awareness);
-    c.awareness = next;
+    // ADR-188: never above the company's cap (the one of the last closed hour)
+    const applied = awarenessAdd(c.awareness, c.awarenessCap ?? awarenessCap(c.tier, 0, c.expansionLevel ?? 0), add);
+    c.awarenessBoost = (c.awarenessBoost ?? 0) + applied;
+    c.awareness += applied;
     persist();
   },
   lastHour: () => demoLastHour(p().company ?? null),
@@ -1869,6 +1948,12 @@ const protests = createProtestsEngine({
 });
 
 export const demoEngine: GameEngine = {
+  // ADR-188: awareness, its cap and what moved it
+  companyAwareness: async () => {
+    const c = p().company;
+    if (!c) throw new GameError("company_not_found");
+    return demoAwareness(c);
+  },
   battle: battles.battle,
   joinBattle: battles.joinBattle,
   leaveBattle: battles.leaveBattle,
@@ -2142,6 +2227,12 @@ export const demoEngine: GameEngine = {
     });
   },
 
+  stockFigures: (ticker) => {
+    if (ticker) meta(ticker);
+    const list = stocks().filter((c) => !ticker || c.ticker === ticker);
+    return Promise.resolve(list.map((c) => demoStockFigures(c, Boolean(ticker))));
+  },
+
   portfolio: () => {
     career.accrue();
     return Promise.resolve(portfolioNow());
@@ -2226,9 +2317,18 @@ export const demoEngine: GameEngine = {
         }
 
         let price = fillPriceE4(input.ticker, input.side, quantityE6);
+        let requestedE6 = quantityE6;
+        let plan: FillPlan | null = null;
         if (limit !== null) price = input.side === "buy" ? Math.min(price, limit) : Math.max(price, limit);
-        // An amount buy spends exactly the amount at the real fill price.
-        if (hasAmount && input.side === "buy") quantityE6 = quantityE6ForBudget(input.amountCents!, price, fee);
+        else {
+          // ADR-189: exactly the plan the preview showed; the rest of a capped order is not executed.
+          if (hasAmount) requestedE6 = demoPlan(input.ticker, input.side, null, input.amountCents!).quantityE6;
+          if (input.side === "sell" && requestedE6 > free && requestedE6 <= free * 1.001) requestedE6 = free;
+          if (input.side === "sell" && requestedE6 > free) throw new GameError("insufficient_position");
+          plan = demoPlan(input.ticker, input.side, requestedE6, null);
+          quantityE6 = plan.quantityE6;
+          price = plan.avgPriceE4;
+        }
         if (quantityE6 <= 0 || valueCents(quantityE6, price) < MIN_ORDER_CENTS) throw new GameError("order_too_small");
         if (input.side === "buy" && valueCents(quantityE6, price) + fee > pl.cashCents)
           throw new GameError("insufficient_funds");
@@ -2248,9 +2348,43 @@ export const demoEngine: GameEngine = {
           xpAwarded: fill.xp,
           level: level(),
           xpTotal: pl.xpTotal,
+          requestedQuantityE6: requestedE6,
+          unfilledQuantityE6: requestedE6 - quantityE6,
+          limitedBy: null,
+          impactBps: plan?.impactBps ?? 0,
         };
       }),
     ),
+
+  quoteOrder: (input) =>
+    delay(() => {
+      if (!meta(input.ticker)) throw new GameError("unknown_security");
+      const plan = demoPlan(input.ticker, input.side, input.quantityE6 ?? null, input.amountCents ?? null);
+      const fee = plan.quantityE6 > 0 ? trading.orderFeeCents : 0;
+      let tax = 0;
+      const position = input.side === "sell" ? portfolioNow().positions.find((x) => x.ticker === input.ticker) : null;
+      if (position && plan.quantityE6 > 0) {
+        const gain = plan.grossCents - fee - valueCents(plan.quantityE6, position.avgPriceE4);
+        const pot = p().lossPotCents ?? 0;
+        if (gain > 0) tax = Math.round((Math.max(0, gain - pot) * trading.capitalGainsTaxBps) / 10_000);
+      }
+      return {
+        touchE4: input.side === "buy" ? quote(input.ticker).ask : quote(input.ticker).bid,
+        requestedQuantityE6: plan.quantityE6,
+        fillQuantityE6: plan.quantityE6,
+        unfilledQuantityE6: 0,
+        avgPriceE4: plan.avgPriceE4,
+        lastPriceE4: plan.lastPriceE4,
+        grossCents: plan.grossCents,
+        feeCents: fee,
+        taxCents: tax,
+        netCents:
+          plan.quantityE6 === 0 ? 0 : input.side === "buy" ? plan.grossCents + fee : plan.grossCents - fee - tax,
+        slippageBps: plan.slippageBps,
+        impactBps: plan.impactBps,
+        limitedBy: null,
+      };
+    }),
 
   cancelOrder: (requestId, orderId) =>
     delay(() =>

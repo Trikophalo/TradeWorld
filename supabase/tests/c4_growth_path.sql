@@ -1,5 +1,5 @@
 -- =============================================================================
--- c4 · Wachstum & Ausbau as one path (ADR-188): a change of the legal form (upgrade_company, the IPO) keeps the bought
+-- c4 · Wachstum & Ausbau as one path (ADR-191): a change of the legal form (upgrade_company, the IPO) keeps the bought
 --      expansion places and level, the next cost follows the level, the stored places always match the rule, and
 --      company_growth_path returns stage, level and step as one path.
 -- =============================================================================

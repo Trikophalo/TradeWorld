@@ -13,6 +13,8 @@ export const DISCLOSURE = {
   /** Key figures and order book arrive with limit orders. */
   stockStats: 2,
   stockOrderBook: 3,
+  /** Business figures of listed companies at the stock exchange (ADR-184): with the key figures. */
+  stockFigures: 2,
   portfolioHistory: 2,
   profileCareer: 2,
   /** Friends (ADR-084): after the tutorial, when the game has a first shape. */

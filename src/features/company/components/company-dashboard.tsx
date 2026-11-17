@@ -25,7 +25,7 @@ import { useCompanyHealth } from "../health";
 import { BoardView } from "../listed/board";
 import { useListedCompany } from "../listed/shared";
 import { companyTodos } from "../listed/view";
-import { companyHref, resolveCompanyTarget, type CompanyTab, type CompanyTarget } from "../tabs";
+import { companyHref, resolveCompanyTarget, sectionTarget, type CompanyTab, type CompanyTarget } from "../tabs";
 import { useCompanyAutopilot } from "./autopilot-card";
 import { BannerEditor } from "./banner-editor";
 import { useCompanyTodoItems } from "./todo-center";
@@ -147,8 +147,8 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
     setMiraOpen(true);
   };
   // Mira opens a place: her panel closes, the page goes there.
-  const onMira: MiraOpen = (to, id) => {
-    const target = resolveCompanyTarget(to, id);
+  const onMira: MiraOpen = (section) => {
+    const target = sectionTarget(section);
     if (target.target !== "mira") setMiraOpen(false);
     go(target);
   };
@@ -271,6 +271,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         <MiraChat
           applications={company.pendingApplications}
           health={miraHealth}
+          company={company}
           onOpen={onMira}
           className="h-[min(68dvh,640px)]"
         />

@@ -1,5 +1,6 @@
 "use client";
 
+import { awarenessView } from "@/features/company/awareness/awareness-view";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { useServerClock } from "@/features/game/server-clock";
@@ -42,7 +43,9 @@ export function CompanyStatusBar({ company }: { company: MyCompany }) {
   const t = useTranslations("hq.status");
   const late = hourlyCloseOverdue(company, useServerClock());
   const status = companyStatus(company, late);
-  const awareness = company.awarenessBps / 100;
+  // ADR-188: the same value and cap as Controlling (awarenessView)
+  const aw = awarenessView(company);
+  const ta = useTranslations("awareness");
   const quality = company.qualityBps / 100;
   const reputation = company.reputation;
   const strengths = company.strengths;
@@ -50,8 +53,8 @@ export function CompanyStatusBar({ company }: { company: MyCompany }) {
     {
       key: "awareness",
       label: t("awareness"),
-      value: `${awareness.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`,
-      tone: awareness >= 30 ? "gain" : awareness >= 10 ? "info" : "warn",
+      value: ta("valueOfCap", { value: aw.pct, cap: aw.capPct }),
+      tone: aw.ofCap >= 0.5 ? "gain" : aw.ofCap >= 0.2 ? "info" : "warn",
       info: t("awarenessInfo"),
     },
     {

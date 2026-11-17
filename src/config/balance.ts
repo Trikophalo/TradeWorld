@@ -143,6 +143,8 @@ export interface TradingConfig {
   readonly minPriceE4: number;
   /** Circuit breaker for the non-event part of a tick return. */
   readonly maxTickReturnBps: number;
+  /** ADR-189: the order sheet warns and shows the exact amount when an order moves the price at least this much. */
+  readonly highImpactWarnBps: number;
   /**
    * Players move prices (owner decision, ADR-056). Player orders are measured in euros, not
    * against the company size, so a few players already move a stock and many players decide it.
@@ -933,6 +935,27 @@ export interface BalanceConfig {
     readonly busyTasks: number;
     readonly urgentMinutes: number;
     readonly historyTurns: number;
+    /** Mira's advice from the company facts (ADR-185). */
+    readonly advice: {
+      /** Advice briefings Mira posts on her own at once (urgent ones always). */
+      readonly briefings: number;
+      /** Suggestions in "Was soll ich tun?". */
+      readonly nextSteps: number;
+      /** Advice below this estimated gain per hour is not worth a briefing (cents). */
+      readonly minImpactCents: number;
+      /** AI workers count as idle below this utilisation (bps). */
+      readonly aiIdleBelowBps: number;
+      /** Free capacity worth a campaign or contract work: share of the capacity (bps). */
+      readonly freeCapacityBps: number;
+      /** Reputation below this is worth a warning (0..100). */
+      readonly reputationLow: number;
+      /** A driver that takes at least this many points from the reputation target is named. */
+      readonly reputationDriverPoints: number;
+      /** Cash that lasts fewer hours than this at the current loss is an alarm. */
+      readonly runwayHours: number;
+      /** A strengths reward this many points away counts as "almost there". */
+      readonly strengthsNearPoints: number;
+    };
   };
   /** Company health (ADR-162): eight factors of a player company, each 0..100 against what profit needs. */
   readonly companyHealth: {
@@ -970,8 +993,11 @@ export interface BalanceConfig {
       readonly marginFull: number;
       /** Hours of running costs in cash that count as 100. */
       readonly cashHoursFull: number;
-      /** ADR-180: awareness that counts as 100 (before: 1.0, so 5 % awareness showed as 5 of 100). */
-      readonly awarenessFull: number;
+      /**
+       * ADR-188: the awareness score is awareness / cap × 100 and follows it this fast, up and down (the other scores
+       * use gainPerHour / decayPerHour).
+       */
+      readonly awarenessFollowPerHour: number;
       /** Bonus on the hour's revenue from an overall score (floor of the mean): the highest tier reached counts. */
       readonly rewards: readonly { readonly at: number; readonly bps: number }[];
     };
@@ -1514,17 +1540,39 @@ export interface StartupsConfig {
     readonly maxAnnualCents: number;
     readonly paretoAlpha: number;
   };
+  /**
+   * Awareness (ADR-188): one value per company, 0..1, moved every closed hour and by single events. Every change is
+   * booked by source into company_awareness_log, so the page can say what moved it.
+   */
   readonly awareness: {
     readonly initial: number;
+    /** Floor: nobody forgets the company completely; decay pulls toward it. */
     readonly min: number;
-    /** Word of mouth: + growth × a × (1 − a) × (0.5 + quality) per quarter. */
-    readonly growthPerQuarter: number;
-    readonly decayPerQuarter: number;
-    /** Marketing: + maxGain × budget / (budget + halfSaturation), halfSaturation = share × quarterly potential. */
-    readonly marketingMaxGain: number;
+    /**
+     * Highest awareness = tier base + perStage × stage + perExpansionLevel × level, at most max. A garage starts at
+     * 60 %; skills (stages) and expansion raise it. Shown to the player.
+     */
+    readonly cap: {
+      readonly byTier: Readonly<Record<"garage" | "small_business" | "gmbh" | "ag", number>>;
+      readonly perStage: number;
+      readonly perExpansionLevel: number;
+      readonly max: number;
+    };
+    /**
+     * Marketing: closes rate × (cap − awareness) per hour, rate = maxRatePerHour × q / (q + half), q = the hour's
+     * marketing × quarterHours, half = max(minHalfSaturationCents, share × quarterly potential).
+     */
+    readonly marketingMaxRatePerHour: number;
     readonly marketingHalfSaturationShare: number;
     readonly marketingMinHalfSaturationCents: number;
-    /** ADR-180: awareness a solved company task adds at once (share, 0.002 = 0,2 Punkte); AI and autopilot less. */
+    /**
+     * Word of mouth per hour: rate × a × (1 − a / cap) × (0.5 + quality) × price strategy × served share × (0.5 +
+     * reputation / 100).
+     */
+    readonly wordOfMouthPerHour: number;
+    /** Forgetting per hour: rate × (awareness − min). */
+    readonly decayPerHour: number;
+    /** Awareness a solved company task adds at once (share, 0.005 = 0,5 Punkte); AI and autopilot less. */
     readonly taskGain: number;
     readonly taskAiShareBps: number;
   };
@@ -1567,7 +1615,10 @@ export interface StartupsConfig {
    */
   readonly products: Readonly<Record<SectorId, readonly ProductConfig[]>>;
   readonly stages: {
-    /** Highest awareness per reached stage (index = stage 0..4). */
+    /**
+     * Display only (ADR-188): the awareness cap of a garage without expansion per stage 0..4. The rule is
+     * awareness.cap (awarenessCap in src/lib/sim/awareness.ts); the length still names the number of stages.
+     */
     readonly awarenessCaps: readonly number[];
     readonly qualityBonusPerStage: number;
     /** Specialists make the whole team more effective: capacity × (1 + bonus × stage). */
@@ -1768,7 +1819,8 @@ export const BALANCE = {
   trading: {
     limitOrders: false,
     orderFeeCents: 100,
-    maxOrderQuantity: 100_000,
+    // ADR-189: no order-size limit; only a technical bound (supply, cash and holdings limit real orders)
+    maxOrderQuantity: 1_000_000_000,
     quantityScale: 1_000_000,
     minOrderValueCents: 100,
     capitalGainsTaxBps: 2500,
@@ -1807,6 +1859,8 @@ export const BALANCE = {
     minPriceE4: 1,
     // Wide enough for a strong player order to show at once (ADR-120).
     maxTickReturnBps: 1000,
+    // ADR-189: from a 5 % price move the order sheet warns before confirming
+    highImpactWarnBps: 500,
     playerImpact: {
       // Active players move prices strongly (ADR-120): 10.000 € net buying moves a penny stock by 10 %,
       // a mid cap by 2 %, a blue chip by 0.5 %.
@@ -2608,13 +2662,19 @@ export const BALANCE = {
     potential: { minAnnualCents: 100_000, maxAnnualCents: 200_000_000_000, paretoAlpha: 0.57 },
     awareness: {
       initial: 0.03,
-      min: 0.01,
-      growthPerQuarter: 0.2,
-      decayPerQuarter: 0.12,
-      marketingMaxGain: 0.24,
+      min: 0.02,
+      cap: {
+        byTier: { garage: 0.6, small_business: 0.7, gmbh: 0.8, ag: 0.9 },
+        perStage: 0.05,
+        perExpansionLevel: 0.03,
+        max: 1,
+      },
+      marketingMaxRatePerHour: 0.06,
       marketingHalfSaturationShare: 0.01,
       marketingMinHalfSaturationCents: 50_000,
-      taskGain: 0.002,
+      wordOfMouthPerHour: 0.008,
+      decayPerHour: 0.004,
+      taskGain: 0.005,
       taskAiShareBps: 5_000,
     },
     quality: { base: 0.25, halfSaturationScore: 20, adjustPerQuarter: 0.35 },
@@ -2634,7 +2694,7 @@ export const BALANCE = {
     estimate: { initialSpread: 2.3, decayPerQuarter: 0.85 },
     insolvency: { graceQuarters: 4, loanWithholdingBps: 5_000, foundingLockoutDays: 3 },
     products: PRODUCTS,
-    stages: { awarenessCaps: [0.5, 0.7, 0.85, 0.95, 1], qualityBonusPerStage: 0.05, capacityBonusPerStage: 0.25 },
+    stages: { awarenessCaps: [0.6, 0.65, 0.7, 0.75, 0.8], qualityBonusPerStage: 0.05, capacityBonusPerStage: 0.25 },
     training: {
       costCentsByTier: [200_000, 500_000, 1_200_000, 2_500_000, 5_000_000],
       wageRaiseBpsByTier: [300, 500, 800, 1_200, 2_000],
@@ -2642,9 +2702,9 @@ export const BALANCE = {
     },
     campaigns: {
       kinds: {
-        flyer: { hours: 24, costHours: 2, demandBps: 2_500, awareness: 0.02 },
-        online: { hours: 48, costHours: 6, demandBps: 4_000, awareness: 0.04 },
-        tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.08 },
+        flyer: { hours: 24, costHours: 2, demandBps: 2_500, awareness: 0.03 },
+        online: { hours: 48, costHours: 6, demandBps: 4_000, awareness: 0.06 },
+        tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.12 },
       },
       minCostCents: 20_000,
       luckMin: 0.4,
@@ -2738,6 +2798,17 @@ export const BALANCE = {
     urgentMinutes: 10,
     /** Chat turns Claude gets as memory. */
     historyTurns: 8,
+    advice: {
+      briefings: 2,
+      nextSteps: 3,
+      minImpactCents: 500,
+      aiIdleBelowBps: 5_000,
+      freeCapacityBps: 2_000,
+      reputationLow: 45,
+      reputationDriverPoints: 2,
+      runwayHours: 6,
+      strengthsNearPoints: 5,
+    },
   },
   /** Company health (ADR-162). */
   companyHealth: {
@@ -2756,7 +2827,7 @@ export const BALANCE = {
       decayPerHour: 0.05,
       marginFull: 0.25,
       cashHoursFull: 24,
-      awarenessFull: 0.5,
+      awarenessFollowPerHour: 0.25,
       rewards: [
         { at: 50, bps: 200 },
         { at: 75, bps: 500 },

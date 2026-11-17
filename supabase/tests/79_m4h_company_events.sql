@@ -593,6 +593,10 @@ select tests.assert(
 -- =============================================================================
 -- H. Hourly close: no event, demand and costs (regulation), capacity (strike), running steps; record hour
 -- =============================================================================
+-- ADR-188: the awareness stands still in this section (exact demand numbers); before, the 50 % stage cap held it
+select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
+select tests.set_cfg('startups', '{awareness,wordOfMouthPerHour}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,decayPerHour}', '0') is null as ok \gset
 select tests.m4h_found(:h, 'Taktgeber Strom', 'energy') as hco \gset
 update public.player_companies set potential_annual_cents = round(1200000 / :mf_garage), awareness = 0.5, quality = 1,
        contract_work = false where company_id = :'hco';
@@ -718,3 +722,4 @@ select tests.assert(
   'run_due_jobs() runs company_events_run_due(); internal functions and AI storage are not for players; ledger audit clean');
 
 select tests.set_cfg('startups', '{demandNoise}', :'noise0'::jsonb);
+select tests.set_cfg('startups', '{awareness}', :'aw_cfg0'::jsonb) is null as ok \gset

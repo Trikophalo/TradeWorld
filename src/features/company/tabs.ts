@@ -68,7 +68,7 @@ const TAB_ALIASES: Record<string, CompanyTarget> = {
  * Sections by name: the old overview sections, Mira's sections, the ids before ADR-187 and the new ones. `section` is
  * the pane or card that holds the place (a merged card opens on that pane), `target` the element to scroll to.
  */
-const SECTIONS: Record<string, CompanyTarget> = {
+const SECTIONS = {
   // Dashboard: numbers and charts only (ADR-187)
   numbers: { tab: "dashboard", section: "numbers" },
   timers: { tab: "dashboard", section: "numbers" },
@@ -132,7 +132,7 @@ const SECTIONS: Record<string, CompanyTarget> = {
   growth: { tab: "controlling", section: "growth" },
   // Marke & Firma
   "group-brand": { tab: "controlling", section: "group-brand" },
-  brand: { tab: "controlling", section: "group-brand", target: "section-brand" },
+  brand: { tab: "controlling", section: "group-brand", target: "brand" },
   close: { tab: "controlling", section: "group-brand", target: "section-company" },
   company: { tab: "controlling", section: "group-brand", target: "section-company" },
   // Buchhaltung
@@ -145,10 +145,47 @@ const SECTIONS: Record<string, CompanyTarget> = {
   advisor: { tab: "books", target: "advisor" },
   // Geschäftsrat
   board: { tab: "board" },
-};
+  // ADR-185: more of Mira's places
+  interview: { tab: "staff", section: "situation", target: "interview" },
+} as const satisfies Record<string, CompanyTarget>;
+
+export type CompanySection = keyof typeof SECTIONS;
+export const COMPANY_SECTIONS = Object.keys(SECTIONS) as CompanySection[];
 
 /** Every section name a link may carry (for tests). */
-export const KNOWN_SECTIONS: readonly string[] = Object.keys(SECTIONS);
+export const KNOWN_SECTIONS: readonly string[] = COMPANY_SECTIONS;
+
+export function isCompanySection(value: string | null | undefined): value is CompanySection {
+  return typeof value === "string" && Object.hasOwn(SECTIONS, value);
+}
+
+/** The place a section name leads to. */
+export function sectionTarget(section: CompanySection): CompanyTarget {
+  return SECTIONS[section];
+}
+
+/** Sections that render only for a listed company. */
+const LISTED_SECTIONS = new Set<CompanySection>([
+  "research",
+  "growth",
+  "dividends",
+  "mood",
+  "staff",
+  "satisfaction",
+  "benefits",
+  "staff-mood",
+]);
+
+/**
+ * Whether a section is on the page right now (ADR-185): the listed parts only while the company is listed, the
+ * trainings once the team is big enough. Mira links only to places that are there.
+ */
+export function sectionAvailable(section: CompanySection, page: { listed: boolean; trainingOpen: boolean }): boolean {
+  const target: CompanyTarget = SECTIONS[section];
+  if (LISTED_TABS.includes(target.tab) || LISTED_SECTIONS.has(section)) return page.listed;
+  if (section === "training") return page.trainingOpen;
+  return true;
+}
 
 export function isCompanyTab(value: string | null | undefined): value is CompanyTab {
   return COMPANY_TABS.includes(value as CompanyTab);
@@ -159,7 +196,7 @@ export function isCompanyTab(value: string | null | undefined): value is Company
  * Mira still says `overview` + `books`, and that is the Buchhaltung tab now.
  */
 export function resolveCompanyTarget(tab?: string | null, section?: string | null): CompanyTarget {
-  const bySection = section ? SECTIONS[section] : undefined;
+  const bySection: CompanyTarget | undefined = isCompanySection(section) ? SECTIONS[section] : undefined;
   if (bySection) return bySection;
   if (isCompanyTab(tab)) return section ? { tab, target: section } : { tab };
   const alias = tab ? TAB_ALIASES[tab] : undefined;
@@ -185,7 +222,7 @@ function linkName(target: CompanyTarget): string | undefined {
   if (!target.target && !target.section) return undefined;
   const same = (v: CompanyTarget) => v.tab === target.tab && v.section === target.section && v.target === target.target;
   for (const name of [target.target, target.section]) {
-    if (name && SECTIONS[name] && same(SECTIONS[name])) return name;
+    if (isCompanySection(name) && same(SECTIONS[name])) return name;
   }
   // A known place under another name (e.g. `section-brand` is reached by `brand`).
   const named = Object.entries(SECTIONS).find(([, v]) => same(v))?.[0];

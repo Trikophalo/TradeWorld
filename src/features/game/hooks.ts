@@ -49,6 +49,30 @@ export function useSecurityDetails(ticker: string) {
   });
 }
 
+const FIGURES_STALE_MS = 2 * 60_000;
+
+/** Business figures of one listed stock (ADR-184), from one request for the whole market list. */
+export function useStockFigures(ticker: string, enabled = true) {
+  return useQuery({
+    queryKey: ["stockFigures"],
+    queryFn: () => engine.stockFigures(),
+    select: (rows) => rows.find((f) => f.ticker === ticker) ?? null,
+    enabled,
+    staleTime: FIGURES_STALE_MS,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+/** Business figures of one stock with its history for the sparkline (stock detail page). */
+export function useStockFigureDetail(ticker: string, enabled = true) {
+  return useQuery({
+    queryKey: ["stockFigures", ticker],
+    queryFn: async () => (await engine.stockFigures(ticker))[0] ?? null,
+    enabled,
+    staleTime: FIGURES_STALE_MS,
+  });
+}
+
 /** Securities of one kind in snapshot order. */
 export function useSecurities(kind: "stock" | "bond") {
   const snapshot = useGame((state) => state.snapshot);

@@ -4171,6 +4171,287 @@ Funktionskarte: `docs/FIRMA_ANALYSE.md`.
 `select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
 aus Spec 6.6) bleibt unbenutzt.
 
+## ADR-184: Aktuelle Umsätze an der Börse — `Annahme`
+
+**Kontext.** Der Besitzer wünscht: „Auch an der Börse sollen bei den Unternehmen die aktuellen Umsätze stehen.“
+
+**Entscheidung.** Neue Lese-RPC `get_stock_revenue(p_ticker)` (Migration 7400, nur neue Funktionen, für angemeldete
+Spieler). Spielerfirmen: aus `player_company_hours` Umsatz der letzten abgeschlossenen Stunde, Umsatz und Gewinn der
+letzten 24 h, die 24 h davor je Stunde auf gleich viele Stunden umgerechnet (Trendpfeil), Ruf und Bekanntheit.
+KI-Firmen: letzter veröffentlichter Quartalsbericht (mit Spieljahr und Quartal), das Quartal davor für den Trend.
+Nur diese Summen verlassen den Server; Bekanntheit und Qualität zeigt die Firmenseite (ADR-051) schon heute allen.
+Marktliste: eine Zeile „Umsatz 24 h … €“ bzw. „Umsatz Quartal … €“ mit Pfeil; Detailseite: Karte „Geschäftszahlen“
+mit kleinem Balkenverlauf (24 Stunden bzw. 8 Quartale). Sichtbar ab Level 2 (`stockFigures`), wie die Kennzahlen.
+
+**Folgen.** Eine Anfrage für die ganze Liste (2 min frisch). Im Demo-Modus sind die KI-Quartale aus der Größe abgeleitet.
+
+## ADR-185: Mira liest Fakten statt Vermutungen – Prüfung aller Regeln, Knöpfe nur, wenn sie gehen, mehr Fragen — `Annahme`
+
+**Kontext.** Der Owner: „Mira sagt manchmal Sachen, die nicht stimmen, sie schickt dich manchmal wohin, wo es nichts
+zu tun gibt. Mira liegt oft sehr falsch. Sie muss viel mehr Kapazität haben.“ Seit ADR-138 sind die Firma
+(ADR-176 Stärken, ADR-180 Wirtschaft und Autopilot, ADR-183 Ruf und flacher Aufbau) und die Tabs (`tabs.ts`) stark
+umgebaut worden; Miras Regeln (`assistant/brain.ts`) lasen aber nur Aufgaben, Züge, die acht Faktoren und die
+Börsendaten, und ihre Links zeigten noch auf die alten Bereiche.
+
+**Prüfung (jede Regel gegen das heutige Spiel).** Geprüft wurden Bedingung (Einheiten bps/Prozent/Anteil, Cent/Euro,
+von ADR-176/180/183 ersetzte Felder, privat/börsennotiert, Demo/Live), Text und Ziel (gibt es die Stelle, ist die
+Aktion dort jetzt möglich).
+
+|   # | Regel                                          | Urteil                       | Befund und Änderung                                                                                                                                                                                                    |
+| --: | ---------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   1 | Aufgabe melden und beraten (`adviseTask`)      | falscher Text                | „voller Wert“ ohne den Stärken-Lohnfaktor (ADR-180, 0,9× bis 1,5×); KI-Chance ohne den Bonus einer passend geschulten KI-Kraft. Jetzt beides wie auf dem Server.                                                       |
+|   2 | Warnung bei überlasteter Person (`warningFor`) | ok                           | –                                                                                                                                                                                                                      |
+|   3 | Krise/Chance melden                            | ok                           | Link „Lage“ bleibt.                                                                                                                                                                                                    |
+|   4 | Geschäftszüge vorschlagen                      | falsche Bedingung            | „Freier Auftrag“ stand auch während der Stunde Pause da und scheiterte. Jetzt nur, wenn einer starten kann.                                                                                                            |
+|   5 | Freier Auftrag (`orderTurn`)                   | ok                           | –                                                                                                                                                                                                                      |
+|   6 | Bewerbungen                                    | veraltet                     | Link auf den ganzen Mitarbeiter-Tab; jetzt direkt „Bewerbungen“.                                                                                                                                                       |
+|   7 | Ruhe und Beispiele                             | ok                           | Um „Was soll ich tun?“, „Lagebericht“, „Warum Verlust?“/„Mehr Umsatz?“ erweitert.                                                                                                                                      |
+|   8 | Plan für alle Aufgaben                         | ok                           | –                                                                                                                                                                                                                      |
+|   9 | Analyse                                        | ok                           | Jetzt mit Lagebericht in Zahlen; Knöpfe geprüft.                                                                                                                                                                       |
+|  10 | Dringende Aufgaben                             | ok                           | –                                                                                                                                                                                                                      |
+|  11 | Ergebnisse                                     | ok                           | –                                                                                                                                                                                                                      |
+|  12 | Schwächster Faktor (Briefing)                  | ok                           | Knöpfe, die schon ein Rat zeigt, fallen weg.                                                                                                                                                                           |
+|  13 | Hebel Marketing                                | falscher Text                | „über das ganze Quartal“ – seit ADR-180 wirkt Marketing jede Stunde. Jetzt mit „+Y Punkte je Stunde“.                                                                                                                  |
+|  14 | Hebel Kampagne                                 | falscher Text                | Erfolgsmeldung verwies auf die „Übersicht“ (gibt es nicht mehr); jetzt Controlling › Marketing.                                                                                                                        |
+|  15 | Hebel Preis                                    | falsche Bedingung            | Preisbindung des Geschäftsrats (börsennotiert) ignoriert; der Knopf scheiterte.                                                                                                                                        |
+|  16 | Hebel Auftragsarbeit                           | ok                           | –                                                                                                                                                                                                                      |
+|  17 | Hebel KI-Kräfte einstellen                     | falsche Bedingung            | Freie Plätze nicht geprüft (`employee_limit`).                                                                                                                                                                         |
+|  18 | Hebel KI-Kräfte entlassen                      | ok                           | –                                                                                                                                                                                                                      |
+|  19 | Hebel Fähigkeit (KI-Kraft mit Fähigkeit)       | falsche Bedingung            | Schon abgedeckte Fähigkeit nicht geprüft (`skill_already_covered`).                                                                                                                                                    |
+|  20 | Hebel Schulung                                 | toter Link                   | Schulungen gibt es erst ab Teamgröße und nur mit Spielern im Team (in der Demo nie); jetzt nur dann.                                                                                                                   |
+|  21 | Hebel Ausbau                                   | toter Link                   | Ziel „business“ (Betrieb), der Ausbau liegt unter „Ausbau“; jetzt dort und, wenn die Kasse reicht, direkt als Knopf.                                                                                                   |
+|  22 | Hebel Rechtsform                               | toter Link                   | Ziel „boss“ = Marketing-Regler; jetzt „Ausbau“ und nur, wenn die nächste Rechtsform möglich ist.                                                                                                                       |
+|  23 | Hebel Aufgaben (Plan, selbst, KI automatisch)  | ok                           | Autopilot (ADR-180) als eigener Knopf ergänzt.                                                                                                                                                                         |
+|  24 | Hebel Krise                                    | falscher Text                | „Krise in der Übersicht ansehen“; jetzt „Lage im Dashboard“.                                                                                                                                                           |
+|  25 | Hebel Einzahlen                                | ok                           | –                                                                                                                                                                                                                      |
+|  26 | Hebel Geschäftszug                             | ok                           | –                                                                                                                                                                                                                      |
+|  27 | Bücher (börsennotiert)                         | ok                           | –                                                                                                                                                                                                                      |
+|  28 | Steuer                                         | ok                           | –                                                                                                                                                                                                                      |
+|  29 | Stimmung                                       | ok                           | –                                                                                                                                                                                                                      |
+|  30 | Geschäftsrat                                   | ok                           | –                                                                                                                                                                                                                      |
+|  31 | Forschung                                      | ok                           | –                                                                                                                                                                                                                      |
+|  32 | Gier (Auszahlungen)                            | falscher Text, falscher Link | „kostet schon −4 % Nachfrage“ (Vorzeichen) und „kostet“, obwohl der Ruf über 50 noch hebt; Link auf die Dividende statt auf die CEO-Auszahlung. Jetzt eigener Text über 50, Betrag ohne Vorzeichen, zuerst Auszahlung. |
+|  33 | „Kein Knopf“-Antwort                           | veraltet                     | „Schau in der Übersicht“; jetzt Dashboard › „Wo es fehlt“.                                                                                                                                                             |
+|  34 | Beschriftung von Links (`describeAction`)      | falscher Text                | Jeder Link außer dem Team hieß „Fertige Wege ansehen“; jetzt je Ziel („Zu Ausbau und Rechtsform“ …).                                                                                                                   |
+|  35 | Vorschläge von Claude (`validActions`)         | falsche Bedingung            | Nur die Rolle geprüft; jetzt dieselbe Prüfung wie jeder Knopf.                                                                                                                                                         |
+
+**Ergebnis:** 16 von 35 Regeln waren falsch: 3 tote Links (Schulung, Ausbau, Rechtsform), 5 falsche Bedingungen
+(Auftrag in der Pause, Preisbindung, freie Plätze, abgedeckte Fähigkeit, Claude-Vorschläge), 6 falsche Texte
+(Aufgabenwert und KI-Chance, Marketing je Quartal, Kampagne, Krise, Gier samt Link, Linkbeschriftung) und 2 veraltete
+Ziele (Bewerbungen, „Übersicht“). Gemeinsame Ursache: Mira kannte Geld, Stunde,
+Bekanntheit, Ruf, Stärken und Autopilot nicht und prüfte nie, ob ein Knopf gerade geht.
+
+**Entscheidung.**
+
+- **Fakten** (`assistant/facts.ts`, `companyFacts`): ein typisierter Schnappschuss aus denselben Abfragen wie die
+  Seite: Kasse und freie Kasse, offene Rechnungen, Reichweite der Kasse, letzte Stunde (Umsatz, Kosten nach Posten,
+  Gewinn, Lohnfaktor), 24 Stunden, Nachfrage gegen Kapazität, KI-Auslastung und Kräfte ohne Arbeit samt Ersparnis
+  (`aiWageDueCents`), Bekanntheit mit Deckel und Hebeln der letzten Stunde, Marketing-Vorschlag und was er je Stunde
+  bringt (Formel aus `awarenessHour`/`marketingGain`, an der echten Marketing-Wirkung der letzten Stunde geeicht),
+  Qualität, Preis und Preisbindung, Ruf mit Treibern und Nachfragewirkung, Stärken mit nächster Bonusstufe, Diagnose,
+  Team und freie Plätze, Ausbau/Rechtsform/Börsengang, Kampagne, Aufgaben und Schwung, Autopilot, Züge, freier
+  Auftrag, Krise, Interview, Börsendaten (Stimmung, Steuer, Bücher, Rat). Einheiten: Cent, bps, Punkte 0–100.
+- **Regeln** (`assistant/advisor.ts`): 19 Regeln über die Fakten (Rechnungen offen, Kasse reicht nur Stunden,
+  Verlust, KI-Kräfte im Leerlauf, Marketing zu niedrig, Marketing am Deckel, Auftragsarbeit, besserer Preis, Premium
+  ohne Qualität, ausverkauft, Kampagne, Ausbau, Rechtsform, Autopilot, Ruf, Stärken-Bonus, fehlende Fähigkeit,
+  Interview, Börsengang). Jede rechnet mit den Formeln des Spiels aus, was sie je Stunde bringt (z. B. Auftragsarbeit
+  = freie Kapazität × 25 % × 30 % Marge; Kampagne = Mehrnachfrage bis zur freien Kapazität × Rohertrag, nur wenn das
+  mehr ist als die Kosten) und nennt die Zahl. Alarme zuerst, sonst nach Euro je Stunde; von selbst meldet Mira
+  alle Alarme und die zwei besten Ratschläge (`companyAssistant.advice`).
+- **Nur Knöpfe, die gehen** (`actionEnabled`): jede Aktion wird gegen die Fakten geprüft wie der Server (Kasse,
+  Plätze, Pause, Preisbindung, laufende Kampagne, unveränderte Werte). Ein Rat ohne gültigen Knopf wird nicht
+  gezeigt; Briefings, Antworten und Claude-Vorschläge laufen durch dieselbe Prüfung.
+- **Links:** `open` trägt nur noch eine Abschnitts-ID aus `tabs.ts` (`CompanySection`); `sectionAvailable` blendet
+  Börsen-Abschnitte und Schulungen aus, wenn es sie nicht gibt. Neue IDs `applications`, `interview`.
+- **Fragen:** „Warum mache ich Verlust?“, „Wie mache ich mehr Umsatz?“ (Engpass Nachfrage oder Kapazität), „Was soll
+  ich als Nächstes tun?“, „Lagebericht“, „Was bringt der Ruf?“, „Was bringen die Stärken?“, „Lohnen sich meine
+  KI-Kräfte?“, „Autopilot an/aus“ und Fragen dazu, „Erklär mir …“ zu jedem Faktor (Bekanntheit mit Hebeln der
+  Stunde). „Wie läuft die Firma?“ beginnt mit dem Lagebericht.
+- **Claude** (`company-assistant`): bekommt die Fakten als `<fakten>` (Euro und Punkte, höchstens 120 Werte) und die
+  Regel, keine Zahl zu erfinden und „Das weiß ich nicht“ zu sagen, was dort fehlt. Ohne Schlüssel antwortet die
+  deterministische Mira auf alle Fragen oben selbst.
+
+**Tests.** `advisor.test.ts`: jede Regel mit Fakten, die sie wahr und falsch machen, und ihren Zahlen; jeder
+angebotene Knopf ist für seine Fakten möglich; jeder Abschnitt aus `tabs.ts` ist ein Element der Seite; jeder Link
+Miras hat eine Beschriftung und ist sichtbar; Fragen und Antworten; alle Textschlüssel existieren. E2E
+`mira-advice.spec.ts` (Demo): Lagebericht, „Was soll ich tun?“, der erste Vorschlag läuft ohne Fehler.
+
+**Folgen.** Die Ratschläge sind Schätzungen „ca. je Stunde“ auf der letzten Stunde; die Marktgröße ist verborgen
+(Mitte der Spanne, geeicht mit der letzten Stunde). `game_config` hat neue Werte unter `companyAssistant.advice`
+(Seeds neu erzeugt, keine Migration).
+
+## ADR-189: Die Vorschau ist die Ausführung, große Orders zu fairem Preis ohne Größengrenze — `Annahme`
+
+Vorgabe des Besitzers: „Wenn man Aktien verkauft, bekommt man manchmal nur die Hälfte. Ich habe gerade für über 100k
+verkauft und nur 50k bekommen. Beim Kaufen ist der Fehler auch ab einer bestimmten Zahl.“ Umsatzzeile:
+„58.877,583251 × 0,8489 € · Gebühr 1,00 € · G/V −46.202,24 €“; die Order-Maske zeigte vorher über 100.000 €.
+
+**Ursache (nachgestellt auf der lokalen Datenbank, `supabase/tests/c7_order_fill.sql`, Abschnitt B):**
+
+- Die Order-Maske rechnete **Stückzahl × Geld-/Briefkurs** (58.877,58 × 1,63 € ≈ 96.000 €) und kannte die
+  Kursauswirkung nicht.
+- Der Server füllt seit ADR-126 entlang der Spieler-Tiefe: Für Pennystocks (alle Spieleraktien) bewegen 1.000 € den
+  Kurs um 1 % (`playerImpact.depthCentsPer100Bps.penny`). Eine Order zahlt im Schnitt die halbe eigene Bewegung.
+  96.000 € bewegen den Kurs um 96 %, der Durchschnitt liegt also 48 % unter dem Geldkurs: 1,63 € → 0,848 €,
+  Erlös 49.916 € (Live: 0,8489 €, 49.981 €). Es gab **keine Grenze**: `maxImpactBpsPerOrder` stand in der
+  Konfiguration, galt aber nur in der alten TS-Schätzung, nicht in `place_order`. Ab rund 200.000 € wäre der Kurs bis
+  auf den Mindestpreis gefallen.
+- Der Kauf hat dasselbe Problem nach oben (100.000 € in eine Spieleraktie: Ø +50 %). Der Kurs vor dem Verkauf war also
+  nicht schon gefallen; **die Order selbst** hat ihn von 1,63 € auf 0,85 € im Schnitt gedrückt.
+- Nicht die Ursache: Steuer (25 % nur auf Gewinne, Gründeraktien werden nicht anders besteuert; beim Verkauf mit
+  Verlust 0 €), das Tagesband aus ADR-170 (begrenzt den Takt-Kurs, nicht die Ausführung) und die Buchung (der Verkäufer
+  bekommt genau Brutto − Gebühr − Steuer auf `player_cash`, die Gebühr geht an den Staat).
+
+**Entscheidung** (mit dem Wunsch des Besitzers: „Man soll generell von Aktien so viele auf einmal kaufen wie man will
+… keine Sperre bei 100k. So viel kaufen und verkaufen, wie man mag.“):
+
+- **Ein Plan für Vorschau und Ausführung:** `market_order_plan()` (SQL) = `planMarketOrder()`
+  (`src/lib/sim/order-fill.ts`). `quote_order(ticker, side, menge | betrag)` liefert ihn samt Gebühr und Steuer
+  (FIFO-Lose, Verlusttopf wie `execute_fill`) für die Maske; `place_order` führt bei Sofort-Orders genau diesen Plan
+  aus. Beträge werden entlang des Preispfads gelöst (Bisektion), ein Kauf gibt nie mehr als den Betrag aus.
+- **Fairer Preispfad statt Grenze:** Die n-te Aktie bewegt den Kurs um `min(a × n, maxTickReturnBps)`. Kleine Orders
+  zahlen wie bisher die halbe eigene Bewegung (ADR-126). Mehr als ein Takt den Kurs bewegen kann (10 %,
+  `trading.maxTickReturnBps`), kann auch eine Order ihn nicht bewegen; darüber hinaus füllt jede weitere Aktie zum
+  gesättigten Preis. Eine Order zahlt so im Schnitt höchstens knapp 10 %, egal wie groß. Ein Hin und Her lohnt sich
+  weiter nicht: der Takt hebt den Kurs höchstens um dieselben 10 %, die der Käufer schon im Schnitt fast bezahlt hat
+  (Test „a round trip never earns the own move“).
+- **Keine Größengrenze:** Jede Menge wird ganz ausgeführt; `trading.maxOrderQuantity` ist nur noch eine technische
+  Schranke (1 Mrd. Stück). Grenzen sind allein Guthaben, Depotbestand und der freie Bestand der Aktie (ADR-153,
+  `limited_by = 'supply'` mit `unfilled_quantity_e6`, in Vorschau und Ergebnis).
+- **Tagesband (ADR-170):** Keine Aktie einer Spielerfirma wird jenseits des Bands ausgeführt; die Order wird trotzdem
+  ganz ausgeführt, Aktien jenseits des Bands zum Bandpreis (nie über dem Geld- bzw. unter dem Briefkurs). Bei
+  ±100 %/−50 % und höchstens 10 % Bewegung je Order greift das nur, wenn der Kurs schon am Band steht.
+- **Die Maske zeigt den Plan:** Ø Ausführungskurs, Kursauswirkung (±%), „Du erhältst ca. X €“ / „Du zahlst ca. X €“.
+  Ab 5 % Kursauswirkung (`trading.highImpactWarnBps`) ein Warnhinweis mit dem genauen Betrag; bestätigt wird mit dem
+  Halteknopf erst, wenn der Plan da ist. Limit-Orders bleiben unverändert (im Spiel ausgeblendet, ADR-117).
+- Verworfen: eine Grenze je Order mit Teilausführung (erster Entwurf; der Besitzer will beliebig große Orders), die
+  Spieler-Tiefe allgemein erhöhen (Pumpen würde wieder billig), nur warnen ohne fairen Preis.
+
+**Zahlen vorher/nachher** (Geldkurs 1,63 €, `c7_order_fill.sql`):
+
+| Order                                   | vorher                               | nachher                                                  |
+| --------------------------------------- | ------------------------------------ | -------------------------------------------------------- |
+| Verkauf 58.877,58 Stück Spieleraktie    | Ø 0,848 €, 49.916 €; Maske: 96.000 € | ganz, Ø 1,4755 € (−9,5 %), ca. 86.870 €, Maske = Buchung |
+| Kauf 100.000 € Pennystock               | Ø +50 %                              | ganz, Ø knapp +9,5 %                                     |
+| Kauf 100.000 € Blue Chip                | Ø +2,4 %                             | unverändert, Kursauswirkung +4,9 % angezeigt             |
+| Kauf 1.000.000 € Spieleraktie/Blue Chip | Ø weit über +100 % bzw. +25 %        | ganz, Ø knapp +10 % bzw. +9 %                            |
+
+Folgen: Große Positionen lassen sich in einem Zug handeln und kosten höchstens rund 10 % Kursauswirkung. Mit 4 Spielern
+zählt der ausstehende Spielerfluss des Takts für alle zusammen. Tests: `src/lib/sim/order-fill.test.ts`,
+`supabase/tests/c7_order_fill.sql`, `e2e/order-fill.spec.ts`.
+
+**Entschädigung:** Die Verkäufe mit großer Kursauswirkung findet auf Live (nur lesend):
+
+```sql
+select t.executed_at, p.nickname, s.ticker, t.quantity_e6 / 1e6 as stueck, t.price_e4 / 1e4 as kurs,
+       q.prev_close_e4 / 1e4 as vortag, t.gross_cents / 100.0 as brutto, t.fee_cents / 100.0 as gebuehr,
+       t.tax_cents / 100.0 as steuer, t.realized_pnl_cents / 100.0 as gv,
+       (select e.amount_cents / 100.0 from public.ledger_entries e
+          join public.ledger_accounts a on a.id = e.account_id
+         where e.transaction_id = t.ledger_transaction_id and a.owner_player_id = o.player_id
+           and a.kind = 'player_cash') as gutschrift
+  from public.trades t
+  join public.orders o on o.id = t.order_id
+  join public.profiles p on p.id = o.player_id
+  join public.securities s on s.id = o.security_id
+  left join public.security_quotes q on q.security_id = s.id
+ where o.side = 'sell' and t.gross_cents >= 1000000
+ order by t.executed_at desc
+ limit 50;
+```
+
+## ADR-188: Bekanntheit neu – ein Wert, eine Regel, sichtbare Obergrenze, jede Änderung gebucht — `Annahme`
+
+**Kontext.** Der Besitzer: „Die Bekanntheit ist immer noch verbuggt … Mach die Bekanntheit nochmal neu.“ Screenshot:
+„Stärke Bekanntheit“ 4/100 nach drei Stunden, die Diagnose zeigt gleichzeitig „Bekanntheit 49 %, nötig wären 77 %“,
+und nichts, was man tut, scheint sie zu bewegen.
+
+**Ursachen (im Code und auf einer lokalen Datenbank nachgestellt).**
+
+1. _Versteckte Obergrenze:_ `stages.awarenessCaps` deckelte eine Garage ohne Fachwissen bei 50 %, ohne dass es irgendwo
+   stand. Bei 49 % brachte Marketing nichts mehr; die Diagnose verlangte trotzdem 77 % (sie rechnete den Bedarf gegen
+   die Kapazität, nicht gegen die Grenze), also eine Forderung, die niemand erfüllen konnte.
+2. _Starker Verfall gegen festes Marketing:_ ADR-180 nahm jede Stunde 2 % des Werts weg und gab Marketing als festen
+   Betrag. Eine Firma mit wenig Budget pendelte sich irgendwo ein, ohne Werbung verlor sie rund 40 % am Tag; mehr
+   Budget half nur bis zur versteckten Grenze.
+3. _Stärke lief der Bekanntheit hinterher:_ Die Stärke „Bekanntheit“ startete bei 0 und rückte 2 % der Lücke je Stunde
+   vor (Ziel 100 × a / 50 %). Drei Stunden nach dem Start standen 4/100 neben 49 % Bekanntheit.
+4. _Viele Schreiber, keine Spur:_ Kampagnen (mit dem Stufendeckel), gelöste Ereignisse, Interviews, Geschäftszüge,
+   eigene Züge, Proteste und die Nachrichtensendung schrieben `player_companies.awareness` jeder auf eigene Art, ohne
+   oder mit anderem Deckel und ohne Protokoll. Nur Aufgaben erschienen als „extra“ in der Stunde.
+
+**Entscheidung: ein Modell (`src/lib/sim/awareness.ts`, gleich in SQL).**
+
+- _Ein Wert_ je Firma (`player_companies.awareness`, 0 … 1). Nachfrage, Börsenwert, Stärken, Diagnose, Mira und
+  Nachrichten lesen dasselbe Feld.
+- _Obergrenze_ `awarenessCap(tier, stage, expansion)` = Rechtsform (Garage 60 %, Kleinunternehmen 70 %, GmbH 80 %,
+  AG 90 %) + 5 Punkte je Fachwissen-Stufe + 3 Punkte je Ausbaustufe, höchstens 100 %. Sie steht auf der Seite mit
+  ihrer Herleitung („60 % als Garage, +5 für Stufe 1, +0 für Ausbaustufe 0“).
+- _Jede Stunde_ (`awarenessHour`, SQL `company_awareness_step`):
+  Marketing `rate × (Grenze − a)` mit `rate = 6 % × q / (q + H)` (q = Stundenbudget × 6, H = max(500 €, Markt/4 ×
+  1 %)): das vorgeschlagene Budget schließt 3 % der Lücke je Stunde, doppeltes Budget weniger als doppelt so viel.
+  Mundpropaganda `0,8 % × a × (1 − a/Grenze) × (0,5 + Qualität) × Preisstrategie × bedienter Anteil × (0,5 +
+Ruf/100)`. Vergessen `0,4 % × (a − 2 %)` je Stunde, Untergrenze 2 %. Über der Grenze (z. B. ein Fachmann ging) nur
+  Vergessen, kein harter Sprung.
+- _Einzelne Ereignisse_ gehen alle durch `company_awareness_add(firma, quelle, delta)`: Zuwachs bis zur Grenze, Verlust
+  bis zur Untergrenze. Aufgaben +0,5 Punkte (KI und Autopilot die Hälfte), Kampagnen +3/+6/+12 (Flyer/Online/TV),
+  Geschäftszüge, Interviews, Nachrichten, eigene Züge, Proteste und Ereignisse mit ihren bisherigen Werten.
+- _Ein Protokoll:_ `company_awareness_log` (Firma, Stunde, Quelle, Summe) nimmt jede Änderung auf, auch die drei Teile
+  der Stunde (Vergessen nimmt eine Rundung an den Grenzen mit, damit die Summe stimmt). `get_company_awareness()`
+  liefert Wert, Grenze und Herleitung, Stärke, die letzte Stunde nach Quellen, „seitdem“ und 24 Stunden Verlauf; die
+  Stunde selbst speichert ihre Quellen in `awareness_parts.sources`. Baustein `AwarenessBreakdown`
+  (`src/features/company/awareness/`) zum Einhängen auf der Firmenseite.
+- _Stärke und Diagnose:_ Die Stärke „Bekanntheit“ ist `100 × a / Grenze` und folgt mit 25 % der Lücke je Stunde (in
+  beide Richtungen, `awarenessFollowPerHour`); die übrigen fünf Stärken bleiben langsam. Die Diagnose misst gegen
+  `min(Bedarf, Grenze)` und nennt die Grenze („erreichbar wären 60 % (Obergrenze 60 %)“), an der Grenze heißt es
+  „Mehr geht jetzt nicht … steigt mit Stufe, Ausbau und Rechtsform“.
+- _Umstellung (Migration 7730, einmal):_ Jede aktive Firma behält ihren Stand relativ zur Grenze: `a / alte
+Stufengrenze × neue Grenze` (eine Garage bei 49 % von 50 % steht danach bei 59 % von 60 %), gebucht als „rescale“;
+  die Stärke wird auf `100 × a / Grenze` gesetzt. `public.data_migrations` verhindert eine Wiederholung.
+
+**Messung (Garage, Median-Markt 33.700 €/Jahr, Qualität 50 %, vorgeschlagenes Marketing 500 €/Quartal, Bekanntheit in
+%, `src/lib/sim/awareness.test.ts` „harness“).**
+
+| Stunde | ohne Marketing | vorgeschlagenes Marketing | Marketing + 1 Aufgabe/h + Flyer täglich |
+| -----: | -------------: | ------------------------: | --------------------------------------: |
+|      0 |            3,0 |                       3,0 |                                     3,0 |
+|      1 |            3,0 |                       4,7 |                                     8,1 |
+|      3 |            3,1 |                       8,0 |                                    12,2 |
+|      6 |            3,1 |                      12,7 |                                    17,9 |
+|     12 |            3,2 |                      20,8 |                                    27,8 |
+|     24 |            3,5 |                      33,0 |                                    42,4 |
+|     48 |            4,0 |                      46,1 |                                    58,5 |
+|     72 |            4,5 |                      51,2 |                                    59,8 |
+|     96 |            5,1 |                      53,2 |                                    59,8 |
+|    168 |            7,1 |                      54,3 |                                    59,8 |
+
+Doppeltes Budget: 38,7 % nach 24 h, 55,1 % nach 96 h. Die Stärke „Bekanntheit“ bei 49 % von 60 %: 47/100 nach drei
+Stunden, 82/100 nach einem Tag (vorher, mit 49 % von 50 %: 6/100 und 37/100). Auf einer lokalen Datenbank (`c6_awareness.sql`): sechs
+abgeschlossene Stunden mit vorgeschlagenem Marketing heben eine neue Garage von 3 % auf rund 12,7 %, ohne Marketing
+bleibt sie bei gut 3 %.
+
+**Folgen.** `stages.awarenessCaps` ist nur noch Anzeige (Garage je Stufe), `companyHealth.strengths.awarenessFull`
+entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awareness_boost` ist ein Aufruf von
+`company_awareness_add(…, 'tasks', …)`. Die Quartalsabrechnung bewegt die Bekanntheit nicht (wie seit ADR-180).
+
+**Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
+Anzeige-Grenzen der Garage.
+
+## ADR-190: Große Nexamon-Züge sind Nachrichten für alle — `Annahme`
+
+**Kontext.** Der Owner: „Wenn einer eine Karte über 100k wert zieht, bekommen alle die Benachrichtigung.“
+
+**Entscheidung.** Ein Trigger nach dem Einfügen in `nexamon_copies` (statt die lange `nexamon_open_pack()` per
+Textersatz zu flicken) erkennt jeden Zug eines Spielers aus einem Pack (gekauft, mehrere, versiegelt, Pack Battle):
+Wert zum Zugzeitpunkt (Kopie inkl. Zustand) über `nexamon.bigPullNotifyCents` (100.000 €) → Benachrichtigung
+`nexamon_big_pull` an alle anderen aktiven Spieler, Feed-Eintrag für die Freunde. One of Ones melden sich schon selbst
+(keine Doppelung), die KI nie. Höchstens eine Rundmeldung je Zieher in `bigPullNotifySeconds` (60 s); mehrere große
+Züge derselben Transaktion (eine Öffnung, ein Mehrfachkauf) werden zu einer Nachricht („… hat 2 Karten über
+100.000 € gezogen, darunter …“) zusammengefasst.
+
+**Folgen.** Neue Tabelle `nexamon_big_pull_broadcasts`, neuer Benachrichtigungstyp (abschaltbar), Feed-Art
+`nexamon_big_pull`. Test `supabase/tests/c8_big_pull.sql`.
+
 ## ADR-187: Firma übersichtlicher – Dashboard nur Zahlen, eine Liste „Zu erledigen“, zusammengeführte Karten — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: Die Aufgaben im Unternehmen seien verstreut, man scrolle ewig, vor allem im
@@ -4204,7 +4485,7 @@ Netzdiagrammen und wirkten widersprüchlich.
 **Folgen.** Inhalte einer Karte, die nicht gewählt ist, sind nicht im DOM; E2E-Tests wählen die Ansicht vorher
 (`showPane` in `e2e/company-helpers.ts`). Die Beschreibungen und „i“-Erklärungen aus ADR-183 bleiben.
 
-## ADR-188: Wachstum & Ausbau als ein Weg, aufklappbare Listen — `Annahme`
+## ADR-191: Wachstum & Ausbau als ein Weg, aufklappbare Listen — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: „Wachstum“ (die vier Stufen des Produkts, ADR-062/071) und der endlose „Ausbau“
 (ADR-083) standen als zwei Karten untereinander, beide mit „Stufe“; Spieler meldeten Kollisionen beim

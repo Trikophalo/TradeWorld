@@ -86,3 +86,43 @@ test("the bulk mode of the collection sums value, fee and payout", async ({ page
   await page.getByTestId("bulk-sell-game").click();
   await expect(page.getByTestId("bulk-list")).toHaveCount(0);
 });
+
+for (const width of [390, 1440]) {
+  test(`the bulk panel stays inside the viewport and auto-selects below a value at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await preparePlayer(page);
+    await page.goto("/nexamon?tab=shop");
+    for (let i = 0; i < 3; i++) {
+      await page.getByTestId("buy-mystic_energy").click();
+      await page.getByTestId("confirm-buy").click();
+      await page.keyboard.press("Escape");
+    }
+    const overlay = page.getByTestId("pack-overlay");
+    if (await overlay.isVisible()) await page.getByTestId("pack-close").click();
+    await expect(overlay).toHaveCount(0);
+    await expect(async () => {
+      await page.getByRole("radio", { name: "Sammlung" }).click();
+      await expect(page.getByTestId("nexamon-hub")).toHaveAttribute("data-tab", "collection", { timeout: 2_000 });
+    }).toPass();
+    await page.getByText("Bulk verkaufen", { exact: true }).click();
+    await expect(page.getByTestId("bulk-sell")).toBeVisible();
+    await page.getByTestId("bulk-keepOne").getByRole("switch").click();
+    await page.getByTestId("bulk-below").fill("1000");
+    await page.getByTestId("bulk-below-select").click();
+    await expect(page.getByTestId("bulk-below-result")).toContainText("ausgewählt");
+    await expect(page.getByTestId("bulk-payout")).not.toHaveText("0,00 €");
+    const panel = (await page.getByTestId("bulk-total").boundingBox())!;
+    for (const id of ["bulk-sell-game", "bulk-share", "bulk-list-market", "bulk-below-select", "bulk-below"]) {
+      const box = await page.getByTestId(id).boundingBox();
+      expect(box, id).not.toBeNull();
+      expect(box!.x, id).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width, id).toBeLessThanOrEqual(width);
+    }
+    for (const id of ["bulk-sell-game", "bulk-list-market"]) {
+      const box = (await page.getByTestId(id).boundingBox())!;
+      expect(box.x + box.width, id).toBeLessThanOrEqual(panel.x + panel.width);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await shot(page, "bulk-sell", page.getByTestId("bulk-sell"));
+  });
+}

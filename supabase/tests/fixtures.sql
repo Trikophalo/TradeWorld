@@ -23,6 +23,8 @@ select public.get_my_missions() is not null as ok \gset
 select public.complete_tutorial(gen_random_uuid());
 \o :fixture_dir/claim_vault.json
 select public.claim_vault(gen_random_uuid());
+\o :fixture_dir/quote_order.json
+select public.quote_order('VLT', 'buy', null, 100000);
 \o :fixture_dir/place_order_market.json
 select public.place_order(gen_random_uuid(), 'VLT', 'buy', 'market', 5000000);
 \o :fixture_dir/place_order_limit.json
@@ -366,6 +368,11 @@ select public.get_company_board(null);
 select public.board_vote(gen_random_uuid(), :fx_motion, false);
 \o :fixture_dir/board_propose.json
 select public.board_propose(gen_random_uuid(), :'fco', 'earmark', '{"purpose": "research", "amount_cents": 50000}');
+-- business figures at the stock exchange (ADR-184): the list and the listed player company's detail
+\o :fixture_dir/get_stock_revenue.json
+select public.get_stock_revenue();
+\o :fixture_dir/get_stock_revenue_detail.json
+select public.get_stock_revenue((select c.ticker from public.companies c where c.id = :'fco'));
 \o
 reset role;
 update public.securities set status = 'delisted', delisted_at = now()
@@ -1138,6 +1145,8 @@ select tests.login_as('authenticated', :fx_ta) is null as ok \gset
 select public.set_company_autopilot(gen_random_uuid(), true);
 \o :fixture_dir/get_company_autopilot.json
 select public.get_company_autopilot();
+\o :fixture_dir/get_company_awareness.json
+select public.get_company_awareness();
 \o
 select public.set_company_autopilot(gen_random_uuid(), false) is not null as ok \gset
 reset role;

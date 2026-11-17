@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ListedCompany } from "@/features/game/listed-types";
 import { engine } from "@/features/game/store";
 import type { MyCompany } from "@/features/game/types";
+import { AwarenessBreakdown } from "../../awareness/awareness-breakdown";
 import { ItemList, ResearchTree } from "../../listed/catalogue";
 import { DividendCard, RestrictionNotes, UpkeepSummary } from "../../listed/controlling-panels";
 import { money } from "../../listed/shared";
@@ -153,7 +154,11 @@ export function ControllingTab({
       badge: <Chip>{t("sections.marketingSummary", { amount: money(company.marketingCentsPerQuarter) })}</Chip>,
       content: (
         <Cols>
-          <MarketingBudgetCard company={company} />
+          <Col>
+            <MarketingBudgetCard company={company} />
+            {/* Where the awareness stands and where it came from (ADR-188), next to its levers. */}
+            <AwarenessBreakdown />
+          </Col>
           <CampaignCard company={company} />
         </Cols>
       ),
@@ -229,7 +234,7 @@ export function ControllingTab({
       description: t("sub.expansion"),
       content: (
         <div className="space-y-4">
-          {/* Growth stages and endless expansion as one path (ADR-188); the legal form next to it. */}
+          {/* Growth stages and endless expansion as one path (ADR-191); the legal form next to it. */}
           <GrowthAndExpansion
             company={company}
             onFill={(skills) => onHire({ skills })}
@@ -309,7 +314,12 @@ export function ControllingTab({
           columns={2}
         >
           <SubSection id="brand" title={t("sections.brand")} description={t("sections.brandSummary")}>
-            <Card padding="md" className="flex flex-wrap items-center gap-3" data-testid="brand">
+            <Card
+              padding="md"
+              id="brand"
+              className="flex scroll-mt-32 flex-wrap items-center gap-3"
+              data-testid="brand"
+            >
               <p className="min-w-0 flex-1 text-sm text-pretty text-fg-2">{t("brandText")}</p>
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="secondary" onClick={onEditBanner} data-testid="brand-banner">

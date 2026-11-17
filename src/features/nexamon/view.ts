@@ -496,6 +496,8 @@ export const revealKey = (copy: Pick<NexamonCopy, "id" | "gradedAt">): string =>
 export function nexamonNotificationLink(typeKey: string, link: string | null): string | null {
   if (typeKey === "nexamon_graded") return "/nexamon?tab=grading";
   if (typeKey === "nexamon_sale") return "/nexamon?tab=market&view=mine";
+  // A big pull of another player (ADR-190) links to the card page; without one, the collectibles.
+  if (typeKey === "nexamon_big_pull") return link ?? "/nexamon";
   return link;
 }
 
@@ -599,6 +601,19 @@ export function bulkGroups(
 /** The copies a selection (card key -> how many) sells: the cheapest first of every card. */
 export function bulkPick(groups: readonly BulkGroup[], selection: Readonly<Record<string, number>>): NexamonCopy[] {
   return groups.flatMap((g) => g.copies.slice(0, Math.max(0, Math.min(g.copies.length, selection[g.card.key] ?? 0))));
+}
+
+/**
+ * Auto-select of the bulk mode: every offered copy worth less than `belowCents`. The groups already honour the
+ * filters and "keep one per card", so the kept copy is never part of them; copies are cheapest first.
+ */
+export function bulkSelectBelow(groups: readonly BulkGroup[], belowCents: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const g of groups) {
+    const n = g.copies.filter((c) => c.valueCents < belowCents).length;
+    if (n > 0) out[g.card.key] = n;
+  }
+  return out;
 }
 
 /** The sets by pack price, cheapest first (shop, market set picker; new sets fall into place by their price). */

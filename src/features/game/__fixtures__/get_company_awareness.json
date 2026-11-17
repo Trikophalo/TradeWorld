@@ -1,0 +1,15 @@
+{
+  "cap": 0.6,
+  "tier": "garage",
+  "floor": 0.02,
+  "since": { "tasks": 0.005 },
+  "stage": 0,
+  "history": [],
+  "strength": 0,
+  "tier_cap": 0.6,
+  "awareness": 0.034999999999999996,
+  "last_hour": null,
+  "per_stage": 0.05,
+  "expansion_level": 0,
+  "per_expansion_level": 0.03
+}

@@ -8,17 +8,23 @@ import { BALANCE } from "@/config/balance";
 import { miniJudge, pitchChanceBps } from "@/features/game/demo/pitches";
 import type {
   CampaignKind,
+  CompanyAutopilot,
+  CompanyInterview,
   CompanyMoveOption,
   CompanyMoves,
   CompanyPitch,
   CompanyTask,
   CompanyTasks,
+  MyCompany,
   PitchMoveKind,
   PriceLevel,
 } from "@/features/game/types";
 import type { ListedCompany } from "@/features/game/listed-types";
 import type { CompanyHealth, HealthFactor, HealthFactorKey, HealthLever } from "@/lib/sim/company-health";
 import { itemByKey } from "@/lib/sim/listed";
+import type { CompanySection } from "../tabs";
+import { actionEnabled, adviceTurns, enabledOptions, reportLines } from "./advisor";
+import { companyFacts } from "./facts";
 
 const cfg = BALANCE.companyAssistant;
 const taskCfg = BALANCE.companyTasks;
@@ -33,7 +39,12 @@ export type MiraAction =
   | { type: "autoAi"; on: boolean }
   /** Several hand-overs at once: Mira's plan for all open tasks. */
   | { type: "plan"; actions: { taskId: number; to: string }[] }
-  | { type: "open"; tab: "overview" | "tasks" | "team"; section?: string }
+  /** A place on the company page (ADR-185: a section id of tabs.ts, checked to exist and to be shown). */
+  | { type: "open"; section: CompanySection }
+  /** The autopilot of the company tasks (ADR-180). */
+  | { type: "autopilot"; on: boolean }
+  /** The next expansion level, paid from the company's cash (ADR-083). */
+  | { type: "expand" }
   /** Fills the input with an example. */
   | { type: "suggest"; text: string }
   /** Company levers (ADR-162), each one existing RPC: marketing budget per quarter, price and contract work. */
@@ -105,6 +116,12 @@ export interface MiraState {
   health?: MiraHealth | null;
   /** The listed company (ADR-167); null or missing while the company is private, for employees or while loading. */
   listed?: ListedCompany | null;
+  /** The company as the page shows it (ADR-185): money, hours, awareness, reputation, strengths. Founder only. */
+  company?: MyCompany | null;
+  /** Autopilot and the last hour's economy (ADR-180). */
+  autopilot?: CompanyAutopilot | null;
+  /** The latest CEO interview (ADR-173). */
+  interview?: CompanyInterview | null;
   now: number;
 }
 
@@ -116,7 +133,11 @@ const minutesLeft = (task: CompanyTask, now: number) =>
 /** Who could do the task, best first, each with Mira's reason. */
 export function adviseTask(task: CompanyTask, state: MiraState, names: MiraNames): MiraOption[] {
   const { tasks, now } = state;
-  const value = names.money(task.valueCents);
+  // ADR-185: a solved task pays its value times the strengths' pay factor (ADR-180), not the bare value.
+  const value = names.money(Math.round((task.valueCents * (state.autopilot?.payFactorBps ?? 10_000)) / 10_000));
+  // The AI helper is surer with an AI worker trained for the task's branch (same rule as the server).
+  const trained = (state.company?.aiWorkerSkills ?? []).some((k) => k.startsWith(`${task.branch}_`));
+  const aiChance = Math.min(9_500, taskCfg.ai.chanceBps + (trained ? taskCfg.ai.skillBonusBps : 0));
   const scored: { option: MiraOption; score: number }[] = [];
   const targets = tasks.people.filter((p) => !p.isMe && (tasks.role === "founder" || p.reportsToMe));
 
@@ -160,7 +181,7 @@ export function adviseTask(task: CompanyTask, state: MiraState, names: MiraNames
                 key: "why.ai",
                 values: {
                   minutes: tasks.aiMinutes,
-                  chance: Math.round(taskCfg.ai.chanceBps / 100),
+                  chance: Math.round(aiChance / 100),
                   share: Math.round(taskCfg.ai.valueBps / 100),
                 },
               },
@@ -252,7 +273,7 @@ export function briefings(state: MiraState, names: MiraNames): MiraTurn[] {
       ],
       options: [
         { action: { type: "compose", kind: "event" }, label: { key: "options.writeStrategy" }, tone: "best" },
-        { action: { type: "open", tab: "overview", section: "situation" }, label: { key: "options.showEvent" } },
+        { action: { type: "open", section: "situation" }, label: { key: "options.showEvent" } },
       ],
     });
   }
@@ -279,14 +300,25 @@ export function briefings(state: MiraState, names: MiraNames): MiraTurn[] {
             },
             tone: i === 0 ? "best" : "neutral",
           })),
-          orderOption(state),
+          // ADR-185: the free order only while one can start (before, it showed during the cooldown and failed).
+          ...(orderBlock(state) === null ? [orderOption(state)] : []),
         ],
       });
     }
   }
 
+  // ADR-185: advice from the company facts, ranked by what it brings; alarms first.
+  const facts = companyFacts(state);
+  const advice = adviceTurns(state, names, facts);
+  turns.push(...advice);
+
+  // The weakest factor, without the buttons the advice already offers.
   const health = healthBriefing(state, names);
-  if (health) turns.push(health);
+  const offered = new Set(advice.flatMap((t) => t.options.map((o) => JSON.stringify(o.action))));
+  if (health) {
+    const options = health.options.filter((o) => !offered.has(JSON.stringify(o.action)));
+    if (options.length > 0) turns.push({ ...health, options });
+  }
 
   turns.push(...listedBriefings(state, names));
 
@@ -294,18 +326,26 @@ export function briefings(state: MiraState, names: MiraNames): MiraTurn[] {
     turns.push({
       id: `apps:${state.applications}`,
       lines: [{ key: "brief.applications", values: { count: state.applications } }],
-      options: [{ action: { type: "open", tab: "team" }, label: { key: "options.openTeam" }, tone: "best" }],
+      options: [
+        { action: { type: "open", section: "applications" }, label: { key: "options.openTeam" }, tone: "best" },
+      ],
     });
   }
 
-  if (turns.length === 0) {
-    turns.push({
+  // ADR-185: no button that would fail; a briefing whose every button fails is not posted.
+  const checked = turns.flatMap((t) => {
+    const options = t.options.filter((o) => actionEnabled(o.action, state, facts));
+    return t.options.length > 0 && options.length === 0 ? [] : [{ ...t, options }];
+  });
+
+  if (checked.length === 0) {
+    checked.push({
       id: `calm:${tasks.tasks.length}`,
       lines: [{ key: "brief.calm" }, { key: "brief.examples" }],
       options: examples(state, names),
     });
   }
-  return turns;
+  return checked;
 }
 
 /** Example commands that fit the company right now. */
@@ -321,6 +361,15 @@ export function examples(state: MiraState, names: MiraNames): MiraOption[] {
     out.push({ action: { type: "suggest", text }, label: { key: "examples.free", values: { text } } });
   }
   if (state.tasks.role === "founder") {
+    // ADR-185: the questions Mira answers from the company facts
+    out.push(
+      { action: { type: "suggest", text: "Was soll ich als Nächstes tun?" }, label: { key: "examples.next" } },
+      { action: { type: "suggest", text: "Lagebericht" }, label: { key: "examples.report" } },
+    );
+    if (state.company?.live && state.company.live.profitPerHourCents < 0)
+      out.push({ action: { type: "suggest", text: "Warum mache ich Verlust?" }, label: { key: "examples.profit" } });
+    else
+      out.push({ action: { type: "suggest", text: "Wie mache ich mehr Umsatz?" }, label: { key: "examples.revenue" } });
     out.push({
       action: { type: "suggest", text: state.tasks.autoAi ? "KI automatisch aus" : "KI automatisch an" },
       label: { key: state.tasks.autoAi ? "examples.autoOff" : "examples.autoOn" },
@@ -338,6 +387,15 @@ export type MiraIntent =
   | { kind: "analysis" }
   /** A question about one of the eight factors (ADR-162); null = where the company loses the most. */
   | { kind: "health"; factor: HealthFactorKey | null }
+  /** Questions answered from the company facts (ADR-185). */
+  | { kind: "profit" }
+  | { kind: "revenue" }
+  | { kind: "next" }
+  | { kind: "report" }
+  | { kind: "reputation" }
+  | { kind: "strengths" }
+  | { kind: "autopilot" }
+  | { kind: "ai" }
   | { kind: "unknown"; reason: "nothing" }
   /** A person or the AI was named, but not which task. */
   | { kind: "unknown"; reason: "noTask"; to: string }
@@ -393,6 +451,20 @@ const ME_WORDS = new Set(["ich", "selbst", "selber"]);
 const PLAN = /\b(plan|plane|verteil\w*|optimier\w*|kuemmer\w*|organisier\w*|teil\w* .*auf)\b/;
 const ANALYSIS = /\b(analyse|analysier\w*|bilanz|zahlen|bericht|auswertung|statistik|wie laeuft\w*|wie stehen wir)\b/;
 const STATUS = /\b(was|status|lage|hilfe|tipp|tipps|uebersicht|briefing|steht an|zu tun)\b/;
+// ADR-185: questions about the company (normalized text: umlauts spelled out)
+const PROFIT =
+  /\b(warum|wieso|weshalb|woher)\b.*\b(verlust\w*|minus|negativ\w*|gewinn\w*|verlier\w*|kosten|rote)\b|\b(gewinn|ergebnis)\w* (ist )?(so )?(negativ|im minus|schlecht)\b|\brote zahlen\b|\bverlust machen\b|\bmache? ich verlust\b/;
+const REVENUE =
+  /\b(mehr|steiger\w*|erhoeh\w*|hoeher\w*|wachs\w*)\b.*\b(umsatz\w*|einnahm\w*|verdien\w*|geld|gewinn\w*|nachfrage)\b|\bmehr verdienen\b|\b(umsatz|nachfrage)\w* (steigern|erhoehen)\b/;
+const NEXT =
+  /\b(was soll ich|was sollte ich|was jetzt|was als naechstes|naechste\w* schritt\w*|was tun|wie weiter|was empfiehlst|empfehlung\w*|womit anfangen|was ist am wichtigsten)\b/;
+const REPORT = /\b(lagebericht|lage bericht|lagebild|zusammenfassung|ueberblick|stand der dinge|wie steht es)\b/;
+const REPUTATION = /\b(ruf|rufs|reputation|ansehen)\b/;
+const STRENGTHS = /\b(staerke\w*|staerken\w*|bonus)\b/;
+const AUTOPILOT = /\bautopilot\w*\b/;
+const AI_STAFF = /\b(ki kraft|ki kraefte|ki mitarbeiter\w*|ki arbeiter\w*|ki angestellt\w*|ki auslastung)\b/;
+const ON = /\b(an|ein|einschalt\w*|aktivier\w*|starte?)\b/;
+const OFF = /\b(aus|stopp|stop|abschalt\w*|ausschalt\w*|deaktivier\w*)\b/;
 
 function matchTask(text: string, candidates: CompanyTask[], names: MiraNames): CompanyTask | null {
   const said = new Set(
@@ -435,6 +507,22 @@ export function parseCommand(text: string, state: MiraState, names: MiraNames): 
     const off = /\b(aus|stopp|stop|nicht|kein|keine|deaktivier\w*|abschalt\w*)\b/.test(norm);
     return { kind: "actions", actions: [{ type: "autoAi", on: !off }] };
   }
+
+  // ADR-185: the autopilot by word, and questions about the company before any hand-over is read.
+  if (AUTOPILOT.test(norm)) {
+    if (!text.includes("?") && !/\b(was|wie|warum|wieso|lohnt|bringt)\b/.test(norm)) {
+      if (OFF.test(norm)) return { kind: "actions", actions: [{ type: "autopilot", on: false }] };
+      if (ON.test(norm)) return { kind: "actions", actions: [{ type: "autopilot", on: true }] };
+    }
+    return { kind: "autopilot" };
+  }
+  if (REPORT.test(norm)) return { kind: "report" };
+  if (PROFIT.test(norm)) return { kind: "profit" };
+  if (NEXT.test(norm)) return { kind: "next" };
+  if (REVENUE.test(norm)) return { kind: "revenue" };
+  if (AI_STAFF.test(norm) && !/\b(gib|geb\w*|uebergib|an die)\b/.test(norm)) return { kind: "ai" };
+  if (REPUTATION.test(norm)) return { kind: "reputation" };
+  if (STRENGTHS.test(norm)) return { kind: "strengths" };
 
   const open = state.tasks.tasks.filter((t) => t.status === "open" && t.canDelegate);
   const mine = state.tasks.tasks.filter((t) => t.mine && t.status === "assigned");
@@ -479,50 +567,18 @@ export function parseCommand(text: string, state: MiraState, names: MiraNames): 
   return { kind: "unknown", reason: "nothing" };
 }
 
-/** Checks actions Claude proposed against the current state: unknown tasks, people or moves are dropped. */
+/**
+ * Checks actions (typed or from Claude) against the current state: unknown tasks, people or moves, and anything the
+ * page would not allow right now (ADR-185: the same check as every button Mira shows), are dropped.
+ */
 export function validActions(actions: readonly MiraAction[], state: MiraState): MiraAction[] {
-  const people = new Set(state.tasks.people.filter((p) => !p.isMe).map((p) => p.nickname));
+  const facts = companyFacts(state);
   return actions.filter((a) => {
-    switch (a.type) {
-      case "delegate": {
-        const t = state.tasks.tasks.find((x) => x.id === a.taskId);
-        return !!t && t.canDelegate && t.status === "open" && (a.to === "ai" ? state.tasks.canUseAi : people.has(a.to));
-      }
-      case "play": {
-        const t = state.tasks.tasks.find((x) => x.id === a.taskId);
-        return !!t && (t.status === "open" || (t.mine && t.status === "assigned"));
-      }
-      case "move":
-        return state.moves?.moves.some((m) => m.key === a.key) ?? false;
-      case "pitch":
-        return (
-          a.text.trim().length >= BALANCE.pitches.minChars &&
-          a.text.trim().length <= BALANCE.pitches.maxChars &&
-          (a.kind === "move" ? orderBlock(state) === null : state.event !== null)
-        );
-      case "autoAi":
-        return state.tasks.role === "founder";
-      case "plan":
-        return a.actions.length > 0;
-      case "marketing":
-        return state.tasks.role === "founder" && Number.isInteger(a.cents) && a.cents >= 0;
-      case "strategy":
-      case "campaign":
-        return state.tasks.role === "founder";
-      case "hireAi":
-      case "dismissAi":
-        return state.tasks.role === "founder" && Number.isInteger(a.count) && a.count > 0;
-      case "invest": {
-        const item = state.listed?.items.find((i) => i.key === a.key);
-        return !!item && item.missing.length === 0 && item.readyAt === null && item.cooldownUntil === null;
-      }
-      case "payTax":
-        return (state.listed?.taxes.dueCents ?? 0) > 0;
-      case "advisor":
-        return !!state.listed && state.listed.taxes.advisor !== a.hire;
-      default:
-        return true;
+    if (a.type === "pitch") {
+      const n = a.text.trim().length;
+      if (n < BALANCE.pitches.minChars || n > BALANCE.pitches.maxChars) return false;
     }
+    return actionEnabled(a, state, facts);
   });
 }
 
@@ -552,7 +608,17 @@ export function describeAction(action: MiraAction, state: MiraState, names: Mira
     case "compose":
       return { action, label: { key: action.kind === "event" ? "options.writeStrategy" : "options.ownMove" } };
     case "open":
-      return { action, label: { key: action.tab === "team" ? "options.openTeam" : "options.showEvent" } };
+      return { action, label: { key: "open.label", values: { section: action.section } } };
+    case "autopilot":
+      return { action, label: { key: action.on ? "options.autopilotOn" : "options.autopilotOff" } };
+    case "expand":
+      return {
+        action,
+        label: {
+          key: "options.expand",
+          values: { cost: names.money(state.company?.expansionCostCents ?? 0) },
+        },
+      };
     case "suggest":
       return { action, label: { key: "examples.free", values: { text: action.text } } };
     case "marketing":
@@ -560,7 +626,7 @@ export function describeAction(action: MiraAction, state: MiraState, names: Mira
         ? { action, label: { key: "health.options.marketing", values: { amount: names.money(action.cents) } } }
         : { action, label: { key: "health.options.marketingStop" } };
     case "strategy":
-      return state.health && action.contractWork && !state.health.contractWork
+      return action.contractWork && (state.company?.contractWork ?? state.health?.contractWork) === false
         ? { action, label: { key: "health.options.contractOn" } }
         : { action, label: { key: "health.options.price", values: { level: action.priceLevel } } };
     case "campaign":
@@ -644,7 +710,7 @@ export function listedBriefings(state: MiraState, names: MiraNames): MiraTurn[] 
   const l = state.listed;
   if (!l || state.tasks.role !== "founder") return [];
   const turns: MiraTurn[] = [];
-  const open = (section: string): MiraAction => ({ type: "open", tab: "overview", section });
+  const open = (section: CompanySection): MiraAction => ({ type: "open", section });
 
   // books: once they can be closed; louder when the tax office is waiting
   if (l.books.canClose && !l.taxes.advisor) {
@@ -739,15 +805,19 @@ export function listedBriefings(state: MiraState, names: MiraNames): MiraTurn[] 
       id: `greed:${Math.floor(l.reputation.payoutRatioBps / 2_500)}`,
       lines: [
         {
-          key: "listed.brief.greed",
+          // ADR-185: above 50 the reputation still lifts the demand; only below it costs (was: "kostet -4 %")
+          key: l.reputation.demandFactor < 1 ? "listed.brief.greed" : "listed.brief.greedEarly",
           values: {
             ratio: Math.round(l.reputation.payoutRatioBps / 100),
             reputation: Math.round(l.reputation.value),
-            demand: Math.round((l.reputation.demandFactor - 1) * 100),
+            demand: Math.abs(Math.round((l.reputation.demandFactor - 1) * 100)),
           },
         },
       ],
-      options: [{ action: open("dividends"), label: { key: "listed.options.openDividends" }, tone: "best" }],
+      options: [
+        { action: open("money"), label: { key: "listed.options.openPayout" }, tone: "best" },
+        { action: open("dividends"), label: { key: "listed.options.openDividends" } },
+      ],
     });
   }
   return turns;
@@ -1015,7 +1085,7 @@ export function analysisTurn(state: MiraState, names: MiraNames): MiraTurn {
   if (staff.length === 0) {
     lines.push({ key: "analysis.noStaff" });
     if (state.tasks.role === "founder")
-      options.push({ action: { type: "open", tab: "team" }, label: { key: "options.hire" } });
+      options.push({ action: { type: "open", section: "team" }, label: { key: "options.hire" } });
   } else lines.push({ key: "analysis.team", values: { busy: busy.length, idle: idle.length, count: staff.length } });
   if (state.moves) {
     lines.push({
@@ -1038,7 +1108,9 @@ export function analysisTurn(state: MiraState, names: MiraNames): MiraTurn {
   }
   if (state.tasks.tasks.some((t) => t.status === "open" && t.canDelegate))
     options.push({ action: { type: "suggest", text: "Verteil alle Aufgaben" }, label: { key: "examples.plan" } });
-  return { id: `analysis:${state.now}`, lines, options };
+  // ADR-185: the Lagebericht in numbers first (founder with the company loaded); no button that would fail.
+  if (state.tasks.role === "founder" && state.company) lines.unshift(...reportLines(state, names));
+  return { id: `analysis:${state.now}`, lines, options: enabledOptions(options, state, companyFacts(state)) };
 }
 
 // ---- Results and alarms: Mira reports back --------------------------------------------------------------------------
@@ -1128,7 +1200,7 @@ const TOPICS: readonly [HealthFactorKey, RegExp][] = [
   ["momentum", /\b(schwung|momentum)\b/],
 ];
 const HEALTH_ASK =
-  /\b(wie|was|warum|wieso|steiger\w*|verbesser\w*|erhoeh\w*|mehr|fehl\w*|hilf\w*|angehen|besser|senk\w*|bring\w*|welche\w*)\b/;
+  /\b(wie|was|warum|wieso|steiger\w*|verbesser\w*|erhoeh\w*|mehr|fehl\w*|hilf\w*|angehen|besser|senk\w*|bring\w*|welche\w*|erklaer\w*|bedeut\w*|heisst)\b/;
 const HEALTH_ANY = /\b(verlust\w*|verlier\w*|schwachstelle\w*|schwaechste\w*|gesundheit|wo fehlt\w*|was fehlt)\b/;
 
 /** Which factor a question is about, "any" for "where do I lose money", null when it is about none. */
@@ -1189,7 +1261,15 @@ function leverOptions(lever: HealthLever, factor: HealthFactor, state: MiraState
         option(
           { type: "marketing", cents: lever.cents },
           lever.cents > 0
-            ? { key: "health.why.marketing", values: { now: names.money(h.marketingCentsPerQuarter) } }
+            ? state.company && lever.cents === companyFacts(state).awareness.suggestedMarketingCents
+              ? {
+                  key: "health.why.marketingGain",
+                  values: {
+                    now: names.money(h.marketingCentsPerQuarter),
+                    gain: companyFacts(state).awareness.marketingGainSuggested,
+                  },
+                }
+              : { key: "health.why.marketing", values: { now: names.money(h.marketingCentsPerQuarter) } }
             : { key: "health.why.marketingStop", values: { amount } },
         ),
       ];
@@ -1230,7 +1310,7 @@ function leverOptions(lever: HealthLever, factor: HealthFactor, state: MiraState
           { key: "health.why.skillAi", values: { wage: names.money(h.aiWageCentsPerHour) } },
         ),
         {
-          action: { type: "open", tab: "team" },
+          action: { type: "open", section: "team" },
           label: {
             key: "health.options.findPlayer",
             values: { skill: names.health?.skill(lever.skill) ?? lever.skill },
@@ -1241,23 +1321,27 @@ function leverOptions(lever: HealthLever, factor: HealthFactor, state: MiraState
     case "train":
       return [
         {
-          action: { type: "open", tab: "team", section: "training" },
+          action: { type: "open", section: "training" },
           label: { key: "health.options.train" },
           hint: { key: "health.why.train" },
         },
       ];
+    // ADR-185: the expansion runs from here when the cash allows; the button sits under "Ausbau" (was: "business").
     case "expand":
       return [
+        { ...describeAction({ type: "expand" }, state, names), hint: { key: "health.why.expand" } },
         {
-          action: { type: "open", tab: "overview", section: "business" },
+          action: { type: "open", section: "expansion" },
           label: { key: "health.options.expand" },
           hint: { key: "health.why.expand" },
         },
       ];
     case "upgrade":
+      // ADR-185: only while the next legal form is in reach (the card under "Ausbau" shows the button).
+      if (state.company && !state.company.canUpgrade) return [];
       return [
         {
-          action: { type: "open", tab: "overview", section: "boss" },
+          action: { type: "open", section: "expansion" },
           label: { key: "health.options.upgrade" },
           hint: { key: "health.why.upgrade" },
         },
@@ -1278,7 +1362,7 @@ function leverOptions(lever: HealthLever, factor: HealthFactor, state: MiraState
         out.push(option({ type: "autoAi", on: true }, { key: "health.why.autoAi" }));
       if (out.length === 0)
         out.push({
-          action: { type: "open", tab: "tasks" },
+          action: { type: "open", section: "tasks" },
           label: { key: "health.options.openTasks" },
           hint: { key: "health.why.tasks" },
         });
@@ -1289,7 +1373,7 @@ function leverOptions(lever: HealthLever, factor: HealthFactor, state: MiraState
       if (state.event && !state.eventPitched)
         out.push({ action: { type: "compose", kind: "event" }, label: { key: "options.writeStrategy" } });
       out.push({
-        action: { type: "open", tab: "overview", section: "situation" },
+        action: { type: "open", section: "situation" },
         label: { key: "health.options.event" },
         hint: { key: "health.why.event" },
       });
@@ -1298,7 +1382,7 @@ function leverOptions(lever: HealthLever, factor: HealthFactor, state: MiraState
     case "deposit":
       return [
         {
-          action: { type: "open", tab: "overview", section: "money" },
+          action: { type: "open", section: "money" },
           label: { key: "health.options.deposit" },
           hint: { key: "health.why.deposit", values: { amount: names.money(lever.cents) } },
         },
@@ -1314,10 +1398,12 @@ export function healthSteps(key: HealthFactorKey, state: MiraState, names: MiraN
   if (!factor || state.tasks.role !== "founder") return [];
   const seen = new Set<string>();
   const out: MiraOption[] = [];
+  const facts = companyFacts(state);
   for (const lever of factor.levers) {
     for (const option of leverOptions(lever, factor, state, names)) {
       const id = JSON.stringify(option.action);
-      if (seen.has(id)) continue;
+      // ADR-185: only buttons that work now
+      if (seen.has(id) || !actionEnabled(option.action, state, facts)) continue;
       seen.add(id);
       out.push(option);
     }
@@ -1347,9 +1433,44 @@ export function healthTurn(key: HealthFactorKey | null, state: MiraState, names:
       : factor.status === "good" || factor.status === "ok"
         ? { key: "health.fine" }
         : { key: "health.noGain" },
+    // ADR-185: the numbers behind the factor from the facts (awareness: the last hour by lever, what marketing buys)
+    ...factLines(k, state),
     { key: steps.length > 0 ? "health.steps" : "health.noSteps" },
   ];
   return { id, lines, options: steps };
+}
+
+/** What the facts add to a factor's answer. */
+function factLines(key: HealthFactorKey, state: MiraState): MiraLine[] {
+  if (!state.company) return [];
+  const f = companyFacts(state);
+  const a = f.awareness;
+  switch (key) {
+    case "awareness":
+      return [
+        a.change
+          ? {
+              key: "health.facts.awareness",
+              values: {
+                points: a.points,
+                cap: a.capPoints,
+                marketing: a.change.marketing,
+                word: a.change.wordOfMouth,
+                decay: a.change.decay,
+              },
+            }
+          : { key: "report.awarenessFlat", values: { points: a.points, cap: a.capPoints } },
+        ...(a.atCap
+          ? [{ key: "health.facts.atCap" }]
+          : [{ key: "health.facts.marketing", values: { now: a.marketingGainNow, gain: a.marketingGainSuggested } }]),
+      ];
+    case "capacity":
+      return f.ai.workers > 0 && f.ai.utilizationBps !== null
+        ? [{ key: "report.ai", values: { workers: f.ai.workers, util: Math.round(f.ai.utilizationBps / 100) } }]
+        : [];
+    default:
+      return [];
+  }
 }
 
 /** Mira raises the weakest point on her own once it is weak or critical (once per factor and status). */

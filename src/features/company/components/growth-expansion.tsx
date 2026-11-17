@@ -14,7 +14,7 @@ import { ExpansionCard } from "./profit";
 const AHEAD = 2;
 
 /**
- * Wachstum & Ausbau in one container (ADR-188): one continuous path, the four growth stages of the product first, then
+ * Wachstum & Ausbau in one container (ADR-191): one continuous path, the four growth stages of the product first, then
  * the endless expansion levels right after them. Below, the part that moves the next step: the open seats of the stage
  * or the next expansion. The two systems keep their own rules and rewards; this only shows them as one way up.
  */

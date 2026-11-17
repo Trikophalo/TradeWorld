@@ -1,7 +1,7 @@
 -- ===== idempotent copy of migrations/20261204007350_company_growth_path.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
 -- =============================================================================
--- NEXA · 7350 · Wachstum & Ausbau as one path (ADR-188)
+-- NEXA · 7350 · Wachstum & Ausbau as one path (ADR-191)
 --
 -- The growth stages of the product (ADR-062, derived from the team's skills) and the endless expansion levels
 -- (ADR-083, player_companies.expansion_level) are shown as one continuous path. Both keep their rules and rewards.
@@ -34,7 +34,7 @@ begin
 end;
 $$;
 comment on function public.company_seats_guard() is
-  'Trigger (ADR-188): companies.max_employees of a player company is derived from tier and expansion level.';
+  'Trigger (ADR-191): companies.max_employees of a player company is derived from tier and expansion level.';
 
 drop trigger if exists company_seats_guard on public.companies;
 create trigger company_seats_guard
@@ -55,7 +55,7 @@ begin
 end;
 $$;
 comment on function public.company_seats_sync() is
-  'Trigger (ADR-188): a new legal form or expansion level updates the places of the company.';
+  'Trigger (ADR-191): a new legal form or expansion level updates the places of the company.';
 
 drop trigger if exists company_seats_sync on public.player_companies;
 create trigger company_seats_sync
@@ -95,7 +95,7 @@ as $$
    where pc.company_id = p_company;
 $$;
 comment on function public.company_growth_path(uuid) is
-  'Wachstum & Ausbau as one path (ADR-188): stage, stages, expansion level, step = stage + level, next, next cost, places.';
+  'Wachstum & Ausbau as one path (ADR-191): stage, stages, expansion level, step = stage + level, next, next cost, places.';
 
 do $$
 begin

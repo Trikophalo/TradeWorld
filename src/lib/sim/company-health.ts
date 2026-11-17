@@ -15,9 +15,9 @@ import {
   fixedCostCents,
   aiUtilizationBps,
   aiWageDueCents,
-  marketingGain,
   priceEffect,
 } from "./startup.ts";
+import { awarenessCap, halfSaturationMarketingCents, marketingRate } from "./awareness.ts";
 import type { PriceLevel, StartupTier } from "./startup.ts";
 
 export const HEALTH_FACTORS = [
@@ -314,17 +314,17 @@ function statusOf(score: number, cfg: BalanceConfig): HealthStatus {
 /** Marketing per quarter that buys half the possible awareness gain: the sensible budget for growth. */
 export function suggestedMarketingCents(c: HealthCompany, cfg: BalanceConfig = BALANCE): number {
   const market = Math.sqrt(Math.max(1, c.estimateLowCents) * Math.max(1, c.estimateHighCents));
-  const a = cfg.startups.awareness;
-  const half = Math.max(a.marketingMinHalfSaturationCents, (market / 4) * a.marketingHalfSaturationShare);
+  const half = halfSaturationMarketingCents(market, cfg.startups.awareness);
   // the page's marketing slider ends at a fifth of the quarter's upper market estimate
   const max = Math.max(100_000, Math.round(c.estimateHighCents / 4 / 5 / 1_000) * 1_000);
   return Math.min(max, Math.round(half / 1_000) * 1_000);
 }
 
-/** Awareness one quarter of this marketing adds (diminishing returns, see marketingGain). */
+/** Share of the gap to the cap one hour of this quarterly marketing closes (ADR-188, see marketingRate). */
 function awarenessFromMarketing(marketingCents: number, c: HealthCompany, cfg: BalanceConfig): number {
   const market = Math.sqrt(Math.max(1, c.estimateLowCents) * Math.max(1, c.estimateHighCents));
-  return marketingGain(marketingCents, market, cfg.startups);
+  const hours = cfg.time.quarterHours;
+  return marketingRate(marketingCents / hours, market, cfg.startups.awareness, hours);
 }
 
 /**
@@ -342,7 +342,8 @@ export function companyHealth(
   const base = simulate(hour, company, cfg);
   const gain = (h: Partial<Hour>) => Math.max(0, simulate({ ...hour, ...h }, company, cfg).profit - base.profit);
   const stage = clamp(Math.floor(company.stage), 0, sc.stages.awarenessCaps.length - 1);
-  const cap = Math.max(sc.awareness.min, sc.stages.awarenessCaps[stage] ?? 1);
+  // ADR-188: the same cap as the hourly close (tier, stage, expansion)
+  const cap = awarenessCap(company.tier, stage, company.expansionLevel, sc.awareness);
   const perWorker = capacityPerWorker(company, cfg) * hour.event.capacityFactor;
   const freeSlots = Math.max(0, company.maxEmployees - company.headcount);
   const factors: HealthFactor[] = [];
@@ -366,7 +367,8 @@ export function companyHealth(
     const needed = demand >= capacity ? a : (a * capacity) / Math.max(1, demand);
     const target = Math.min(cap, needed);
     const capped = needed > cap + 1e-6;
-    const share = demand >= capacity ? 1 : a / needed;
+    // ADR-188: judged against what is reachable now (the cap), like the strength "Bekanntheit"
+    const share = demand >= capacity ? 1 : a / Math.max(1e-9, target);
     const marketing = suggestedMarketingCents(company, cfg);
     const atCap = capped && a >= cap - 0.005;
     const skill = nextSkill(company);
@@ -397,6 +399,7 @@ export function companyHealth(
               values: {
                 awarenessPct: pct(a),
                 neededPct: pct(target),
+                capPct: pct(cap),
                 demandCents: cents(demand),
                 capacityCents: cents(capacity),
               },
@@ -581,7 +584,7 @@ export function companyHealth(
     if (next && missing.length > 0) {
       const factor =
         (1 + sc.stages.capacityBonusPerStage * (stage + 1)) / (1 + sc.stages.capacityBonusPerStage * stage);
-      const nextCap = sc.stages.awarenessCaps[Math.min(stage + 1, sc.stages.awarenessCaps.length - 1)] ?? 1;
+      const nextCap = awarenessCap(company.tier, stage + 1, company.expansionLevel, sc.awareness);
       impact = gain({
         capacity: hour.capacity * factor,
         aiWorkers: hour.aiWorkers + missing.length,

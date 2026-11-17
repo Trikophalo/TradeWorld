@@ -10,6 +10,10 @@
 import { BALANCE } from "../../config/balance.ts";
 import type { BalanceConfig, SectorId, StartupsConfig } from "../../config/balance.ts";
 import { roundToBigInt } from "./money.ts";
+import { awarenessCap, awarenessHour, marketingRate } from "./awareness.ts";
+import type { AwarenessHour } from "./awareness.ts";
+
+export type { AwarenessHour } from "./awareness.ts";
 
 export type StartupTier = "garage" | "small_business" | "gmbh" | "ag";
 export type PriceLevel = "budget" | "normal" | "premium";
@@ -88,16 +92,21 @@ export function qualityTarget(teamSectorScore: number, cfg: StartupsConfig = BAL
   return cfg.quality.base + (1 - cfg.quality.base) * (score / (score + cfg.quality.halfSaturationScore));
 }
 
-/** Awareness gained from a marketing budget (diminishing returns). */
+/**
+ * Share of the gap to the cap that one hour of this quarterly marketing budget closes (ADR-188; diminishing returns).
+ */
 export function marketingGain(
-  marketingCents: number,
+  marketingCentsPerQuarter: number,
   potentialAnnualCents: number,
   cfg: StartupsConfig = BALANCE.startups,
+  quarterHours: number = BALANCE.time.quarterHours,
 ): number {
-  if (marketingCents <= 0) return 0;
-  const a = cfg.awareness;
-  const half = Math.max(a.marketingMinHalfSaturationCents, (potentialAnnualCents / 4) * a.marketingHalfSaturationShare);
-  return (a.marketingMaxGain * marketingCents) / (marketingCents + half);
+  return marketingRate(
+    marketingCentsPerQuarter / Math.max(1, quarterHours),
+    potentialAnnualCents,
+    cfg.awareness,
+    quarterHours,
+  );
 }
 
 /** Revenue the team can serve per quarter (before stage and expansion bonuses). */
@@ -279,16 +288,8 @@ export function closeStartupQuarter(
     Math.min(1, qualityTarget(input.teamSectorScore, sc) + sc.stages.qualityBonusPerStage * stage) *
     (1 - sc.aiQualityPenalty * aiShare);
   const quality = clamp(state.quality + sc.quality.adjustPerQuarter * (target - state.quality), 0, 1);
-  const marketing = Number(input.marketingCents);
-  const awareness = clamp(
-    state.awareness +
-      sc.awareness.growthPerQuarter * pricing.awareness * state.awareness * (1 - state.awareness) * (0.5 + quality) +
-      marketingGain(marketing, potential, sc) -
-      sc.awareness.decayPerQuarter * state.awareness,
-    sc.awareness.min,
-    // Without the right specialists a company cannot grow beyond its stage (ADR-062).
-    Math.max(sc.awareness.min, sc.stages.awarenessCaps[stage] ?? 1),
-  );
+  // ADR-188: awareness moves only in the hours (awarenessHour); the quarter reports it
+  const awareness = state.awareness;
 
   // Demand and capacity count in units at the normal price; the price strategy changes both price and demand.
   const demand =
@@ -429,6 +430,8 @@ export interface StartupHourInput {
   readonly campaignFactor?: number;
   /** Task momentum (ADR-148): demand multiplier from solved tasks, default 1. */
   readonly taskMomentum?: number;
+  /** ADR-188: reputation 0..100 for word of mouth, default 50. */
+  readonly reputation?: number;
   /**
    * Listed companies only (ADR-167, see listedHourEffect in listed.ts): research, products, regions, machines,
    * benefits, employee satisfaction and reputation as terms of the hour, plus the hour's running costs of all that
@@ -555,61 +558,23 @@ export function closeStartupHour(
     aiUtilizationBps: aiUtilization,
     profitCents: revenueCents - cogsCents - playerWagesPaidCents - aiWagesPaidCents - fixedCents - marketingCents,
     awareness: awarenessHour(
-      state.awareness,
-      state.quality,
-      Number(marketingCents),
-      potential,
-      priceEffect(input.priceLevel, state.quality, sc).awareness,
-      stage,
-      cfg,
+      {
+        awareness: state.awareness,
+        cap: awarenessCap(input.tier, stage, input.expansionLevel ?? 0, sc.awareness),
+        quality: state.quality,
+        priceAwareness: priceEffect(input.priceLevel, state.quality, sc).awareness,
+        marketingCentsThisHour: Number(marketingCents),
+        effectivePotentialAnnualCents: potential,
+        servedShare: demand > 0 ? sold / demand : 1,
+        reputation: input.reputation,
+      },
+      sc.awareness,
+      hours,
     ),
   };
 }
 
 // ------------------------------------------------------------------ hourly awareness and AI wages (ADR-180)
-
-/** What moved the awareness in one operating hour; all values are shares (0.008 = 0,8 Punkte). */
-export interface AwarenessHour {
-  readonly before: number;
-  readonly next: number;
-  readonly wordOfMouth: number;
-  readonly marketing: number;
-  readonly decay: number;
-  /** Highest awareness the stage allows (ADR-062). */
-  readonly cap: number;
-}
-
-/**
- * Awareness after one operating hour (ADR-180): word of mouth (S-curve, x price strategy, x quality), the hour's
- * marketing (diminishing returns, the quarter rule spread over its hours) and a slow decay, capped by the stage.
- * Before ADR-180 this happened once per quarter; now every hour shows its effect.
- */
-export function awarenessHour(
-  awareness: number,
-  quality: number,
-  marketingCentsThisHour: number,
-  effectivePotential: number,
-  priceAwareness: number,
-  stage: number,
-  cfg: BalanceConfig = BALANCE,
-): AwarenessHour {
-  const sc = cfg.startups;
-  const a = sc.awareness;
-  const hours = Math.max(1, cfg.time.quarterHours);
-  const s = clamp(Math.floor(stage), 0, sc.stages.awarenessCaps.length - 1);
-  const wordOfMouth = (a.growthPerQuarter / hours) * priceAwareness * awareness * (1 - awareness) * (0.5 + quality);
-  const marketing = marketingGain(marketingCentsThisHour * hours, effectivePotential, sc) / hours;
-  const decay = (a.decayPerQuarter / hours) * awareness;
-  const cap = Math.max(a.min, sc.stages.awarenessCaps[s] ?? 1);
-  return {
-    before: awareness,
-    next: clamp(awareness + wordOfMouth + marketing - decay, a.min, cap),
-    wordOfMouth,
-    marketing,
-    decay,
-    cap,
-  };
-}
 
 /**
  * Share of the AI workers' capacity the hour used, in bps (ADR-180): founder and players serve first, the AI workers

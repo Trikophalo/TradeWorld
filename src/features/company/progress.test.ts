@@ -3,7 +3,7 @@ import { companyProgress } from "./progress";
 
 const stages = (reached: number) => Array.from({ length: 4 }, (_, i) => ({ reached: i < reached }));
 
-describe("company progress (ADR-188)", () => {
+describe("company progress (ADR-191)", () => {
   it("counts the growth stages first", () => {
     expect(companyProgress({ stages: stages(0), expansionLevel: 0 })).toEqual({
       stagesDone: 0,
