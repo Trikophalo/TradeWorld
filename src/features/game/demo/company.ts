@@ -42,6 +42,14 @@ import {
   type StartupTier,
 } from "@/lib/sim/startup";
 import { formatMoney } from "@/lib/format";
+import {
+  EMPTY_STRENGTHS,
+  strengthsInstant,
+  strengthsNextReward,
+  strengthsOverall,
+  strengthsRewardBps,
+  strengthsStep,
+} from "@/lib/sim/company-strengths";
 import { DEMO_COMPANIES } from "@/lib/demo/market";
 import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
 import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
@@ -812,6 +820,7 @@ export function createCompanyEngine(host: CompanyHost) {
         stakePayoutCents: h.stakePayoutCents ?? 0,
       })),
       founderPayoutBps: company.founderPayoutBps ?? 0,
+      strengths: demoStrengths(company),
       campaign: campaignView(company),
       campaignCosts: campaignCosts(company),
       priceLevel: company.priceLevel ?? "normal",
@@ -1375,4 +1384,38 @@ export interface DemoListedStock {
   logo: CompanyLogoData | null;
   priceE4: number;
   marketCapCents: number;
+}
+
+/** Strengths (ADR-176) in the demo: replayed from the kept hours with the same rules as the server. */
+function demoStrengths(company: DemoCompanyState): MyCompany["strengths"] {
+  const cfg = BALANCE.companyHealth.strengths;
+  let scores = EMPTY_STRENGTHS;
+  for (const h of company.hours ?? []) {
+    scores = strengthsStep(
+      scores,
+      strengthsInstant(
+        {
+          awareness: company.awareness,
+          quality: company.quality,
+          demandCents: h.demandCents,
+          capacityCents: h.capacityCents,
+          revenueCents: h.revenueCents,
+          profitCents: h.profitCents,
+          payFactorBps: h.payFactorBps,
+          cashCents: company.cashCents,
+          unpaidCents: company.unpaidCents ?? 0,
+        },
+        cfg,
+      ),
+      cfg,
+    );
+  }
+  return {
+    scores: { ...scores },
+    overall: strengthsOverall(scores),
+    hours: company.hours?.length ?? 0,
+    rewardBps: strengthsRewardBps(scores, cfg),
+    next: strengthsNextReward(scores, cfg),
+    closeError: null,
+  };
 }

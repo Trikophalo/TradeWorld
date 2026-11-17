@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { COMPANY_BUILDINGS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -16,7 +17,7 @@ import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
-import type { MyCompany, PriceLevel } from "@/features/game/types";
+import type { CompanyOverview, MyCompany, PriceLevel } from "@/features/game/types";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
@@ -26,6 +27,38 @@ import { useCompanyRefresh } from "../hooks";
 
 const cfg = BALANCE.startups;
 const PRICE_LEVELS: readonly PriceLevel[] = ["budget", "normal", "premium"];
+
+/**
+ * A write whose answer is the company (ADR-176): the answer goes straight into the page's cache, and success is only
+ * claimed when the answer shows what was asked. Before, the toast said "saved" whatever the server sent back.
+ */
+function useCompanyWrite() {
+  const client = useQueryClient();
+  const errorText = useGameErrorText();
+  const refresh = useCompanyRefresh();
+  return async (
+    action: () => Promise<MyCompany>,
+    stored: (company: MyCompany) => boolean,
+    texts: { done: string; failTitle: string; notStored: (company: MyCompany) => string },
+  ) => {
+    try {
+      const company = await action();
+      client.setQueryData<CompanyOverview>(["company", "mine"], (d) => (d ? { ...d, company } : d));
+      if (!stored(company)) {
+        toast.error(texts.failTitle, texts.notStored(company));
+        return false;
+      }
+      haptic("success");
+      void playSound("success");
+      toast.success(texts.done, undefined, { silent: true });
+      await refresh();
+      return true;
+    } catch (error) {
+      toast.error(texts.failTitle, errorText(error));
+      return false;
+    }
+  };
+}
 
 function useCompanyAction() {
   const errorText = useGameErrorText();
@@ -192,12 +225,16 @@ function FlowRow({ label, parts, total }: { label: string; parts: FlowPart[]; to
 /** Price strategy and contract work (ADR-083). */
 export function StrategyCard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm.strategy");
-  const act = useCompanyAction();
+  const write = useCompanyWrite();
   const [saving, setSaving] = useState(false);
 
   const save = async (priceLevel: PriceLevel) => {
     setSaving(true);
-    await act(() => engine.setCompanyStrategy(crypto.randomUUID(), priceLevel, true), t("saved"), t("title"));
+    await write(
+      () => engine.setCompanyStrategy(crypto.randomUUID(), priceLevel, true),
+      (c) => c.priceLevel === priceLevel,
+      { done: t("saved"), failTitle: t("title"), notStored: () => t("notStored") },
+    );
     setSaving(false);
   };
   const p = cfg.pricing[company.priceLevel];
@@ -318,7 +355,7 @@ export function ExpansionCard({ company }: { company: MyCompany }) {
 /** Automatic CEO payout (ADR-086): a share of every profitable hour goes to the founder's private account. */
 export function PayoutCard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm.payout");
-  const act = useCompanyAction();
+  const write = useCompanyWrite();
   const { stepBps, maxBps } = cfg.founderPayout;
   const [bps, setBps] = useState(company.founderPayoutBps);
   const [state, setState] = useState<ButtonState>("idle");
@@ -327,7 +364,15 @@ export function PayoutCard({ company }: { company: MyCompany }) {
 
   const save = async () => {
     setState("loading");
-    const ok = await act(() => engine.setFounderPayout(crypto.randomUUID(), bps), t("saved"), t("title"));
+    const ok = await write(
+      () => engine.setFounderPayout(crypto.randomUUID(), bps),
+      (c) => c.founderPayoutBps === bps,
+      {
+        done: t("saved"),
+        failTitle: t("title"),
+        notStored: (c) => t("notStored", { percent: Math.round(c.founderPayoutBps / 100) }),
+      },
+    );
     setState(ok ? "success" : "idle");
     if (ok) window.setTimeout(() => setState("idle"), 800);
   };

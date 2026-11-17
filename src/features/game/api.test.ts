@@ -94,6 +94,25 @@ describe("RPC contract", () => {
     expect(company.banner!.grid.join("")).toContain("f");
   });
 
+  // ADR-176: what the owner's company page reads on the live server (real RPC answers).
+  it("a listed company: hours and live numbers, strengths; strategy and payout answers carry the stored values", () => {
+    const read = (name: string) => JSON.parse(readFileSync(dir + name, "utf8"));
+    const listed = toCompanyOverview(RPC_SCHEMAS.get_my_company.parse(read("get_my_company_listed.json"))).company!;
+    expect(listed.listing?.status).toBe("listed");
+    expect(listed.hours.length).toBeGreaterThan(0);
+    expect(listed.live).not.toBeNull();
+    expect(listed.strengths).not.toBeNull();
+    expect(listed.strengths!.hours).toBe(listed.hours.length);
+    expect(listed.strengths!.closeError).toBeNull();
+    expect(Object.keys(listed.strengths!.scores).sort()).toEqual(
+      ["awareness", "delivery", "finance", "margin", "quality", "team"].sort(),
+    );
+    const strategy = RPC_SCHEMAS.set_company_strategy.parse(read("set_company_strategy.json"));
+    expect(strategy.company?.price_level).toBe("premium");
+    const payout = RPC_SCHEMAS.set_founder_payout.parse(read("set_founder_payout.json"));
+    expect(payout.company?.founder_payout_bps).toBe(2500);
+  });
+
   it("a started business move says when it is available again", () => {
     const moves = RPC_SCHEMAS.start_company_move.parse(
       JSON.parse(readFileSync(dir + "start_company_move_resting.json", "utf8")),

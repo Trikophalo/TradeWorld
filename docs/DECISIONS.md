@@ -3697,3 +3697,50 @@ Erfolgs- und Misserfolgszeilen im Verlauf. Der Erwartungswert bleibt der der Ris
 - Demo: das erste Interview kommt sofort, sobald die Demo-Firma existiert; danach per Zufall wie auf dem Server.
 - Annahmen: Claude bewertet Interviews (noch) nicht; die Spalte `judge` ist dafür vorgesehen, die Mini-KI ist
   Rückfallebene und derzeit allein aktiv.
+
+## ADR-176: Firmen-Fehlerberichte, Stärken mit Belohnung, Controlling geordnet — `Annahme`
+
+**Kontext.** Der Besitzer spielt auf dem Live-Server und meldete für seine börsennotierte Firma: Ruf-Graph bewegt sich
+nicht, CEO-Auszahlung und Strategie bleiben nach „gespeichert“ auf 0 % bzw. „Normal“, „bringt X €“ im Mitarbeiter-Tab
+überall 0 €, Umsatz/Kosten/Gewinn der letzten Stunde fehlen und „Verlauf“ meldet dauerhaft „Noch keine abgeschlossene
+Betriebsstunde“. Dazu der Wunsch nach einem Stärken-Diagramm, das lange braucht und sich lohnt, und nach einem
+übersichtlicheren Controlling.
+
+**Untersuchung (Live-Pfad).** Komponente → `engine` (`api-company.ts`: `set_company_strategy(p_request_id, p_price_level,
+p_contract_work)`, `set_founder_payout(p_request_id, p_bps)` in Basispunkten) → letzte SQL-Definitionen (m4c/m4e plus
+die Replace-Patches aus 5400) → `get_my_company()`/`company_state()` → Zod → Anzeige. Mit genau diesen Argumenten auf einer
+lokalen Datenbank mit allen Migrationen und zusätzlich einmal `update-to-latest.sql` (so wie der Deploy, Funktionsrümpfe
+danach identisch) gilt für eine börsennotierte Firma: Strategie und Auszahlung werden gespeichert und zurückgelesen,
+die Stundenabrechnung schreibt Stunden, `listed_company_hours` und bewegt den Ruf (Test `b5_company_bugs2.sql`).
+Gemeinsam erklären die Punkte 1, 4 und 5 sich nur durch eine Stundenabrechnung, die für diese eine Firma nicht
+durchläuft: Ruf und Stimmung bewegen sich nur in `listed_hour_after()`, „bringt X €“ und „Verlauf“ lesen `hours`.
+`player_companies_run_due()` fängt Fehler je Firma ab und schreibt sie nur nach `job_runs` (ADR-168) – im Spiel
+war das unsichtbar. Für 2 und 3 gibt es im Code keinen Pfad, der den Wert zurücksetzt; der Client meldete aber
+„gespeichert“, ohne die Antwort anzusehen, und Zod ergänzt fehlende Felder still mit `normal`/`0`/`[]`.
+Nebenbefund: `a1_company_fixes.sql` und `a8_company_awareness.sql` setzten ein Quartalsende in den letzten 9 bzw. 30
+Stunden voraus, das eine frische Datenbank je nach Uhrzeit nicht hat; dann scheiterte `verify_local.sh` und mit ihm
+der Deploy-Workflow, ohne dass die Datenbank aktualisiert wurde.
+
+**Entscheidung.**
+
+- `company_state()` liefert `strengths.close_error` (Zeitpunkt, Fehlertext, Anzahl) aus `job_runs`; das Dashboard
+  zeigt ihn oben. So ist eine hängende Abrechnung mit der Serverursache sichtbar.
+- Strategie und CEO-Auszahlung schreiben die Antwort des Servers sofort in den Cache und melden nur Erfolg, wenn sie den
+  gewünschten Wert zeigt, sonst einen Fehler mit dem zurückgemeldeten Wert. Die Auszahlungskarte wird mit dem
+  gespeicherten Wert neu aufgebaut.
+- a1/a8 prüfen die Quartalsberichte nur, wenn im Fenster ein Quartal endete.
+- **Stärken:** sechs Werte statt der acht Diagnosefaktoren (Bekanntheit, Qualität, Lieferfähigkeit, Rendite, Team,
+  Finanzen; die acht Faktoren aus ADR-162 bleiben als Erklärung darunter). Jede Stunde rückt jeder Wert um
+  `gainPerHour` (2 %) der Lücke zum Stundenwert vor, bei schlechteren Stunden um `decayPerHour` (5 %) zurück: rund
+  zehn Tage guter Stunden bis zur obersten Stufe. Belohnung nach dem abgerundeten Schnitt: ab 50 +2 %, 75 +5 %, 90 +10 %,
+  98 +15 % auf den Umsatz der Stunde, gezahlt von den Haushalten (geschlossener Geldkreislauf), gebucht als
+  „Stärken-Bonus“. Formeln in `src/lib/sim/company-strengths.ts` und identisch in Migration 6600; Werte in
+  `companyHealth.strengths`. `companyHealthPayFactor(scores)` (1,00 bis 1,15) dürfen andere Funktionen (Firmen-Minispiele)
+  als Lohnfaktor nutzen; die Werte stehen in `get_my_company` unter `strengths.scores`.
+- **Controlling** in fünf Bereiche (Verkaufen, Betrieb und Wachstum, Geld, Forschung und Anlagen, Auftritt) mit Kopf
+  aus Symbol und einer Zeile Erklärung, je zwei Spalten ab `lg`, Geschäftszüge über volle Breite und eine klebende
+  Sprungleiste. Abschnitte und Deep-Links (`tabs.ts`) bleiben; neu ist `strengths`.
+
+**Offen.** Die konkrete Fehlermeldung der Live-Firma ist erst mit dem Deploy sichtbar (Dashboard oder
+`select * from job_runs where job_name = 'company_hours'`). Die Demo rechnet die Stärken aus ihren Stunden nach,
+zahlt den Bonus aber nicht.

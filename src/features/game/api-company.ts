@@ -250,6 +250,17 @@ const companySchema = z.object({
   founder_payout_bps: num.default(0),
   campaign: campaignSchema.nullable().default(null),
   campaign_costs: z.object({ flyer: num, online: num, tv: num }).nullable().default(null),
+  strengths: z
+    .object({
+      scores: z.object({ awareness: num, quality: num, delivery: num, margin: num, team: num, finance: num }),
+      overall: num,
+      hours: num,
+      reward_bps: num,
+      next: z.object({ at: num, bps: num }).nullable(),
+      close_error: z.object({ at: iso, error: z.string(), failures: num }).nullable(),
+    })
+    .nullable()
+    .default(null),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -576,6 +587,22 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
     expansionCostCents: c.expansion_cost_cents,
     marketFactor: c.market_factor,
     founderPayoutBps: c.founder_payout_bps,
+    strengths: c.strengths
+      ? {
+          scores: c.strengths.scores,
+          overall: c.strengths.overall,
+          hours: c.strengths.hours,
+          rewardBps: c.strengths.reward_bps,
+          next: c.strengths.next,
+          closeError: c.strengths.close_error
+            ? {
+                at: c.strengths.close_error.at,
+                error: c.strengths.close_error.error,
+                failures: c.strengths.close_error.failures,
+              }
+            : null,
+        }
+      : null,
   };
 }
 

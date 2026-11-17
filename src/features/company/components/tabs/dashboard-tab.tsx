@@ -30,6 +30,7 @@ import { COMPANY_MOVES_KEY, moveText } from "../company-moves";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { netProfit } from "../headquarters";
 import { HealthPanel, type AskMira } from "../health-panel";
+import { CloseErrorNote, StrengthsCard } from "../strengths-card";
 import { OfficeScene } from "../office-scene";
 import { StaffValueCard } from "../staff-value-card";
 import { InterviewCard } from "../interview-card";
@@ -71,6 +72,11 @@ export function DashboardTab({
   return (
     <div className="space-y-4" data-testid="company-dashboard">
       <TodoStrip company={company} listed={listed} go={go} />
+      <CloseErrorNote company={company} />
+      {/* The strengths with their reward first: what the company is good at, at a glance (ADR-176). */}
+      <div id="strengths" className="scroll-mt-24">
+        <StrengthsCard company={company} />
+      </div>
       <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-5">
         <div className="space-y-4">
           <NumbersCard company={company} listed={listed} listedPending={listedPending} />

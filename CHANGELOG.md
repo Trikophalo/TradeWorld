@@ -113,6 +113,10 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Stärken der Firma (ADR-176):** Ganz oben im Firmen-Dashboard zeigt ein Netz sechs Stärken. Sie wachsen nur langsam
+  über Tage guter Stunden, zahlen dafür ab 50 Punkten einen Umsatzbonus von 2 % bis 15 %. Controlling ist in fünf
+  Bereiche mit Sprungleiste geordnet; Strategie und CEO-Auszahlung melden nur noch Erfolg, wenn der Server sie übernimmt,
+  und eine hängende Stundenabrechnung steht mit der Fehlermeldung im Dashboard.
 - **Pack Battles und Live-Öffnen (ADR-172):** Im Collectibles-Tab stehen deine Freunde als Figuren. Fordere einen zum
   Pack Battle heraus: beide zahlen ein Pack vom gleichen Set, wer mehr Wert zieht, bekommt alle zehn Karten. Über
   „Live“ schaust du anderen beim Öffnen zu und schickst Emojis; abschalten geht in den Einstellungen.

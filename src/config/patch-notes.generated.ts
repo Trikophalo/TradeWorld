@@ -483,6 +483,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Pack Battles und Live-Öffnen",
         text: "Im Collectibles-Tab stehen deine Freunde als Figuren.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-9dc576aa",
+        title: "Stärken der Firma",
+        text: "Ganz oben im Firmen-Dashboard zeigt ein Netz sechs Stärken.",
+      },
     ],
   },
   {

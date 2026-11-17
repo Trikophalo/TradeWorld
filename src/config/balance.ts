@@ -956,6 +956,23 @@ export interface BalanceConfig {
     readonly reserveHours: number;
     /** A fix worth less than this per hour does not count as a loss. */
     readonly minImpactCents: number;
+    /**
+     * Strengths (ADR-176): six scores the server keeps per company. Each hour they move a small step toward what the
+     * hour showed (up slowly, down faster), so 100 takes days of good play. A high overall score pays a bonus on the
+     * hour's revenue (households pay it, closed money system).
+     */
+    readonly strengths: {
+      /** Share of the gap to the hour's value closed per hour when the value is higher (0.02: about 10 days to 99). */
+      readonly gainPerHour: number;
+      /** Share of the gap closed per hour when the value is lower (neglect costs faster than it was earned). */
+      readonly decayPerHour: number;
+      /** Net margin (profit / revenue) that counts as 100. */
+      readonly marginFull: number;
+      /** Hours of running costs in cash that count as 100. */
+      readonly cashHoursFull: number;
+      /** Bonus on the hour's revenue from an overall score (floor of the mean): the highest tier reached counts. */
+      readonly rewards: readonly { readonly at: number; readonly bps: number }[];
+    };
   };
   /** Crises, scandals and a falling share price cut wages (ADR-131). */
   readonly wageMood: {
@@ -2692,6 +2709,18 @@ export const BALANCE = {
     runwayTargetHours: 48,
     reserveHours: 6,
     minImpactCents: 100,
+    strengths: {
+      gainPerHour: 0.02,
+      decayPerHour: 0.05,
+      marginFull: 0.25,
+      cashHoursFull: 24,
+      rewards: [
+        { at: 50, bps: 200 },
+        { at: 75, bps: 500 },
+        { at: 90, bps: 1_000 },
+        { at: 98, bps: 1_500 },
+      ],
+    },
   },
   wageMood: {
     crisisPerSeverityBps: 500,

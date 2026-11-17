@@ -33,6 +33,7 @@ const SECTIONS: Record<string, CompanyTarget> = {
   // Dashboard
   mira: { tab: "dashboard", target: "mira" },
   health: { tab: "dashboard", target: "health" },
+  strengths: { tab: "dashboard", target: "strengths" },
   todo: { tab: "dashboard", target: "todo" },
   situation: { tab: "dashboard", section: "situation" },
   history: { tab: "dashboard", section: "history" },

@@ -2374,7 +2374,8 @@
       "lowQuality": "Deine Qualität liegt unter 50 %. Mit Premium kommt nur die Hälfte der Kunden.",
       "contractAuto": "Leerlauf verkauft deine Firma automatisch: {share} % der freien Kapazität arbeitet für andere Firmen. Mehr Gewinn holst du mit Geschäftszügen.",
       "contractNow": "Gerade {amount} pro Stunde aus Aufträgen",
-      "saved": "Strategie gespeichert"
+      "saved": "Strategie gespeichert",
+      "notStored": "Der Server hat die Strategie nicht übernommen. Bitte lade die Seite neu und versuche es noch einmal."
     },
     "expansion": {
       "title": "Ausbau",
@@ -2404,7 +2405,8 @@
       "today": "Heute ausgezahlt",
       "hint": "Nur aus Gewinn und nur aus freiem Geld: Offene Rechnungen werden zuerst bezahlt. Was du nicht auszahlst, bleibt für Wachstum in der Firma.",
       "save": "Auszahlung speichern",
-      "saved": "Auszahlung gespeichert"
+      "saved": "Auszahlung gespeichert",
+      "notStored": "Der Server hat {percent} % zurückgemeldet. Bitte lade die Seite neu und versuche es noch einmal."
     },
     "closeNext": "Danach kannst du sofort eine neue Firma gründen. Der Name deiner alten Firma ist dann wieder frei.",
     "tabMira": "Mira",
@@ -8437,6 +8439,34 @@
     "max": "Mehr geht nicht: größtes Zuhause, voller Wohnwert.",
     "none": "Wer ein Zuhause hat oder zur Miete wohnt, bekommt jede Stunde Geld und XP. Je größer und schöner, desto mehr."
   },
+  "companyStrengths": {
+    "title": "Stärken der Firma",
+    "intro": "Sechs Werte, die nur langsam wachsen: Jede abgeschlossene Stunde zieht sie ein kleines Stück zu dem, was die Stunde gezeigt hat. Wer nachlässt, verliert schneller, als er gewonnen hat.",
+    "keys": {
+      "awareness": "Bekanntheit",
+      "quality": "Qualität",
+      "delivery": "Lieferfähigkeit",
+      "margin": "Rendite",
+      "team": "Team",
+      "finance": "Finanzen"
+    },
+    "hints": {
+      "awareness": "Werbung, Kampagnen und gelöste Aufgaben machen dich bekannter.",
+      "quality": "Forschung, Weiterbildung und gute Stimmung heben die Qualität.",
+      "delivery": "Genug Leute und KI-Kräfte, damit du jede Nachfrage bedienst.",
+      "margin": "Gewinn im Verhältnis zum Umsatz: 25 % Marge zählen voll.",
+      "team": "Alle Löhne werden voll bezahlt.",
+      "finance": "Keine offenen Rechnungen und Kasse für einen Tag Kosten."
+    },
+    "reward": "Belohnung",
+    "rewardNow": "+{percent} Umsatz in jeder Stunde",
+    "rewardNone": "Noch keine: Ab 50 Punkten im Schnitt gibt es einen Bonus.",
+    "rewardNext": "Ab {at} Punkten: +{percent} Umsatz",
+    "tiers": "Belohnungsstufen",
+    "tier": "{at}: +{percent}",
+    "slow": "Bisher {hours} abgerechnete Stunden. 100 Punkte brauchen Tage mit guten Stunden.",
+    "closeError": "Die Stundenabrechnung deiner Firma klappt gerade nicht ({failures} Versuche). Das Spiel versucht es jede Minute neu. Meldung des Servers:"
+  },
   "companyHealth": {
     "title": "Wo es fehlt",
     "intro": "Acht Punkte entscheiden, ob deine Firma Gewinn macht. Je weiter außen, desto besser.",
@@ -9307,6 +9337,19 @@
         "growthSummary": "{count, plural, =0 {Noch nichts im Besitz} one {# Posten im Besitz} other {# Posten im Besitz}}",
         "dividends": "Dividenden",
         "dividendsSummary": "Heute möglich: bis {amount}"
+      },
+      "groups": {
+        "nav": "Bereiche im Controlling",
+        "sell": "Verkaufen",
+        "sellText": "Preis, Werbung und Geschäftszüge: was Nachfrage bringt.",
+        "run": "Betrieb und Wachstum",
+        "runText": "Wer liefert, wo es klemmt und wie die Firma größer wird.",
+        "money": "Geld",
+        "moneyText": "Kasse, deine Auszahlung, Börse und Dividenden.",
+        "listed": "Forschung und Anlagen",
+        "listedText": "Was die börsennotierte Firma dauerhaft stärker macht.",
+        "brand": "Auftritt",
+        "brandText": "Banner, Logo und das Ende der Firma."
       },
       "capitalHint": "Ein Börsengang bringt Kapital und macht Aktionäre zu Mitbesitzern.",
       "brandText": "Banner und Logo erscheinen auf deiner Firmenseite, in der Rangliste und an der Börse.",
