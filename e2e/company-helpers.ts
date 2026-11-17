@@ -55,7 +55,11 @@ export async function showOverview(page: Page) {
  * Produkte & Märkte), group-team (Team & Plätze, Stimmung, Wert des Teams).
  */
 export async function showPane(page: Page, group: string, label: string) {
-  const option = page.getByTestId(`firm-section-${group}`).getByRole("radio", { name: label, exact: true });
+  const card = page.getByTestId(`firm-section-${group}`);
+  await expect(card).toBeVisible();
+  // A card with a single pane (e.g. growth of a private company) has no switch.
+  if ((await card.getByRole("radio").count()) === 0) return;
+  const option = card.getByRole("radio", { name: label, exact: true });
   await option.click();
   await expect(option).toHaveAttribute("aria-checked", "true");
 }
