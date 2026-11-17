@@ -513,6 +513,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Kritiker für NFTs",
         text: "Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit Stärke und Schwäche, der Markt als kleines Abzeichen).",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-ef1a3d78",
+        title: "Yin Yang",
+        text: "110 Karten im Tuschestil für 2.000 € je Pack, mit einsamen Kriegern und dem Paar Yin und Yang in Schwarz und Weiß.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-9b4668ed",
+        title: "Titans Revenge",
+        text: "Das teuerste Nexamon-Set für 100.000 € je Pack: 30 Titanen in Iron, Titanium, Diamond und Uranium.",
+      },
     ],
   },
   {

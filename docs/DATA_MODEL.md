@@ -8055,3 +8055,19 @@ Migrationen `20261204006900_company_economy`, `…6910_company_autopilot`, `…6
 - RPCs: `get_company_autopilot()` (Mitglieder) und `set_company_autopilot(p_request_id, p_on)` (Gründer, idempotent)
   liefern `{on, can_toggle, mood, chance_bps, reward_bps, fail_penalty_bps, max_per_day, every_minutes,
 pay_factor_bps, today {done, success, cents}, log [...], last_hour {…, ai_utilization_bps, awareness_parts}}`.
+
+## Nachtrag: Titans Revenge und Yin Yang (ADR-182)
+
+Migrationen `20261204007200_nexamon_new_sets_packs.sql`, `…7210_nexamon_new_sets_ranks.sql`. Keine neue Tabelle: die
+461 Karten und Regeln kommen über `game_config` (`pnpm db:config`), `nexamon_sync()` übernimmt die Sets und legt den
+KI-Startbestand an.
+
+- `game_config.nexamon`: neu `setOdds` (Platz-Tabelle je Set, Yin Yang in Teilen von 36.000), `packRules.titans_revenge`,
+  `quickSell.setRarities.titans_revenge`, `ai.excludedRarities` mit `uranium`; je Seltenheit Einträge für `iron`,
+  `titanium`, `diamond`, `uranium`. `game_config.nexamon_rarities.rank` mit den neuen Rängen.
+- Intern (service_role): neu `nexamon_slot_rarity(p_set, p_slot, p_u)` (Tabelle des Sets, sonst `odds`). Gepatcht:
+  `nexamon_open_pack()` würfelt Platz 4/5 mit der Set-Tabelle und überspringt in KI-Packs Stufen einer KI-gesperrten
+  Seltenheit (der Platz bleibt Basis); `buy_nexamon_pack()`, `open_nexamon_sealed_pack()`, `nexamon_battle_pull()`
+  zählen die Missionen nach `nexamon_rarity_rank()` (≥ 1 Rare, ≥ 2 Ultra).
+- RPC `get_nexamon_market()`: der Filter `p_rarity` nimmt jede Seltenheit mit bekanntem Rang.
+- Kartenart `warrior` gibt es nur im Client-Katalog (Anzeige), die Datenbank kennt sie nicht.

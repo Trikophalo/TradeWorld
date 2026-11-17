@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Titans Revenge (ADR-182):** Das teuerste Nexamon-Set für 100.000 € je Pack: 30 Titanen in Iron, Titanium, Diamond und
+  Uranium. Uranium steckt in 1 von 500 Packs, die KI hat sie nie; im Mittel bringt ein Pack 90 % seines Preises.
+- **Yin Yang (ADR-182):** 110 Karten im Tuschestil für 2.000 € je Pack, mit einsamen Kriegern und dem Paar Yin und Yang
+  in Schwarz und Weiß. Ab Ultra Rare sind die Chancen 10 % kleiner, die Karten dafür 12 % mehr wert.
+
 - **Kritiker für NFTs (ADR-181):** Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit
   Stärke und Schwäche, der Markt als kleines Abzeichen). Gute Bilder bekommen mehr und höhere Angebote, Kopien keine,
   und die Sammler reden jetzt zurück: sie antworten, feilschen, loben, lästern und erinnern an ihr Angebot.

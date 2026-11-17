@@ -4022,3 +4022,56 @@ Haushalte haben. Das Haushaltskonto ist im Auge zu behalten. Die Garage-Simulati
 jetzt unter 5 % Pleiten und über 85 % Gewinn (vorher 20–45 % Pleiten); das Risiko liegt bei den großen Rechtsformen.
 Ältere SQL-Tests prüfen die Mechanik weiter mit den alten Zahlen (Vorspann in den Dateien). Die Demo macht alles nach,
 den Autopiloten nur, wenn die Seite offen ist.
+
+## ADR-182: Titans Revenge und Yin Yang im Spiel — `Annahme`
+
+**Kontext:** Karten und Pixel-Art zweier neuer Nexamon-Sets lagen als Entwürfe im Repository: Titans Revenge (30
+kolossale Titanen, eigene Seltenheiten Iron/Titanium/Diamond/Uranium, Pack 100.000 €, ~90 % Erwartungswert) und
+Yin Yang (110 Karten im japanischen Tuschestil, Monster und einsame Krieger, Pack 2.000 €, Werte 10× der ersten
+Spannen und ab Ultra × 1,12, Ziehchancen ab Ultra × 0,9). Beide sollen vollständig ins Spiel: Katalog, Shop, Markt,
+Popup, Pack Battles, Live-Öffnungen, versiegelte Packs, Demo und Datenbank.
+
+**Entscheidung:**
+
+- **Katalog:** `NEXAMON_SETS` um `titans_revenge` (Präfix `tr`) und `yin_yang` (`yy`); Layouts 15/7/4/4 und
+  54/30/16/8/2 (461 Karten in sechs Sets). Neue Seltenheiten `iron`, `titanium`, `diamond`, `uranium` mit Rang 0, 2, 3
+  und 5 (Uranium gleichauf mit der One of One: die größte Enthüllung). Preisspannen je Set stehen in
+  `NEXAMON_SET_PRICE_RANGE` (Titans aus `titans-draft.ts`, Yin Yang aus `yinyang-draft.ts`). Neue Kartenart
+  `warrior` (Krieger): KP wie ein Monster, kleines Schild „KRIEGER“ auf der Vorderseite.
+- **Titans-Werte × 1,125:** Mit den Entwurfspreisen lag der Erwartungswert eines Packs bei nur 79,9 % (Sim). Der
+  Katalog nimmt jeden Startpreis × 1,125 (`TITAN_VALUE_FACTOR`, auf ganze Euro gerundet); die Spannen wachsen mit.
+  Ergebnis 89,9 % zum Startwert, 87,7 % nach Zustandsfaktor (`nexamonExpectedPackValue`, Test im Katalog).
+- **Titans-Pack:** `packRules.titans_revenge` = Basis Iron, Stufen Uranium 1/500 (1 Karte), Diamond 1/50 (1),
+  Titanium 1/5 (1–2), von hinten gefüllt; Iron im Schnitt 4,68 Karten, praktisch 3 bis 5.
+- **Yin-Yang-Pack:** klassische Plätze, aber eine eigene Platz-Tabelle `setOdds.yin_yang` in Teilen von 36.000, damit
+  ×0,9 exakt bleibt: Platz 5 Legendary 36, Prisma 405, Ultra 1.350, Platz 4 Ultra 1.350. Der frei gewordene Anteil
+  (ab Ultra) geht an die Rare (Platz 4: 9.150, Platz 5: 9.199), die Commons bleiben gleich. Eine stufenweise
+  Weitergabe (Legendary → Prisma → Ultra) hätte die mittleren Seltenheiten nicht um genau 10 % gesenkt; gewünscht war
+  „ab Ultra je 10 % weniger“. Gleiche Regel in `nexamonSlotOdds(slot, cfg, set)` und `nexamon_slot_rarity(set, …)`.
+- **KI:** darf Iron und Titanium halten und anbieten (Startbestand wie Common/Ultra: 6 und 2 Kopien je Karte),
+  Diamond nur aus eigenen Packs (kein Startbestand, ~1 in 50 KI-Titans-Packs, dann einmal angeboten, Bestand höchstens
+  1), Uranium nie: `ai.excludedRarities` enthält `uranium`. Würfelt ein KI-Pack die Uranium-Stufe, bleibt der Platz
+  Iron (sonst hätte der KI-Schutz-Trigger den ganzen Lauf abgebrochen). Uranium-Werte bewegen sich wie Legendaries
+  (Angebot/Nachfrage, ohne KI-Käufe). Eigene Migration (7200/7210), die KI-Slab-Logik bleibt unberührt.
+- **Boni (ADR-171):** Titanium, Diamond und Uranium geben Boni wie Ultra, Prisma und Legendary (0,5 / 1 / 2,5 %),
+  Iron keinen. Set-Faktor Titans 1,75 (teuerstes Pack), Yin Yang 1,5. Die Deckel und das Knie bleiben, also kann
+  kein Set die Grenzen sprengen; Rare Nr. 60 von Yin Yang gibt wie überall einen Bonus.
+- **Sammlungen:** Set komplett heißt bei Titans alle 30 Karten (inklusive der vier Uranium); Master-Set zusätzlich jede
+  Diamond und Uranium als eigener Slab ab Note 9 (`masterRarities` um `diamond`, `uranium`). Bei Yin Yang wie bei den
+  klassischen Sets (Prismas und Legendaries).
+- **Missionen:** „Rare oder besser“ zählt nach Rang ≥ 1 (Iron zählt nicht), „Ultra oder besser“ nach Rang ≥ 2
+  (Titanium, Diamond, Uranium, One of One). Marktfilter nimmt jede bekannte Seltenheit.
+- **Bulk:** `quickSell.setRarities.titans_revenge = ["iron"]`; Yin Yang wie gehabt Common und Rare.
+- **Aussehen:** Iron im klassischen Rahmen aus dunklem, rostigem Eisen mit Nieten und Funken; Titanium als
+  Ausbruch-Rahmen aus gebürstetem Silberblau; Diamond als Vollbild mit Kristallfacetten und Prisma-Funkeln; Uranium
+  als Vollbild, das zurücktritt (schwarzer Rand, grüner Schein, nur Name und Fuß als feste Platten), damit das
+  riesige Auge wirkt. Folien: Funken (Iron), gebürstet (Titanium), Facetten mit starkem Glitzer (Diamond), pulsierender
+  grüner Schein (Uranium). Yin (yy-109) und Yang (yy-110) tragen den Legendary-Rahmen in Tusche statt Gold, schwarz
+  und weiß, mit gespiegelten Eckpunkten und dem roten Siegel. Packs: Titans als massive, genietete Panzerplatte mit
+  Titanen-Silhouette und glühendem Auge; Yin Yang schwarz-weiß auf Reispapier mit Tuschebergen, großem Ensō samt
+  Yin-Yang und einem roten Siegel als einziger Farbe. Set-Symbole: Titanenauge, Yin-Yang. Uranium hat einen eigenen
+  Enthüllungston (`pull-uranium.wav`: Geigerzähler, dann ein glühender Akkord); Diamond nutzt den Legendary-Ton.
+
+**Folgen:** Erwartungswerte (Startwerte): Titans 89.901 € je Pack (89,9 %), Yin Yang 4.453 € (222,7 %). Titans ist
+das einzige Set, das im Mittel Geld kostet; der Reiz liegt in Uranium (1 in 500, 9,6–39,4 Mio. €). Der Shop-Hinweis
+„Raten gelten für alle Sets“ gilt nur noch für die klassischen Sets; die Ratenkarte erklärt die beiden neuen.
