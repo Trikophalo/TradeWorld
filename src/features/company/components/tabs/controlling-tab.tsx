@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
@@ -8,12 +9,13 @@ import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ListedCompany } from "@/features/game/listed-types";
+import { engine } from "@/features/game/store";
 import type { MyCompany } from "@/features/game/types";
 import { ItemList, ResearchTree } from "../../listed/catalogue";
 import { DividendCard, RestrictionNotes, UpkeepSummary } from "../../listed/controlling-panels";
 import { money } from "../../listed/shared";
 import type { CompanyTarget } from "../../tabs";
-import { CompanyMovesCard } from "../company-moves";
+import { COMPANY_MOVES_KEY, CompanyMovesCard } from "../company-moves";
 import {
   DangerZone,
   MarketCard,
@@ -24,12 +26,12 @@ import {
   UpgradeCard,
 } from "../company-parts";
 import type { HireRequest } from "../employer";
-import { FirmSection, MergedCard, SectionNav, SubSection, type Pane } from "../firm-layout";
-import { GrowthPath } from "../growth-path";
+import { FirmSection, FoldBlock, MergedCard, SectionNav, SubSection, type Pane } from "../firm-layout";
+import { GrowthAndExpansion } from "../growth-expansion";
 import { ListingCard } from "../listing";
 import { PitchCard } from "../pitch-card";
 import { ProductionCard } from "../production";
-import { ExpansionCard, PayoutCard, ProfitCoach, StrategyCard } from "../profit";
+import { PayoutCard, ProfitCoach, StrategyCard } from "../profit";
 import { CampaignCard, ProfitRoutes } from "../routes";
 
 /** A small grey chip with the current state of a block (budget, cash, research done …). */
@@ -78,6 +80,12 @@ export function ControllingTab({
   const tb = useTranslations("banner");
   const tk = useTranslations("listed.kinds");
   const tg = useTranslations("hq.controlling.groups");
+  const tf = useTranslations("hq.folds");
+  const moves = useQuery({
+    queryKey: COMPANY_MOVES_KEY,
+    queryFn: () => engine.companyMoves(),
+    refetchInterval: 20_000,
+  });
   const trainingOpen = company.employees + company.aiWorkers >= company.trainingFrom;
   const toStaff = () => go({ tab: "staff", section: "staff-team" });
   const toCampaign = () => go({ tab: "controlling", section: "marketing", target: "campaign" });
@@ -155,10 +163,12 @@ export function ControllingTab({
       label: ts("moves"),
       description: t("sub.moves"),
       content: (
-        <div className="space-y-4">
-          <CompanyMovesCard />
-          <PitchCard kind="move" />
-        </div>
+        <FoldBlock id="moves" title={ts("moves")} summary={tf("running", { count: moves.data?.running.length ?? 0 })}>
+          <div className="space-y-4">
+            <CompanyMovesCard />
+            <PitchCard kind="move" />
+          </div>
+        </FoldBlock>
       ),
     },
   ];
@@ -218,17 +228,15 @@ export function ControllingTab({
       label: tw("expansion"),
       description: t("sub.expansion"),
       content: (
-        <Cols>
-          <GrowthPath
+        <div className="space-y-4">
+          {/* Growth stages and endless expansion as one path (ADR-188); the legal form next to it. */}
+          <GrowthAndExpansion
             company={company}
             onFill={(skills) => onHire({ skills })}
             onTrain={trainingOpen ? () => go({ tab: "staff", section: "staff-team", target: "training" }) : undefined}
           />
-          <Col>
-            <ExpansionCard company={company} />
-            <UpgradeCard company={company} />
-          </Col>
-        </Cols>
+          <UpgradeCard company={company} />
+        </div>
       ),
     },
     ...(listed

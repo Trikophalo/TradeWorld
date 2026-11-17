@@ -19,8 +19,10 @@ test("dashboard: key numbers, the last hour in words, the autopilot switch", asy
 
   const dashboard = page.getByTestId("company-dashboard");
   await expect(dashboard.getByTestId("stat-cash")).toBeVisible();
-  await expect(dashboard.getByTestId("company-todo")).toBeVisible();
-  const autopilot = dashboard.getByTestId("company-autopilot");
+  await expect(dashboard.getByTestId("stat-todo")).toBeVisible();
+  // The autopilot moved to the to-do center on Mitarbeiter (ADR-187); the to-do tile leads there.
+  await dashboard.getByTestId("tile-todo").click();
+  const autopilot = page.getByTestId("company-staff").getByTestId("company-autopilot");
   await expect(autopilot).toContainText("Autopilot");
   await expect(autopilot.getByTestId("autopilot-chance")).toContainText("%");
 
@@ -32,6 +34,10 @@ test("dashboard: key numbers, the last hour in words, the autopilot switch", asy
 
   // after closed hours the dashboard says where the awareness came from
   await page.getByTestId("company-header").getByText("Demo: Quartal jetzt abschließen").click();
+  await page
+    .getByTestId("company-tabs")
+    .getByRole("tab", { name: /Dashboard/ })
+    .click();
   await expect(dashboard.getByTestId("pulse-awareness")).toContainText("Bekanntheit");
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

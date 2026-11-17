@@ -10193,7 +10193,7 @@
         "capital": "Kapital & Börse",
         "dividends": "Dividenden",
         "group-growth": "Wachstum",
-        "expansion": "Ausbau & Rechtsform",
+        "expansion": "Wachstum & Ausbau",
         "research": "Forschung",
         "growth": "Produkte & Märkte",
         "group-brand": "Marke & Firma",
@@ -10251,6 +10251,20 @@
       "short": "Mira",
       "title": "Mira",
       "text": "Deine Assistentin: Sie erklärt, plant und erledigt Aufgaben für dich."
+    },
+    "folds": {
+      "openCount": "{count, plural, =0 {keine offen} one {# offen} other {# offen}}",
+      "people": "{count, plural, one {# Person} other {# Personen}}",
+      "running": "{count, plural, =0 {keiner läuft} one {# läuft} other {# laufen}}"
+    },
+    "growthPath": {
+      "title": "Wachstum & Ausbau",
+      "text": "Ein Weg nach oben: erst die vier Stufen deines Produkts (Fachleute besetzen), danach geht es ohne Ende mit Ausbaustufen weiter (mehr Markt, Plätze und Kapazität).",
+      "step": "Schritt {step}",
+      "stage": "Stufe {n}",
+      "level": "Ausbau {n}",
+      "pathLabel": "Dein Weg: Stufen und Ausbau",
+      "needsForm": "Ausbauen geht ab der GmbH. Die Rechtsform wechselst du direkt darunter."
     }
   },
   "nexamonLive": {

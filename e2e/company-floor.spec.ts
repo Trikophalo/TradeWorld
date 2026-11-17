@@ -1,4 +1,4 @@
-import { showDashboard, showStaff } from "./company-helpers";
+import { showStaff } from "./company-helpers";
 import { expect, test, type Page } from "@playwright/test";
 
 /*
@@ -127,6 +127,8 @@ test("company page: writing into the office shows a bubble over my figure and la
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
 
+  // The office sits in the team card of Mitarbeiter since ADR-187, next to the chat.
+  await showStaff(page);
   const office = page.getByTestId("office");
   const me = office.locator('[data-testid="office-person"][data-me="true"]');
   await expect(me).toHaveAttribute("data-nickname", "Plaudertasche");
@@ -139,11 +141,9 @@ test("company page: writing into the office shows a bubble over my figure and la
   await expect(say.getByPlaceholder("Sag was ins Büro …")).toHaveValue("");
 
   // The same words stand in the company chat.
-  await showStaff(page);
   await expect(page.getByTestId("chat-messages")).toContainText("Kaffee ist fertig!");
 
-  // My figure opens my profile (the office is on the dashboard).
-  await showDashboard(page);
+  // My figure opens my profile.
   await me.click();
   await expect(page).toHaveURL(/\/players\/Plaudertasche$/);
 });

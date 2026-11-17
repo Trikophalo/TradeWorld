@@ -544,7 +544,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je…",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-a554cfe6",
+        id: "startseite-waehrung-zur-wahl-freundescode-692033fa",
         title: "Firma übersichtlicher",
         text: "Das Dashboard zeigt nur Zahlen und Grafiken, ein Tipp führt zum passenden Hebel; alles Fällige steht in einer Liste „Zu erledigen“, das Controlling…",
       },

@@ -1,13 +1,15 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Segmented } from "@/components/ui/segmented";
 import { Tooltip } from "@/components/ui/tooltip";
 import { haptic } from "@/lib/haptics";
+import { DURATION, EASE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { placeOf, resolveCompanyTarget, type CompanyTarget } from "../tabs";
 
@@ -208,6 +210,121 @@ export function SectionNav({ items, label, testId }: { items: NavItem[]; label: 
   );
 }
 
+// ------------------------------------------------------------------ folding blocks (ADR-187)
+
+const FOLD_KEY = "nexa-company-folds";
+
+function readFolds(): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(FOLD_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Open or closed, remembered per player in this browser (read after hydration). */
+function useFold(id: string, defaultOpen: boolean): [boolean, () => void] {
+  // The server and the first client render use the default; the stored choice follows after hydration.
+  const stored = useSyncExternalStore(
+    noSubscribe,
+    () => readFolds()[id],
+    () => undefined,
+  );
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const open = chosen ?? (typeof stored === "boolean" ? stored : defaultOpen);
+  const toggle = () => {
+    const next = !open;
+    setChosen(next);
+    try {
+      window.localStorage.setItem(FOLD_KEY, JSON.stringify({ ...readFolds(), [id]: next }));
+    } catch {
+      // storage blocked: the state lives for this visit
+    }
+  };
+  return [open, toggle];
+}
+
+const noSubscribe = () => () => {};
+
+/**
+ * A block that opens and closes (ADR-187, owner request): a header button with `aria-expanded` and, while closed, a
+ * short summary (a count, a total). Used for long lists that are not needed every visit.
+ */
+export function FoldBlock({
+  id,
+  title,
+  summary,
+  defaultOpen = true,
+  className,
+  children,
+}: {
+  id: string;
+  title: string;
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [stored, toggle] = useFold(id, defaultOpen);
+  // A link to the place opens it for this visit (not remembered).
+  const [forced, setForced] = useState(false);
+  useEffect(() => {
+    const on = (event: Event) => {
+      const d = (event as CustomEvent<CompanyTarget>).detail;
+      if (d && (d.target === id || d.section === id)) setForced(true);
+    };
+    window.addEventListener(COMPANY_FOCUS_EVENT, on);
+    return () => window.removeEventListener(COMPANY_FOCUS_EVENT, on);
+  }, [id]);
+  const open = stored || forced;
+  const body = `fold-${id}`;
+  return (
+    <div className={cn("space-y-3", className)} data-testid={`fold-${id}`} data-open={open}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={body}
+        onClick={() => {
+          haptic("tap");
+          if (forced) {
+            setForced(false);
+            if (stored) toggle();
+          } else toggle();
+        }}
+        data-testid={`fold-${id}-toggle`}
+        className="group flex w-full items-center gap-2 rounded-md border-b border-line-1 px-1 pb-2 text-left focus-ring transition duration-fast hover:border-line-2 active:scale-[0.99]"
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "font-pixel text-xs text-fg-3 transition-transform duration-fast group-hover:text-fg-1",
+            open && "rotate-90",
+          )}
+        >
+          ›
+        </span>
+        <span className="min-w-0 flex-1 label-pixel text-fg-1">{title}</span>
+        {summary !== undefined && (
+          <span className="shrink-0 nums text-xs text-fg-3" data-testid={`fold-${id}-summary`}>
+            {summary}
+          </span>
+        )}
+      </button>
+      {open && (
+        <motion.div
+          id={body}
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DURATION.base, ease: EASE.out }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ merged cards (ADR-187)
 
 /** Sent by the company page right before it scrolls to a place: merged cards switch to the right pane. */
@@ -355,10 +472,10 @@ export function DashLink({
     >
       {children}
       <span
-        className="mt-1 flex items-center gap-1 truncate px-1 text-2xs text-accent transition-opacity duration-fast pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-visible:opacity-100"
+        className="mt-1 flex items-start gap-1 px-1 text-2xs text-accent transition-opacity duration-fast pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-visible:opacity-100"
         data-testid="dash-hint"
       >
-        <span className="min-w-0 truncate">{hint}</span>
+        <span className="min-w-0 text-pretty">{hint}</span>
         <span aria-hidden className="font-pixel">
           ›
         </span>

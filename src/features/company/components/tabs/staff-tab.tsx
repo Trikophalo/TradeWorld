@@ -12,13 +12,16 @@ import { TaskBoard } from "../../tasks/task-board";
 import { AutopilotCard } from "../autopilot-card";
 import { CompanyChat } from "../company-chat";
 import { TeamView, type HireRequest } from "../employer";
-import { FirmSection, MergedCard, SectionNav, type NavItem, type Pane } from "../firm-layout";
+import { FirmSection, FoldBlock, MergedCard, SectionNav, type NavItem, type Pane } from "../firm-layout";
 import { InterviewCard } from "../interview-card";
 import { OfficeScene } from "../office-scene";
 import { PitchCard } from "../pitch-card";
 import { CompanyNewsCard, SituationCard } from "../situation";
 import { StaffValueCard } from "../staff-value-card";
 import { TodoCenter, type TodoItem } from "../todo-center";
+
+/** From this many people "Was jeder leistet" starts closed. */
+const FOLD_TEAM_FROM = 6;
 
 /**
  * The staff tab (ADR-167; to-do center and merged team card since ADR-187): first everything that is due as one
@@ -45,6 +48,8 @@ export function StaffTab({
   const tw = useTranslations("hq.where.places");
   const tgr = useTranslations("hq.groupCards");
   const tt = useTranslations("hq.todo");
+  const tf = useTranslations("hq.folds");
+  const heads = company.employees + company.aiWorkers + 1;
   const nav: NavItem[] = [
     { id: "todo", label: tt("title"), icon: UI_ICONS.bell, badge: todos.length },
     { id: "staff-tasks", label: t("jump.tasks"), icon: UI_ICONS.briefcase },
@@ -82,7 +87,17 @@ export function StaffTab({
       id: "staff-value",
       label: tw("staff-value"),
       description: t("sections.value.text"),
-      content: <StaffValueCard company={company} id="staff-value-card" />,
+      content: (
+        // Closed by default once the team is long (ADR-187); the count says what is inside.
+        <FoldBlock
+          id="staff-value"
+          title={tw("staff-value")}
+          summary={tf("people", { count: heads })}
+          defaultOpen={heads <= FOLD_TEAM_FROM}
+        >
+          <StaffValueCard company={company} id="staff-value-card" />
+        </FoldBlock>
+      ),
     },
   ];
   return (

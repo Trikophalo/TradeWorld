@@ -47,9 +47,12 @@ async function foundCompany(page: Page) {
 test("the overview shows eight factors and the chart; a factor goes to Mira with the question", async ({ page }) => {
   await foundCompany(page);
 
-  // The dashboard is the first tab: Mira raises the weakest point on her own, the full panel stands below.
+  // Mira (her own panel since ADR-187) raises the weakest point on her own.
   await showDashboard(page);
+  await page.getByTestId("mira-open").click();
   await expect(page.getByTestId("mira").getByText(/Hier verlierst du gerade am meisten:/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("mira")).toBeHidden();
 
   // ADR-183: nothing folds; the full panel stands in the section "Stärken und Diagnose" (jump bar)
   await page.getByTestId("dashboard-nav").getByTestId("nav-diagnosis").click();
@@ -61,6 +64,9 @@ test("the overview shows eight factors and the chart; a factor goes to Mira with
     await expect(panel.locator(`[data-testid="health-factor"][data-factor="${key}"]`)).toHaveCount(1);
   await expect(panel.getByTestId("health-weakest")).toContainText("Hier verlierst du am meisten:");
   await expect(panel.getByTestId("health-profit")).toContainText("/h");
+  // One view with the long-term strengths (ADR-187): six of the eight topics carry one.
+  await expect(panel.getByTestId("health-longterm")).toHaveCount(6);
+  await expect(panel.getByTestId("strengths-overall")).toContainText("/ 100");
 
   // No horizontal scroll on the phone.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

@@ -4203,3 +4203,32 @@ Netzdiagrammen und wirkten widersprüchlich.
 
 **Folgen.** Inhalte einer Karte, die nicht gewählt ist, sind nicht im DOM; E2E-Tests wählen die Ansicht vorher
 (`showPane` in `e2e/company-helpers.ts`). Die Beschreibungen und „i“-Erklärungen aus ADR-183 bleiben.
+
+## ADR-188: Wachstum & Ausbau als ein Weg, aufklappbare Listen — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: „Wachstum“ (die vier Stufen des Produkts, ADR-062/071) und der endlose „Ausbau“
+(ADR-083) standen als zwei Karten untereinander, beide mit „Stufe“; Spieler meldeten Kollisionen beim
+fortlaufenden Ausbauen (Ausbau „zurückgesetzt“ oder blockiert nach einem Stufenwechsel). Außerdem sollen
+„Geschäftszüge“, „Bewerbungen“ und „Was jeder leistet“ auf- und zuklappbar sein.
+
+**Ursache der Kollision.** Plätze einer Spielerfirma sind `maxEmployees(Rechtsform) + employeesPerLevel × Ausbaustufe`
+(`company_max_employees`). `upgrade_company` (neue Rechtsform) und der Abschluss des Börsengangs (`ipo_escrow`)
+schrieben aber den reinen Rechtsform-Wert in die Kopie `companies.max_employees`. Die Ausbaustufe selbst blieb
+erhalten (Markt, Kapazität, Fixkosten und Kosten der nächsten Stufe rechneten richtig weiter), doch alles, was die
+Spalte liest (Firmenprofil, öffentliche Sichten, die Missionen „einstellen“), sah nach dem Wechsel weniger Plätze;
+die Einstellungsprüfung zählte dagegen über die Funktion. Ergebnis: Ausbau „weg“ in der Anzeige, Missionen blockiert,
+widersprüchliche Platzzahlen. Doppelt gezählt wurde nichts; Markt ist Rechtsform × (1 + Bonus × Stufe), jede Stufe
+einmal.
+
+**Entscheidung.**
+
+- Migration 7350 (mit Kopie in `updates/`): Trigger `company_seats_sync` und `company_seats_guard` halten
+  `companies.max_employees` immer gleich `company_max_employees`, egal wer schreibt; bestehende Firmen werden
+  repariert. `company_growth_path(company)` liefert den ganzen Weg (Stufe, Ausbaustufe, Schritt, nächstes Ziel,
+  nächste Kosten, Plätze). SQL-Test `c4_growth_path.sql`. Regeln und Belohnungen beider Systeme unverändert.
+- Oberfläche: eine Karte „Wachstum & Ausbau“ (`growth-expansion.tsx`) mit einem durchgehenden Weg: Stufe 1–4, danach
+  Ausbau 1, 2, … ohne Ende; darunter die offenen Plätze der Stufe und der nächste Ausbau. `progress.ts` zählt beides
+  als einen Schritt (Test daneben). Die Rechtsform steht direkt darunter.
+- `FoldBlock`: Kopf als Knopf mit `aria-expanded`, zugeklappt eine kurze Zusammenfassung (Anzahl), Zustand je
+  Spieler in `localStorage` (nach der Hydration), Einblenden nur über `opacity`/`transform` mit Motion-Tokens. Ein
+  Link auf die Stelle klappt sie für diesen Besuch auf. „Was jeder leistet“ startet ab sechs Personen zugeklappt.

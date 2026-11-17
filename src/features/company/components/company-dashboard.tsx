@@ -72,7 +72,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const teaser = useDisclosed("companyListed");
   const now = useServerClock();
 
-  const [miraOpen, setMiraOpen] = useState(false);
+  const [miraOpen, setMiraOpen] = useState(() => current.target === "mira");
 
   /**
    * Scrolls to the place (nothing folds any more, ADR-183), with a short highlight. A merged card switches to the
