@@ -4058,7 +4058,11 @@ Popup, Pack Battles, Live-Öffnungen, versiegelte Packs, Demo und Datenbank.
   kein Set die Grenzen sprengen; Rare Nr. 60 von Yin Yang gibt wie überall einen Bonus.
 - **Sammlungen:** Set komplett heißt bei Titans alle 30 Karten (inklusive der vier Uranium); Master-Set zusätzlich jede
   Diamond und Uranium als eigener Slab ab Note 9 (`masterRarities` um `diamond`, `uranium`). Bei Yin Yang wie bei den
-  klassischen Sets (Prismas und Legendaries).
+  klassischen Sets (Prismas und Legendaries). Neu für alle Sets: ein Typ mit weniger als drei Karten im Set ist keine
+  Sammlung (`sets.type.minCards`; die klassischen Sets haben je Typ mindestens drei, Titans dagegen Typen mit einer
+  Iron-Karte). Eine Belohnungs-Pack zählt bei Titans 10.000 € statt 100.000 € (`sets.rewardPackCents`), sonst hätte
+  eine billige Typ-Sammlung 300.000 € gezahlt (im SQL-Test aufgefallen). Typ 30.000 €, Set komplett 200.000 €,
+  Master 750.000 €.
 - **Missionen:** „Rare oder besser“ zählt nach Rang ≥ 1 (Iron zählt nicht), „Ultra oder besser“ nach Rang ≥ 2
   (Titanium, Diamond, Uranium, One of One). Marktfilter nimmt jede bekannte Seltenheit.
 - **Bulk:** `quickSell.setRarities.titans_revenge = ["iron"]`; Yin Yang wie gehabt Common und Rare.

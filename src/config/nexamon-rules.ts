@@ -470,9 +470,15 @@ export const NEXAMON_RULES = {
      * pack prices of the set (from the households, as far as they have it) and `rewardXp` XP, once per player.
      */
     sets: {
-      type: { bps: 50, rewardPacks: 3, rewardXp: 300 },
+      /** A type with fewer than `minCards` cards in a set is no collection (ADR-182: Titans has one-card types). */
+      type: { bps: 50, rewardPacks: 3, rewardXp: 300, minCards: 3 },
       complete: { kind: "xp", bps: 200, rewardPacks: 20, rewardXp: 2_500 },
       master: { bps: 100, rewardPacks: 75, rewardXp: 10_000 },
+      /**
+       * The money of one reward pack where it is not the set's pack price (ADR-182): a Titans pack costs 100.000 €,
+       * but a type collection of iron and titanium cards is worth far less; there a reward pack counts 10.000 €.
+       */
+      rewardPackCents: { titans_revenge: 1_000_000 } as Readonly<Record<string, number>>,
       masterMinGrade: 9,
       /** Titans Revenge (ADR-182): its diamonds and uranium cards as slabs. */
       masterRarities: ["prisma", "legendary", "diamond", "uranium"],

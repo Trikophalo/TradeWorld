@@ -151,6 +151,7 @@ export function nexamonCollections(
     const types = [...new Set(setCards.map((c) => c.type))];
     for (const type of types) {
       const of = setCards.filter((c) => c.type === type);
+      if (of.length < s.type.minCards) continue;
       const missing = of.filter((c) => !owned.has(c.key)).map((c) => c.key);
       out.push({
         set,
@@ -239,7 +240,8 @@ export function nexamonCollectionReward(
   cfg: Config = BALANCE.nexamon,
 ): { cents: number; xp: number } {
   const r = cfg.bonuses.sets[kind];
-  return { cents: r.rewardPacks * cfg.sets[set].packPriceCents, xp: r.rewardXp };
+  const pack = cfg.bonuses.sets.rewardPackCents[set] ?? cfg.sets[set].packPriceCents;
+  return { cents: r.rewardPacks * pack, xp: r.rewardXp };
 }
 
 // ---------------------------------------------------------------------------------------------- Black Label hype

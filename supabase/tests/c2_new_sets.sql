@@ -199,5 +199,11 @@ reset role;
 select tests.assert((:'bi'::jsonb ->> 'count')::integer = 1 and tests.cash(:a) = :a1::bigint + (:'bi'::jsonb ->> 'total_cents')::bigint,
   'bulk: an iron card of Titans Revenge sells to the game at once');
 
+select tests.assert(
+  not exists (select 1 from public.nexamon_collection_completions
+               where set_key = 'titans_revenge' and kind = 'type' and reward_cents > 3 * 1000000)
+  and position('minCards' in pg_get_functiondef('public.nexamon_bonus_recompute(uuid)'::regprocedure)) > 0,
+  'Titans collections: no one-card types, a reward pack counts 10.000 €');
+
 update public.game_config set value = :'nx_cfg'::jsonb where key = 'nexamon';
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds after Titans Revenge and Yin Yang');
