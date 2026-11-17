@@ -4,6 +4,7 @@ import { COMPANY_TASK_RULES, COMPANY_TASKS, FUN_NEWS, type CompanyTaskConfig } f
 import { NEWS_SHOW_RULES } from "./news-show.ts";
 import { NEWS_PROMO_RULES } from "./news-promos.ts";
 import { COMPANY_SKILL_RULES, COMPANY_SKILLS } from "./company-skills.ts";
+import { TALENT_POOL, TALENT_ROLES, TALENT_RULES, TALENT_TRAITS } from "./talents.ts";
 import { INTERVIEW_QUESTIONS, INTERVIEW_RULES, type InterviewQuestionConfig } from "./interviews.ts";
 import { PITCH_RULES } from "./pitches.ts";
 import { PROTEST_RULES } from "./protests.ts";
@@ -917,6 +918,12 @@ export interface BalanceConfig {
   readonly newsPromos: typeof NEWS_PROMO_RULES;
   /** Fertigkeiten of player companies (ADR-194), values in company-skills.ts. */
   readonly companySkills: typeof COMPANY_SKILL_RULES & { readonly skills: typeof COMPANY_SKILLS };
+  /** Talente for the 15 Stellen (ADR-199), values and the generated pool in talents.ts. */
+  readonly talents: typeof TALENT_RULES & {
+    readonly roles: typeof TALENT_ROLES;
+    readonly traits: typeof TALENT_TRAITS;
+    readonly pool: typeof TALENT_POOL;
+  };
   /** CEO interviews of NEXA Nachrichten (ADR-173), values and question pools in interviews.ts. */
   readonly interviews: typeof INTERVIEW_RULES & { readonly pool: readonly InterviewQuestionConfig[] };
   /** Own strategies judged by Claude or the Mini-KI (ADR-132), values in pitches.ts. */
@@ -2786,6 +2793,7 @@ export const BALANCE = {
   newsShow: NEWS_SHOW_RULES,
   newsPromos: NEWS_PROMO_RULES,
   companySkills: { ...COMPANY_SKILL_RULES, skills: COMPANY_SKILLS },
+  talents: { ...TALENT_RULES, roles: TALENT_ROLES, traits: TALENT_TRAITS, pool: TALENT_POOL },
   interviews: { ...INTERVIEW_RULES, pool: INTERVIEW_QUESTIONS },
   pitches: PITCH_RULES,
   protests: PROTEST_RULES,

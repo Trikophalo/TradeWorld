@@ -89,6 +89,7 @@ describe("BALANCE", () => {
       "newsShow",
       "newsPromos",
       "companySkills",
+      "talents",
       "interviews",
       "companyAssistant",
       "companyHealth",
