@@ -235,6 +235,12 @@ export const NEXAMON_RULES = {
      */
     listingResetHours: 6,
     stockCap: { common: 12, rare: 8, ultra: 4, prisma: 2, legendary: 1, one_of_one: 0 },
+    /**
+     * Graded copies never leave circulation (ADR-165): a slab that reaches the AI (an AI collector's buy, a leaving
+     * player) is never retired; the AI holds it `minHours` + (`maxHours` - `minHours`) x u^`skewPow` hours (u uniform,
+     * so most come back within a day, some are held for days) and then lists it at its current value plus `askBps`.
+     */
+    slabHold: { minHours: 1, maxHours: 72, skewPow: 2 },
   },
   /**
    * Bulk (ADR-174): raw copies of the bulk rarities (`rarities`, or per set `setRarities[set]`, e.g. Titans Revenge's

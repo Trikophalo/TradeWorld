@@ -261,15 +261,16 @@ select public.nexamon_ai_reset() as rs \gset
 select public.nexamon_ai_reset() as rs2 \gset
 select tests.assert(
   (:'rs'::jsonb ->> 'deleted')::integer > 0 and :'rs2'::jsonb ->> 'skipped' = 'not due'
-  and (select count(*) from public.nexamon_copies where card_key = 'me-001' and ai_owner is not null) = 12
+  and (select count(*) from public.nexamon_copies where card_key = 'me-001' and ai_owner is not null and grade is null) = 12
   and not exists (select 1 from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
-                   where c.ai_owner is not null
+                   where c.ai_owner is not null and c.grade is null
                    group by c.card_key, k.rarity
                   having count(*) > (:'nx_cfg'::jsonb #>> array['ai', 'stockCap', k.rarity])::integer)
-  and (select count(*) from public.nexamon_listings where seller_ai is not null and card_key = 'me-001') = 4
+  and (select count(*) from public.nexamon_listings l join public.nexamon_copies c on c.id = l.copy_id
+        where l.seller_ai is not null and l.card_key = 'me-001' and c.grade is null) = 4
   and not exists (select 1 from public.nexamon_listings where seller_ai is not null and price_cents = 1)
   and (select population from public.nexamon_cards where card_key = 'me-001') >= 14,
-  'nexamon_ai_reset(): AI offers gone and listed anew at the value, stock capped per card, once per period; population still counts every copy');
+  'nexamon_ai_reset(): AI offers gone and listed anew at the value, stock capped per card, once per period; population still counts every copy; slabs are never retired (ADR-165)');
 update public.nexamon_meta set ai_reset_at = ai_reset_at - interval '7 hours';
 select (public.nexamon_ai_reset() ->> 'deleted') is not null as ok \gset
 select tests.assert(:'ok'::boolean, 'nexamon_ai_reset(): runs again after six hours');

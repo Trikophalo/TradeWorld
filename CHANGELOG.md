@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Slabs bleiben im Umlauf:** Bewertete Karten, die die KI kauft, verschwinden nie; sie behält sie eine Weile (1 bis 72 h)
+  und bietet sie dann zum aktuellen Wert wieder am Markt an.
 - **Kritiker für NFTs (ADR-181):** Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit
   Stärke und Schwäche, der Markt als kleines Abzeichen). Gute Bilder bekommen mehr und höhere Angebote, Kopien keine,
   und die Sammler reden jetzt zurück: sie antworten, feilschen, loben, lästern und erinnern an ihr Angebot.
