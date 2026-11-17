@@ -1785,7 +1785,7 @@ export const BALANCE = {
       premiumScaleDepths: 20,
     },
     // ADR-170: no pump with money from the own company, at most +30 % / -23 % a day
-    playerStocks: { insiderCooldownHours: 24, dailyBandBps: 3_000 },
+    playerStocks: { insiderCooldownHours: 24, dailyBandBps: 10_000 },
   },
 
   // ----------------------------------------------------------- centralBank (spec 5.1)

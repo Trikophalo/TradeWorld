@@ -107,8 +107,8 @@ select public.place_order(gen_random_uuid(), :'tkr', 'buy', 'market', null, null
 reset role;
 select (select sum(x) from unnest(tests.run_ticks(:'sec', public.game_now(), 12)) x) as g1 \gset
 select last_price_e4 as p1 from public.security_quotes where security_id = :'sec' \gset
-select tests.assert(:'b1' = 'filled' and :p1::bigint > :p0::bigint and :p1::bigint <= ceil(:p0::bigint * 1.3),
-  'the founder''s buying lifts the price, but at most dailyBandBps (30 %) over the previous close ('
+select tests.assert(:'b1' = 'filled' and :p1::bigint > :p0::bigint and :p1::bigint <= ceil(:p0::bigint * 2.0),
+  'the founder''s buying lifts the price, but at most dailyBandBps (100 %) over the previous close ('
   || :p0 || ' -> ' || :p1 || ')');
 
 select tests.login_as('authenticated', :f);
@@ -158,8 +158,8 @@ $$;
 select last_price_e4 as p3, (select max(last_price_e4) from public.security_quotes where security_id = :'sec') as pmax
   from public.security_quotes where security_id = :'sec' \gset
 select tests.sell_down(:f, :'sec', 600000000000);
-select tests.assert(:p3::bigint <= ceil(:p2::bigint * 1.3) and tests.cash(:f) < :d0::bigint,
-  '100.000 EUR of buying in an hour: price ' || :p2 || ' -> ' || :p3 || ' (band 30 %), selling again loses '
+select tests.assert(:p3::bigint <= ceil(:p2::bigint * 2.0) and tests.cash(:f) < :d0::bigint,
+  '100.000 EUR of buying in an hour: price ' || :p2 || ' -> ' || :p3 || ' (band 100 %), selling again loses '
   || ((:d0::bigint - tests.cash(:f)) / 100.0) || ' EUR');
 
 -- =============================================================================

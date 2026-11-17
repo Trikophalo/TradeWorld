@@ -1397,7 +1397,7 @@ höchstens 9 000, stündlich 1/24 davon; Sperre 20 h, Ablauf 6 h. Je Punkt 60 bp
 | Abstand zweier Kapitalerhöhungen    | `startups.ipo.capitalIncreaseCooldownHours`  | 24 h                                                        |
 | Sperre für Ausgabeerlöse            | `startups.ipo.issueProceedsLockHours`        | 72 h nicht entnehmbar                                       |
 | Insiderregel                        | `trading.playerStocks.insiderCooldownHours`  | 24 h kein Kauf der eigenen Aktie nach Geld aus der Firma    |
-| Tagesband Spieleraktien             | `trading.playerStocks.dailyBandBps`          | +30 % / −23 % zum Vortagesschluss                           |
+| Tagesband Spieleraktien             | `trading.playerStocks.dailyBandBps`          | +100 % / −50 % zum Vortagesschluss (vorher +30 % / −23 %)   |
 | Sammler-Angebote gelten             | `nfts.ai.offerHours`                         | 2 h (vorher 24 h wie Spielerangebote)                       |
 | Käufe von Spielern                  | `nfts.ai.maxBuysPerHour`, `maxBuysPerDay`    | 6 je Stunde, 100 je Tag (vorher 60 je Tag)                  |
 | Handel unter Sammlern               | `nfts.ai.trade.perHour`, `trade.perDay`      | 24 je Stunde, 480 je Tag (vorher 300 je Tag)                |

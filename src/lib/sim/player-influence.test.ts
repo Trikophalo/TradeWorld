@@ -69,6 +69,6 @@ describe("playerStockBandE4 (ADR-170)", () => {
     expect(playerStockBandE4(20_000, 0, cfg)).toBe(20_000);
   });
   it("uses the game's band", () => {
-    expect(BALANCE.trading.playerStocks.dailyBandBps).toBe(3_000);
+    expect(BALANCE.trading.playerStocks.dailyBandBps).toBe(10_000);
   });
 });
