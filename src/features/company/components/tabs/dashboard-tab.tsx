@@ -609,7 +609,11 @@ function MoodCard({ listed, go }: { listed: ListedCompany; go: Go }) {
               {t("reputationEffects", {
                 demand: formatBps(Math.round((r.demandFactor - 1) * 10_000)),
                 price: formatBps(Math.round((r.priceFactor - 1) * 10_000)),
-                payout: formatBps(r.payoutRatioBps).replace("+", ""),
+                // payouts far above the profit (e.g. when profit is tiny) read better as "> 100 %" than as "9.904 %"
+                payout:
+                  r.payoutRatioBps > 10_000
+                    ? `> ${formatBps(10_000).replace("+", "")}`
+                    : formatBps(r.payoutRatioBps).replace("+", ""),
               })}
             </p>
           </div>

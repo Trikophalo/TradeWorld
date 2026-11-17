@@ -1,12 +1,10 @@
 "use client";
 
-import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import type { ListedHistoryPoint } from "@/features/game/listed-types";
 import { formatMoneyShort } from "@/lib/format";
-import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { gaugeAngle, gaugeArc, gaugePoint, historyLine, linePath } from "./view";
+import { gaugeArc, gaugePoint, historyLine, linePath } from "./view";
 
 /*
  * Charts of the company page (ADR-167, UI). Plain SVG with token colours: zones are green / yellow / red from the
@@ -91,15 +89,8 @@ export function ZoneGauge({
             strokeDasharray="3 2"
           />
         )}
-        {/* The needle turns around the hub; the transparent square keeps the hub as the origin. */}
-        <motion.g
-          initial={false}
-          animate={{ rotate: gaugeAngle(value) }}
-          transition={SPRING.smooth}
-          style={{ transformOrigin: `${cx}px ${cy}px`, transformBox: "view-box" }}
-        >
-          <path d={`M ${cx - 4} ${cy} L ${cx} ${cy - r + 16} L ${cx + 4} ${cy} Z`} className="fill-fg-1" />
-        </motion.g>
+        {/* The needle is drawn from the hub to the value (no CSS transform, so it always starts in the hub). */}
+        <path d={needlePath(value, cx, cy, r - 16)} className="fill-fg-1" />
         <circle cx={cx} cy={cy} r={7} className="fill-fg-1 stroke-surface-1" strokeWidth={2} />
       </svg>
       <figcaption className="-mt-1 text-center">
@@ -385,4 +376,15 @@ export function HoursChart({ hours, className }: { hours: readonly HourBar[]; cl
       </figcaption>
     </figure>
   );
+}
+
+/** A thin triangle from the hub (cx, cy) to the gauge position of `value`. */
+function needlePath(value: number, cx: number, cy: number, length: number): string {
+  const tip = gaugePoint(Math.max(0, Math.min(100, value)), cx, cy, length);
+  const dx = tip.x - cx;
+  const dy = tip.y - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / len) * 4;
+  const ny = (dx / len) * 4;
+  return `M ${cx + nx} ${cy + ny} L ${tip.x} ${tip.y} L ${cx - nx} ${cy - ny} Z`;
 }
