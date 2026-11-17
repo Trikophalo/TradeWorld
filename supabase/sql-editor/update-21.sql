@@ -2134,4 +2134,1387 @@ begin
 end;
 $do$;
 
+-- ===== supabase/updates/20261204006700_battle_sims_five.sql =====
+-- ===== idempotent copy of migrations/20261204006700_battle_sims_five.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 6700 · News battles: five more action games as PL/pgSQL (ADR-177)
+-- =============================================================================
+-- Goldrausch-Zone (zone), Bulle und Bär (tag), Wackelparkett (tiles), Farbrausch (paint) and Crash-Regen (crash):
+-- the same integer simulations as src/lib/sim/battle/{zone,tag,tiles,paint,crash}.ts, with the same arguments and
+-- answer as the other games (battle_sim_floor ...). A change to the TypeScript rules must be made here too;
+-- supabase/tests/b6_battles_prizes.sql and src/lib/sim/battle/vectors.test.ts run both against the same inputs.
+--   battle_sim(kind, seed, params, streams, until)   redefined with all seventeen games
+--   battle_is_tick(kind)                            patched (replace): the new games are action games
+--   battles.kind                                    the check takes the new games
+-- Internal helpers: no grants. Idempotent: runs unchanged as supabase/updates/20261204006700_battle_sims_five.sql.
+
+-- ---------------------------------------------------------------------------
+-- Goldrausch-Zone (src/lib/sim/battle/zone.ts)
+-- ---------------------------------------------------------------------------
+-- A free tile inside the zone for coin number p_index: from the drawn tile on, the first without an alive player
+-- (p_occ > 0) or a coin; the middle when there is none
+create or replace function public.battle_zone_tile(p_seed bigint, p_index integer, p_w integer, p_h integer,
+                                                   p_cx integer, p_cy integer, p_r integer, p_occ integer[],
+                                                   p_coins integer[])
+returns integer
+language plpgsql
+immutable
+as $$
+declare
+  v_size  integer := p_w * p_h;
+  v_start integer := (public.battle_hash(p_seed, 710, p_index) % v_size)::integer;
+  v_tile  integer;
+  k       integer;
+begin
+  for k in 0 .. v_size - 1 loop
+    v_tile := (v_start + k) % v_size;
+    continue when greatest(abs(v_tile % p_w - p_cx), abs(v_tile / p_w - p_cy)) > p_r;
+    continue when p_occ[v_tile + 1] > 0 or v_tile = any (coalesce(p_coins, '{}'));
+    return v_tile;
+  end loop;
+  return p_cy * p_w + p_cx;
+end;
+$$;
+
+create or replace function public.battle_sim_zone(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_shrink integer := (g ->> 'firstShrink')::integer;
+  g_every  integer := (g ->> 'shrinkEvery')::integer;
+  g_rmin   integer := (g ->> 'radiusMin')::integer;
+  g_first  integer := (g ->> 'firstCoin')::integer;
+  g_per    integer := (g ->> 'coinsPerPlayers')::integer;
+  g_cmax   integer := (g ->> 'coinsMax')::integer;
+  g_delay  integer := (g ->> 'spawnDelay')::integer;
+  g_gevery integer := (g ->> 'goldEvery')::integer;
+  g_gval   integer := (g ->> 'goldValue')::integer;
+  cx       integer := w / 2;
+  cy       integer := h / 2;
+  r0       integer := greatest(w / 2, h / 2);
+  r        integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  score integer[]; reach integer[]; rk bigint[];
+  ct integer[]; ca integer[]; cn integer[];
+  occ integer[];
+  v_count  integer;
+  v_next   integer := 0;
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; c integer; nx integer; ny integer; alive integer; v_tile integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  score := mv; reach := mv;
+  rk := array_fill(0::bigint, array[n]);
+  outt := array_fill(-1, array[n]);
+  r := r0;
+  occ := array_fill(0, array[w * h]);
+  for i in 1 .. n loop
+    occ[py[i] * w + px[i] + 1] := i;
+  end loop;
+  v_count := least(g_cmax, 1 + n / g_per);
+  ct := '{}'; ca := '{}'; cn := '{}';
+  for c in 1 .. v_count loop
+    ct := ct || public.battle_zone_tile(p_seed, v_next, w, h, cx, cy, r, occ, ct);
+    ca := ca || g_first;
+    cn := cn || v_next;
+    v_next := v_next + 1;
+  end loop;
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+      end if;
+    end loop;
+    -- walk inside the zone; a tile two want goes to the one with fewer coins, then by lot (walkContested)
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h and greatest(abs(nx - cx), abs(ny - cy)) <= r then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      rk[i] := case when want[i] = 1 then score[i]::bigint * 4294967296 + public.battle_hash(p_seed, 7100 + t, i - 1) else 0 end;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] and rk[j] < rk[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    -- the zone shrinks: who is outside is out, coins outside move in
+    if r > g_rmin and t = g_shrink + (r0 - r) * g_every then
+      r := r - 1;
+      for i in 1 .. n loop
+        if outt[i] < 0 and greatest(abs(px[i] - cx), abs(py[i] - cy)) > r then outt[i] := t; end if;
+      end loop;
+      occ := array_fill(0, array[w * h]);
+      for i in 1 .. n loop
+        if outt[i] < 0 then occ[py[i] * w + px[i] + 1] := i; end if;
+      end loop;
+      for c in 1 .. v_count loop
+        continue when greatest(abs(ct[c] % w - cx), abs(ct[c] / w - cy)) <= r;
+        ct[c] := -1;
+        ct[c] := public.battle_zone_tile(p_seed, v_next, w, h, cx, cy, r, occ, ct);
+        ca[c] := t + g_delay;
+        cn[c] := v_next;
+        v_next := v_next + 1;
+      end loop;
+    end if;
+    -- coins
+    occ := array_fill(0, array[w * h]);
+    for i in 1 .. n loop
+      if outt[i] < 0 then occ[py[i] * w + px[i] + 1] := i; end if;
+    end loop;
+    for c in 1 .. v_count loop
+      continue when t < ca[c];
+      v_tile := ct[c];
+      j := occ[v_tile + 1];
+      continue when j = 0;
+      score[j] := score[j] + case when (cn[c] + 1) % g_gevery = 0 then g_gval else 1 end;
+      reach[j] := t;
+      ct[c] := -1;
+      ct[c] := public.battle_zone_tile(p_seed, v_next, w, h, cx, cy, r, occ, ct);
+      ca[c] := t + g_delay;
+      cn[c] := v_next;
+      v_next := v_next + 1;
+    end loop;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := score[i];
+    k3[i] := case when score[i] > 0 then -reach[i] else 0 end;
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(score), 'radius', r);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Bulle und Bär (src/lib/sim/battle/tag.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_tag(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_bstep  integer := (g ->> 'bearStepTicks')::integer;
+  g_freeze integer := (g ->> 'freezeTicks')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  held integer[]; tags integer[];
+  bear     integer;
+  tagged   integer;
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; nx integer; ny integer; alive integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  held := mv; tags := mv;
+  outt := array_fill(-1, array[n]);
+  bear := (public.battle_hash(p_seed, 801, 0) % n)::integer + 1;
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+      end if;
+    end loop;
+    -- a bear who left: the alive player with the fewest bear ticks, then the lot of the tick
+    if bear = 0 or outt[bear] >= 0 then
+      select s into bear from generate_series(1, n) s
+       where outt[s] < 0
+       order by held[s], public.battle_hash(p_seed, 8000 + t, s - 1), s
+       limit 1;
+      bear := coalesce(bear, 0);
+    end if;
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    tagged := 0;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then
+          go[i] := 0;
+          if i = bear and tagged = 0 then tagged := j; end if;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then
+        px[i] := tx[i]; py[i] := ty[i];
+        mv[i] := case when i = bear then g_bstep else st end;
+        steps[i] := steps[i] + 1;
+      end if;
+    end loop;
+    if tagged > 0 then
+      tags[bear] := tags[bear] + 1;
+      bear := tagged;
+      stun[tagged] := g_freeze;
+    end if;
+    if bear > 0 then held[bear] := held[bear] + 1; end if;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1 else 0 end;
+    k2[i] := -held[i];
+    k3[i] := tags[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(held), 'bear', bear - 1);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Wackelparkett (src/lib/sim/battle/tiles.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_tiles(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_bstart integer := (g ->> 'breakStart')::integer;
+  g_bmin   integer := (g ->> 'breakMin')::integer;
+  g_bstep  integer := (g ->> 'breakStepEvery')::integer;
+  g_regrow integer := (g ->> 'regrowStart')::integer;
+  g_rgrow  integer := (g ->> 'regrowGrowEvery')::integer;
+  g_idle   integer := (g ->> 'idleMax')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[]; fx integer[]; fy integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; idle integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  crack integer[]; hole integer[];
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; nx integer; ny integer; alive integer; tile integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  fx := px; fy := py;
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; idle := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  outt := array_fill(-1, array[n]);
+  crack := array_fill(-1, array[w * h]);
+  hole := array_fill(0, array[w * h]);
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+      end if;
+    end loop;
+    -- walk: holes cannot be entered
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h and hole[ny * w + nx + 1] <= t then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then
+        fx[i] := px[i]; fy[i] := py[i];
+        px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then idle[i] := case when mv[i] = 0 then idle[i] + 1 else 0 end; end if;
+    end loop;
+    -- the tile left cracks; standing still too long breaks the own tile now
+    for i in 1 .. n loop
+      continue when outt[i] >= 0;
+      if go[i] = 1 then
+        tile := fy[i] * w + fx[i] + 1;
+        if crack[tile] < 0 then crack[tile] := t + greatest(g_bmin, g_bstart - t / g_bstep); end if;
+      elsif idle[i] >= g_idle then
+        tile := py[i] * w + px[i] + 1;
+        if crack[tile] < 0 then crack[tile] := t; end if;
+      end if;
+    end loop;
+    for tile in 1 .. w * h loop
+      if crack[tile] >= 0 and crack[tile] <= t then
+        crack[tile] := -1;
+        hole[tile] := t + g_regrow + t / g_rgrow;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 and hole[py[i] * w + px[i] + 1] > t then outt[i] := t; end if;
+    end loop;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := steps[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(steps));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Farbrausch (src/lib/sim/battle/paint.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_paint(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'durationTicks')::integer;
+  g_cool   integer := (g ->> 'bombCool')::integer;
+  g_rad    integer := (g ->> 'bombRadius')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  own integer[]; score integer[]; cool integer[]; claim integer[];
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; nx integer; ny integer; alive integer; tile integer; ex integer; ey integer;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  score := mv; cool := mv;
+  outt := array_fill(-1, array[n]);
+  -- own: 0 nobody, else the slot (1-based)
+  own := array_fill(0, array[w * h]);
+  for i in 1 .. n loop
+    tile := py[i] * w + px[i] + 1;
+    if own[tile] <> i then
+      if own[tile] > 0 then score[own[tile]] := score[own[tile]] - 1; end if;
+      own[tile] := i; score[i] := score[i] + 1;
+    end if;
+  end loop;
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+        if cool[i] > 0 then cool[i] := cool[i] - 1; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    -- paint bombs: a tile claimed by exactly one bomb takes its colour (claim: 0 none, slot, -1 several)
+    claim := array_fill(0, array[w * h]);
+    for i in 1 .. n loop
+      continue when outt[i] >= 0 or code[i] < 5 or cool[i] > 0;
+      cool[i] := g_cool;
+      for ey in py[i] - g_rad .. py[i] + g_rad loop
+        for ex in px[i] - g_rad .. px[i] + g_rad loop
+          continue when ex < 0 or ey < 0 or ex >= w or ey >= h;
+          tile := ey * w + ex + 1;
+          claim[tile] := case when claim[tile] = 0 then i else -1 end;
+        end loop;
+      end loop;
+    end loop;
+    for tile in 1 .. w * h loop
+      if claim[tile] > 0 and own[tile] <> claim[tile] then
+        if own[tile] > 0 then score[own[tile]] := score[own[tile]] - 1; end if;
+        own[tile] := claim[tile]; score[claim[tile]] := score[claim[tile]] + 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      continue when outt[i] >= 0;
+      tile := py[i] * w + px[i] + 1;
+      if own[tile] <> i then
+        if own[tile] > 0 then score[own[tile]] := score[own[tile]] - 1; end if;
+        own[tile] := i; score[i] := score[i] + 1;
+      end if;
+    end loop;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1 else 0 end;
+    k2[i] := score[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(score));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Crash-Regen (src/lib/sim/battle/crash.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim_crash(p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  g        jsonb := p_params -> 'game';
+  w        integer := (p_params ->> 'w')::integer;
+  h        integer := (p_params ->> 'h')::integer;
+  st       integer := (p_params ->> 'stepTicks')::integer;
+  disc     integer := (p_params ->> 'disconnectTicks')::integer;
+  n        integer := coalesce(array_length(p_streams, 1), 0);
+  len      integer := greatest(p_until, 1);
+  g_max    integer := (g ->> 'maxTicks')::integer;
+  g_hearts integer := (g ->> 'hearts')::integer;
+  g_first  integer := (g ->> 'firstWave')::integer;
+  g_every  integer := (g ->> 'waveEvery')::integer;
+  g_emin   integer := (g ->> 'waveEveryMin')::integer;
+  g_estep  integer := (g ->> 'waveEveryStep')::integer;
+  g_warn   integer := (g ->> 'warnTicks')::integer;
+  g_cstart integer := (g ->> 'countStart')::integer;
+  g_cper   integer := (g ->> 'countPerPlayers')::integer;
+  g_cmax   integer := (g ->> 'countMax')::integer;
+  g_inv    integer := (g ->> 'invulnTicks')::integer;
+  dx       integer[] := array[0, 0, 1, 0, -1];
+  dy       integer[] := array[0, -1, 0, 1, 0];
+  v_in     bytea;
+  px integer[]; py integer[];
+  mv integer[]; stun integer[]; xr integer[]; outt integer[]; steps integer[];
+  code integer[]; want integer[]; tx integer[]; ty integer[]; go integer[];
+  hearts integer[]; inv integer[]; centres integer[];
+  v_hit    integer := 0;
+  v_hit_at integer;
+  t        integer := 0;
+  done     boolean := false;
+  endt     integer := -1;
+  i integer; j integer; d integer; b integer; nx integer; ny integer; alive integer; m integer; v_c integer;
+  v_struck boolean;
+  k1 integer[]; k2 integer[]; k3 integer[];
+begin
+  if n = 0 then
+    return jsonb_build_object('done', true, 'end_tick', -1, 'tick', 0, 'ranking', '[]'::jsonb, 'out', '[]'::jsonb, 'score', '[]'::jsonb);
+  end if;
+  v_in := public.battle_stream_bytes(p_streams, n, len);
+  select sx, sy into px, py from public.battle_spawns(p_seed, n, p_params -> 'spawns');
+  mv := array_fill(0, array[n]); stun := mv; xr := mv; steps := mv; code := mv; want := mv; tx := mv; ty := mv; go := mv;
+  inv := mv;
+  hearts := array_fill(g_hearts, array[n]);
+  outt := array_fill(-1, array[n]);
+  v_hit_at := g_first;
+  while not done and t < p_until loop
+    for i in 1 .. n loop
+      code[i] := -1;
+      continue when outt[i] >= 0;
+      b := get_byte(v_in, (i - 1) * len + t);
+      if b = 113 then outt[i] := t; continue; end if;
+      if b between 48 and 57 then
+        xr[i] := 0; code[i] := b - 48;
+      else
+        xr[i] := xr[i] + 1;
+        if xr[i] >= disc then outt[i] := t; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      if outt[i] < 0 then
+        if mv[i] > 0 then mv[i] := mv[i] - 1; end if;
+        if stun[i] > 0 then stun[i] := stun[i] - 1; end if;
+        if inv[i] > 0 then inv[i] := inv[i] - 1; end if;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      want[i] := 0;
+      continue when outt[i] >= 0 or mv[i] > 0 or stun[i] > 0 or code[i] <= 0;
+      d := code[i] % 5;
+      continue when d = 0;
+      nx := px[i] + dx[d + 1]; ny := py[i] + dy[d + 1];
+      if nx >= 0 and ny >= 0 and nx < w and ny < h then
+        tx[i] := nx; ty[i] := ny; want[i] := 1;
+      end if;
+    end loop;
+    for i in 1 .. n loop
+      go[i] := want[i];
+      continue when want[i] = 0;
+      for j in 1 .. n loop
+        continue when j = i or outt[j] >= 0;
+        if px[j] = tx[i] and py[j] = ty[i] then go[i] := 0;
+        elsif want[j] = 1 and tx[j] = tx[i] and ty[j] = ty[i] then go[i] := 0;
+        end if;
+      end loop;
+    end loop;
+    for i in 1 .. n loop
+      if go[i] = 1 then px[i] := tx[i]; py[i] := ty[i]; mv[i] := st; steps[i] := steps[i] + 1; end if;
+    end loop;
+    -- the crashes of the due wave hit (a plus of five tiles each)
+    if v_hit_at + g_warn = t then
+      centres := '{}';
+      for m in 0 .. least(g_cmax, g_cstart + v_hit / 2 + n / g_cper) - 1 loop
+        centres := centres || (public.battle_hash(p_seed, 1100 + v_hit, m) % (w * h))::integer;
+      end loop;
+      for i in 1 .. n loop
+        continue when outt[i] >= 0 or inv[i] > 0;
+        v_struck := false;
+        foreach v_c in array centres loop
+          if abs(v_c % w - px[i]) + abs(v_c / w - py[i]) <= 1 then v_struck := true; end if;
+        end loop;
+        continue when not v_struck;
+        hearts[i] := hearts[i] - 1;
+        inv[i] := g_inv;
+        if hearts[i] <= 0 then outt[i] := t; end if;
+      end loop;
+      v_hit_at := v_hit_at + greatest(g_emin, g_every - v_hit * g_estep);
+      v_hit := v_hit + 1;
+    end if;
+    alive := 0;
+    for i in 1 .. n loop
+      if outt[i] < 0 then alive := alive + 1; end if;
+    end loop;
+    if (n >= 2 and alive <= 1) or alive = 0 or t + 1 >= g_max then done := true; endt := t; end if;
+    t := t + 1;
+  end loop;
+  k1 := array_fill(0, array[n]); k2 := k1; k3 := k1;
+  for i in 1 .. n loop
+    k1[i] := case when outt[i] < 0 then 1000000 else outt[i] end;
+    k2[i] := hearts[i];
+  end loop;
+  return jsonb_build_object('done', done, 'end_tick', endt, 'tick', t,
+                            'ranking', to_jsonb(public.battle_rank(p_seed, n, k1, k2, k3)),
+                            'out', to_jsonb(outt), 'score', to_jsonb(hearts));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- One entry for all games (the definition of 4900 with the five new games)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_sim(p_kind text, p_seed bigint, p_params jsonb, p_streams text[], p_until integer)
+returns jsonb
+language plpgsql
+immutable
+as $$
+begin
+  return case p_kind
+    when 'floor' then public.battle_sim_floor(p_seed, p_params, p_streams, p_until)
+    when 'bulls' then public.battle_sim_bulls(p_seed, p_params, p_streams, p_until)
+    when 'coins' then public.battle_sim_coins(p_seed, p_params, p_streams, p_until)
+    when 'sumo' then public.battle_sim_sumo(p_seed, p_params, p_streams, p_until)
+    when 'potato' then public.battle_sim_potato(p_seed, p_params, p_streams, p_until)
+    when 'pump' then public.battle_sim_pump(p_seed, p_params, p_streams, p_until)
+    when 'bear' then public.battle_sim_bear(p_seed, p_params, p_streams, p_until)
+    when 'dash' then public.battle_sim_dash(p_seed, p_params, p_streams, p_until)
+    when 'margin' then public.battle_sim_margin(p_seed, p_params, p_streams, p_until)
+    when 'elevator' then public.battle_sim_elevator(p_seed, p_params, p_streams, p_until)
+    when 'laser' then public.battle_sim_laser(p_seed, p_params, p_streams, p_until)
+    when 'rodeo' then public.battle_sim_rodeo(p_seed, p_params, p_streams, p_until)
+    when 'zone' then public.battle_sim_zone(p_seed, p_params, p_streams, p_until)
+    when 'tag' then public.battle_sim_tag(p_seed, p_params, p_streams, p_until)
+    when 'tiles' then public.battle_sim_tiles(p_seed, p_params, p_streams, p_until)
+    when 'paint' then public.battle_sim_paint(p_seed, p_params, p_streams, p_until)
+    when 'crash' then public.battle_sim_crash(p_seed, p_params, p_streams, p_until)
+    else null end;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- The new games are action games; battles takes their kinds
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.battle_is_tick(text)'::regprocedure);
+begin
+  if position('''crash''' in v_def) = 0 then
+    if position($q$'rodeo')$q$ in v_def) = 0 then
+      raise exception 'battle_is_tick() has an unexpected shape (no ''rodeo'')); add the ADR-177 action games by hand';
+    end if;
+    v_def := replace(v_def, $q$'rodeo')$q$, $q$'rodeo', 'zone', 'tag', 'tiles', 'paint', 'crash')$q$);
+    execute v_def;
+  end if;
+end;
+$do$;
+
+alter table public.battles drop constraint if exists battles_kind_check;
+alter table public.battles add constraint battles_kind_check check (kind is null or kind in (
+  'floor', 'bulls', 'coins', 'sumo', 'potato', 'pump', 'bear', 'dash', 'margin', 'elevator', 'laser', 'rodeo',
+  'zone', 'tag', 'tiles', 'paint', 'crash',
+  'quiz', 'estimate', 'bell', 'vault', 'ticker', 'higher', 'auction'));
+
+revoke all on function public.battle_zone_tile(bigint, integer, integer, integer, integer, integer, integer, integer[], integer[]) from public, anon, authenticated;
+revoke all on function public.battle_sim_zone(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_tag(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_tiles(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_paint(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim_crash(bigint, jsonb, text[], integer) from public, anon, authenticated;
+revoke all on function public.battle_sim(text, bigint, jsonb, text[], integer) from public, anon, authenticated;
+
+-- ===== supabase/updates/20261204006710_nexamon_sealed_packs.sql =====
+-- ===== idempotent copy of migrations/20261204006710_nexamon_sealed_packs.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 6710 · Nexamon: sealed booster packs (ADR-177)
+-- =============================================================================
+-- Booster packs a player owns but has not opened yet ("Ungeöffnete Booster" in Collectibles): won in news battles
+-- or bought to open later. Opening one runs exactly the pull of a bought pack (public.nexamon_open_pack, called by
+-- name; the population, the live opening trigger on nexamon_packs and the missions as with buy_nexamon_pack), but
+-- charges nothing. buy_nexamon_pack itself stays untouched.
+-- * Table nexamon_sealed_packs (owner, set, source battle | bought, price paid, created_at, opened_at, pack_id).
+-- * nexamon_grant_sealed_packs(player, set, count, source, battle) -> count: internal, used by the battle prizes.
+-- * RPC get_nexamon_sealed_packs(): the unopened packs of the caller (works while Nexamon is still locked).
+-- * RPC open_nexamon_sealed_pack(request_id, pack_id): opens one (answer like buy_nexamon_pack plus sealed_id).
+-- * RPC buy_nexamon_sealed_pack(request_id, set, count): charges like buy_nexamon_pack (same set price, same
+--   ledger kind nexamon_pack, cash -> households, same rate limit) and puts count packs into the inventory.
+-- Errors: sealed_pack_unknown NX290 (and those of buy_nexamon_pack).
+-- Idempotent: runs unchanged as supabase/updates/20261204006710_nexamon_sealed_packs.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error key
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_new text := $q$    when 'sealed_pack_unknown'        then 'NX290'
+    else 'NX007'$q$;
+begin
+  if position('''sealed_pack_unknown''' in v_def) = 0 then
+    if position($q$    else 'NX007'$q$ in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the sealed pack error key (ADR-177) by hand';
+    end if;
+    execute replace(v_def, $q$    else 'NX007'$q$, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- B. Table (internal: read and written only by the functions below)
+-- ---------------------------------------------------------------------------
+create table if not exists public.nexamon_sealed_packs (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  set_key     text not null,
+  source      text not null check (source in ('battle', 'bought')),
+  price_cents bigint not null default 0 check (price_cents >= 0),
+  battle_id   bigint,
+  created_at  timestamptz not null default now(),
+  opened_at   timestamptz,
+  pack_id     uuid
+);
+create index if not exists nexamon_sealed_packs_player_idx on public.nexamon_sealed_packs (player_id, created_at);
+alter table public.nexamon_sealed_packs enable row level security;
+revoke all on public.nexamon_sealed_packs from public, anon, authenticated;
+grant all on public.nexamon_sealed_packs to service_role;
+comment on table public.nexamon_sealed_packs is
+  'Sealed Nexamon booster packs (ADR-177): won in news battles (source battle) or bought to open later (bought, '
+  'price_cents paid). opened_at/pack_id once opened (nexamon_packs). Internal (RPCs get_nexamon_sealed_packs, '
+  'open_nexamon_sealed_pack, buy_nexamon_sealed_pack).';
+
+-- ---------------------------------------------------------------------------
+-- C. Helpers
+-- ---------------------------------------------------------------------------
+-- p_count sealed packs of a set for a player; 0 for an unknown set or a count below 1
+create or replace function public.nexamon_grant_sealed_packs(p_player uuid, p_set text, p_count integer, p_source text,
+                                                            p_battle bigint default null, p_price_cents bigint default 0)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_player is null or coalesce(p_count, 0) < 1
+     or public.nexamon_cfg() #> array['sets', p_set] is null then
+    return 0;
+  end if;
+  insert into public.nexamon_sealed_packs (player_id, set_key, source, price_cents, battle_id, created_at)
+  select p_player, p_set, p_source, greatest(0, coalesce(p_price_cents, 0)), p_battle, public.game_now()
+    from generate_series(1, p_count);
+  return p_count;
+end;
+$$;
+revoke all on function public.nexamon_grant_sealed_packs(uuid, text, integer, text, bigint, bigint) from public, anon, authenticated;
+grant execute on function public.nexamon_grant_sealed_packs(uuid, text, integer, text, bigint, bigint) to service_role;
+
+-- The unopened packs of a player, oldest first
+create or replace function public.nexamon_sealed_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', s.id, 'set', s.set_key, 'name', coalesce(public.nexamon_cfg() #>> array['sets', s.set_key, 'name'], s.set_key),
+           'source', s.source, 'price_cents', s.price_cents, 'created_at', s.created_at)
+           order by s.created_at, s.id), '[]'::jsonb)
+    from public.nexamon_sealed_packs s
+   where s.player_id = p_player and s.opened_at is null;
+$$;
+revoke all on function public.nexamon_sealed_json(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- D. RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_nexamon_sealed_packs()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+begin
+  return jsonb_build_object('packs', public.nexamon_sealed_json(v_player), 'unlocked', public.nexamon_unlocked(v_player),
+                            'server_time', public.game_now());
+end;
+$$;
+comment on function public.get_nexamon_sealed_packs() is
+  'RPC: the caller''s unopened Nexamon booster packs (ADR-177), oldest first, and whether Nexamon is unlocked.';
+revoke all on function public.get_nexamon_sealed_packs() from public, anon;
+grant execute on function public.get_nexamon_sealed_packs() to authenticated;
+
+create or replace function public.open_nexamon_sealed_pack(p_request_id uuid, p_pack_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_pack   uuid := gen_random_uuid();
+  v_cards  jsonb;
+  s        public.nexamon_sealed_packs;
+  r        record;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_pack_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'open_nexamon_sealed_pack');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into s from public.nexamon_sealed_packs x
+   where x.id = p_pack_id and x.player_id = v_player and x.opened_at is null
+   for update;
+  if s.id is null then
+    perform public.api_error('sealed_pack_unknown');
+  end if;
+  if not exists (select 1 from public.nexamon_cards k where k.set_key = s.set_key and k.in_catalogue) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_pack', coalesce((cfg #>> '{packs,perMinute}')::integer, 20), 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  perform public.nexamon_sync(v_now);
+  -- the pull of a bought pack, without the money
+  v_cards := public.nexamon_open_pack(s.set_key, v_player, null, v_pack, v_now);
+  insert into public.nexamon_packs (id, player_id, set_key, price_cents, cards, opened_at)
+  values (v_pack, v_player, s.set_key, s.price_cents, v_cards, v_now);
+  update public.nexamon_sealed_packs set opened_at = v_now, pack_id = v_pack where id = s.id;
+  update public.nexamon_set_state set player_packs_opened = player_packs_opened + 1 where set_key = s.set_key;
+  perform public.mission_event(v_player, 'nexamon_pack', 1, null);
+  for r in select x ->> 'rarity' as rarity from jsonb_array_elements(v_cards) x loop
+    if r.rarity <> 'common' then
+      perform public.mission_event(v_player, 'nexamon_rare', 1, null);
+    end if;
+    if r.rarity in ('ultra', 'prisma', 'legendary') then
+      perform public.mission_event(v_player, 'nexamon_ultra', 1, null);
+    end if;
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'pack_id', v_pack, 'sealed_id', s.id, 'set', s.set_key, 'price_cents', s.price_cents, 'cards', v_cards,
+    'packs_opened', (select count(*) from public.nexamon_packs p where p.player_id = v_player and p.set_key = s.set_key),
+    'sealed_left', (select count(*) from public.nexamon_sealed_packs x where x.player_id = v_player and x.opened_at is null)));
+end;
+$$;
+comment on function public.open_nexamon_sealed_pack(uuid, uuid) is
+  'RPC: opens one of the caller''s sealed booster packs (ADR-177) with the pull of a bought pack (nexamon_open_pack), '
+  'no charge; answer as buy_nexamon_pack plus sealed_id and sealed_left; errors nexamon_locked, invalid_argument, '
+  'sealed_pack_unknown, nexamon_unknown, rate_limited.';
+revoke all on function public.open_nexamon_sealed_pack(uuid, uuid) from public, anon;
+grant execute on function public.open_nexamon_sealed_pack(uuid, uuid) to authenticated;
+
+create or replace function public.buy_nexamon_sealed_pack(p_request_id uuid, p_set text, p_count integer default 1)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_price  bigint;
+  v_total  bigint;
+  v_cash   bigint;
+  v_max    integer := coalesce((public.nexamon_cfg() #>> '{packs,perMinute}')::integer, 20);
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_set is null or p_count is null or p_count < 1 or p_count > v_max then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_nexamon_sealed_pack');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_price := (cfg #>> array['sets', p_set, 'packPriceCents'])::bigint;
+  if v_price is null or v_price < 0 or not exists (select 1 from public.nexamon_cards k where k.set_key = p_set and k.in_catalogue) then
+    perform public.api_error('nexamon_unknown');
+  end if;
+  if not public.rate_limit_hit(v_player, 'nexamon_pack', v_max, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  v_total := v_price * p_count;
+  v_cash := public.lock_player_accounts(v_player);
+  if v_cash < v_total then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_total > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('households'),
+                                   v_total, 'nexamon_pack',
+                                   'Booster gekauft (ungeöffnet): ' || p_count || ' × ' || coalesce(cfg #>> array['sets', p_set, 'name'], p_set),
+                                   'nexamon_pack', null, 'nexamon:sealed:' || v_player::text || ':' || p_request_id::text, v_player,
+                                   jsonb_build_object('set', p_set, 'price_cents', v_price, 'count', p_count, 'sealed', true));
+  end if;
+  perform public.nexamon_grant_sealed_packs(v_player, p_set, p_count, 'bought', null, v_price);
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'set', p_set, 'count', p_count, 'price_cents', v_total, 'packs', public.nexamon_sealed_json(v_player)));
+end;
+$$;
+comment on function public.buy_nexamon_sealed_pack(uuid, text, integer) is
+  'RPC: buys p_count booster packs of a set without opening them (ADR-177): same price and ledger kind as '
+  'buy_nexamon_pack, the packs go to the sealed inventory; errors nexamon_locked, invalid_argument, nexamon_unknown, '
+  'rate_limited, insufficient_funds.';
+revoke all on function public.buy_nexamon_sealed_pack(uuid, text, integer) from public, anon;
+grant execute on function public.buy_nexamon_sealed_pack(uuid, text, integer) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- E. A wiped account loses its sealed packs too (account_wipe patched by replace; a deleted profile cascades)
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.account_wipe(uuid, text)'::regprocedure);
+  v_old text := $t$  perform public.nexamon_wipe_player(p_player);$t$;
+begin
+  if position('nexamon_sealed_packs' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'account_wipe() has an unexpected shape; delete the sealed packs (ADR-177) by hand';
+    end if;
+    execute replace(v_def, v_old, v_old || $t$
+  delete from public.nexamon_sealed_packs where player_id = p_player;$t$);
+  end if;
+end;
+$do$;
+
+-- ===== supabase/updates/20261204006720_battle_prizes_more.sql =====
+-- ===== idempotent copy of migrations/20261204006720_battle_prizes_more.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 6720 · News battles: accessories and sealed Nexamon booster packs as prizes (ADR-177)
+-- =============================================================================
+-- Two more prize kinds next to xp, money, skin and nft (battles.prizes.weights), chosen when the lobby opens and shown
+-- before the battle:
+-- * accessory {"kind":"accessory","tier":"rare"}: the tier is drawn from prizes.accessoryTiers; the winner gets a
+--   random accessory of the shop catalogue (ADR-155, not the battle exclusives) of that tier they do not own yet. When
+--   they own all of them: the money prize instead (fallback).
+-- * packs {"kind":"packs","packs":[{"set","count"}]}: sealed booster packs of up to two sets worth at most
+--   prizes.packsCapCents together (set prices from game_config.nexamon, battle_pick_packs mirrors pickPackPrize in
+--   src/lib/sim/battle/prizes.ts), at most prizes.packsMax packs. They go to nexamon_sealed_packs (source battle).
+--   No set fits: the money prize.
+-- NFTs stay as before (ADR-160): a gallery NFT nobody owns is handed over (artworks.owner_id), else money.
+--   battle_pick_packs(cap, max, u1..u4)  new, internal
+--   battle_open, battle_prize_json, battle_prize_label, battle_pay   redefined (copies of 4720 plus the new kinds)
+-- Idempotent: runs unchanged as supabase/updates/20261204006720_battle_prizes_more.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. The pack pick (src/lib/sim/battle/prizes.ts: pickPackPrize)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_pick_packs(p_cap bigint, p_max integer, p_u1 double precision,
+                                                    p_u2 double precision, p_u3 double precision, p_u4 double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_keys   text[];
+  v_prices bigint[];
+  v_n      integer;
+  v_main   integer;
+  v_mmax   integer;
+  v_mcount integer;
+  v_rest   bigint;
+  v_sec    integer := null;
+  v_smax   integer;
+  v_out    jsonb;
+  k        integer;
+begin
+  select array_agg(x.key order by x.price desc, x.key), array_agg(x.price order by x.price desc, x.key)
+    into v_keys, v_prices
+    from (select e.key, (e.value ->> 'packPriceCents')::bigint as price
+            from jsonb_each(coalesce(public.nexamon_cfg() -> 'sets', '{}'::jsonb)) e
+           where (e.value ->> 'packPriceCents')::bigint > 0 and (e.value ->> 'packPriceCents')::bigint <= p_cap
+             and exists (select 1 from public.nexamon_cards c where c.set_key = e.key and c.in_catalogue)) x;
+  v_n := coalesce(array_length(v_keys, 1), 0);
+  if v_n = 0 or p_max < 1 then
+    return '[]'::jsonb;
+  end if;
+  v_main := least(v_n - 1, floor(p_u1 * v_n)::integer) + 1;
+  v_mmax := least(p_max::bigint, p_cap / v_prices[v_main])::integer;
+  v_mcount := 1 + least(v_mmax - 1, floor(p_u2 * v_mmax)::integer);
+  v_out := jsonb_build_array(jsonb_build_object('set', v_keys[v_main], 'count', v_mcount));
+  v_rest := p_cap - v_mcount * v_prices[v_main];
+  if p_u3 < 0.5 then
+    -- the cheapest other set that still fits
+    for k in reverse v_n .. 1 loop
+      if k <> v_main and v_prices[k] <= v_rest then v_sec := k; exit; end if;
+    end loop;
+    if v_sec is not null then
+      v_smax := least((p_max - v_mcount)::bigint, v_rest / v_prices[v_sec])::integer;
+      if v_smax >= 1 then
+        v_out := v_out || jsonb_build_object('set', v_keys[v_sec], 'count', 1 + least(v_smax - 1, floor(p_u4 * v_smax)::integer));
+      end if;
+    end if;
+  end if;
+  return v_out;
+end;
+$$;
+revoke all on function public.battle_pick_packs(bigint, integer, double precision, double precision, double precision, double precision)
+  from public, anon, authenticated;
+
+-- The packs of a prize with names and their total price at the current set prices
+create or replace function public.battle_packs_json(p_packs jsonb)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('kind', 'packs',
+    'packs', coalesce(jsonb_agg(jsonb_build_object('set', x ->> 'set', 'count', (x ->> 'count')::integer,
+                                                   'name', coalesce(public.nexamon_cfg() #>> array['sets', x ->> 'set', 'name'], x ->> 'set'))
+                                order by ord), '[]'::jsonb),
+    'cents', coalesce(sum((x ->> 'count')::bigint * coalesce((public.nexamon_cfg() #>> array['sets', x ->> 'set', 'packPriceCents'])::bigint, 0)), 0))
+    from jsonb_array_elements(coalesce(p_packs, '[]'::jsonb)) with ordinality as e(x, ord);
+$$;
+revoke all on function public.battle_packs_json(jsonb) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- B. Opening a lobby draws the prize (4720 plus accessory and packs)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_open(p_now timestamptz)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg    jsonb := public.battles_cfg();
+  w      jsonb := cfg #> '{prizes,weights}';
+  tw     jsonb := cfg #> '{prizes,accessoryTiers}';
+  v_tot  double precision;
+  v_roll double precision;
+  v_kind text := 'xp';
+  v_art  uuid;
+  v_id   bigint;
+  v_prize jsonb;
+  v_tier text;
+  v_packs jsonb;
+  k      text;
+begin
+  perform pg_advisory_xact_lock(7311160);
+  if exists (select 1 from public.battles b where b.status in ('open', 'running')) then
+    return null;
+  end if;
+  select sum(value::double precision) into v_tot from jsonb_each_text(coalesce(w, '{}'::jsonb));
+  v_roll := random() * coalesce(v_tot, 0);
+  for k in select key from jsonb_each_text(coalesce(w, '{}'::jsonb)) order by key loop
+    v_roll := v_roll - (w ->> k)::double precision;
+    if v_roll < 0 then v_kind := k; exit; end if;
+  end loop;
+  if v_kind = 'nft' then
+    v_art := public.battle_free_artwork();
+    if v_art is null then v_kind := 'money'; end if;
+  elsif v_kind = 'skin' and coalesce(jsonb_array_length(cfg -> 'accessories'), 0) = 0 then
+    v_kind := 'xp';
+  elsif v_kind = 'accessory' then
+    -- the tier: weighted, keys in sorted order (pickWeighted)
+    select sum(value::double precision) into v_tot from jsonb_each_text(coalesce(tw, '{}'::jsonb)) where value::double precision > 0;
+    v_roll := random() * coalesce(v_tot, 0);
+    for k in select key from jsonb_each_text(coalesce(tw, '{}'::jsonb)) where value::double precision > 0 order by key loop
+      v_tier := k;
+      v_roll := v_roll - (tw ->> k)::double precision;
+      exit when v_roll < 0;
+    end loop;
+    if v_tier is null then v_kind := 'money'; end if;
+  elsif v_kind = 'packs' then
+    v_packs := public.battle_pick_packs(coalesce((cfg #>> '{prizes,packsCapCents}')::bigint, 0),
+                                        coalesce((cfg #>> '{prizes,packsMax}')::integer, 1),
+                                        random(), random(), random(), random());
+    if jsonb_array_length(v_packs) = 0 then v_kind := 'money'; end if;
+  end if;
+  v_prize := jsonb_build_object('kind', v_kind);
+  if v_kind = 'accessory' then v_prize := v_prize || jsonb_build_object('tier', v_tier); end if;
+  if v_kind = 'packs' then v_prize := v_prize || jsonb_build_object('packs', v_packs); end if;
+  insert into public.battles (status, seed, prize, artwork_id, opened_at)
+  values ('open', floor(random() * 4294967296)::bigint, v_prize, v_art, p_now)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. What the prize is worth, its label, the payout (4720 plus accessory and packs)
+-- ---------------------------------------------------------------------------
+create or replace function public.battle_prize_json(p_battle public.battles, p_players integer)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg  jsonb := public.battles_cfg() -> 'prizes';
+  v_n  integer := greatest(coalesce(p_players, 0), coalesce((public.battles_cfg() #>> '{lobby,minPlayers}')::integer, 3));
+  v_mult double precision := coalesce((public.config_jsonb('progression') ->> 'xpMultiplier')::double precision, 1);
+  a    public.artworks;
+begin
+  if p_battle.result ? 'prize' then
+    return p_battle.result -> 'prize';
+  end if;
+  case p_battle.prize ->> 'kind'
+    when 'xp' then
+      return jsonb_build_object('kind', 'xp', 'xp',
+        round(((cfg ->> 'xpBase')::integer + (cfg ->> 'xpPerPlayer')::integer * v_n) * v_mult)::integer);
+    when 'money' then
+      return jsonb_build_object('kind', 'money', 'cents',
+        (cfg ->> 'moneyBaseCents')::bigint + (cfg ->> 'moneyPerPlayerCents')::bigint * v_n);
+    when 'skin' then
+      return jsonb_build_object('kind', 'skin', 'accessories',
+        coalesce((select jsonb_agg(x ->> 'key') from jsonb_array_elements(public.battles_cfg() -> 'accessories') x), '[]'::jsonb));
+    when 'accessory' then
+      return jsonb_build_object('kind', 'accessory', 'tier', coalesce(p_battle.prize ->> 'tier', 'rare'));
+    when 'packs' then
+      return public.battle_packs_json(p_battle.prize -> 'packs');
+    when 'nft' then
+      select * into a from public.artworks x where x.id = p_battle.artwork_id;
+      if a.id is null then
+        return jsonb_build_object('kind', 'money', 'cents',
+          (cfg ->> 'moneyBaseCents')::bigint + (cfg ->> 'moneyPerPlayerCents')::bigint * v_n);
+      end if;
+      return jsonb_build_object('kind', 'nft', 'artwork',
+        jsonb_build_object('id', a.id, 'title', a.title, 'serial', a.serial, 'rarity', a.rarity, 'pixels', a.pixels));
+    else
+      return jsonb_build_object('kind', 'xp', 'xp', 0);
+  end case;
+end;
+$$;
+
+create or replace function public.battle_prize_label(p_prize jsonb)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case p_prize ->> 'kind'
+    when 'xp' then coalesce(p_prize ->> 'xp', '0') || ' XP'
+    when 'money' then public.format_eur((p_prize ->> 'cents')::bigint)
+    when 'skin' then 'das exklusive Accessoire „' || coalesce(p_prize ->> 'name', 'Battle-Skin') || '“'
+    when 'accessory' then case when p_prize ? 'name' then 'das Accessoire „' || (p_prize ->> 'name') || '“'
+                               else 'ein zufälliges Accessoire (' || case p_prize ->> 'tier' when 'rare' then 'selten'
+                                 when 'epic' then 'episch' when 'legendary' then 'legendär' when 'mythic' then 'mythisch'
+                                 else 'gewöhnlich' end || ')' end
+    when 'packs' then coalesce((select string_agg((x ->> 'count') || ' × ' || coalesce(x ->> 'name', x ->> 'set'), ' + ')
+                                  from jsonb_array_elements(p_prize -> 'packs') x), 'Booster') || ' (ungeöffnet)'
+    when 'nft' then 'das NFT „' || coalesce(p_prize #>> '{artwork,title}', 'NFT') || '“'
+    else 'Ruhm und Ehre' end;
+$$;
+
+create or replace function public.battle_pay(p_battle public.battles, p_winner uuid, p_players integer, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.battles_cfg();
+  v_prize jsonb := public.battle_prize_json(p_battle, p_players);
+  v_money jsonb := jsonb_build_object('kind', 'money', 'cents',
+                     (cfg #>> '{prizes,moneyBaseCents}')::bigint + (cfg #>> '{prizes,moneyPerPlayerCents}')::bigint
+                       * greatest(p_players, (cfg #>> '{lobby,minPlayers}')::integer), 'fallback', true);
+  v_key   text;
+  v_name  text;
+  v_art   uuid;
+  v_xp    integer;
+  v_cents bigint;
+  v_got   integer := 0;
+  a       public.artworks;
+  v_e     jsonb;
+begin
+  if p_winner is null
+     or public.battle_prize_wins_today(p_winner, p_now) >= coalesce((cfg #>> '{prizes,dailyPrizeCap}')::integer, 3) then
+    return null;
+  end if;
+  if v_prize ->> 'kind' = 'skin' then
+    select x ->> 'key', x ->> 'name' into v_key, v_name
+      from jsonb_array_elements(cfg -> 'accessories') x
+     where not exists (select 1 from public.player_accessories o where o.player_id = p_winner and o.accessory_key = x ->> 'key')
+     order by random() limit 1;
+    if v_key is null then
+      v_prize := v_money;
+    else
+      insert into public.player_accessories (player_id, accessory_key, price_paid_cents) values (p_winner, v_key, 0)
+      on conflict do nothing;
+      return jsonb_build_object('kind', 'skin', 'key', v_key, 'name', v_name);
+    end if;
+  elsif v_prize ->> 'kind' = 'accessory' then
+    -- a random shop accessory of the tier the winner does not own (never a battle exclusive)
+    select i ->> 'key', i ->> 'name' into v_key, v_name
+      from jsonb_array_elements(coalesce(public.accessories_cfg() -> 'items', '[]'::jsonb)) i
+     where i ->> 'rarity' = v_prize ->> 'tier' and not coalesce((i ->> 'exclusive')::boolean, false)
+       and not exists (select 1 from public.player_accessories o where o.player_id = p_winner and o.accessory_key = i ->> 'key')
+     order by random() limit 1;
+    if v_key is null then
+      v_prize := v_money;
+    else
+      insert into public.player_accessories (player_id, accessory_key, price_paid_cents) values (p_winner, v_key, 0)
+      on conflict do nothing;
+      return jsonb_build_object('kind', 'accessory', 'tier', v_prize ->> 'tier', 'key', v_key, 'name', v_name);
+    end if;
+  elsif v_prize ->> 'kind' = 'packs' then
+    for v_e in select e from jsonb_array_elements(v_prize -> 'packs') e loop
+      v_got := v_got + public.nexamon_grant_sealed_packs(p_winner, v_e ->> 'set', (v_e ->> 'count')::integer, 'battle', p_battle.id, 0);
+    end loop;
+    if v_got > 0 then
+      return v_prize;
+    end if;
+    v_prize := v_money;
+  elsif v_prize ->> 'kind' = 'nft' then
+    v_art := p_battle.artwork_id;
+    if not exists (select 1 from public.artworks x where x.id = v_art and x.owner_id is null and x.ai_owner is null
+                     and not exists (select 1 from public.artwork_auctions y where y.artwork_id = x.id and y.status = 'open')) then
+      v_art := public.battle_free_artwork(p_battle.artwork_id);
+    end if;
+    if v_art is null then
+      v_prize := v_money;
+    else
+      update public.artworks set owner_id = p_winner, ask_cents = null, listed_at = null where id = v_art
+      returning * into a;
+      return jsonb_build_object('kind', 'nft', 'artwork',
+        jsonb_build_object('id', a.id, 'title', a.title, 'serial', a.serial, 'rarity', a.rarity, 'pixels', a.pixels));
+    end if;
+  end if;
+  if v_prize ->> 'kind' = 'xp' then
+    v_xp := public.grant_xp(p_winner, 'battle'::public.xp_source,
+      (cfg #>> '{prizes,xpBase}')::integer + (cfg #>> '{prizes,xpPerPlayer}')::integer
+        * greatest(p_players, (cfg #>> '{lobby,minPlayers}')::integer),
+      'battle:' || p_battle.id, 'battle', null);
+    return jsonb_build_object('kind', 'xp', 'xp', v_xp);
+  end if;
+  v_cents := (v_prize ->> 'cents')::bigint;
+  if v_cents > 0 then
+    perform public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(p_winner, 'player_cash'),
+                                   v_cents, 'battle_prize'::public.ledger_tx_kind, 'News-Battle gewonnen', 'battle', null,
+                                   'battle:' || p_battle.id, p_winner, jsonb_build_object('battle_id', p_battle.id));
+  end if;
+  return v_prize;
+end;
+$$;
+
 commit;

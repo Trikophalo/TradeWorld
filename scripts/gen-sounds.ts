@@ -1493,6 +1493,56 @@ function battleZap(): Float64Array {
   return master(m.buf, { lowpass: 9000, maxSeconds: 0.35 });
 }
 
+/** Farbrausch (ADR-177): a paint bomb bursts: a wet splat with a short low thump. */
+function battleSplat(): Float64Array {
+  const m = new Mix(0.35, 83);
+  noise(m, 0, 0.16, { type: "bp", cutoff: 900, to: 300, sweep: 0.16, q: 0.9 }, 0.7, { a: 0.002, d: 0.14, r: 0.04 });
+  m.tone({ at: 0, note: "A2", to: "D2", glide: 0.1, gate: 0.1, gain: 0.45, env: { d: 0.1, s: 0, r: 0.04 } });
+  return master(m.buf, { lowpass: 6000, maxSeconds: 0.35 });
+}
+
+/** Bulle und Bär (ADR-177): tagged: two quick notes down, "du bist's". */
+function battleTag(): Float64Array {
+  const m = new Mix(0.3, 84);
+  m.tone({ at: 0, note: "E5", gate: 0.07, wave: "pulse", duty: 0.25, gain: 0.45, env: { d: 0.06, s: 0.4, r: 0.03 } });
+  m.tone({ at: 0.09, note: "B4", gate: 0.12, wave: "pulse", duty: 0.25, gain: 0.45, env: { d: 0.1, s: 0.4, r: 0.05 } });
+  return master(m.buf, { lowpass: 8000, maxSeconds: 0.3 });
+}
+
+/** Crash-Regen (ADR-177): a crash hits the floor: a falling whistle into a dull boom. */
+function battleImpact(): Float64Array {
+  const m = new Mix(0.55, 85);
+  m.tone({
+    at: 0,
+    note: "G5",
+    to: "C4",
+    glide: 0.14,
+    gate: 0.14,
+    wave: "pulse",
+    duty: 0.5,
+    gain: 0.18,
+    env: { d: 0.14, s: 0.6, r: 0.02 },
+  });
+  noise(m, 0.14, 0.35, { type: "lp", cutoff: 700, to: 200, sweep: 0.3 }, 0.8, { a: 0.002, d: 0.3, r: 0.08 });
+  m.tone({ at: 0.14, note: "C2", to: "G1", glide: 0.2, gate: 0.2, gain: 0.55, env: { d: 0.2, s: 0, r: 0.06 } });
+  return master(m.buf, { lowpass: 4000, maxSeconds: 0.55 });
+}
+
+/** Goldrausch-Zone (ADR-177): the zone shrinks: a rising warble. */
+function battleShrink(): Float64Array {
+  const m = new Mix(0.5, 86);
+  for (let i = 0; i < 4; i++)
+    m.tone({
+      at: i * 0.1,
+      note: ["C4", "E4", "G4", "C5"][i]!,
+      gate: 0.08,
+      wave: "triangle",
+      gain: 0.4,
+      env: { d: 0.08, s: 0.5, r: 0.04 },
+    });
+  return master(m.buf, { room: { mix: 0.15, size: 0.5 }, maxSeconds: 0.5 });
+}
+
 /** Laserschranke: a jump: the classic "boing" up. */
 function battleJump(): Float64Array {
   const m = new Mix(0.25, 81);
@@ -1656,6 +1706,10 @@ const RENDER: Record<string, () => Float64Array> = {
   "battle-click": battleClick,
   "battle-unlock": battleUnlock,
   "battle-gavel": battleGavel,
+  "battle-splat": battleSplat,
+  "battle-tag": battleTag,
+  "battle-impact": battleImpact,
+  "battle-shrink": battleShrink,
   "pack-crinkle": packCrinkle,
   "pack-tear": packTear,
   "card-flick": cardFlick,
