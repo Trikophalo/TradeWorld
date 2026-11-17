@@ -1,0 +1,20 @@
+{
+  "id": "fe40c802-1c42-4cbb-8b04-b74354b06458",
+  "set": "mystic_energy",
+  "done": false,
+  "kind": "pack",
+  "cards": [
+    { "slot": 1, "rarity": "common", "serial": 7, "card_key": "me-044", "condition": "mint", "value_cents": 340 },
+    { "slot": 2, "rarity": "common", "serial": 8, "card_key": "me-023", "condition": "good", "value_cents": 297 }
+  ],
+  "is_me": false,
+  "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+  "ends_at": "2026-11-17T00:04:34.457752+00:00",
+  "viewers": 1,
+  "opponent": null,
+  "progress": 2,
+  "battle_id": null,
+  "reactions": [],
+  "started_at": "2026-11-17T00:04:03.957752+00:00",
+  "server_time": "2026-11-17T00:04:03.968521+00:00"
+}

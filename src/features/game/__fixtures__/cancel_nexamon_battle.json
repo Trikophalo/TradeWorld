@@ -1,0 +1,31 @@
+{
+  "battle": {
+    "id": "df82407f-4039-4e8b-980d-fe8acadc2f3c",
+    "me": "challenger",
+    "set": "mystic_energy",
+    "status": "cancelled",
+    "winner": null,
+    "ends_at": null,
+    "live_id": null,
+    "slot_ms": 1800,
+    "tear_ms": 2400,
+    "viewers": 0,
+    "opponent": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] },
+    "coin_seed": null,
+    "decide_at": null,
+    "reactions": [],
+    "starts_at": null,
+    "tie_break": null,
+    "challenger": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+    "created_at": "2026-11-17T00:04:03.918688+00:00",
+    "expires_at": "2026-11-17T00:05:03.918688+00:00",
+    "accepted_at": null,
+    "price_cents": 20000,
+    "server_time": "2026-11-17T00:04:03.929645+00:00",
+    "abort_reason": null,
+    "opponent_cards": [],
+    "opponent_cents": 0,
+    "challenger_cards": [],
+    "challenger_cents": 0
+  }
+}
