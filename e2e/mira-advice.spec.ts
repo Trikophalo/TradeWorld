@@ -45,6 +45,8 @@ async function foundCompany(page: Page) {
 
 test("Mira's top suggestion leads to an enabled action", async ({ page }) => {
   await foundCompany(page);
+  // Mira is a panel on every tab (ADR-187): the button next to the tabs opens it.
+  await page.getByTestId("mira-open").click();
   const mira = page.getByTestId("mira");
   await expect(mira.getByTestId("mira-says").first()).toContainText("Hi, ich bin Mira");
 

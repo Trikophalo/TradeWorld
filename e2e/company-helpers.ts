@@ -57,9 +57,14 @@ export async function showOverview(page: Page) {
 export async function showPane(page: Page, group: string, label: string) {
   const card = page.getByTestId(`firm-section-${group}`);
   await expect(card).toBeVisible();
-  // A card with a single pane (e.g. growth of a private company) has no switch.
-  if ((await card.getByRole("radio").count()) === 0) return;
   const option = card.getByRole("radio", { name: label, exact: true });
+  // A card with a single pane (e.g. growth of a private company) has no switch; while data reloads it may show up late.
+  try {
+    await option.waitFor({ timeout: 8_000 });
+  } catch {
+    if ((await card.getByRole("radio").count()) === 0) return;
+    throw new Error(`pane "${label}" not found in ${group}`);
+  }
   await option.click();
   await expect(option).toHaveAttribute("aria-checked", "true");
 }
