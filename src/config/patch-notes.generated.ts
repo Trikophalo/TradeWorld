@@ -593,6 +593,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Firma übersichtlicher",
         text: "Das Dashboard zeigt nur Zahlen und Grafiken, ein Tipp führt zum passenden Hebel; alles Fällige steht in einer Liste „Zu erledigen“, das Controlling…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-1af57b97",
+        title: "Fertigkeiten für Firmen",
+        text: "Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“.",
+      },
     ],
   },
   {

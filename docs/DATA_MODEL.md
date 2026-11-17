@@ -8185,3 +8185,18 @@ claimed_cents, tax: {owner, revenue_cents, refund_cents, cap_cents, share_bps} |
   `untangle {grid, edges, points}` → `{points}`, `odd {rounds}` → `{choices}`, `rebuild {size, layout, show_seconds}` →
   `{layout}`, `align {slots, parts}` → `{at}`, `pipes {size, tiles, turns, from, to}` → `{turns}`, `sizes {sizes}` →
   `{order}`, `conveyor {items, every_ms, travel_ms}` → `{bins}` (−1 = verpasst). Die RPC-Antworten behalten ihre Form.
+
+## Fertigkeiten der Firmen (ADR-194, Migration `20261204008300_company_skills.sql`)
+
+- `company_skills (company_id, skill_key, level 1..20, ready_at, spent_cents, updated_at)`, PK beide ersten Spalten.
+  RLS: lesen dürfen Gründer und CEO der Firma; schreiben nur über RPC.
+- Intern: `company_skills_cfg()`, `company_skill_def(key)`, `company_held_skills(company)` (Fähigkeiten von Gründer und
+  aktiven Mitarbeitern), `company_skills_hour_effect(company, hour)`, `company_skills_json(company)`;
+  `listed_hour_effect` multipliziert die Faktoren ein.
+
+| RPC                                        | Antwort                                                                                                                                                                                                                                              |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_company_skills()`                     | `{ company_id, free_cash_cents, skills: [{ key, branch, effect, level, max_level, training_until, requires, next_requires, missing, next_cost_cents, next_hours, effect_bps, next_effect_bps }], total: { *_factor, *_bps, quality_add }, cap_bps }` |
+| `learn_company_skill(p_request_id, p_key)` | wie oben plus `learned_key`, `learned_level`; idempotent. Fehler `skill_locked`, `locked` (Schulung läuft), `insufficient_funds`, `invalid_argument` (unbekannt oder Höchststufe), `company_not_found`                                               |
+
+Ledger: `company_costs` „Fertigkeit: Schulung“, Schlüssel `company_skill:<firma>:<request>`.
