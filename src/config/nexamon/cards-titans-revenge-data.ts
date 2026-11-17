@@ -151,7 +151,7 @@ export const TITANS_REVENGE_CARDS: TitanCardDraft[] = [
     key: "tr-011",
     number: 11,
     rarity: "iron",
-    name: "Brandungskrebs",
+    name: "Wogenkrebs",
     type: "water",
     hp: 110,
     stage: 0,

@@ -135,7 +135,25 @@ describe("Cosmic Winds and bulk (ADR-174)", () => {
     ]);
     expect(groups[0]!.odds).toMatchObject({ kind: "one_of_one", oneInPacks: 5_000, slot5: 1, denominator: 5_000 });
     expect(packOdds("mystic_energy").some((r) => r.rarity === "one_of_one")).toBe(false);
-    expect(setsByPackPrice()).toEqual(["mystic_energy", "super_apex", "cosmic_winds", "prismatic_peak"]);
+    // ADR-182: Titans Revenge rows by tier, iron as the base; Yin Yang on its own slot table
+    expect(packOdds("titans_revenge").map((r) => [r.rarity, r.kind, r.oneInPacks])).toEqual([
+      ["uranium", "tier", 500],
+      ["diamond", "tier", 50],
+      ["titanium", "tier", 5],
+      ["iron", "base", null],
+    ]);
+    expect(packOdds("titans_revenge").at(-1)!.perPack).toBeCloseTo(4.678, 3);
+    const yy = packOdds("yin_yang");
+    expect(yy.find((r) => r.rarity === "legendary")).toMatchObject({ slot5: 36, denominator: 36_000 });
+    expect(yy.find((r) => r.rarity === "ultra")).toMatchObject({ slot4: 1_350, slot5: 1_350 });
+    expect(setsByPackPrice()).toEqual([
+      "mystic_energy",
+      "super_apex",
+      "yin_yang",
+      "cosmic_winds",
+      "prismatic_peak",
+      "titans_revenge",
+    ]);
   });
 
   it("offers raw bulk copies after the filters, keeps the best copy, skips bonus cards", () => {
@@ -173,7 +191,7 @@ describe("binder", () => {
 
   it("shows every card in set and number order with the own copies", () => {
     const entries = binderEntries(ALL, copies, DEFAULT_BINDER_FILTER);
-    expect(entries).toHaveLength(321);
+    expect(entries).toHaveLength(461);
     expect(entries[0]!.stats.cardKey).toBe("me-001");
     expect(entries[77]!.stats.cardKey).toBe("sa-001");
     const tumpli = entries.find((e) => e.stats.cardKey === "me-003")!;
@@ -192,11 +210,13 @@ describe("binder", () => {
   it("filters by set, rarity and ownership", () => {
     const filter = (patch: object) => binderEntries(ALL, copies, { ...DEFAULT_BINDER_FILTER, ...patch });
     expect(filter({ set: "super_apex" })).toHaveLength(77);
-    expect(filter({ rarity: "legendary" })).toHaveLength(8);
+    expect(filter({ rarity: "legendary" })).toHaveLength(10);
+    expect(filter({ rarity: "uranium" })).toHaveLength(4);
+    expect(filter({ set: "yin_yang" })).toHaveLength(110);
     expect(filter({ rarity: "one_of_one" })).toHaveLength(3);
     expect(filter({ set: "cosmic_winds" })).toHaveLength(90);
     expect(filter({ ownership: "owned" }).map((e) => e.stats.cardKey)).toEqual(["me-003", "sa-010"]);
-    expect(filter({ ownership: "missing" })).toHaveLength(319);
+    expect(filter({ ownership: "missing" })).toHaveLength(459);
     expect(filter({ ownership: "duplicates" }).map((e) => e.stats.cardKey)).toEqual(["me-003"]);
     expect(filter({ ownership: "owned", set: "prismatic_peak" })).toEqual([]);
   });
@@ -216,6 +236,8 @@ describe("binder", () => {
       ["super_apex", 77],
       ["prismatic_peak", 77],
       ["cosmic_winds", 90],
+      ["titans_revenge", 30],
+      ["yin_yang", 110],
     ]);
     expect(groupBySet(entries, "value")).toHaveLength(1);
     expect(groupBySet([], "value")).toEqual([]);
@@ -456,6 +478,8 @@ describe("profileBinder", () => {
       ["super_apex", 1, 77],
       ["prismatic_peak", 0, 77],
       ["cosmic_winds", 0, 90],
+      ["titans_revenge", 0, 30],
+      ["yin_yang", 0, 110],
     ]);
     expect(groups[0]!.entries.map((e) => e.card.number)).toEqual(first.map((x) => x.number));
     expect(groups[0]!.entries.filter((e) => e.owned !== null)).toHaveLength(2);

@@ -177,6 +177,61 @@ export function nexamonTierOdds(
 }
 
 /**
+ * Expected cards of every rarity in one pack of a set (ADR-182), exact: a tier rule is enumerated over every
+ * combination of tier hits and counts (later tiers lose slots the earlier ones took), a slot-table set uses its
+ * table. One of Ones are left out (they leave the game once pulled).
+ */
+export function nexamonExpectedCounts(set: string, cfg: Config = BALANCE.nexamon): Record<string, number> {
+  const rule = nexamonPackRule(set, cfg);
+  if (!rule) {
+    const out: Record<string, number> = { ...nexamonExpectedPerPack(cfg, set) };
+    delete out.one_of_one;
+    return out;
+  }
+  const out: Record<string, number> = { [rule.base]: 0 };
+  const walk = (i: number, free: number, p: number, got: Record<string, number>) => {
+    if (i === rule.tiers.length) {
+      for (const [r, n] of Object.entries(got)) out[r] = (out[r] ?? 0) + p * n;
+      out[rule.base] = (out[rule.base] ?? 0) + p * free;
+      return;
+    }
+    const tier = rule.tiers[i]!;
+    const hit = 1 / Math.max(1, tier.packs);
+    walk(i + 1, free, p * (1 - hit), got);
+    const span = Math.max(0, tier.max - tier.min) + 1;
+    for (let n = tier.min; n <= tier.max; n++) {
+      const take = Math.min(n, free);
+      walk(i + 1, free - take, (p * hit) / span, { ...got, [tier.rarity]: (got[tier.rarity] ?? 0) + take });
+    }
+  };
+  walk(0, cfg.packSize, 1, {});
+  return out;
+}
+
+/**
+ * Expected value of one pack at the cards' start prices (ADR-182): every rarity's expected count x the mean start
+ * price of its cards, and the same x the mean condition factor (what the pulled raw copies are worth).
+ */
+export function nexamonExpectedPackValue(
+  cards: readonly { rarity: string; startPriceCents: number }[],
+  set: string,
+  cfg: Config = BALANCE.nexamon,
+): { cents: number; rawCents: number } {
+  const counts = nexamonExpectedCounts(set, cfg);
+  let cents = 0;
+  for (const [rarity, n] of Object.entries(counts)) {
+    const pool = cards.filter((c) => c.rarity === rarity);
+    if (pool.length === 0 || n === 0) continue;
+    cents += (n * pool.reduce((a, c) => a + c.startPriceCents, 0)) / pool.length;
+  }
+  const factor = cfg.conditions.order.reduce(
+    (a, c) => a + (cfg.conditions.weightBps[c] * cfg.conditions.valueBps[c]) / 10_000 / 10_000,
+    0,
+  );
+  return { cents, rawCents: cents * factor };
+}
+
+/**
  * Opens one pack of a set: `cards` are the cards of that set. Per slot: the rarity (slots 4 and 5 roll), then a
  * card of that rarity (commons never twice in a pack), then its condition. With free One of Ones, slot
  * `oneOfOne.slot` first rolls 1 in `oneOfOne.packs` for one of them (picked uniformly among the free ones).
