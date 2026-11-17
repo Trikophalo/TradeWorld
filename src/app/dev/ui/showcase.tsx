@@ -74,6 +74,8 @@ import { SOUND_NAMES, playSound } from "@/lib/sound";
 import { useMountTime } from "@/lib/use-now";
 import { useSettings } from "@/stores/settings";
 import { cn } from "@/lib/utils";
+import { CriticBadge } from "@/features/artworks/components/artwork-card";
+import type { Artwork } from "@/features/game/types";
 
 const COLOR_GROUPS = [
   { title: "Flächen", tokens: ["bg-0", "bg-1", "bg-2", "bg-3"] },
@@ -1050,6 +1052,17 @@ export function Showcase() {
 
       <Section id="nexamon" title="Nexamon-Sammelkarten (ADR-165)">
         <NexamonShowcase />
+      </Section>
+
+      <Section id="critic" title="Kritiker-Urteil für NFTs (ADR-181)">
+        <Demo label="CriticBadge: gut, mittel, schwach">
+          {[92, 58, 12].map((score) => (
+            <CriticBadge
+              key={score}
+              artwork={{ quality: { score, best: "harmony", worst: "outline", copy: null } } as Artwork}
+            />
+          ))}
+        </Demo>
       </Section>
 
       <Section id="pixel" title={t("pixel")}>

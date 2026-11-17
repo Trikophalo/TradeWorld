@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Artwork, GameEngine, GameErrorKey } from "./types";
 import { rpc } from "./rpc";
+import { ART_QUALITY_KEYS } from "@/lib/sim/art-quality";
 
 /*
  * Artworks against the server (ADR-080, docs/ARTWORKS.md). snake_case JSON in, camelCase out.
@@ -41,6 +42,16 @@ export const artworkSchema = z.object({
   created_at: iso,
   hot: num,
   auction: auctionSchema.nullable(),
+  // ADR-181; optional so that older servers still parse
+  quality: z
+    .object({
+      score: num,
+      best: z.enum(ART_QUALITY_KEYS),
+      worst: z.enum(ART_QUALITY_KEYS),
+      copy: z.enum(["exact", "near"]).nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 type ArtworkRow = z.infer<typeof artworkSchema>;
 
@@ -130,6 +141,7 @@ export function toArtwork(a: ArtworkRow): Artwork {
     liked: a.liked,
     createdAt: a.created_at,
     hot: a.hot,
+    quality: a.quality ?? null,
     auction: a.auction
       ? {
           id: a.auction.id,

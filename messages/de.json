@@ -2952,7 +2952,25 @@
     "rankCreatorsCount": "{count, plural, one {# NFT} other {# NFTs}}",
     "rankEmpty": "Noch wurde nichts verkauft.",
     "you": "Du",
-    "open": "Ansehen"
+    "open": "Ansehen",
+    "critic": "Kritiker-Urteil",
+    "criticScore": "{score}/100",
+    "criticVerdict": "Stark: {best}. Schwach: {worst}.",
+    "criticCopy": "Die Kritiker halten es für eine Kopie eines älteren NFTs. Die Sammler zahlen dafür kaum etwas.",
+    "criticHint": "Nur du siehst das ganze Urteil. Je besser das Bild, desto mehr bieten die KI-Sammler.",
+    "criticBadge": "Kritik {score}",
+    "criticBadgeLabel": "Kritiker-Urteil: {score} von 100",
+    "criticAspects": {
+      "coverage": "Bildfüllung",
+      "colours": "Farbwahl",
+      "harmony": "Farbharmonie",
+      "contrast": "Kontrast",
+      "structure": "Sauberkeit",
+      "outline": "Konturen",
+      "composition": "Komposition",
+      "detail": "Detailreichtum",
+      "shapes": "Formen"
+    }
   },
   "estate": {
     "title": "Grundstück",

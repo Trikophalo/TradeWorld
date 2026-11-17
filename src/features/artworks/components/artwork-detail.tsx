@@ -123,7 +123,30 @@ function Facts({ artwork }: { artwork: Artwork }) {
           {t("royaltyShare", { percent: Math.round(artwork.royaltyBps / 100), name: artwork.creator })}
         </p>
       )}
+      <CriticVerdict artwork={artwork} />
     </dl>
+  );
+}
+
+/** ADR-181: the owner sees the critics' verdict with the strongest and the weakest aspect. */
+function CriticVerdict({ artwork }: { artwork: Artwork }) {
+  const t = useTranslations("art");
+  const me = useGame((state) => state.portfolio?.nickname);
+  const q = artwork.quality;
+  if (!q || !me || artwork.owner !== me) return null;
+  return (
+    <div className="col-span-2 rounded-md border border-line-1 bg-surface-2 p-3" data-testid="critic-verdict">
+      <dt className="label-pixel text-fg-3">{t("critic")}</dt>
+      <dd className="space-y-1">
+        <p className="nums text-xl font-semibold text-fg-1">{t("criticScore", { score: q.score })}</p>
+        <p className="text-xs text-fg-2">
+          {q.copy
+            ? t("criticCopy")
+            : t("criticVerdict", { best: t(`criticAspects.${q.best}`), worst: t(`criticAspects.${q.worst}`) })}
+        </p>
+        <p className="text-2xs text-fg-3">{t("criticHint")}</p>
+      </dd>
+    </div>
   );
 }
 
