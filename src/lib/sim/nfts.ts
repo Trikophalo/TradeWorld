@@ -20,6 +20,37 @@ export interface NftValueInput {
   /** Demand (ADR-141): open offers on it and its sales of the last days. */
   readonly openOffers?: number;
   readonly recentSales?: number;
+  /** Critic score 0..100 (ADR-181); null or missing counts as neutral. */
+  readonly quality?: number | null;
+}
+
+/** Quality factor (bps) between min and max: min + (max - min) x score / 100; null = neutral. */
+function qualityFactorBps(quality: number | null | undefined, min: number, max: number, cfg: NftConfig): number {
+  const q = Math.max(0, Math.min(100, Math.floor(quality ?? cfg.ai.quality.neutral)));
+  return min + Math.floor(((max - min) * q) / 100);
+}
+
+/** ADR-181: what the score does to the valuation anchor (score 50 = 10 000). */
+export function nftQualityValueBps(quality: number | null | undefined, cfg: NftConfig = BALANCE.nfts): number {
+  return qualityFactorBps(quality, cfg.ai.quality.valueMinBps, cfg.ai.quality.valueMaxBps, cfg);
+}
+
+/** ADR-181: a chance (bps) scaled by the score; 0 below noInterestBelow. */
+export function nftQualityChanceBps(
+  baseBps: number,
+  quality: number | null | undefined,
+  cfg: NftConfig = BALANCE.nfts,
+): number {
+  const q = cfg.ai.quality;
+  if (quality !== null && quality !== undefined && quality < q.noInterestBelow) return 0;
+  return Math.floor((baseBps * qualityFactorBps(quality, q.chanceMinBps, q.chanceMaxBps, cfg)) / 10_000);
+}
+
+/** The anchor from mint cost or floor, scaled by quality. */
+function qualityBase(input: NftValueInput, cfg: NftConfig): number {
+  return Math.floor(
+    (Math.max(input.mintCents ?? 0, cfg.ai.floorCents) * nftQualityValueBps(input.quality, cfg)) / 10_000,
+  );
 }
 
 /** Demand bonus (ADR-141): open offers and recent sales, each capped. */
@@ -43,7 +74,7 @@ function bonusBps(input: NftValueInput, cfg: NftConfig): number {
 
 /** Fair value among collectors (ADR-141): mint cost or floor x bonuses, without the last price. */
 export function nftFairCents(input: NftValueInput, cfg: NftConfig = BALANCE.nfts): number {
-  const base = Math.max(input.mintCents ?? 0, cfg.ai.floorCents);
+  const base = qualityBase(input, cfg);
   return Math.floor((base * (10_000 + bonusBps(input, cfg))) / 10_000);
 }
 
@@ -103,8 +134,7 @@ export function nftSaleSplit(
  * price, mint cost and floor; bonuses for likes, the creator's reputation and age (each capped).
  */
 export function nftAiValueCents(input: NftValueInput, cfg: NftConfig = BALANCE.nfts): number {
-  const ai = cfg.ai;
-  const anchor = Math.max(input.lastSaleCents ?? 0, input.mintCents ?? 0, ai.floorCents);
+  const anchor = Math.max(input.lastSaleCents ?? 0, qualityBase(input, cfg));
   return Math.floor((anchor * (10_000 + bonusBps(input, cfg))) / 10_000);
 }
 
@@ -114,9 +144,20 @@ export function nftAiWouldBuy(askCents: number, valueCents: number): boolean {
 }
 
 /** A lowball offer: lowballMin..lowballMax of the valuation (u in [0, 1)), down to whole euros, at least minOffer. */
-export function nftLowballCents(valueCents: number, u: number, cfg: NftConfig = BALANCE.nfts): number {
+export function nftLowballCents(
+  valueCents: number,
+  u: number,
+  cfg: NftConfig = BALANCE.nfts,
+  quality: number | null = null,
+): number {
   const ai = cfg.ai;
-  const bps = ai.lowballMinBps + Math.floor(Math.min(Math.max(u, 0), 0.999999) * (ai.lowballMaxBps - ai.lowballMinBps));
+  // ADR-181: great art gets closer to its value, poor art lower (truncated like integer division in SQL)
+  const shift =
+    quality === null ? 0 : Math.trunc(((Math.max(0, Math.min(100, quality)) - 50) * ai.quality.lowballShiftBps) / 50);
+  const bps = Math.min(
+    10_000,
+    ai.lowballMinBps + Math.floor(Math.min(Math.max(u, 0), 0.999999) * (ai.lowballMaxBps - ai.lowballMinBps)) + shift,
+  );
   return Math.max(cfg.minOfferCents, Math.floor((valueCents * bps) / 10_000 / 100) * 100);
 }
 

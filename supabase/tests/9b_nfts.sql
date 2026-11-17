@@ -35,6 +35,13 @@ create or replace function tests.nft_ai(p_buy integer, p_offer integer, p_unlist
    where key = 'nfts' $$;
 grant execute on all functions in schema tests to public;
 select tests.nft_ai(10000, 10000, 0);
+-- ADR-181: the test pictures are copies of each other; the critic score and the chat replies are tested in
+-- b9_nft_quality.sql, so the NFT tests up to there run with a neutral critic and quiet collectors
+drop table if exists tests.nft_cfg_saved;
+create table tests.nft_cfg_saved as select value from public.game_config where key = 'nfts';
+select tests.set_cfg('nfts', '{ai,quality}', '{"neutral":50,"valueMinBps":10000,"valueMaxBps":10000,"chanceMinBps":10000,"chanceMaxBps":10000,"noInterestBelow":0,"lowballShiftBps":0,"mockBelow":0,"praiseFrom":101,"goodFrom":101,"badBelow":0}');
+select tests.set_cfg('nfts', '{ai,talk,maxRepliesPerRun}', '0');
+select tests.set_cfg('nfts', '{ai,talk,maxFollowupsPerRun}', '0');
 select tests.set_cfg('nfts', '{ai,auction,bidChanceBps}', '0');  -- ADR-170: no collector bids in this file
 
 -- =============================================================================

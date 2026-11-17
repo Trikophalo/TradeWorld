@@ -65,8 +65,8 @@ begin
 end;
 $$;
 
--- artCopyKind against the older NFTs (all others but p_self, created before p_before): exact | near | null
-create or replace function public.art_copy_kind(p_sig text, p_self uuid, p_before timestamptz)
+-- artCopyKind against the older NFTs (created before p_self, or all when p_self is null): exact | near | null
+create or replace function public.art_copy_kind(p_sig text, p_self uuid)
 returns text
 language plpgsql
 stable
@@ -78,16 +78,21 @@ declare
   v_drawn integer := char_length(replace(p_sig, '.', ''));
   r       record;
   v_diff  integer;
+  v_at    timestamptz := 'infinity';
+  v_ser   bigint := 9223372036854775807;
 begin
   if p_sig is null or p_sig = '' then
     return null;
   end if;
+  if p_self is not null then
+    select a.created_at, a.serial into v_at, v_ser from public.artworks a where a.id = p_self;
+  end if;
   if exists (select 1 from public.artworks a where md5(a.quality_sig) = md5(p_sig) and a.quality_sig = p_sig
-               and a.id is distinct from p_self and a.created_at <= p_before) then
+               and a.id is distinct from p_self and (a.created_at, a.serial) < (v_at, v_ser)) then
     return 'exact';
   end if;
   for r in select a.quality_sig as sig from public.artworks a
-            where a.quality_sig is not null and a.id is distinct from p_self and a.created_at <= p_before
+            where a.quality_sig is not null and a.id is distinct from p_self and (a.created_at, a.serial) < (v_at, v_ser)
               and char_length(a.quality_sig) = char_length(p_sig)
               and abs(char_length(replace(a.quality_sig, '.', '')) - v_drawn) <= v_limit
             limit 500 loop
@@ -413,7 +418,7 @@ begin
     return null;
   end if;
   v_sig := public.art_signature(a.pixels);
-  v_q := public.art_quality(a.pixels, public.art_copy_kind(v_sig, a.id, a.created_at));
+  v_q := public.art_quality(a.pixels, public.art_copy_kind(v_sig, a.id));
   update public.artworks set quality = (v_q ->> 'score')::smallint, quality_detail = v_q - 'score', quality_sig = v_sig
    where id = a.id;
   return (v_q ->> 'score')::integer;
@@ -440,12 +445,12 @@ create trigger artworks_quality_upd after update of pixels on public.artworks
   for each row when (old.pixels is distinct from new.pixels) execute function public.artworks_quality_trigger();
 
 revoke all on function public.art_signature(jsonb) from public, anon, authenticated;
-revoke all on function public.art_copy_kind(text, uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.art_copy_kind(text, uuid) from public, anon, authenticated;
 revoke all on function public.art_quality(jsonb, text) from public, anon, authenticated;
 revoke all on function public.artwork_rate_quality(uuid) from public, anon, authenticated;
 revoke all on function public.artworks_quality_trigger() from public, anon, authenticated;
 grant execute on function public.art_signature(jsonb) to service_role;
-grant execute on function public.art_copy_kind(text, uuid, timestamptz) to service_role;
+grant execute on function public.art_copy_kind(text, uuid) to service_role;
 grant execute on function public.art_quality(jsonb, text) to service_role;
 grant execute on function public.artwork_rate_quality(uuid) to service_role;
 
