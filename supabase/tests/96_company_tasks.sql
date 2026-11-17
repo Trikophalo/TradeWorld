@@ -86,8 +86,9 @@ select tests.assert(
   and :'p1'::jsonb ->> 'game' = 'pick' and jsonb_array_length(:'p1'::jsonb -> 'puzzle' -> 'tiles') = 12
   and not (:'p1'::jsonb ? 'solution')
   and :'a1'::jsonb ->> 'status' = 'success' and (:'a1'::jsonb ->> 'score_bps')::int = 10000
-  and (:'a1'::jsonb ->> 'result_cents')::bigint = 44000
-  and (select a.balance_cents from public.ledger_accounts a where a.id = public.company_cash_account(:'cid')) = :cash0::bigint + 44000
+  -- 44 000 x 0.9: a new company (strengths 0) gets 90 % of the task pay (ADR-180)
+  and (:'a1'::jsonb ->> 'result_cents')::bigint = 39600
+  and (select a.balance_cents from public.ledger_accounts a where a.id = public.company_cash_account(:'cid')) = :cash0::bigint + 39600
   and (:'a1'::jsonb ->> 'xp')::int > 0
   and exists (select 1 from public.company_news n where n.company_id = :'cid' and n.kind = 'task_success'
                 and n.payload ->> 'task' = 'pack_shirts' and n.payload ->> 'nickname' = 'Ida_Intern'),
@@ -102,7 +103,7 @@ select tests.throws_key(format('select public.submit_company_task(gen_random_uui
 reset role;
 select tests.assert(
   :'a2'::jsonb ->> 'status' = 'failure' and (:'a2'::jsonb ->> 'result_cents')::bigint = -26400
-  and (select a.balance_cents from public.ledger_accounts a where a.id = public.company_cash_account(:'cid')) = :cash0::bigint + 44000 - 26400
+  and (select a.balance_cents from public.ledger_accounts a where a.id = public.company_cash_account(:'cid')) = :cash0::bigint + 39600 - 26400
   and exists (select 1 from public.company_news n where n.company_id = :'cid' and n.kind = 'task_failure'),
   'submit_company_task(): a wrong answer costs 60 % of the value (company_costs), news of the failure');
 

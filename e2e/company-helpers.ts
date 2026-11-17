@@ -7,6 +7,7 @@ import { expect, type Page } from "@playwright/test";
  */
 const ALL_SECTIONS = [
   // Dashboard
+  "details",
   "situation",
   "numbers",
   "history",

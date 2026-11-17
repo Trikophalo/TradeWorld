@@ -4,6 +4,19 @@
 \set QUIET 1
 set client_min_messages = notice;
 
+-- ADR-180 changed the company scale (market x 10, capacity x 1.5, idle AI workers at the standby share). This file
+-- checks the mechanics with the numbers it was written for; the end of the file restores the current values.
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 1, "small_business": 4, "gmbh": 15, "ag": 40}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 300000, "retail": 250000, "energy": 250000, "pharma": 300000, "logistics": 250000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '600000') is null as ok \gset
+-- and awareness that does not move by the hour, so every hour sells with the same awareness
+select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
+select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,decayPerQuarter}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,marketingMaxGain}', '0') is null as ok \gset
+
 \set f '''0a30a30a-0000-4000-8000-0000000000f1'''
 \set a '''0a30a30a-0000-4000-8000-0000000000a1'''
 \set b '''0a30a30a-0000-4000-8000-0000000000b1'''
@@ -914,3 +927,11 @@ update public.game_config set value = jsonb_set(value, '{demandNoise}', :'noise0
 select tests.set_cfg('listed', '{board,cooldownHours}', '6');
 select tests.set_cfg('listed', '{board,maxOpen}', '2');
 select tests.set_cfg('startups', '{ipo,issueProceedsLockHours}', :'lock0'::jsonb);
+
+-- ADR-180: back to the current company scale
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 10, "small_business": 40, "gmbh": 150, "ag": 400}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 450000, "retail": 375000, "energy": 375000, "pharma": 450000, "logistics": 375000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '2500') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '360000') is null as ok \gset
+select tests.set_cfg('startups', '{awareness}', :'aw_cfg0'::jsonb) is null as ok \gset

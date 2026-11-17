@@ -28,6 +28,9 @@ create table if not exists public.company_autopilot (
   updated_at      timestamptz not null default now()
 );
 alter table public.company_autopilot enable row level security;
+drop trigger if exists set_updated_at on public.company_autopilot;
+create trigger set_updated_at before update on public.company_autopilot
+  for each row execute function public.set_updated_at();
 revoke all on public.company_autopilot from anon, authenticated;
 comment on table public.company_autopilot is
   'Autopilot per player company (ADR-180). Read and written through get_company_autopilot / set_company_autopilot.';
@@ -47,6 +50,12 @@ alter table public.company_autopilot_log enable row level security;
 revoke all on public.company_autopilot_log from anon, authenticated;
 comment on table public.company_autopilot_log is
   'Every task the autopilot resolved (ADR-180); kept 7 days. Read through get_company_autopilot.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('company_autopilot', 'company', 'Autopilot', 'Morgens: was der Autopilot deiner Firma über Nacht erledigt hat.',
+        'notif_company', true, true, false, 211)
+on conflict (key) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- B. Rules (ports of src/lib/sim/company-autopilot.ts)
@@ -370,3 +379,8 @@ revoke all on function public.get_company_autopilot() from public, anon;
 revoke all on function public.set_company_autopilot(uuid, boolean) from public, anon;
 grant execute on function public.get_company_autopilot() to authenticated;
 grant execute on function public.set_company_autopilot(uuid, boolean) to authenticated;
+
+revoke all on function public.company_strengths_overall_of(uuid) from public, anon, authenticated;
+revoke all on function public.company_task_pay_factor_bps(uuid) from public, anon, authenticated;
+revoke all on function public.company_autopilot_mood(uuid) from public, anon, authenticated;
+revoke all on function public.company_autopilot_chance_bps(uuid) from public, anon, authenticated;

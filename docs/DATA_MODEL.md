@@ -7968,3 +7968,27 @@ Migration `20261204006800_news_running_gags.sql`.
   `news_show_build()`), `news_show_gag_chat(show, now)` (aus `news_show_after_start()`); Apply-Typ `gag` in
   `news_show_start()` (zählt die Folge einmal je Sendung, Feed unter Firmen). `store_news_show_script()` behält
   Gag-Segmente. Konfiguration `game_config.newsShow.runningGags`.
+
+## Nachtrag: Firmen-Überholung (ADR-180)
+
+Migrationen `20261204006900_company_economy`, `…6910_company_autopilot`, `…6920_task_games_five` (je mit Kopie in
+`supabase/updates/`).
+
+- `player_company_hours`: neu `ai_utilization_bps`, `awareness_before`, `awareness_after`, `awareness_parts`
+  (`word_of_mouth`, `marketing`, `decay`, `extra`, `cap`).
+- `player_companies.awareness_boost`: Bekanntheit aus Aufgaben/Autopilot seit der letzten Stunde (die Stunde meldet sie
+  als `extra` und setzt sie zurück).
+- `company_tasks.autopilot_chance_bps`: gesetzt, wenn der Autopilot die Aufgabe erledigt hat. Der Check
+  `company_tasks_game_check` kennt die fünf neuen Spiele.
+- `company_autopilot` (RLS an, kein Client-Zugriff): `company_id`, `enabled`, `enabled_at`, `summary_sent_on`.
+- `company_autopilot_log` (RLS an, kein Client-Zugriff, 7 Tage): `company_id`, `task_id`, `task_key`, `success`,
+  `result_cents`, `chance_bps`, `at`.
+- Mitteilungstyp `company_autopilot` (Zusammenfassung am Morgen).
+- Funktionen: `company_awareness_hour`, `company_ai_utilization_bps`, `company_ai_wage_due_cents`,
+  `company_awareness_boost`, `company_task_pay_factor_bps`, `company_autopilot_mood`, `company_autopilot_chance_bps`,
+  `company_autopilot_run` (aus `company_tasks_run_due`), `company_task_puzzle_more`, `company_task_grade_more`.
+  Gepatcht: `player_company_close_hour`, `player_company_close_quarter`, `company_strengths_instant`,
+  `company_task_resolve`, `company_tasks_run_due`, `company_task_puzzle`, `company_task_grade`.
+- RPCs: `get_company_autopilot()` (Mitglieder) und `set_company_autopilot(p_request_id, p_on)` (Gründer, idempotent)
+  liefern `{on, can_toggle, mood, chance_bps, reward_bps, fail_penalty_bps, max_per_day, every_minutes,
+pay_factor_bps, today {done, success, cents}, log [...], last_hour {…, ai_utilization_bps, awareness_parts}}`.

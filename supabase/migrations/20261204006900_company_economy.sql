@@ -205,3 +205,9 @@ begin
   execute replace(v_def, a1, b1);
 end;
 $patch$;
+
+revoke all on function public.company_awareness_hour(double precision, double precision, double precision, double precision,
+  double precision, integer) from public, anon, authenticated;
+revoke all on function public.company_ai_utilization_bps(double precision, double precision, integer, double precision)
+  from public, anon, authenticated;
+revoke all on function public.company_ai_wage_due_cents(integer, integer) from public, anon, authenticated;

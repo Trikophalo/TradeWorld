@@ -6,6 +6,12 @@
 -- game rules come with game_config (companyTasks.tasks, companyTasks.games).
 -- Idempotent: runs unchanged as supabase/updates/20261204006920_task_games_five.sql.
 
+alter table public.company_tasks drop constraint if exists company_tasks_game_check;
+alter table public.company_tasks add constraint company_tasks_game_check
+  check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path',
+                  'memory', 'timing', 'diff', 'quick', 'route', 'haggle', 'pack', 'catch',
+                  'restock', 'receipts', 'offer', 'pattern', 'shelf'));
+
 create or replace function public.company_task_puzzle_more(p_task jsonb)
 returns jsonb
 language plpgsql
@@ -229,3 +235,6 @@ begin
 $b$ || a1);
 end;
 $patch$;
+
+revoke all on function public.company_task_puzzle_more(jsonb) from public, anon, authenticated;
+revoke all on function public.company_task_grade_more(text, jsonb, jsonb) from public, anon, authenticated;

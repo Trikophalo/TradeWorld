@@ -5,6 +5,19 @@
 \set QUIET 1
 set client_min_messages = notice;
 
+-- ADR-180 changed the company scale (market x 10, capacity x 1.5, idle AI workers at the standby share). This file
+-- checks the mechanics with the numbers it was written for; the end of the file restores the current values.
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 1, "small_business": 4, "gmbh": 15, "ag": 40}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 300000, "retail": 250000, "energy": 250000, "pharma": 300000, "logistics": 250000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '10000') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '600000') is null as ok \gset
+-- and awareness that does not move by the hour, so every hour sells with the same awareness
+select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
+select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,decayPerQuarter}', '0') is null as ok \gset
+select tests.set_cfg('startups', '{awareness,marketingMaxGain}', '0') is null as ok \gset
+
 \set a '''07207207-0000-4000-8000-0000000000a1'''
 \set b '''07207207-0000-4000-8000-0000000000b2'''
 \set c '''07207207-0000-4000-8000-0000000000c3'''
@@ -160,15 +173,17 @@ reset role;
 select tests.company_of(:d) as dco \gset
 select tests.company_of(:e) as eco \gset
 update public.player_companies set awareness = 0.3, quality = 0.5 where company_id in (:'dco', :'eco');
-select public.player_company_close_quarter(:'dco', :qid) is not null and public.player_company_close_quarter(:'eco', :qid) is not null as ok \gset
+-- ADR-180: word of mouth now works every hour (growthPerQuarter / quarterHours per hour)
+select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0.3') is null as ok \gset
+select public.player_company_close_hour(:'dco', :'qs'::timestamptz + interval '7 hours') is not null
+   and public.player_company_close_hour(:'eco', :'qs'::timestamptz + interval '7 hours') is not null as ok \gset
+select tests.set_cfg('startups', '{awareness,growthPerQuarter}', '0') is null as ok \gset
 select (select awareness from public.player_companies where company_id = :'dco') as awd,
-       (select awareness from public.player_companies where company_id = :'eco') as awe,
-       (select quality from public.player_companies where company_id = :'dco') as qd,
-       (select quality from public.player_companies where company_id = :'eco') as qe \gset
+       (select awareness from public.player_companies where company_id = :'eco') as awe \gset
 select tests.assert(
-  :qd::float8 = :qe::float8 and :awd::float8 > :awe::float8
-  and abs((:awd::float8 - :awe::float8) - 0.3 * (1.5 - 0.7) * 0.3 * 0.7 * (0.5 + :qd::float8)) < 1e-9,
-  'quarter close: word of mouth x pricing.awareness (budget 1.5, premium 0.7)');
+  :awd::float8 > :awe::float8
+  and abs((:awd::float8 - :awe::float8) - 0.3 / 6 * (1.5 - 0.7) * 0.3 * 0.7 * (0.5 + 0.5)) < 1e-9,
+  'operating hour: word of mouth x pricing.awareness (budget 1.5, premium 0.7)');
 
 -- =============================================================================
 -- D. Expansion levels from the company cash (GmbH and AG only)
@@ -246,3 +261,11 @@ select tests.assert(
   'go_public(): a garage may go public from level 9 (fromTiers incl. garage)');
 
 select tests.set_cfg('startups', '{demandNoise}', :'noise0'::jsonb);
+
+-- ADR-180: back to the current company scale
+select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 10, "small_business": 40, "gmbh": 150, "ag": 400}') is null as ok \gset
+select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
+  '{"tech": 450000, "retail": 375000, "energy": 375000, "pharma": 450000, "logistics": 375000}') is null as ok \gset
+select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '2500') is null as ok \gset
+select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '360000') is null as ok \gset
+select tests.set_cfg('startups', '{awareness}', :'aw_cfg0'::jsonb) is null as ok \gset

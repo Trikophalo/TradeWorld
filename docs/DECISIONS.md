@@ -3770,3 +3770,89 @@ Das Meme lebt so lange wie die Firma. Eine echte börsennotierte Firma mit ähnl
 - Demo: Schalter `demo.preview` zeigt den Gag mit der erfundenen Firma „Vulcan Energy“ von „Bohr_Boris“, wenn die
   Demo-Firma nicht so heißt; `/dev/ui` hat den Knopf „Running Gag“.
 - Bewusst nicht in Changelog und Patchnotes (Überraschung, Wunsch des Owners).
+
+## ADR-180: Firmen-Überholung – Wirtschaft nach Messung, Autopilot, fünf neue Minispiele, einfaches Dashboard — `Annahme`
+
+**Kontext.** Der Owner (Live-Server): „Die KI-Arbeitskräfte machen nur Minus, man macht generell kaum Umsatz. Alles
+ist verworren bei den Tabs. Man gewinnt nie an Bekanntheit.“ Dazu der Wunsch nach einem Auto-Knopf (60 % Erfolg, mit
+der Stimmung bis 120 %) und nach neuen Minispielen, die mit den sechs Stärken mehr bringen.
+
+**Messung (vorher).** `scripts/company-harness.ts` (TS, `closeStartupHour` + Quartal) und dieselben vier Firmen auf
+einer lokalen Datenbank mit der echten Stundenabrechnung (`player_companies_run_due`, Spielzeit Stunde für Stunde
+vorgestellt, Aufgaben tagsüber gelöst). Markt jeweils der Median (u = 0,5: 3.374 €/Spieljahr = Tag).
+
+| Firma (Harness, Stunde 72) | Umsatz €/h | Gewinn €/h | KI-Lohn fällig €/h | KI-Beitrag €/h |   Bekanntheit |
+| -------------------------- | ---------: | ---------: | -----------------: | -------------: | ------------: |
+| Garage solo, Tech          |         73 |        −54 |                  0 |              0 | 50 % (Deckel) |
+| Kleinunternehmen, 3 KI     |        469 |       −417 |                360 |              0 |          70 % |
+| GmbH, 8 KI, Marketing      |      2.271 |     −1.422 |                960 |            467 |          85 % |
+| AG, 20 KI                  |      7.114 |        144 |              2.400 |          4.351 |          95 % |
+
+Die SQL-Abrechnung (Stufe 0, ohne Fachwissen) bestätigt das: Kleinunternehmen −416 €/h in jeder Stunde, GmbH −1.416,
+AG −2.749; die Garage lebte fast nur von Auftragsarbeit (187 von 189 € Umsatz). Die Stundenabrechnung lief für alle
+vier Firmen ohne Fehler (`job_runs` leer, `close_error` null); das Geld der Firmen kam fast nur aus Aufgaben.
+
+**Ursachen.**
+
+1. _Kaum Umsatz:_ Die Märkte waren winzig gegenüber der Kapazität. Ein Median-Markt trägt 3.374 €/Tag, also
+   141 €/h bei voller Bekanntheit; der Gründer allein schafft 750 €/h. Die Nachfrage lag damit fast immer unter der
+   Kapazität des Gründers.
+2. _KI-Kräfte nur Minus:_ Jede KI-Kraft kostete 120 €/h, egal ob es Arbeit gab. Weil schon der Gründer die ganze
+   Nachfrage bediente, brachten zusätzliche KI-Kräfte nichts (Beitrag 0 €/h), kosteten aber den vollen Lohn; der
+   Lohnfaktor kürzte dann alle Löhne auf das Verdiente, und der Verlust blieb bei Fixkosten und Marketing.
+3. _Keine Bekanntheit:_ Die Bekanntheit änderte sich nur einmal je Quartal (alle sechs Stunden), dazwischen stand
+   sie still. Kampagnen brachten +0,5 bis +2,5 Punkte, Aufgaben und Geschäftszüge nichts. Die Stärke „Bekanntheit“
+   rechnete mit 100 % als Ziel; eine Firma mit 5 % Bekanntheit stand dort bei 5 von 100 und rückte nur 2 % der Lücke
+   je Stunde vor (aus 0 wurde nach einem Tag 1). Ohne Fachwissen deckelt Stufe 0 bei 50 %.
+
+**Entscheidung.**
+
+- _Markt ×10, Kapazität ×1,5:_ `marketFactorByTier` 10/40/150/400 (statt 1/4/15/40), `capacityCentsPerProductivity`
+  Tech/Pharma 450.000, sonst 375.000 je Quartal. GmbH-Fixkosten 3.600 € statt 6.000 € je Quartal.
+- _KI-Kräfte nach Auslastung (`aiUtilizationBps`, `aiWageDueCents`):_ Gründer und Spieler bedienen zuerst, die KI-Kräfte
+  den Rest. Den vollen Lohn kostet nur der genutzte Teil ihrer Kapazität, mindestens `aiWorkerStandbyBps` (25 %). Eine
+  ausgelastete KI-Kraft bringt in jeder Branche mehr, als sie kostet (Kapazität × Bruttomarge > 120 €/h; Test). Ohne
+  Nachfrage zeigt das Dashboard „Zu wenig Nachfrage: … stehen still und kosten je 25 % des Lohns“.
+- _Bekanntheit jede Stunde (`awarenessHour`):_ Mundpropaganda `growthPerQuarter/6 × a(1−a)(0,5+Qualität)` (0,2),
+  Marketing `marketingMaxGain × B/(B+Halb)/6` mit B = Stundenbudget × 6 (0,24; Halbsättigung 1 % des Quartalsmarkts,
+  mindestens 500 €), Vergessen `decayPerQuarter/6 × a` (0,12), gedeckelt durch die Stufe. Das Quartal bewegt sie nicht
+  mehr. Jede Stunde speichert ihre Teile (`awareness_parts`), das Dashboard sagt „+2,0 durch Marketing“. Gelöste
+  Aufgaben +0,2 Punkte sofort (KI und Autopilot +0,1), Kampagnen +2/+4/+8 Punkte. Die Stärke „Bekanntheit“ zählt
+  50 % als 100 (`awarenessFull`).
+- _Ziele:_ Eine gut geführte Garage verdient nach einem Tag rund 300–450 €/h (Junior-Lohn 300 €/h, Senior 700 €/h),
+  ein Kleinunternehmen mit drei KI-Kräften 400–550 €/h, eine GmbH mit acht KI-Kräften gut 1.000 €/h; Verluste gibt es
+  in den ersten Stunden, solange die Bekanntheit wächst.
+- _Autopilot:_ Schalter im Dashboard (nur Gründer). Jede Minute (`company_tasks_run_due` → `company_autopilot_run`)
+  übernimmt er jede offene Aufgabe, die `delayMinutes` (3) gewartet hat, ohne Minispiel. Chance
+  `6.000 + 6.000 × Stimmung` bps; Stimmung = Mitarbeiterzufriedenheit (börsennotiert) oder die Stärke „Team“ (privat,
+  folgt dem Lohnfaktor). Ab 100 % sicherer Erfolg, der Teil darüber erhöht den Lohn (120 % → ×1,2). Erfolg zahlt 70 %
+  eines perfekten Laufs, daneben kostet 30 % des Werts (statt 60 %). Ist niemand aktiv, legt er selbst stündlich eine
+  Aufgabe an; höchstens 24 Autopilot-Aufgaben je Berliner Tag. Jede Aufgabe steht in `company_autopilot_log`; ab 7 Uhr
+  kommt eine Mitteilung „Autopilot: 14 Aufgaben erledigt“ mit Erfolgen und Betrag. Geschäftszüge übernimmt er nicht.
+- _Aufgabenlohn nach Stärken:_ jede gelöste Aufgabe × `9.000 + 6.000 × Gesamtwert/100` bps (0,9× bis 1,5×), linear
+  statt der Stufen von `companyHealthPayFactor` (1,00–1,15), damit es spürbar ist.
+- _Fünf neue Minispiele (Tippen statt Ziehen):_ Nachbestellen (`restock`), Belege prüfen (`receipts`), Bestes Angebot
+  (`offer`), Zahlenreihe (`pattern`), Regal einräumen (`shelf`, 4×4-Sudoku). Bewertung in
+  `src/lib/sim/company-tasks-more.ts`, gleich in SQL (`company_task_grade_more`); fünf neue Aufgaben im Katalog.
+- _Dashboard:_ oben Zahlen, „Was die letzte Stunde sagt“ (Bekanntheit nach Hebeln, KI-Auslastung, ausverkauft),
+  „Zu erledigen“ mit neuen Punkten (Marketing setzen, KI-Kräfte im Leerlauf, ausverkauft, Autopilot), Autopilot,
+  Mira, die sechs Stärken. Timer, die acht Faktoren, Teamwert und Büro liegen unter „Erweitert“. Deep Links
+  (`health`, `staff-value`) öffnen „Erweitert“.
+
+**Nachher (Harness, Stunde 72, Stufe wie oben):**
+
+| Firma                  | Umsatz €/h | Gewinn €/h | KI-Lohn €/h | KI-Beitrag €/h | KI-Auslastung |   Bekanntheit |
+| ---------------------- | ---------: | ---------: | ----------: | -------------: | ------------: | ------------: |
+| Garage solo            |        731 |        440 |           0 |              0 |             – | 50 % (Deckel) |
+| Kleinunternehmen, 3 KI |      3.516 |        454 |         360 |            820 |         100 % |          70 % |
+| GmbH, 8 KI             |      8.906 |      1.135 |         960 |          2.625 |         100 % |          85 % |
+| AG, 20 KI              |     28.219 |     15.973 |       2.400 |         19.688 |         100 % |          95 % |
+
+Bekanntheit mit dem vorgeschlagenen Marketing: +2,0 Punkte je Stunde, die Garage von 3 % auf 27 % in zwölf Stunden
+(vorher 9,6 %). In SQL (Stufe 0): Garage +370 bis +389 €/h ab Stunde 24, Kleinunternehmen +150 bis +168 €/h.
+
+**Folgen und Annahmen.** Mehr Firmenumsatz fließt aus dem Haushaltskonto; die Abrechnung zahlt nie mehr, als die
+Haushalte haben. Das Haushaltskonto ist im Auge zu behalten. Die Garage-Simulation (1.000 Firmen, zehn Tage) zeigt
+jetzt unter 5 % Pleiten und über 85 % Gewinn (vorher 20–45 % Pleiten); das Risiko liegt bei den großen Rechtsformen.
+Ältere SQL-Tests prüfen die Mechanik weiter mit den alten Zahlen (Vorspann in den Dateien). Die Demo macht alles nach,
+den Autopiloten nur, wenn die Seite offen ist.
