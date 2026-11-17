@@ -94,6 +94,18 @@ export const nexamonOneOfOneChance = (cfg: Config = BALANCE.nexamon): number => 
 export const nexamonOneOfOneHit = (u: number, cfg: Config = BALANCE.nexamon): boolean =>
   Math.floor(clampUnit(u) * cfg.oneOfOne.packs) === 0;
 
+/** When a set comes out (ms since epoch), or null if it is out from the start (ADR-182: `sets[set].releaseAt`). */
+export function nexamonReleaseAt(set: string, cfg: Config = BALANCE.nexamon): number | null {
+  const at = (cfg.sets as Readonly<Record<string, { releaseAt?: string }>>)[set]?.releaseAt;
+  return at ? Date.parse(at) : null;
+}
+
+/** Whether a set can be bought and opened at `nowMs`. */
+export const nexamonSetReleased = (set: string, nowMs: number, cfg: Config = BALANCE.nexamon): boolean => {
+  const at = nexamonReleaseAt(set, cfg);
+  return at === null || nowMs >= at;
+};
+
 /** Whether the AI may pull, hold or buy cards of this rarity (ADR-174: never a One of One). */
 export const nexamonAiAllowed = (rarity: NexamonRarity, cfg: Config = BALANCE.nexamon): boolean =>
   !(cfg.ai.excludedRarities as readonly string[]).includes(rarity);

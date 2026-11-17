@@ -6,10 +6,14 @@ set client_min_messages = notice;
 
 \set a '''0c2c2c2c-0000-4000-8000-0000000000a1'''
 \set b '''0c2c2c2c-0000-4000-8000-0000000000b1'''
-update public.invite_codes set max_uses = max_uses + 2 where code = 'M1-TESTS';
+update public.invite_codes set max_uses = max_uses + 3 where code = 'M1-TESTS';
+\set c '''0c2c2c2c-0000-4000-8000-0000000000c1'''
 select tests.signup(:a, 'Ns_Anna') is not null and tests.signup(:b, 'Ns_Bruno') is not null as ok \gset
 select tests.set_level(:a, 10);
 select tests.set_level(:b, 10);
+select tests.signup(:c, 'Ns_Clara') is not null as ok \gset
+select tests.set_level(:c, 10);
+select tests.fund(:c, 1000000000, 'test:c2:c');
 select tests.fund(:a, 10000000000, 'test:c2:a');
 select tests.fund(:b, 1000000000, 'test:c2:b');
 select value as nx_cfg from public.game_config where key = 'nexamon' \gset
@@ -18,6 +22,19 @@ select tests.set_cfg('nexamon', '{ai,packsPerHour}',
 select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
 select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.set_cfg('nexamon', '{packs,perMinute}', '1000');
+-- a release time in the future: nothing of the set can be bought or opened, the AI pulls nothing (ADR-182)
+select tests.set_cfg('nexamon', '{sets,yin_yang,releaseAt}', to_jsonb((now() + interval '1 hour')::text));
+select tests.login_as('authenticated', :b);
+select tests.throws_key($$select public.buy_nexamon_pack(gen_random_uuid(), 'yin_yang')$$, 'nexamon_set_not_released',
+  'buy_nexamon_pack(): refused before the release time');
+select tests.throws_key($$select public.buy_nexamon_sealed_pack(gen_random_uuid(), 'yin_yang', 1)$$, 'nexamon_set_not_released',
+  'buy_nexamon_sealed_pack(): refused before the release time');
+reset role;
+select tests.assert(public.nexamon_open_pack('yin_yang', null, 'Karten-Kalle', null, now()) = '[]'::jsonb
+  and not public.nexamon_set_released('yin_yang', now()) and public.nexamon_set_released('mystic_energy', now()),
+  'an AI pack of an unreleased set pulls nothing');
+select tests.set_cfg('nexamon', '{sets,titans_revenge,releaseAt}', 'null');
+select tests.set_cfg('nexamon', '{sets,yin_yang,releaseAt}', 'null');
 select public.nexamon_sync() is not null as ok \gset
 
 create or replace function tests.ns_ai_open(p_set text) returns jsonb language sql security definer as $$
@@ -204,6 +221,89 @@ select tests.assert(
                where set_key = 'titans_revenge' and kind = 'type' and reward_cents > 3 * 1000000)
   and position('minCards' in pg_get_functiondef('public.nexamon_bonus_recompute(uuid)'::regprocedure)) > 0,
   'Titans collections: no one-card types, a reward pack counts 10.000 €');
+
+-- =============================================================================
+-- F. Several packs at once, and a live opening that goes on (ADR-182)
+-- =============================================================================
+select tests.cash(:c) as c0 \gset
+\set rqm '''0c2c2c2c-0000-4000-8000-0000000000f7'''
+select tests.login_as('authenticated', :c);
+select public.buy_nexamon_packs(:rqm, 'mystic_energy', 3) as mb \gset
+select public.buy_nexamon_packs(:rqm, 'mystic_energy', 3) as mb2 \gset
+select tests.throws_key($$select public.buy_nexamon_packs(gen_random_uuid(), 'mystic_energy', 11)$$, 'invalid_argument',
+  'buy_nexamon_packs(): at most packs.maxPerBuy');
+select tests.throws_key($$select public.buy_nexamon_packs(gen_random_uuid(), 'mystic_energy', 0)$$, 'invalid_argument',
+  'buy_nexamon_packs(): at least one');
+reset role;
+select tests.assert(
+  :'mb'::jsonb = :'mb2'::jsonb and jsonb_array_length(:'mb'::jsonb -> 'packs') = 3
+  and (:'mb'::jsonb ->> 'price_cents')::bigint = 3 * 20000 and tests.cash(:c) = :c0::bigint - 3 * 20000
+  and (select count(distinct x ->> 'pack_id') from jsonb_array_elements(:'mb'::jsonb -> 'packs') x) = 3
+  and (select count(*) from public.nexamon_packs where player_id = :c) = 3,
+  'buy_nexamon_packs(): three packs, three prices, in order, idempotent');
+select tests.assert(
+  (select count(*) from public.nexamon_live where player_id = :c and kind = 'pack') = 1
+  and (select pack_no = 1 and jsonb_array_length(queue) = 2 and pack_id = (:'mb'::jsonb #>> '{packs,0,pack_id}')::uuid
+         from public.nexamon_live where player_id = :c),
+  'live: the three packs are one session, two of them waiting');
+select (:'mb'::jsonb #>> '{packs,1,pack_id}') as p2 \gset
+select id as live_c from public.nexamon_live where player_id = :c \gset
+select tests.login_as('authenticated', :c);
+select public.nexamon_live_progress(:'p2', 1) as lp \gset
+reset role;
+select tests.assert(
+  :'lp'::jsonb ->> 'live_id' = :'live_c'
+  and (select pack_no = 2 and jsonb_array_length(queue) = 1 and pack_id = :'p2'::uuid and progress = 1
+         from public.nexamon_live where id = :'live_c'),
+  'live: the opener moves on to pack 2, the session (and its viewers) stay, pack 2 is shown');
+-- a pack within live.continueSeconds after the end continues it; later it is a new session
+update public.nexamon_live set queue = '[]'::jsonb, ends_at = now() - interval '20 seconds',
+       started_at = now() - interval '2 minutes' where id = :'live_c';
+select tests.login_as('authenticated', :c);
+select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') ->> 'pack_id' as p4 \gset
+reset role;
+select tests.assert(
+  (select pack_no = 3 and pack_id = :'p4'::uuid from public.nexamon_live where id = :'live_c')
+  and (select count(*) from public.nexamon_live where player_id = :c and kind = 'pack') = 1,
+  'live: a pack 20 s after the end continues the session as pack 3');
+update public.nexamon_live set ends_at = now() - interval '40 seconds', started_at = now() - interval '2 minutes'
+ where id = :'live_c';
+select tests.login_as('authenticated', :c);
+select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') is not null as ok \gset
+reset role;
+select tests.assert((select count(*) from public.nexamon_live where player_id = :c and kind = 'pack') = 2,
+  'live: a pack 40 s after the end starts a new session');
+
+-- =============================================================================
+-- G. The announcement airs in exactly one show (ADR-182)
+-- =============================================================================
+select value as ns_cfg from public.game_config where key = 'newsShow' \gset
+select tests.set_cfg('newsShow', '{announcements}', '[{"at": "2030-01-01T10:00:00Z", "releaseAt": "2030-01-01T10:30:00Z",
+  "sets": [{"set": "titans_revenge", "cardKey": "tr-027", "mood": "shocked", "headline": "Neu: Titans", "text": "Ab {time} Uhr!"},
+           {"set": "yin_yang", "cardKey": "yy-109", "mood": "proud", "headline": "Neu: Yin Yang", "text": "Auch ab {time} Uhr."}]}]');
+select tests.assert(
+  jsonb_array_length(public.news_show_announcements('2030-01-01 08:50:00+00')) = 0
+  and jsonb_array_length(public.news_show_announcements('2030-01-01 09:20:00+00')) = 0
+  and not exists (select 1 from public.news_announcements_aired where announcement_at = '2030-01-01 10:00:00+00'),
+  'announcement: no show before its hour');
+select public.news_show_announcements('2030-01-01 09:50:00+00') as an1 \gset
+select tests.assert(
+  jsonb_array_length(:'an1'::jsonb) = 2 and :'an1'::jsonb #>> '{0,kind}' = 'release'
+  and :'an1'::jsonb #>> '{0,text}' = 'Ab 11:30 Uhr!' and :'an1'::jsonb #>> '{0,nexamon,card_key}' = 'tr-027'
+  and :'an1'::jsonb #>> '{1,nexamon,set}' = 'yin_yang'
+  -- a rebuilt draft of the same show gets it again, as its replacement
+  and jsonb_array_length(public.news_show_announcements('2030-01-01 10:05:00+00')) = 2
+  -- every later show never
+  and jsonb_array_length(public.news_show_announcements('2030-01-01 10:35:00+00')) = 0
+  and jsonb_array_length(public.news_show_announcements('2030-01-01 10:50:00+00')) = 0
+  and jsonb_array_length(public.news_show_announcements('2030-01-02 09:50:00+00')) = 0
+  and (select slot from public.news_announcements_aired where announcement_at = '2030-01-01 10:00:00+00')
+      = '2030-01-01 10:00:00+00',
+  'announcement: exactly one show slot, its time in Berlin, never again later');
+select public.news_show_build('2030-01-01 09:50:00+00') as nsb \gset
+select tests.assert(:'nsb'::jsonb #>> '{0,kind}' = 'release' and :'nsb'::jsonb #>> '{1,kind}' = 'release',
+  'news_show_build(): the announcement opens the show');
+update public.game_config set value = :'ns_cfg'::jsonb where key = 'newsShow';
 
 update public.game_config set value = :'nx_cfg'::jsonb where key = 'nexamon';
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds after Titans Revenge and Yin Yang');

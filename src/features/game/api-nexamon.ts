@@ -8,6 +8,7 @@ import type {
   NexamonEngine,
   NexamonListing,
   NexamonMarketQuery,
+  NexamonPackResult,
 } from "./nexamon-types";
 import { rpc } from "./rpc";
 
@@ -270,6 +271,7 @@ const quickSoldSchema = z.object({
   count: num,
   total_cents: num,
 });
+const packsSchema = z.object({ set: setKey, count: num, price_cents: num, packs: z.array(packSchema) });
 const gradingSchema = z.object({ copy: copySchema, fee_cents: num, ready_at: iso });
 const crackedSchema = z.object({ copy: copySchema, old_grade: num });
 
@@ -280,6 +282,7 @@ export const NEXAMON_RPC_SCHEMAS = {
   get_nexamon: overviewSchema,
   get_player_nexamon: playerSchema,
   buy_nexamon_pack: packSchema,
+  buy_nexamon_packs: packsSchema,
   list_nexamon_card: listedSchema,
   unlist_nexamon_card: unlistedSchema,
   list_nexamon_cards: listedManySchema,
@@ -291,6 +294,24 @@ export const NEXAMON_RPC_SCHEMAS = {
   crack_nexamon_slab: crackedSchema,
   get_nexamon_bonuses: bonusesSchema,
 } as const;
+
+const toPack = (r: z.infer<typeof packSchema>): NexamonPackResult => ({
+  packId: r.pack_id,
+  set: r.set,
+  priceCents: r.price_cents,
+  cards: r.cards.map((c) => ({
+    slot: c.slot,
+    copyId: c.copy_id,
+    cardKey: c.card_key,
+    rarity: c.rarity,
+    condition: c.condition,
+    isNew: c.is_new,
+    serial: c.serial,
+    population: c.population,
+    valueCents: c.value_cents,
+  })),
+  packsOpened: r.packs_opened,
+});
 
 const toCopy = (c: z.infer<typeof copySchema>): NexamonCopy => ({
   id: c.id,
@@ -387,24 +408,11 @@ export const liveNexamonEngine: NexamonEngine = {
     };
   },
   async buyNexamonPack(requestId, set) {
-    const r = await rpc("buy_nexamon_pack", { p_request_id: requestId, p_set: set }, packSchema);
-    return {
-      packId: r.pack_id,
-      set: r.set,
-      priceCents: r.price_cents,
-      cards: r.cards.map((c) => ({
-        slot: c.slot,
-        copyId: c.copy_id,
-        cardKey: c.card_key,
-        rarity: c.rarity,
-        condition: c.condition,
-        isNew: c.is_new,
-        serial: c.serial,
-        population: c.population,
-        valueCents: c.value_cents,
-      })),
-      packsOpened: r.packs_opened,
-    };
+    return toPack(await rpc("buy_nexamon_pack", { p_request_id: requestId, p_set: set }, packSchema));
+  },
+  async buyNexamonPacks(requestId, set, count) {
+    const r = await rpc("buy_nexamon_packs", { p_request_id: requestId, p_set: set, p_count: count }, packsSchema);
+    return { set: r.set, count: r.count, priceCents: r.price_cents, packs: r.packs.map(toPack) };
   },
   async nexamonCollection(set = null) {
     const r = await rpc("get_nexamon_collection", { p_set: set }, collectionSchema);

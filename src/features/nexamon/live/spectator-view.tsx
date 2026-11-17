@@ -44,10 +44,13 @@ export function SpectatorView({ liveId, onClose }: { liveId: string | null; onCl
   const last = v?.cards[v.cards.length - 1];
   const lastCard = last ? nexamonCard(last.cardKey) : undefined;
   const sum = v?.cards.reduce((s, p) => s + p.valueCents, 0) ?? 0;
-  const heard = useRef(0);
+  // ADR-182: a continued session shows its next pack under the same live id; the count starts again
+  const heard = useRef({ pack: 1, n: 0 });
   useEffect(() => {
-    if (!v || v.cards.length <= heard.current) return;
-    heard.current = v.cards.length;
+    if (!v) return;
+    if (v.packNo !== heard.current.pack) heard.current = { pack: v.packNo, n: 0 };
+    if (v.cards.length <= heard.current.n) return;
+    heard.current.n = v.cards.length;
     if (last) void playSound(SOUND[last.rarity]);
   }, [v, last]);
 
@@ -58,6 +61,7 @@ export function SpectatorView({ liveId, onClose }: { liveId: string | null; onCl
         <Dialog.Content
           data-testid="spectator-view"
           data-shown={v?.cards.length ?? 0}
+          data-pack-no={v?.packNo ?? 1}
           aria-describedby={undefined}
           className="fixed inset-0 z-sheet flex flex-col bg-bg pt-safe pb-safe outline-none lg:m-auto lg:h-[min(94dvh,820px)] lg:w-[min(94vw,760px)] lg:rounded-xl lg:border-2 lg:border-line-2 lg:shadow-3"
         >
@@ -68,7 +72,16 @@ export function SpectatorView({ liveId, onClose }: { liveId: string | null; onCl
                 <Dialog.Title className="truncate font-pixel text-sm text-fg-1 uppercase">
                   {v ? t("spectate.title", { name: v.player.nickname }) : t("spectate.loading")}
                 </Dialog.Title>
-                {v && <p className="text-xs text-fg-3">{t(`sets.${v.set}`)}</p>}
+                {v && (
+                  <p className="flex items-center gap-1.5 text-xs text-fg-3">
+                    {t(`sets.${v.set}`)}
+                    {v.packNo > 1 && (
+                      <Badge tone="accent" data-testid="spectate-pack-no">
+                        {t("spectate.packNo", { n: v.packNo })}
+                      </Badge>
+                    )}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -93,7 +106,7 @@ export function SpectatorView({ liveId, onClose }: { liveId: string | null; onCl
                   <AnimatePresence mode="popLayout" initial={false}>
                     {lastCard ? (
                       <motion.div
-                        key={`c-${v.cards.length}`}
+                        key={`c-${v.packNo}-${v.cards.length}`}
                         initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.7, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={reduced ? { opacity: 0 } : { opacity: 0, x: -80, scale: 0.8 }}
@@ -108,7 +121,7 @@ export function SpectatorView({ liveId, onClose }: { liveId: string | null; onCl
                       </motion.div>
                     ) : (
                       <motion.div
-                        key="pack"
+                        key={`pack-${v.packNo}`}
                         animate={reduced ? undefined : { y: [0, -6, 0] }}
                         transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
                         exit={{ opacity: 0 }}
@@ -128,7 +141,7 @@ export function SpectatorView({ liveId, onClose }: { liveId: string | null; onCl
                     const pull = v.cards[i];
                     const card = pull ? nexamonCard(pull.cardKey) : undefined;
                     return (
-                      <li key={i}>
+                      <li key={`${v.packNo}-${i}`}>
                         {card ? (
                           <motion.div
                             initial={reduced ? { opacity: 0 } : { opacity: 0, y: -10 }}

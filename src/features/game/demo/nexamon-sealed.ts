@@ -1,5 +1,6 @@
 import { NEXAMON_RULES } from "@/config/nexamon-rules";
 import { NEXAMON_SETS } from "@/config/nexamon/types";
+import { nexamonSetReleased } from "@/lib/sim/nexamon";
 import { unlockLevel } from "@/lib/sim/progression";
 import type { NexamonPackResult, NexamonSetKey } from "../nexamon-types";
 import type { NexamonSealedEngine, NexamonSealedOpenResult, NexamonSealedPack } from "../nexamon-sealed-types";
@@ -95,6 +96,7 @@ export function createSealedEngine(host: SealedHost): NexamonSealedEngine & {
           if (!requestId || !Number.isInteger(count) || count < 1 || count > cfg.packs.perMinute)
             throw new GameError("invalid_argument");
           if (!isSet(set)) throw new GameError("nexamon_unknown");
+          if (!nexamonSetReleased(set, host.now())) throw new GameError("nexamon_set_not_released");
           const price = cfg.sets[set].packPriceCents;
           if (host.cashCents() < price * count) throw new GameError("insufficient_funds");
           host.pay(price * count);

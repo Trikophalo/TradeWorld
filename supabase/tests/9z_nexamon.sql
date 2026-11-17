@@ -126,6 +126,9 @@ select tests.assert(
 -- =============================================================================
 -- B. The catalogue comes from game_config; the AI sellers get their starting stock
 -- =============================================================================
+-- ADR-182: the tests do not wait for release times
+select tests.set_cfg('nexamon', '{sets,titans_revenge,releaseAt}', 'null');
+select tests.set_cfg('nexamon', '{sets,yin_yang,releaseAt}', 'null');
 select public.nexamon_sync() as synced \gset
 select public.nexamon_sync() as synced2 \gset
 select tests.assert(

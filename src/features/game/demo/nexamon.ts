@@ -28,6 +28,7 @@ import {
   nexamonValueAfterQuickSell,
   nexamonValueAfterSale,
   nexamonValueBounds,
+  nexamonSetReleased,
 } from "@/lib/sim/nexamon";
 import { divRoundHalfEven } from "@/lib/sim/money";
 import {
@@ -501,6 +502,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     // 2. the AI's packs
     let opened = 0;
     for (const set of NEXAMON_SETS) {
+      // ADR-182: no AI packs of a set before its release
+      if (!nexamonSetReleased(set, now)) continue;
       const perHour = cfg.ai.packsPerHour[set];
       const since = (s.aiPacksAt[set] ??= now);
       let due = Math.floor(((now - since) / HOUR) * perHour);
@@ -731,6 +734,70 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     return c;
   }
 
+  /** One bought pack: pays, pulls, mints (buy_nexamon_pack). */
+  function buyPackIn(s: DemoNexamonState, set: NexamonSetKey, now: number): NexamonPackResult {
+    if (!nexamonSetReleased(set, now)) throw new GameError("nexamon_set_not_released");
+    if (!(NEXAMON_SETS as readonly string[]).includes(set)) throw new GameError("nexamon_unknown");
+    const price = cfg.sets[set].packPriceCents;
+    s.packTimes = s.packTimes.filter((t) => t > now - 60_000);
+    if (s.packTimes.length >= cfg.packs.perMinute) throw new GameError("rate_limited");
+    if (host.cashCents() < price) throw new GameError("insufficient_funds");
+    host.pay(price);
+    s.packTimes.push(now);
+    const packId = `pack-${s.nextId++}`;
+    const pulls = openPlayerPack(s, set);
+    const cards = pulls.map((pull) => {
+      const isNew = !s.copies.some((c) => c.cardKey === pull.key);
+      const serial = mint(s, pull.key, now);
+      const copy: DemoCopy = {
+        id: `nx-${s.nextId++}`,
+        cardKey: pull.key,
+        serial,
+        condition: pull.condition,
+        grade: null,
+        gradingUntil: null,
+        gradedAt: null,
+        acquiredAt: now,
+        listing: null,
+      };
+      s.copies.push(copy);
+      if (pull.rarity === "one_of_one") {
+        (s.oneOfOnes ??= {})[pull.key] = now;
+        host.feed("nexamon_one_of_one", {
+          card_key: pull.key,
+          set,
+          rarity: pull.rarity,
+          serial,
+          name: info(pull.key).name,
+        });
+      }
+      if ((cfg.feedRarities as readonly string[]).includes(pull.rarity))
+        host.feed("nexamon_pull", {
+          card_key: pull.key,
+          set,
+          rarity: pull.rarity,
+          serial,
+          condition: pull.condition,
+        });
+      if (pull.rarity !== "common") host.track("nexamon_rares");
+      if (pull.rarity !== "common" && pull.rarity !== "rare") host.track("nexamon_ultras");
+      return {
+        slot: pull.slot,
+        copyId: copy.id,
+        cardKey: pull.key,
+        rarity: pull.rarity,
+        condition: pull.condition,
+        isNew,
+        serial,
+        population: serial,
+        valueCents: copyValue(s, copy),
+      };
+    });
+    s.packs[set] = (s.packs[set] ?? 0) + 1;
+    host.track("nexamon_packs");
+    return { packId, set, priceCents: price, cards, packsOpened: s.packs[set]! };
+  }
+
   const write = <T>(requestId: string, run: (s: DemoNexamonState, now: number) => T): Promise<T> =>
     Promise.resolve().then(() => {
       requireUnlock();
@@ -794,67 +861,20 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
       };
     },
 
-    buyNexamonPack: (requestId, set) =>
+    buyNexamonPack: (requestId, set) => write(requestId, (s, now) => buyPackIn(s, set, now)),
+
+    /** Several packs at once (ADR-182): all or nothing, every pack counts for the rate limit. */
+    buyNexamonPacks: (requestId, set, count) =>
       write(requestId, (s, now) => {
         if (!(NEXAMON_SETS as readonly string[]).includes(set)) throw new GameError("nexamon_unknown");
+        if (!Number.isInteger(count) || count < 1 || count > cfg.packs.maxPerBuy)
+          throw new GameError("invalid_argument");
         const price = cfg.sets[set].packPriceCents;
-        s.packTimes = s.packTimes.filter((t) => t > now - 60_000);
-        if (s.packTimes.length >= cfg.packs.perMinute) throw new GameError("rate_limited");
-        if (host.cashCents() < price) throw new GameError("insufficient_funds");
-        host.pay(price);
-        s.packTimes.push(now);
-        const packId = `pack-${s.nextId++}`;
-        const pulls = openPlayerPack(s, set);
-        const cards = pulls.map((pull) => {
-          const isNew = !s.copies.some((c) => c.cardKey === pull.key);
-          const serial = mint(s, pull.key, now);
-          const copy: DemoCopy = {
-            id: `nx-${s.nextId++}`,
-            cardKey: pull.key,
-            serial,
-            condition: pull.condition,
-            grade: null,
-            gradingUntil: null,
-            gradedAt: null,
-            acquiredAt: now,
-            listing: null,
-          };
-          s.copies.push(copy);
-          if (pull.rarity === "one_of_one") {
-            (s.oneOfOnes ??= {})[pull.key] = now;
-            host.feed("nexamon_one_of_one", {
-              card_key: pull.key,
-              set,
-              rarity: pull.rarity,
-              serial,
-              name: info(pull.key).name,
-            });
-          }
-          if ((cfg.feedRarities as readonly string[]).includes(pull.rarity))
-            host.feed("nexamon_pull", {
-              card_key: pull.key,
-              set,
-              rarity: pull.rarity,
-              serial,
-              condition: pull.condition,
-            });
-          if (pull.rarity !== "common") host.track("nexamon_rares");
-          if (pull.rarity !== "common" && pull.rarity !== "rare") host.track("nexamon_ultras");
-          return {
-            slot: pull.slot,
-            copyId: copy.id,
-            cardKey: pull.key,
-            rarity: pull.rarity,
-            condition: pull.condition,
-            isNew,
-            serial,
-            population: serial,
-            valueCents: copyValue(s, copy),
-          };
-        });
-        s.packs[set] = (s.packs[set] ?? 0) + 1;
-        host.track("nexamon_packs");
-        return { packId, set, priceCents: price, cards, packsOpened: s.packs[set]! };
+        const recent = s.packTimes.filter((t) => t > now - 60_000).length;
+        if (recent + count > cfg.packs.perMinute) throw new GameError("rate_limited");
+        if (host.cashCents() < price * count) throw new GameError("insufficient_funds");
+        const packs = Array.from({ length: count }, () => buyPackIn(s, set, now));
+        return { set, count, priceCents: price * count, packs };
       }),
 
     async nexamonCollection(set = null) {

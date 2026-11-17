@@ -11,18 +11,23 @@
 export const NEXAMON_RULES = {
   /** Cards in a booster pack; the slots are numbered 1 to 5. */
   packSize: 5,
-  /** The sets in release order with the price of a booster pack (money to the households). */
+  /**
+   * The sets in release order with the price of a booster pack (money to the households). `releaseAt` (ADR-182): a
+   * set cannot be bought, opened, sealed or battled before this instant (UTC); the shop shows it as "Neu ab".
+   */
   sets: {
     mystic_energy: { name: "Nexamon: Mystic Energy", packPriceCents: 20_000 },
     super_apex: { name: "Nexamon: Super Apex", packPriceCents: 100_000 },
     prismatic_peak: { name: "Nexamon: Prismatic Peak", packPriceCents: 1_000_000 },
     cosmic_winds: { name: "Nexamon: Cosmic Winds", packPriceCents: 500_000 },
-    titans_revenge: { name: "Nexamon: Titans Revenge", packPriceCents: 10_000_000 },
-    yin_yang: { name: "Nexamon: Yin Yang", packPriceCents: 200_000 },
+    titans_revenge: { name: "Nexamon: Titans Revenge", packPriceCents: 10_000_000, releaseAt: "2026-11-17T16:30:00Z" },
+    yin_yang: { name: "Nexamon: Yin Yang", packPriceCents: 200_000, releaseAt: "2026-11-17T16:30:00Z" },
   },
   packs: {
     /** At most this many packs per player and minute. */
     perMinute: 20,
+    /** Packs of one set in one purchase (ADR-182); every one counts for perMinute. */
+    maxPerBuy: 10,
   },
   /**
    * Pull rates. Slots 1 to 3 always hold a common. Slot 4 and slot 5 roll once each, in parts of `denominator`;
@@ -400,6 +405,11 @@ export const NEXAMON_RULES = {
    * shows every `fallbackSlotMs`. A session lives at most `maxMs` and `lingerMs` after the last card.
    */
   live: {
+    /**
+     * ADR-182: a player's next pack that starts at most this long after their live opening ended (or while it runs)
+     * continues that session; spectators stay and see the next pack.
+     */
+    continueSeconds: 30,
     staleMs: 10_000,
     fallbackSlotMs: 2_500,
     lingerMs: 8_000,

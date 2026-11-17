@@ -1,6 +1,6 @@
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_CARDS, NEXAMON_SETS, type NexamonSetKey } from "@/config/nexamon";
-import { nexamonOpenPack, nexamonCopyValueCents, nexamonE4FromCents } from "@/lib/sim/nexamon";
+import { nexamonOpenPack, nexamonCopyValueCents, nexamonE4FromCents, nexamonSetReleased } from "@/lib/sim/nexamon";
 import { battleKnownSlots, battleTimeline, decideBattle } from "@/lib/sim/nexamon-battle";
 import { createRng } from "@/lib/sim/rng";
 import type { NexamonPull } from "../nexamon-types";
@@ -25,7 +25,9 @@ const cfg = BALANCE.nexamon;
 const ACCEPT_MS = 2_500;
 /** A made-up friend opens a pack live in every window of this length (for `LIVE_MS`). */
 const LIVE_WINDOW_MS = 45_000;
-const LIVE_MS = 26_000;
+const LIVE_MS = 34_000;
+/** ADR-182: the made-up friend opens two packs in one session, the second this long after the first. */
+const LIVE_PACK_MS = 16_000;
 const LIVE_FIRST_MS = 2_000;
 const OWN_LIVE_MS = 30_000;
 
@@ -81,6 +83,9 @@ interface OwnLive {
   set: NexamonSetKey;
   startedAt: number;
   progress: number;
+  /** ADR-182: which pack of the session is shown, and the packs waiting after it. */
+  packNo: number;
+  queue: { packId: string; set: NexamonSetKey }[];
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -120,22 +125,36 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
     const rng = createRng(172).derive("live", String(window));
     const friend = friends[Math.floor(rng.next() * friends.length)]!;
     const set = NEXAMON_SETS[Math.floor(rng.next() * 2)]!;
-    const cards = nexamonOpenPack(
-      NEXAMON_CARDS.filter((c) => c.set === set),
-      rng.next,
-    ).map((pull): NexamonShownPull => ({
-      slot: pull.slot,
-      cardKey: pull.key,
-      rarity: pull.rarity,
-      condition: pull.condition,
-      serial: 1 + Math.floor(rng.next() * 400),
-      valueCents: nexamonCopyValueCents(
-        nexamonE4FromCents(NEXAMON_CARDS.find((c) => c.key === pull.key)!.startPriceCents),
-        pull.condition,
-        null,
-      ),
-    }));
-    return { id: `live-friend-${window}`, friend, set, startedAt, endsAt: startedAt + LIVE_MS, cards };
+    const pack = () =>
+      nexamonOpenPack(
+        NEXAMON_CARDS.filter((c) => c.set === set),
+        rng.next,
+      ).map((pull): NexamonShownPull => ({
+        slot: pull.slot,
+        cardKey: pull.key,
+        rarity: pull.rarity,
+        condition: pull.condition,
+        serial: 1 + Math.floor(rng.next() * 400),
+        valueCents: nexamonCopyValueCents(
+          nexamonE4FromCents(NEXAMON_CARDS.find((c) => c.key === pull.key)!.startPriceCents),
+          pull.condition,
+          null,
+        ),
+      }));
+    const packs = [pack(), pack()];
+    // ADR-182: the second pack follows in the same session
+    const packNo = now >= startedAt + LIVE_PACK_MS ? 2 : 1;
+    const packStart = startedAt + (packNo - 1) * LIVE_PACK_MS;
+    return {
+      id: `live-friend-${window}`,
+      friend,
+      set,
+      startedAt,
+      endsAt: startedAt + LIVE_MS,
+      packNo,
+      packStart,
+      cards: packs[packNo - 1]!,
+    };
   }
 
   function settle(b: DemoBattle, now: number) {
@@ -237,7 +256,16 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
 
   return {
     demoPackOpened(packId, set) {
-      own.push({ id: `live-own-${nextId++}`, packId, set, startedAt: host.now(), progress: 0 });
+      const now = host.now();
+      const last = own.at(-1);
+      // ADR-182: a pack within live.continueSeconds after the last session ended continues it
+      if (last && now <= last.startedAt + OWN_LIVE_MS + cfg.live.continueSeconds * 1_000) {
+        if (last.queue.length === 0 && (last.progress >= cfg.packSize || now >= last.startedAt + OWN_LIVE_MS))
+          Object.assign(last, { packId, set, startedAt: now, progress: 0, packNo: last.packNo + 1 });
+        else last.queue.push({ packId, set });
+        return;
+      }
+      own.push({ id: `live-own-${nextId++}`, packId, set, startedAt: now, progress: 0, packNo: 1, queue: [] });
       if (own.length > 10) own.shift();
     },
 
@@ -318,6 +346,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
       return host.idempotent(requestId, () => {
         const now = host.now();
         if (!(NEXAMON_SETS as readonly string[]).includes(set)) throw new GameError("nexamon_unknown");
+        if (!nexamonSetReleased(set, now)) throw new GameError("nexamon_set_not_released");
         if (nickname.toLowerCase() === host.me().nickname.toLowerCase()) throw new GameError("nexamon_battle_self");
         const friend = lobbyFriends().find((f) => f.nickname.toLowerCase() === nickname.toLowerCase());
         if (!friend) throw new GameError("nexamon_battle_not_here");
@@ -388,7 +417,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
       if (live && live.id === liveId) {
         const visible = Math.max(
           0,
-          Math.min(cfg.packSize, Math.floor((now - live.startedAt - LIVE_FIRST_MS) / cfg.live.fallbackSlotMs) + 1),
+          Math.min(cfg.packSize, Math.floor((now - live.packStart - LIVE_FIRST_MS) / cfg.live.fallbackSlotMs) + 1),
         );
         return {
           id: live.id,
@@ -401,6 +430,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
           startedAt: iso(live.startedAt),
           endsAt: iso(live.endsAt),
           viewers: 2 + (Math.floor(now / 7000) % 3),
+          packNo: live.packNo,
           progress: visible,
           cards: live.cards.slice(0, visible),
           done: false,
@@ -421,6 +451,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
         startedAt: iso(mine.startedAt),
         endsAt: iso(mine.startedAt + OWN_LIVE_MS),
         viewers: 2,
+        packNo: mine.packNo,
         progress: mine.progress,
         cards: [],
         done: mine.startedAt + OWN_LIVE_MS <= now,
@@ -430,7 +461,22 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
     },
 
     async reportNexamonLive(packId, revealed) {
-      const live = own.find((o) => o.packId === packId);
+      let live = own.find((o) => o.packId === packId);
+      // ADR-182: the opener moved on to a waiting pack of the session: it is shown now
+      const waiting = own.find((o) => o.queue.some((q) => q.packId === packId));
+      if (!live && waiting) {
+        const at = waiting.queue.findIndex((q) => q.packId === packId);
+        const next = waiting.queue[at]!;
+        Object.assign(waiting, {
+          packId,
+          set: next.set,
+          startedAt: host.now(),
+          progress: 0,
+          packNo: waiting.packNo + at + 1,
+          queue: waiting.queue.slice(at + 1),
+        });
+        live = waiting;
+      }
       if (!live) return { liveId: null, viewers: 0, reactions: [] };
       live.progress = Math.max(live.progress, Math.min(cfg.packSize, revealed));
       return { liveId: live.id, viewers: 2, reactions: ownReactions(live, host.now()) };

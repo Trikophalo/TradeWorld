@@ -1977,6 +1977,11 @@ export const demoEngine: GameEngine = {
     packBattles.demoPackOpened(pack.packId, set);
     return pack;
   },
+  async buyNexamonPacks(requestId, set, count) {
+    const bought = await nexamon.buyNexamonPacks(requestId, set, count);
+    for (const pack of bought.packs) packBattles.demoPackOpened(pack.packId, set);
+    return bought;
+  },
   nexamonSealedPacks: sealed.nexamonSealedPacks,
   buyNexamonSealedPack: sealed.buyNexamonSealedPack,
   async openNexamonSealedPack(requestId, packId) {
