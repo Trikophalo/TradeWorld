@@ -563,7 +563,8 @@ describe("Nexamon market value (ADR-165)", () => {
         rarity,
         population,
       });
-    expect(above("legendary", 1)).toBeCloseTo(2 * cfg.ai.buyChanceBps, -1);
+    expect(above("legendary", 1)).toBeLessThanOrEqual(cfg.ai.buyChanceBps);
+    expect(above("legendary", 1)).toBeGreaterThan(cfg.ai.buyChanceBps - 2);
     expect(above("common", 100_000)).toBeLessThan(above("ultra", 10));
   });
 
@@ -710,12 +711,12 @@ describe("Nexamon AI and fees (ADR-165)", () => {
     expect(chance(1, "good", null)).toBe(10_000);
     expect(chance(40_000, "mint", 10, 40_000)).toBe(10_000);
     expect(chance(0, "mint", null)).toBe(0);
-    // premiums: poor 0 %, good 3 %, near mint 8 %, mint 12 %; slabs by grade, Black Label 20 %
+    // premiums: poor 0 %, good 3 %, near mint 8 %, mint 12 %; slabs by grade, Black Label 15 %, never above maxPremiumBps
     expect(["poor", "good", "near_mint", "mint"].map((c) => nexamonAiPremiumBps(c as NexamonCondition, null))).toEqual([
       0, 300, 800, 1_200,
     ]);
     expect([7, 8, 8.5, 9, 9.5, 10, 11].map((g) => nexamonAiPremiumBps("mint", g))).toEqual([
-      0, 500, 700, 1_000, 1_200, 1_500, 2_000,
+      0, 500, 700, 1_000, 1_200, 1_500, 1_500,
     ]);
     expect(nexamonAiMaxPriceCents(10_000, "mint", null)).toBe(11_200);
     expect(nexamonAiMaxPriceCents(10_000, "near_mint", null)).toBe(10_800);
@@ -729,6 +730,26 @@ describe("Nexamon AI and fees (ADR-165)", () => {
     expect(chance(10_600, "mint", null)).toBeLessThan(full);
     expect(chance(11_200, "mint", null)).toBeCloseTo((full * cfg.ai.atMaxChanceBps) / 10_000, -1);
     expect(nexamonAiExpectedMinutes(10_000)).toBe(1);
+  });
+
+  it("buys any price at or below the value and above it rarely, more often for popular cards, never beyond +15 % (ADR-195)", () => {
+    const chance = (priceCents: number, rarity: NexamonRarity, population: number, grade: number | null = null) =>
+      nexamonAiBuyChanceBps({ priceCents, copyValueCents: 150_000_000, condition: "mint", grade, rarity, population });
+    // 1.5 M EUR at or below the value: certain
+    expect(chance(150_000_000, "common", 1_000_000)).toBe(10_000);
+    expect(chance(120_000_000, "legendary", 1)).toBe(10_000);
+    // +10 %: a popular card sometimes, an unpopular one rarely, both well below certain
+    const popular = chance(165_000_000, "legendary", 1, 10);
+    const unpopular = chance(165_000_000, "common", 1_000_000, 10);
+    expect(popular).toBeGreaterThan(5 * unpopular);
+    expect(unpopular).toBeGreaterThan(0);
+    expect(popular).toBeLessThanOrEqual(cfg.ai.buyChanceBps);
+    // the chance falls with the premium
+    expect(chance(155_000_000, "legendary", 1, 10)).toBeGreaterThan(popular);
+    // above +15 %: never, not even for a Black Label
+    expect(chance(172_500_001, "legendary", 1, 11)).toBe(0);
+    expect(chance(180_000_000, "legendary", 1, 11)).toBe(0);
+    expect(nexamonAiPremiumBps("mint", 11)).toBeLessThanOrEqual(cfg.ai.maxPremiumBps);
     expect(nexamonAiExpectedMinutes(3_000)).toBe(3);
     expect(nexamonAiExpectedMinutes(0)).toBeNull();
   });

@@ -113,7 +113,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
-- **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +25 %, zusammen bis zum Vierfachen; die Preise verdoppeln sich von 4.000 € bis 8.192.000 €.
+- **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro Stunde); die Preise steigen von 3.000 € bis rund 259.500 €.
+
+- **KI kauft auch teure Karten (ADR-195):** Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab. Bis 15 % über Wert klappt es nur manchmal, eher bei beliebten Karten; darüber nie.
 
 - **Fertigkeiten für Firmen (ADR-194):** Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“. Jede Stufe braucht die passende Fähigkeit aus deinem Skilltree (oder dem eines Mitarbeiters), kostet Firmengeld und hebt danach Nachfrage, Kapazität oder Qualität oder senkt Kosten, also mehr Gewinn und einen besseren Kurs.
 

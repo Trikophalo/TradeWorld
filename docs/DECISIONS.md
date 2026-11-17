@@ -4437,6 +4437,36 @@ entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awaren
 **Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
 Anzeige-Grenzen der Garage.
 
+## ADR-195: KI-Sammler kaufen auch teure Karten zum Marktwert — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: „Die KI muss auch teure Karten zu Marktpreis kaufen.“ Angebote um 1,5 Mio. € zum
+Marktwert blieben liegen. Ursachen im Minutenjob `nexamon_run_due` (seit Migration 6010):
+
+- Jeder KI-Kauf zählte gegen das Tagesbudget je Set (`ai.dailyBudgetPacks` × Booster-Preis: 60.000 € in Mystic Energy,
+  300.000 € in Super Apex, 600.000 € in Yin Yang). Eine Karte über diesem Budget wurde nie gekauft, auch nicht zum Wert.
+- Über dem Wert kaufte die KI mit 30 % × (1 + Beliebtheit) je Minute, Black Label bis + 20 %: zu oft und zu weit.
+- Nur 500 zufällige Angebote je Lauf, faire Angebote ohne Vorrang.
+
+**Entscheidung.** Migration 8500 (Kopie in `updates/`):
+
+- Zum Wert der Kopie oder darunter (derselbe Wert wie in der Oberfläche, mit Karte) kauft die KI im nächsten
+  Minutenlauf, egal wie teuer. Diese Käufe zählen gegen kein Budget; Grenze ist nur das Geld der Haushalte. Faire
+  Angebote kommen in jedem Lauf zuerst.
+- Über dem Wert höchstens + `ai.maxPremiumBps` (15 %), weiter begrenzt durch den Aufschlag nach Zustand oder Note.
+  Chance je Minute `ai.buyChanceBps` (1 %) × (`ai.buyChanceMinShareBps` 4 % + Rest × Beliebtheit), also 0,04 %
+  (unbeliebte Karte) bis 1 % (beliebteste), linear fallend bis auf `atMaxChanceBps` (20 %) davon am Höchstpreis. Nur diese Käufe
+  prüfen das Tagesbudget je Set (die Summe aller KI-Käufe des Sets am Tag).
+- Unverändert: nie die eigenen Angebote der KI, nie `ai.excludedRarities` (One of One, Uran bleiben unter Spielern,
+  ADR-174/182), Sperre noch nicht erschienener Sets und die Slab-Haltezeit der KI (ADR-185), `nexamon_sell` mit
+  `request_id` je Angebot (kein Doppelkauf), Ledger-Summe 0 über das Haushaltskonto.
+
+**Geldmenge.** Die tägliche KI-Ausgabe ist höchstens `dailyBudgetPacks` × Booster-Preis je Set für Aufschläge plus
+die Summe aller Angebote zum fairen Wert; sie wächst also mit fair angebotenen Karten. Die Spieler bekommen dafür nur,
+was die Karte wert ist (abzüglich 5 % Gebühr), und eine Karte ist danach weg vom Spielermarkt.
+
+**Folgen.** `nexamonAiBuyChanceBps` und `nexamonAiPremiumBps` (TS) gelten wie in SQL; die Demo prüft das Budget nur
+über dem Wert. SQL-Test `d3_ai_buys_expensive.sql`.
+
 ## ADR-194: Fertigkeiten der Spielerfirmen, freigeschaltet durch den Skilltree — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: Im Unternehmen soll es die Sektion „Fertigkeiten“ geben. Man fördert dort Dinge wie
@@ -4686,13 +4716,15 @@ einmal.
 
 ## ADR-197: Grundeinkommen stark verbesserbar — `Annahme`
 
-**Kontext.** Der Besitzer will das Grundeinkommen in den Verbesserungen stark ausbauen können; bisher drei Stufen
-mit je +10 % (höchstens +30 %).
+**Kontext.** Der Besitzer will das Grundeinkommen in den Verbesserungen stark und günstig ausbauen können; bisher drei
+Stufen mit je +10 % (höchstens +30 %).
 
-**Entscheidung.** `upgrades.income`: 12 Stufen, je +25 % (`perLevel` 2 500 bps, höchstens +300 %, also das
-Vierfache), freigeschaltet ab Level 3 alle 2 Level (3, 5, …, 25; letzte Stufe bis Level 30 wie bei allen Verbesserungen), Preis 4.000 € · 2^Stufe (bis 8.192.000 €).
-Server liest alles aus `game_config` (`upgrade_cost_cents`, `upgrade_stage_level`, `player_basic_income_cents_per_hour`),
-daher keine Migration. Das Geld bleibt geschlossen (ADR-041): Käufe fließen in die Staatskasse, die das Grundeinkommen
-zahlt; der Kassenfaktor (`basicIncome.treasuryTargetCents`, `minFactor`) dämpft weiter, wenn sie leer wird.
+**Entscheidung.** `upgrades.income`: 12 Stufen, je +50 % (`perLevel` 5 000 bps, höchstens +600 %, also das
+Siebenfache, 700 € je Stunde), freigeschaltet ab Level 3 alle 2 Level (3, 5, …, 25; letzte Stufe bis Level 30 wie
+bei allen Verbesserungen), Preis 3.000 € · 1,5^Stufe (bis rund 259.500 €). Der Server liest alles aus `game_config`
+(`upgrade_cost_cents`, `upgrade_stage_level`, `player_basic_income_cents_per_hour`), daher keine Migration.
 
-**Folgen.** Frühe Stufen lohnen sich nach etwa ein bis zwei Wochen, die oberen sind ein langes Geldziel.
+**Folgen.** Bei zwei Tresor-Leerungen am Tag (16 Stunden) bringt jede Stufe +800 € am Tag: Stufe 1 lohnt sich nach
+4 Tagen, Stufe 12 nach etwa 11 Wochen. Das Geld bleibt geschlossen (ADR-041): Käufe fließen in die Staatskasse, die
+das Grundeinkommen zahlt; leert sie sich unter das Ziel (`basicIncome.treasuryTargetCents`, 250 Mio. €), sinkt der
+Faktor bis `minFactor` 0,25. Bei vier Spielern auf Stufe 12 sind das höchstens rund 45.000 € am Tag, weit unter dem Ziel.

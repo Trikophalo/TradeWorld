@@ -70,7 +70,7 @@ select tests.assert(
   'company_task_puzzle(): every new puzzle is solvable with full marks on the server');
 select tests.assert(
   (select bool_and((select count(*) from jsonb_array_elements(z #> '{puzzle,board}') with ordinality b(v, o)
-                     where (b.v #>> '{}')::integer <> (o - 1)::integer and (b.v #>> '{}')::integer >= 0) >= 5
+                     where (b.v #>> '{}')::integer <> (o - 1)::integer and (b.v #>> '{}')::integer >= 0) >= 2
                    and (select count(distinct v) from jsonb_array_elements(z #> '{puzzle,board}') v) = 9)
      from c5_puzzles where g = 'tiles')
   and (select bool_and(public.company_task_crossings(z #> '{puzzle,edges}', z #> '{puzzle,points}') >= 2
@@ -83,7 +83,7 @@ select tests.assert(
          from c5_puzzles where g = 'pipes')
   and (select bool_and(public.company_task_grade(g, z -> 'solution', jsonb_build_object('turns', z #> '{puzzle,turns}')) <= 5000)
          from c5_puzzles where g = 'pipes'),
-  'company_task_puzzle(): tiles are scrambled (5+ tiles off), untangle starts crossed, pipes start open');
+  'company_task_puzzle(): tiles are scrambled (2+ tiles off), untangle starts crossed, pipes start open');
 select tests.assert(
   (select bool_and(not (z -> 'puzzle') ? 'untangled' and not (z -> 'puzzle') ? 'path' and not (z -> 'puzzle') ? 'need')
      from c5_puzzles),

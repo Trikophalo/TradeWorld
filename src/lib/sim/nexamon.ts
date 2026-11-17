@@ -643,9 +643,13 @@ export function nexamonAiPremiumBps(
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
 ): number {
-  if (grade === null) return cfg.ai.premiumBps[condition] ?? 0;
-  if (nexamonIsBlackLabel(grade)) return cfg.ai.blackLabelPremiumBps;
-  return cfg.ai.gradePremiumBps[nexamonGradeIndex(grade, cfg)] ?? 0;
+  const premium =
+    grade === null
+      ? (cfg.ai.premiumBps[condition] ?? 0)
+      : nexamonIsBlackLabel(grade)
+        ? cfg.ai.blackLabelPremiumBps
+        : (cfg.ai.gradePremiumBps[nexamonGradeIndex(grade, cfg)] ?? 0);
+  return Math.min(premium, cfg.ai.maxPremiumBps);
 }
 
 /** The most an AI collector pays for a copy: its value x (1 + premium), rounded down. */
@@ -660,7 +664,8 @@ export function nexamonAiMaxPriceCents(
 
 /**
  * Chance per minute that an AI collector buys a player's listing, in basis points: certain (10 000) at or below the
- * copy's value; above it `buyChanceBps` x (1 + popularity), falling linearly to `atMaxChanceBps` of that at the
+ * copy's value, whatever the price (ADR-195); above it `buyChanceBps` x (`buyChanceMinShareBps` + the
+ * rest x popularity), falling linearly to `atMaxChanceBps` of that at the
  * most the AI pays (nexamonAiMaxPriceCents); 0 above that or for a price of 0.
  */
 export function nexamonAiBuyChanceBps(
@@ -675,10 +680,9 @@ export function nexamonAiBuyChanceBps(
   cfg: Config = BALANCE.nexamon,
 ): number {
   if (!nexamonAiAllowed(i.rarity, cfg)) return 0;
-  const full = Math.min(
-    10_000,
-    Math.floor((cfg.ai.buyChanceBps * (10_000 + nexamonPopularityBps(i.rarity, i.population, cfg))) / 10_000),
-  );
+  const pop = nexamonPopularityBps(i.rarity, i.population, cfg);
+  const minShare = cfg.ai.buyChanceMinShareBps;
+  const full = mulDivFloor(cfg.ai.buyChanceBps, minShare + mulDivFloor(10_000 - minShare, pop, 10_000), 10_000);
   if (i.priceCents <= 0) return 0;
   if (i.priceCents <= i.copyValueCents) return 10_000;
   const max = nexamonAiMaxPriceCents(i.copyValueCents, i.condition, i.grade, cfg);
