@@ -10737,9 +10737,9 @@
       "tax_return": "Steuererklärung"
     },
     "summary": {
-      "pack_sale": "Alle Booster von {set} kosten {pct} % weniger.",
+      "pack_sale": "Alle Booster von {set} kosten {pct} % weniger.",
       "free_nft": "Dein nächstes NFT kostet keine Prägegebühr. Einmal pro Person.",
-      "tax_return": "Firmenchefs bekommen {pct} % ihres Umsatzes zurück, höchstens {cap}."
+      "tax_return": "Firmenchefs bekommen {pct} % ihres Umsatzes zurück, höchstens {cap}."
     },
     "go": {
       "pack_sale": "Zu den Boostern",
@@ -10748,12 +10748,12 @@
     },
     "used": "Schon genutzt",
     "toastTitle": "News-Aktion: {kind}",
-    "badge": "−{pct} % · noch",
+    "badge": "−{pct} % · noch",
     "regular": "Normalpreis {price}",
     "freeNftCost": "Nächstes NFT: gratis statt {amount}",
     "tax": {
       "title": "Steuererklärung",
-      "intro": "Das Finanzamt zahlt {pct} % des Umsatzes deiner Firmen aus den letzten {hours} abgeschlossenen Stunden zurück, höchstens {cap}.",
+      "intro": "Das Finanzamt zahlt {pct} % des Umsatzes deiner Firmen aus den letzten {hours} abgeschlossenen Stunden zurück, höchstens {cap}.",
       "revenue": "Umsatz (letzte {hours} Stunden)",
       "refund": "Erstattung",
       "capped": "Gedeckelt auf {cap}",
