@@ -113,7 +113,9 @@ select tests.assert(
           -- News-Aktionen (ADR-193)
           || array['get_news_promo', 'file_news_tax_return']
           -- Fertigkeiten of player companies (ADR-194)
-          || array['get_company_skills', 'learn_company_skill']) x),
+          || array['get_company_skills', 'learn_company_skill']
+          || array['get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
+                   'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

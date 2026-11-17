@@ -179,7 +179,10 @@ select tests.assert(
            -- News-Aktionen (ADR-193)
            'get_news_promo', 'file_news_tax_return',
            -- Fertigkeiten of player companies (ADR-194)
-           'get_company_skills', 'learn_company_skill']
+           'get_company_skills', 'learn_company_skill',
+           -- Talente and Mit-Geschaeftsfuehrung (ADR-199)
+           'get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
+           'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
