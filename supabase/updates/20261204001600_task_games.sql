@@ -11,9 +11,18 @@
 -- The solution carries what grading needs (tolerance, steps, the grid), so company_task_grade() stays immutable.
 -- Same rules as src/lib/sim/company-tasks.ts. Idempotent: runs unchanged as supabase/updates/20261204001600_task_games.sql.
 
-alter table public.company_tasks drop constraint if exists company_tasks_game_check;
-alter table public.company_tasks add constraint company_tasks_game_check
-  check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path'));
+-- (update copy only, ADR-173: once 6400 allowed more games, rows may use them; this older constraint is then skipped
+--  and 6400 sets the full one again further down)
+do $do$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'company_tasks_game_check'
+                    and pg_get_constraintdef(oid) like '%memory%') then
+    alter table public.company_tasks drop constraint if exists company_tasks_game_check;
+    alter table public.company_tasks add constraint company_tasks_game_check
+      check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path'));
+  end if;
+end;
+$do$;
 
 -- Moves of the shortest route from p_start to p_goal on a p_size × p_size grid around the walls (breadth-first);
 -- null if there is none. Cells are numbered row by row from 0.

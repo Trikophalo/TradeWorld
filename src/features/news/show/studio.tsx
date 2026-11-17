@@ -413,6 +413,7 @@ const KIND_TONES: Record<NewsKind, KindTone> = {
   cards: "info",
   tax: "loss",
   corp: "info",
+  interview: "accent",
   outro: "accent",
 };
 
@@ -425,7 +426,18 @@ const TONE_CLASS: Record<KindTone, string> = {
 };
 
 /** The caption over a player's photo on the topic screen: what they are in this story. */
-const FRAME_KINDS = ["loser", "winner", "scandal", "hype", "gossip", "nft", "cards", "tax", "corp"] as const;
+const FRAME_KINDS = [
+  "loser",
+  "winner",
+  "scandal",
+  "hype",
+  "gossip",
+  "nft",
+  "cards",
+  "tax",
+  "corp",
+  "interview",
+] as const;
 type FrameKind = (typeof FRAME_KINDS)[number] | "other";
 const FRAME_CLASS: Record<FrameKind, string> = {
   loser: "bg-loss text-on-semantic",
@@ -437,6 +449,7 @@ const FRAME_CLASS: Record<FrameKind, string> = {
   cards: "bg-info text-on-semantic",
   tax: "bg-loss text-on-semantic",
   corp: "bg-info text-on-semantic",
+  interview: "bg-accent text-on-accent",
   other: "bg-accent text-on-accent",
 };
 /** Wanted posters have paper behind the figure. */

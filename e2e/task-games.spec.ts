@@ -23,6 +23,8 @@ async function drag(page: Page, from: Locator, to: Locator) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/dev/ui");
+  // the showcase is heavy: let it hydrate before dragging
+  await page.waitForLoadState("networkidle");
 });
 
 test("match: drag every card into the box its rule names (ADR-144)", async ({ page }) => {
@@ -101,4 +103,35 @@ test("rotate and sort: turn the dial by dragging, drop the card on its stack (AD
   await expect(sort.getByText("Noch 8")).toBeVisible();
   await drag(page, sort.getByTestId("sort-card"), sort.getByRole("button", { name: /Offen/ }));
   await expect(sort.getByText("Noch 7")).toBeVisible();
+});
+
+test("memory and haggle: find the pairs, negotiate three rounds (ADR-173)", async ({ page }) => {
+  const memory = page.getByTestId("game-memory");
+  await memory.scrollIntoViewIfNeeded();
+  // cards [2, 0, 3, 1, 0, 2, 1, 3]: the pairs are 0/5, 1/4, 3/6, 2/7
+  const cards = memory.getByTestId("memory-card");
+  // the showcase is heavy: wait until it reacts (hydrated) before playing
+  await expect(async () => {
+    await cards.nth(0).click();
+    await expect(cards.nth(0)).not.toHaveAccessibleName(/verdeckt/, { timeout: 500 });
+  }).toPass({ timeout: 30_000 });
+  for (const i of [5, 1, 4, 3, 6, 2]) {
+    await cards.nth(i).click();
+    await expect(cards.nth(i)).not.toHaveAccessibleName(/verdeckt/);
+  }
+  // the last card completes the game: the answer goes out and the sample starts over
+  await cards.nth(7).click();
+  await expect(page.getByText(/"misses":0/)).toBeVisible();
+
+  const haggle = page.getByTestId("game-haggle");
+  await haggle.scrollIntoViewIfNeeded();
+  // rounds [[1, 0, 2], [2, 1, 0], [0, 2, 1]]: the best reply sits at 1, 2 and 0
+  for (const pos of [1, 2, 0]) await haggle.getByTestId("haggle-reply").nth(pos).click();
+  await expect(page.getByText('{"choices":[1,2,0]}')).toBeVisible();
+  await page.screenshot({
+    path: process.env.NEXA_SHOT_DIR
+      ? `${process.env.NEXA_SHOT_DIR}/games-${test.info().project.name}.png`
+      : test.info().outputPath("games.png"),
+    fullPage: false,
+  });
 });

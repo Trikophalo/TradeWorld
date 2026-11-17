@@ -1,0 +1,45 @@
+{
+  "interview": {
+    "id": 6,
+    "status": "answered",
+    "answers": [
+      {
+        "text": "Danke an das ganze Team und unsere Kunden.",
+        "verdict": "good",
+        "reaction": "Sehr souverän. Notiert: Fixture_Gmbh kann reden."
+      },
+      {
+        "text": "Noch, aber bald stelle ich die ersten Leute ein.",
+        "verdict": "good",
+        "reaction": "Starke Antwort. Ich hasse es, wenn Leute vorbereitet sind."
+      },
+      { "text": "", "verdict": "none", "reaction": "Keine Antwort ist auch eine Antwort. Eine schlechte." }
+    ],
+    "company": "Fixture Werke",
+    "aired_at": null,
+    "questions": [
+      {
+        "text": "Fixture Werke ist inzwischen riesig. Wollen Sie eigentlich die ganze Stadt kaufen?",
+        "quick": ["Wir wollen besser werden, nicht nur größer.", "Nur die schönen Ecken.", "Ja. Und danach das Land."]
+      },
+      {
+        "text": "Sie machen bei Fixture Werke alles allein. Reden Sie in der Mittagspause mit dem Drucker?",
+        "quick": [
+          "Noch, aber bald stelle ich die ersten Leute ein.",
+          "Der Drucker ist ein guter Zuhörer.",
+          "Ich brauche niemanden."
+        ]
+      },
+      {
+        "text": "Wo steht Fixture Werke in fünf Jahren? Und bitte nicht „auf dem Mond“.",
+        "quick": ["Marktführer, mit glücklichen Kunden und Team.", "Hoffentlich noch da.", "Auf dem Mond."]
+      }
+    ],
+    "expires_at": "2026-11-17T06:11:14.574968+00:00",
+    "reputation": 0,
+    "answered_at": "2026-11-17T00:11:14.581222+00:00",
+    "requested_at": "2026-11-17T00:11:14.574968+00:00",
+    "awareness_bps": 120
+  },
+  "max_chars": 240
+}

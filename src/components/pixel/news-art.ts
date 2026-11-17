@@ -1613,6 +1613,7 @@ export const NEWS_KIND_ICONS = {
   cards: cardsIcon,
   tax: taxIcon,
   corp: corpIcon,
+  interview: mic,
   outro: hand,
 } as const satisfies Record<string, PixelArt>;
 export type NewsKind = keyof typeof NEWS_KIND_ICONS;

@@ -39,6 +39,34 @@ describe("company task texts (ADR-129, ADR-144)", () => {
         case "path":
           for (const field of ["start", "goal", "wall"]) expect(m![field], `${task.key}.${field}`).toBeTruthy();
           break;
+        // ADR-173
+        case "memory":
+          expect(new Set(list(m!.labels)).size, task.key).toBe(g.memory.pairs);
+          break;
+        case "timing":
+          expect(list(m!.labels), task.key).toHaveLength(g.timing.rounds);
+          break;
+        case "diff":
+          expect(new Set(list(m!.labels)).size, task.key).toBe(g.diff.symbols);
+          break;
+        case "route":
+          expect(m!.start, task.key).toBeTruthy();
+          expect(list(m!.stops), task.key).toHaveLength(g.route.stops);
+          break;
+        case "haggle":
+          expect(list(m!.rounds), task.key).toHaveLength(g.haggle.rounds);
+          for (const round of list(m!.rounds) as { line?: string; replies?: unknown }[]) {
+            expect(round.line, task.key).toBeTruthy();
+            expect(list(round.replies), task.key).toHaveLength(3);
+          }
+          break;
+        case "pack":
+          expect(list(m!.labels), task.key).toHaveLength(g.pack.items);
+          expect(m!.unit, task.key).toBeTruthy();
+          break;
+        case "catch":
+          expect(list(m!.labels).length, task.key).toBeGreaterThanOrEqual(2);
+          break;
         default:
           break;
       }

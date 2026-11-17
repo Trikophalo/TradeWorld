@@ -8,6 +8,7 @@ import type { TaskGame } from "@/features/game/types";
 import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { DragSortGame, MatchGame, PathGame, RotateGame, SliderGame } from "./drag-games";
+import { CatchGame, DiffGame, HaggleGame, MemoryGame, PackGame, QuickGame, RouteGame, TimingGame } from "./more-games";
 import { useTaskText } from "./task-text";
 
 /*
@@ -306,5 +307,21 @@ export function TaskGameView(props: GameProps & { game: TaskGame }) {
       return <MatchGame {...props} />;
     case "path":
       return <PathGame {...props} />;
+    case "memory":
+      return <MemoryGame {...props} />;
+    case "timing":
+      return <TimingGame {...props} />;
+    case "diff":
+      return <DiffGame {...props} />;
+    case "quick":
+      return <QuickGame {...props} />;
+    case "route":
+      return <RouteGame {...props} />;
+    case "haggle":
+      return <HaggleGame {...props} />;
+    case "pack":
+      return <PackGame {...props} />;
+    case "catch":
+      return <CatchGame {...props} />;
   }
 }

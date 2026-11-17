@@ -884,6 +884,1237 @@ begin
 end;
 $do$;
 
+-- ===== supabase/migrations/20261204006400_task_games_more.sql =====
+-- =============================================================================
+-- NEXA · 6400 · Eight more company task games (ADR-173)
+-- =============================================================================
+-- More variety on the task board, each game themed by its tasks (config: companyTasks.games, texts in messages):
+--   memory  {cards}                    -> {pairs, misses}  equal pairs, each wrong flip costs miss_bps
+--   timing  {targets, sweep_ms}        -> {stops}          stop a sweeping marker in its zone (scored like slider)
+--   diff    {left, right}              -> {picked}         the cells of the copy that differ (scored like pick)
+--   quick   {problems}                 -> {choices}        quick sums, one of three answers is right
+--   route   {points}                   -> {order}          shortest round trip from the depot; extra fields cost step_bps
+--   haggle  {rounds}                   -> {choices}        a negotiation: best reply full marks, middle ok_bps
+--   pack    {weights, values, cap}     -> {picked}         the most value within the capacity, over it nothing
+--   catch   {events, every_ms, show_ms}-> {picked}         tap the good tiles while they show (scored like pick)
+-- company_task_puzzle() and company_task_grade() are the definitions of 1600 plus the new games (copied, the latest
+-- ones). Same rules as src/lib/sim/company-tasks.ts.
+-- Idempotent: runs unchanged as supabase/updates/20261204006400_task_games_more.sql.
+
+alter table public.company_tasks drop constraint if exists company_tasks_game_check;
+alter table public.company_tasks add constraint company_tasks_game_check
+  check (game in ('pick', 'count', 'sort', 'order', 'seq', 'math', 'slider', 'rotate', 'match', 'path',
+                  'memory', 'timing', 'diff', 'quick', 'route', 'haggle', 'pack', 'catch'));
+
+-- Fields of a round trip from the depot (points[0]) through the stops in p_order and back (Manhattan).
+create or replace function public.company_task_tour_length(p_points jsonb, p_order integer[])
+returns integer
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_x   integer := (p_points -> 0 ->> 0)::integer;
+  v_y   integer := (p_points -> 0 ->> 1)::integer;
+  v_sum integer := 0;
+  k     integer;
+begin
+  foreach k in array coalesce(p_order, '{}') loop
+    v_sum := v_sum + abs(v_x - (p_points -> k ->> 0)::integer) + abs(v_y - (p_points -> k ->> 1)::integer);
+    v_x := (p_points -> k ->> 0)::integer;
+    v_y := (p_points -> k ->> 1)::integer;
+  end loop;
+  return v_sum + abs(v_x - (p_points -> 0 ->> 0)::integer) + abs(v_y - (p_points -> 0 ->> 1)::integer);
+end;
+$$;
+
+-- The shortest round trip over every order of the stops (four stops: 24 orders).
+create or replace function public.company_task_route_best(p_points jsonb)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  with recursive perm(ord) as (
+    select array[]::integer[]
+    union all
+    select p.ord || s
+      from perm p, generate_series(1, jsonb_array_length(p_points) - 1) s
+     where not s = any (p.ord) and cardinality(p.ord) < jsonb_array_length(p_points) - 1)
+  select min(public.company_task_tour_length(p_points, ord))::integer
+    from perm where cardinality(ord) = jsonb_array_length(p_points) - 1;
+$$;
+
+-- The most value of any subset of the items within the capacity (six items: 64 subsets).
+create or replace function public.company_task_pack_best(p_weights integer[], p_values integer[], p_cap integer)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(max(x.v), 0)::integer
+    from (select m, coalesce(sum(p_values[i]) filter (where (m >> (i - 1)) & 1 = 1), 0) as v,
+                 coalesce(sum(p_weights[i]) filter (where (m >> (i - 1)) & 1 = 1), 0) as w
+            from generate_series(0, (1 << cardinality(p_weights)) - 1) m, generate_series(1, cardinality(p_weights)) i
+           group by m) x
+   where x.w <= p_cap;
+$$;
+
+create or replace function public.company_task_puzzle(p_task jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  g        jsonb := public.company_tasks_cfg() -> 'games' -> (p_task ->> 'game');
+  v_game   text := p_task ->> 'game';
+  v_n      integer;
+  v_tiles  jsonb;
+  v_sol    jsonb;
+  v_vals   integer[] := '{}';
+  v_v      integer;
+  a        integer;
+  b        integer;
+  v_size   integer;
+  v_start  integer;
+  v_goal   integer;
+  v_walls  integer[];
+  v_len    integer;
+  v_try    integer;
+  v_prev   integer;
+  v_cap    integer;
+  v_w      integer[];
+begin
+  if v_game in ('pick', 'count') then
+    v_n := public.rand_between((g ->> 'minTargets')::integer, (g ->> 'maxTargets')::integer);
+    with t as (
+      select i, case when i <= v_n then 0 else 1 + floor(random() * 2)::integer end as lab
+        from generate_series(1, (g ->> 'tiles')::integer) i),
+    s as (select lab, row_number() over (order by random()) - 1 as pos from t)
+    select jsonb_agg(lab order by pos), coalesce(jsonb_agg(pos order by pos) filter (where lab = 0), '[]'::jsonb)
+      into v_tiles, v_sol from s;
+    if v_game = 'pick' then
+      return jsonb_build_object('puzzle', jsonb_build_object('tiles', v_tiles), 'solution', jsonb_build_object('targets', v_sol));
+    end if;
+    return jsonb_build_object('puzzle', jsonb_build_object('tiles', v_tiles), 'solution', jsonb_build_object('count', v_n));
+  elsif v_game = 'sort' then
+    with s as (select i, row_number() over (order by random()) as pos from generate_series(0, (g ->> 'items')::integer - 1) i)
+    select jsonb_agg(i order by pos), jsonb_agg(case when i < (g ->> 'items')::integer / 2 then 0 else 1 end order by pos)
+      into v_tiles, v_sol from s;
+    return jsonb_build_object('puzzle', jsonb_build_object('items', v_tiles), 'solution', jsonb_build_object('sides', v_sol));
+  elsif v_game = 'order' then
+    while coalesce(array_length(v_vals, 1), 0) < (g ->> 'items')::integer loop
+      -- the task's own realistic range (ADR-140), else the game's default
+      v_v := public.rand_between(coalesce((p_task -> 'range' ->> 0)::integer, (g ->> 'min')::integer),
+                                 coalesce((p_task -> 'range' ->> 1)::integer, (g ->> 'max')::integer));
+      if not v_v = any (v_vals) then
+        v_vals := v_vals || v_v;
+      end if;
+    end loop;
+    select jsonb_agg(i - 1 order by case when coalesce((p_task ->> 'asc')::boolean, true) then v else -v end)
+      into v_sol from unnest(v_vals) with ordinality as x(v, i);
+    return jsonb_build_object('puzzle', jsonb_build_object('values', to_jsonb(v_vals)),
+                              'solution', jsonb_build_object('order', v_sol));
+  elsif v_game = 'seq' then
+    select jsonb_agg(floor(random() * 4)::integer) into v_sol from generate_series(1, (g ->> 'length')::integer);
+    return jsonb_build_object('puzzle', jsonb_build_object('sequence', v_sol, 'show_seconds', (g ->> 'showSeconds')::integer),
+                              'solution', jsonb_build_object('sequence', v_sol));
+  elsif v_game = 'math' then
+    a := public.rand_between((p_task -> 'a' ->> 0)::integer, (p_task -> 'a' ->> 1)::integer);
+    b := public.rand_between((p_task -> 'b' ->> 0)::integer, (p_task -> 'b' ->> 1)::integer);
+    if p_task ->> 'op' = 'pct' then
+      -- whole results: big amounts in hundreds, small ones in tens with rates in tens
+      if (p_task -> 'a' ->> 1)::integer >= 1000 then
+        a := greatest(100, (a / 100) * 100);
+      else
+        a := greatest(10, (a / 10) * 10);
+        b := greatest(10, (b / 10) * 10);
+      end if;
+    end if;
+    v_v := case p_task ->> 'op' when 'mul' then a * b when 'add' then a + b when 'sub' then a - b
+                                when 'pct' then a * b / 100 end;
+    return jsonb_build_object('puzzle', jsonb_build_object('a', a, 'b', b), 'solution', jsonb_build_object('value', v_v));
+  elsif v_game = 'slider' then
+    -- ADR-144: one gap per slider on a track of 0..100; the piece starts at 0
+    select jsonb_agg(public.rand_between((g ->> 'min')::integer, (g ->> 'max')::integer) order by i)
+      into v_sol from generate_series(1, (g ->> 'sliders')::integer) i;
+    return jsonb_build_object('puzzle', jsonb_build_object('targets', v_sol),
+                              'solution', jsonb_build_object('positions', v_sol, 'tolerance', (g ->> 'tolerance')::integer));
+  elsif v_game = 'rotate' then
+    -- every dial starts minTurn .. steps - minTurn steps away from its mark
+    select jsonb_agg(t order by i),
+           jsonb_agg((t + public.rand_between((g ->> 'minTurn')::integer, (g ->> 'steps')::integer - (g ->> 'minTurn')::integer))
+                     % (g ->> 'steps')::integer order by i)
+      into v_sol, v_tiles
+      from (select i, public.rand_between(0, (g ->> 'steps')::integer - 1) as t
+              from generate_series(1, (g ->> 'dials')::integer) i) x;
+    return jsonb_build_object('puzzle', jsonb_build_object('start', v_tiles, 'target', v_sol, 'steps', (g ->> 'steps')::integer),
+                              'solution', jsonb_build_object('dials', v_sol, 'steps', (g ->> 'steps')::integer));
+  elsif v_game = 'match' then
+    -- perBox of the groupSize cards of every box, shuffled; card i belongs in box i / groupSize
+    with c as (
+      select bx, k, row_number() over (partition by bx order by random()) as rn
+        from generate_series(0, (g ->> 'boxes')::integer - 1) bx, generate_series(0, (g ->> 'groupSize')::integer - 1) k),
+    s as (select bx * (g ->> 'groupSize')::integer + k as item, bx, row_number() over (order by random()) as pos
+            from c where rn <= (g ->> 'perBox')::integer)
+    select jsonb_agg(item order by pos), jsonb_agg(bx order by pos) into v_tiles, v_sol from s;
+    return jsonb_build_object('puzzle', jsonb_build_object('items', v_tiles, 'boxes', (g ->> 'boxes')::integer),
+                              'solution', jsonb_build_object('boxes', v_sol));
+  elsif v_game = 'path' then
+    -- start on the left edge, goal on the right; the walls must force a detour of at least minDetour steps
+    v_size := (g ->> 'size')::integer;
+    for v_try in 1..60 loop
+      v_start := public.rand_between(0, v_size - 1) * v_size;
+      v_goal := public.rand_between(0, v_size - 1) * v_size + v_size - 1;
+      v_n := public.rand_between((g ->> 'minWalls')::integer, (g ->> 'maxWalls')::integer);
+      select coalesce(array_agg(c order by c), '{}') into v_walls
+        from (select c from generate_series(0, v_size * v_size - 1) c
+               where c not in (v_start, v_goal) order by random() limit v_n) x;
+      v_len := public.company_task_path_length(v_size, v_start, v_goal, v_walls);
+      exit when v_len is not null
+            and v_len >= abs(v_start / v_size - v_goal / v_size) + v_size - 1 + (g ->> 'minDetour')::integer;
+      v_len := null;
+    end loop;
+    if v_len is null then
+      -- fallback: a wall across the middle column
+      v_start := (v_size / 2) * v_size;
+      v_goal := v_start + v_size - 1;
+      select array_agg(k * v_size + v_size / 2 order by k) into v_walls from generate_series(1, v_size - 2) k;
+      v_len := public.company_task_path_length(v_size, v_start, v_goal, v_walls);
+    end if;
+    return jsonb_build_object(
+      'puzzle', jsonb_build_object('size', v_size, 'start', v_start, 'goal', v_goal, 'walls', to_jsonb(v_walls)),
+      'solution', jsonb_build_object('size', v_size, 'start', v_start, 'goal', v_goal, 'walls', to_jsonb(v_walls),
+                                     'length', v_len, 'step_bps', (g ->> 'stepBps')::integer));
+  elsif v_game = 'memory' then
+    -- ADR-173: every label twice, face down, shuffled
+    select jsonb_agg(c.lab order by c.r) into v_sol
+      from (select i / 2 as lab, random() as r from generate_series(0, 2 * (g ->> 'pairs')::integer - 1) i) c;
+    return jsonb_build_object('puzzle', jsonb_build_object('cards', v_sol),
+                              'solution', jsonb_build_object('cards', v_sol, 'miss_bps', (g ->> 'missBps')::integer));
+  elsif v_game = 'timing' then
+    select jsonb_agg(public.rand_between((g ->> 'min')::integer, (g ->> 'max')::integer) order by i)
+      into v_sol from generate_series(1, (g ->> 'rounds')::integer) i;
+    return jsonb_build_object('puzzle', jsonb_build_object('targets', v_sol, 'sweep_ms', (g ->> 'sweepMs')::integer),
+                              'solution', jsonb_build_object('stops', v_sol, 'tolerance', (g ->> 'tolerance')::integer));
+  elsif v_game = 'diff' then
+    -- the copy differs from the original in minDiffs..maxDiffs cells, each with another label
+    v_size := (g ->> 'cells')::integer;
+    v_n := (g ->> 'symbols')::integer;
+    select array_agg(public.rand_between(0, v_n - 1) order by i) into v_vals from generate_series(1, v_size) i;
+    select coalesce(array_agg(c order by c), '{}') into v_walls
+      from (select c from generate_series(0, v_size - 1) c order by random()
+             limit public.rand_between((g ->> 'minDiffs')::integer, (g ->> 'maxDiffs')::integer)) x;
+    select jsonb_agg(case when (i - 1) = any (v_walls) then (v_vals[i] + 1 + public.rand_between(0, v_n - 2)) % v_n
+                          else v_vals[i] end order by i)
+      into v_tiles from generate_series(1, v_size) i;
+    return jsonb_build_object('puzzle', jsonb_build_object('left', to_jsonb(v_vals), 'right', v_tiles),
+                              'solution', jsonb_build_object('targets', to_jsonb(v_walls)));
+  elsif v_game = 'quick' then
+    -- problems sums with the task's operation; the right result and two near misses, shuffled
+    v_tiles := '[]'::jsonb;
+    v_sol := '[]'::jsonb;
+    for v_try in 1..(g ->> 'problems')::integer loop
+      a := public.rand_between((p_task -> 'a' ->> 0)::integer, (p_task -> 'a' ->> 1)::integer);
+      b := public.rand_between((p_task -> 'b' ->> 0)::integer, (p_task -> 'b' ->> 1)::integer);
+      if p_task ->> 'op' = 'pct' then
+        if (p_task -> 'a' ->> 1)::integer >= 1000 then
+          a := greatest(100, (a / 100) * 100);
+        else
+          a := greatest(10, (a / 10) * 10);
+          b := greatest(10, (b / 10) * 10);
+        end if;
+      end if;
+      v_v := case coalesce(p_task ->> 'op', 'add') when 'mul' then a * b when 'add' then a + b when 'sub' then a - b
+                                                   when 'pct' then a * b / 100 end;
+      v_len := greatest(1, abs(v_v) / 10);
+      select array_agg(o order by random()) into v_vals
+        from unnest(array[v_v, v_v + v_len * public.rand_between(1, 3), v_v - v_len * public.rand_between(1, 3)]) o;
+      v_tiles := v_tiles || jsonb_build_object('a', a, 'b', b, 'op', coalesce(p_task ->> 'op', 'add'), 'options', to_jsonb(v_vals));
+      v_sol := v_sol || to_jsonb(array_position(v_vals, v_v) - 1);
+    end loop;
+    return jsonb_build_object('puzzle', jsonb_build_object('problems', v_tiles), 'solution', jsonb_build_object('choices', v_sol));
+  elsif v_game = 'route' then
+    -- a depot and stops on distinct fields of a grid x grid map; the shortest round trip by brute force
+    v_size := (g ->> 'grid')::integer;
+    select jsonb_agg(jsonb_build_array(x.c % v_size, x.c / v_size) order by x.rn) into v_tiles
+      from (select c, row_number() over (order by random()) as rn from generate_series(0, v_size * v_size - 1) c) x
+     where x.rn <= (g ->> 'stops')::integer + 1;
+    return jsonb_build_object('puzzle', jsonb_build_object('points', v_tiles),
+                              'solution', jsonb_build_object('points', v_tiles, 'best', public.company_task_route_best(v_tiles),
+                                                             'step_bps', (g ->> 'stepBps')::integer));
+  elsif v_game = 'haggle' then
+    -- per round the three replies (0 best, 1 middle, 2 bad) in a shuffled order
+    select jsonb_agg((select jsonb_agg(k order by random() + i * 0) from generate_series(0, 2) k) order by i)
+      into v_sol from generate_series(1, (g ->> 'rounds')::integer) i;
+    return jsonb_build_object('puzzle', jsonb_build_object('rounds', v_sol),
+                              'solution', jsonb_build_object('rounds', v_sol, 'ok_bps', (g ->> 'okBps')::integer));
+  elsif v_game = 'pack' then
+    v_n := (g ->> 'items')::integer;
+    select array_agg(public.rand_between((g ->> 'minWeight')::integer, (g ->> 'maxWeight')::integer) order by i)
+      into v_w from generate_series(1, v_n) i;
+    select array_agg(public.rand_between((g ->> 'minValue')::integer, (g ->> 'maxValue')::integer) order by i)
+      into v_vals from generate_series(1, v_n) i;
+    v_cap := greatest((g ->> 'maxWeight')::integer,
+                      ((select sum(x) from unnest(v_w) x)::bigint * (g ->> 'capShareBps')::integer / 10000)::integer);
+    return jsonb_build_object('puzzle', jsonb_build_object('weights', to_jsonb(v_w), 'values', to_jsonb(v_vals), 'cap', v_cap),
+                              'solution', jsonb_build_object('weights', to_jsonb(v_w), 'values', to_jsonb(v_vals), 'cap', v_cap,
+                                                             'best', public.company_task_pack_best(v_w, v_vals, v_cap)));
+  elsif v_game = 'catch' then
+    -- tiles pop up one after another, never twice on the same field in a row; at least two good ones
+    v_tiles := '[]'::jsonb;
+    v_prev := -1;
+    for v_try in 0..(g ->> 'events')::integer - 1 loop
+      v_v := public.rand_between(0, (g ->> 'cells')::integer - 1);
+      if v_v = v_prev then
+        v_v := (v_v + 1) % (g ->> 'cells')::integer;
+      end if;
+      v_prev := v_v;
+      v_tiles := v_tiles || jsonb_build_object('cell', v_v, 'good', random() * 10000 < (g ->> 'goodShareBps')::integer);
+    end loop;
+    v_try := 0;
+    while (select count(*) from jsonb_array_elements(v_tiles) e where (e ->> 'good')::boolean) < 2
+          and v_try < jsonb_array_length(v_tiles) loop
+      v_tiles := jsonb_set(v_tiles, array[v_try::text, 'good'], 'true'::jsonb);
+      v_try := v_try + 1;
+    end loop;
+    select coalesce(jsonb_agg(i - 1 order by i) filter (where (e ->> 'good')::boolean), '[]'::jsonb)
+      into v_sol from jsonb_array_elements(v_tiles) with ordinality x(e, i);
+    return jsonb_build_object('puzzle', jsonb_build_object('events', v_tiles, 'every_ms', (g ->> 'everyMs')::integer,
+                                                           'show_ms', (g ->> 'showMs')::integer),
+                              'solution', jsonb_build_object('targets', v_sol));
+  end if;
+  raise exception 'unknown task game %', v_game;
+end;
+$$;
+
+create or replace function public.company_task_grade(p_game text, p_solution jsonb, p_answer jsonb)
+returns integer
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_hits    integer;
+  v_wrong   integer;
+  v_total   integer;
+  v_diff    integer;
+  v_key     text;
+  v_sum     bigint;
+  v_exact   numeric;
+  v_half    numeric;
+  v_steps   numeric;
+  v_size    integer;
+  v_route   integer[];
+  v_k       integer;
+  v_e       jsonb;
+  v_i       numeric;
+  v_j       numeric;
+  v_used    integer[];
+begin
+  if p_answer is null or jsonb_typeof(p_answer) <> 'object' then
+    return 0;
+  end if;
+  if p_game in ('pick', 'diff', 'catch') then
+    if jsonb_typeof(p_answer -> 'picked') <> 'array' then
+      return 0;
+    end if;
+    v_total := jsonb_array_length(p_solution -> 'targets');
+    select count(*) filter (where p_solution -> 'targets' @> to_jsonb(x)),
+           count(*) filter (where not p_solution -> 'targets' @> to_jsonb(x))
+      into v_hits, v_wrong
+      from (select distinct x from jsonb_array_elements(p_answer -> 'picked') x) d;
+    return greatest(0, least(10000, ((v_hits - v_wrong) * 10000) / greatest(v_total, 1)));
+  elsif p_game in ('count', 'math') then
+    v_key := case p_game when 'count' then 'count' else 'value' end;
+    if jsonb_typeof(p_answer -> v_key) <> 'number' then
+      return 0;
+    end if;
+    v_diff := abs((p_answer ->> v_key)::numeric - (p_solution ->> v_key)::numeric);
+    return case when v_diff = 0 then 10000 when p_game = 'count' and v_diff = 1 then 5000 else 0 end;
+  elsif p_game in ('slider', 'rotate', 'timing') then
+    -- ADR-144: per piece or dial exact (slider: within the tolerance) full marks, close half; the average counts
+    v_key := case p_game when 'slider' then 'positions' when 'timing' then 'stops' else 'dials' end;
+    if jsonb_typeof(p_answer -> v_key) <> 'array' then
+      return 0;
+    end if;
+    if p_game in ('slider', 'timing') then
+      v_exact := (p_solution ->> 'tolerance')::numeric;
+      v_half := 3 * v_exact;
+    else
+      v_exact := 0;
+      v_half := 1;
+      v_steps := (p_solution ->> 'steps')::numeric;
+    end if;
+    v_total := jsonb_array_length(p_solution -> v_key);
+    select coalesce(sum(case when d is null then 0 when d <= v_exact then 10000 when d <= v_half then 5000 else 0 end), 0)
+      into v_sum
+      from (select case when a.v is null or jsonb_typeof(a.v) <> 'number' then null
+                        when p_game in ('slider', 'timing') then abs((a.v #>> '{}')::numeric - (s.v #>> '{}')::numeric)
+                        else least(abs((a.v #>> '{}')::numeric - (s.v #>> '{}')::numeric) % v_steps,
+                                   v_steps - abs((a.v #>> '{}')::numeric - (s.v #>> '{}')::numeric) % v_steps)
+                   end as d
+              from jsonb_array_elements(p_solution -> v_key) with ordinality s(v, i)
+              left join jsonb_array_elements(p_answer -> v_key) with ordinality a(v, i) on a.i = s.i) x;
+    return (v_sum / greatest(v_total, 1))::integer;
+  elsif p_game = 'path' then
+    -- a route from start to goal in single steps, around the walls, no cell twice; each extra step costs step_bps
+    if jsonb_typeof(p_answer -> 'path') <> 'array' then
+      return 0;
+    end if;
+    v_size := (p_solution ->> 'size')::integer;
+    if exists (select 1 from jsonb_array_elements(p_answer -> 'path') e
+                where case when jsonb_typeof(e) <> 'number' then true
+                           else (e #>> '{}')::numeric % 1 <> 0
+                             or (e #>> '{}')::numeric not between 0 and v_size * v_size - 1 end) then
+      return 0;
+    end if;
+    select array_agg((e #>> '{}')::numeric::integer order by i) into v_route
+      from jsonb_array_elements(p_answer -> 'path') with ordinality x(e, i);
+    v_total := coalesce(array_length(v_route, 1), 0);
+    if v_total < 2 or v_route[1] <> (p_solution ->> 'start')::integer
+       or v_route[v_total] <> (p_solution ->> 'goal')::integer then
+      return 0;
+    end if;
+    if (select count(distinct c) from unnest(v_route) c) <> v_total
+       or exists (select 1 from jsonb_array_elements_text(p_solution -> 'walls') w where w::integer = any (v_route)) then
+      return 0;
+    end if;
+    for v_k in 2..v_total loop
+      if abs(v_route[v_k] / v_size - v_route[v_k - 1] / v_size)
+         + abs(v_route[v_k] % v_size - v_route[v_k - 1] % v_size) <> 1 then
+        return 0;
+      end if;
+    end loop;
+    return greatest(0, least(10000,
+      10000 - (v_total - 1 - (p_solution ->> 'length')::integer) * (p_solution ->> 'step_bps')::integer));
+  elsif p_game = 'memory' then
+    -- ADR-173: pairs of equal cards, each card once; every wrong flip costs miss_bps
+    if jsonb_typeof(p_answer -> 'pairs') <> 'array' then
+      return 0;
+    end if;
+    v_total := jsonb_array_length(p_solution -> 'cards');
+    v_used := '{}';
+    v_hits := 0;
+    for v_e in select x from jsonb_array_elements(p_answer -> 'pairs') x loop
+      continue when jsonb_typeof(v_e) <> 'array';
+      continue when jsonb_array_length(v_e) <> 2;
+      continue when jsonb_typeof(v_e -> 0) <> 'number' or jsonb_typeof(v_e -> 1) <> 'number';
+      v_i := (v_e ->> 0)::numeric;
+      v_j := (v_e ->> 1)::numeric;
+      continue when v_i % 1 <> 0 or v_j % 1 <> 0 or v_i < 0 or v_j < 0 or v_i >= v_total or v_j >= v_total or v_i = v_j;
+      continue when v_i::integer = any (v_used) or v_j::integer = any (v_used)
+                 or p_solution -> 'cards' -> v_i::integer <> p_solution -> 'cards' -> v_j::integer;
+      v_used := v_used || v_i::integer || v_j::integer;
+      v_hits := v_hits + 1;
+    end loop;
+    v_wrong := 0;
+    if jsonb_typeof(p_answer -> 'misses') = 'number' then
+      v_i := (p_answer ->> 'misses')::numeric;
+      if v_i % 1 = 0 and v_i > 0 then
+        v_wrong := least(v_i, 100000)::integer;
+      end if;
+    end if;
+    return greatest(0, least(10000, (v_hits * 10000) / greatest(v_total / 2, 1) - v_wrong * (p_solution ->> 'miss_bps')::integer));
+  elsif p_game in ('route', 'pack') then
+    -- route: a full order of the stops 1..n; pack: distinct items 0..n-1 within the capacity
+    v_key := case p_game when 'route' then 'order' else 'picked' end;
+    if jsonb_typeof(p_answer -> v_key) <> 'array' then
+      return 0;
+    end if;
+    v_total := case p_game when 'route' then jsonb_array_length(p_solution -> 'points') - 1
+                           else jsonb_array_length(p_solution -> 'weights') end;
+    if exists (select 1 from jsonb_array_elements(p_answer -> v_key) e
+                where case when jsonb_typeof(e) <> 'number' then true
+                           when p_game = 'route' then (e #>> '{}')::numeric % 1 <> 0 or (e #>> '{}')::numeric not between 1 and v_total
+                           else (e #>> '{}')::numeric % 1 <> 0 or (e #>> '{}')::numeric not between 0 and v_total - 1 end) then
+      return 0;
+    end if;
+    select coalesce(array_agg((e #>> '{}')::numeric::integer order by i), '{}') into v_route
+      from jsonb_array_elements(p_answer -> v_key) with ordinality x(e, i);
+    v_k := coalesce(array_length(v_route, 1), 0);
+    if (select count(distinct c) from unnest(v_route) c) <> v_k or (p_game = 'route' and v_k <> v_total) then
+      return 0;
+    end if;
+    if p_game = 'route' then
+      return greatest(0, least(10000, 10000 - (public.company_task_tour_length(p_solution -> 'points', v_route)
+                                               - (p_solution ->> 'best')::integer) * (p_solution ->> 'step_bps')::integer));
+    end if;
+    select coalesce(sum((p_solution -> 'weights' ->> c)::integer), 0), coalesce(sum((p_solution -> 'values' ->> c)::integer), 0)
+      into v_hits, v_wrong from unnest(v_route) c;
+    if v_hits > (p_solution ->> 'cap')::integer then
+      return 0;
+    end if;
+    return greatest(0, least(10000, (v_wrong * 10000) / greatest((p_solution ->> 'best')::integer, 1)));
+  elsif p_game = 'haggle' then
+    -- per round the rank of the chosen reply: 0 full marks, 1 ok_bps, 2 nothing; the average counts
+    if jsonb_typeof(p_answer -> 'choices') <> 'array' then
+      return 0;
+    end if;
+    v_total := jsonb_array_length(p_solution -> 'rounds');
+    select coalesce(sum(case when c.v is null or jsonb_typeof(c.v) <> 'number' then 0
+                             when (c.v #>> '{}')::numeric % 1 <> 0
+                               or (c.v #>> '{}')::numeric not between 0 and jsonb_array_length(r.v) - 1 then 0
+                             when (r.v ->> ((c.v #>> '{}')::numeric::integer))::integer = 0 then 10000
+                             when (r.v ->> ((c.v #>> '{}')::numeric::integer))::integer = 1 then (p_solution ->> 'ok_bps')::integer
+                             else 0 end), 0)
+      into v_sum
+      from jsonb_array_elements(p_solution -> 'rounds') with ordinality r(v, i)
+      left join jsonb_array_elements(p_answer -> 'choices') with ordinality c(v, i) on c.i = r.i;
+    return (v_sum / greatest(v_total, 1))::integer;
+  else
+    v_key := case p_game when 'sort' then 'sides' when 'order' then 'order' when 'match' then 'boxes'
+                         when 'quick' then 'choices' else 'sequence' end;
+    if jsonb_typeof(p_answer -> v_key) <> 'array' then
+      return 0;
+    end if;
+    v_total := jsonb_array_length(p_solution -> v_key);
+    select count(*) into v_hits
+      from jsonb_array_elements(p_solution -> v_key) with ordinality s(v, i)
+      join jsonb_array_elements(p_answer -> v_key) with ordinality a(v, i) on a.i = s.i
+     where a.v = s.v;
+    return (v_hits * 10000) / greatest(v_total, 1);
+  end if;
+end;
+$$;
+
+revoke all on function public.company_task_tour_length(jsonb, integer[]) from public, anon, authenticated;
+revoke all on function public.company_task_route_best(jsonb) from public, anon, authenticated;
+revoke all on function public.company_task_pack_best(integer[], integer[], integer) from public, anon, authenticated;
+
+-- ===== supabase/migrations/20261204006410_more_company_moves.sql =====
+-- =============================================================================
+-- NEXA · 6410 · More business moves, some only from a tier on or for listed companies (ADR-173)
+-- =============================================================================
+-- The new moves themselves are config (game_config.companyMoves.moves, src/config/company-moves.ts). Two new
+-- optional fields of a move are honoured here:
+--   minTier     the move is offered from this company tier on (garage < small_business < gmbh < ag)
+--   listedOnly  the move is offered to listed companies only (listed_is())
+-- company_moves_state() leaves out what the company may not start yet, so start_company_move() answers move_unknown
+-- for it as for any move of another product. Patch of the function as it is now (after 5300); a missing anchor
+-- raises instead of silently doing nothing.
+-- Idempotent: runs unchanged as supabase/updates/20261204006410_more_company_moves.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.company_moves_state(uuid)'::regprocedure);
+  v_old text := $t$         where o.mv ->> 'product' in ('*', coalesce(pc.product_key, ''))) x), '[]'::jsonb),$t$;
+  v_new text := $t$         where o.mv ->> 'product' in ('*', coalesce(pc.product_key, ''))
+           -- ADR-173: from a tier on, or for listed companies only
+           and (o.mv ->> 'minTier' is null
+                or coalesce(array_position(array['garage', 'small_business', 'gmbh', 'ag'], v_tier), 4)
+                   >= coalesce(array_position(array['garage', 'small_business', 'gmbh', 'ag'], o.mv ->> 'minTier'), 1))
+           and (not coalesce((o.mv ->> 'listedOnly')::boolean, false) or public.listed_is(p_company))) x), '[]'::jsonb),$t$;
+begin
+  if position('listedOnly' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'company_moves_state(): anchor for minTier/listedOnly (ADR-173) not found';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ===== supabase/migrations/20261204006420_ceo_interviews.sql =====
+-- =============================================================================
+-- NEXA · 6420 · CEO interviews in NEXA Nachrichten (ADR-173)
+-- =============================================================================
+-- Now and then the show asks a founder for an interview:
+-- * company_interviews_run_due() (hourly): requests expire after expiresHours ("kein Kommentar" by silence); every
+--   active company whose founder was around lately rolls a 24th of its daily chance (more for bigger and listed
+--   companies and after a scandal, layoffs or a loss), at most one roll an hour and one request per cooldownHours.
+-- * company_interview_request(): three questions from game_config.interviews.pool that fit the company's facts
+--   (profit, loss, listed, mood, layoffs, scandal, size, staff, awareness), at most maxSituational of them tied to
+--   the situation; a notification to the founder.
+-- * get_company_interview(), answer_company_interview(), decline_company_interview(): the founder answers each
+--   question in free text (length-limited, moderated with text_has_profanity) or with one of three quick answers.
+--   The Mini-KI (company_interview_judge, same rules as src/lib/sim/interviews.ts) judges every answer -2..+2;
+--   the sum moves awareness (and the reputation of a listed company), capped. Declining or ignoring costs a little.
+--   The effects apply at once, so the interview never depends on the show airing.
+-- * news_show_interviews() gives the next show one interview: per question a segment "interview" (the host asks,
+--   reads the answer and reacts, with a mood per verdict; the CEO's figure on the screen), or one "kein Kommentar"
+--   segment. news_show_start() marks it aired once (apply type "interview") and files it under companies in the feed.
+-- Errors: interview_not_found NX260, interview_text_invalid NX261, interview_closed NX262.
+-- Idempotent: runs unchanged as supabase/updates/20261204006420_ceo_interviews.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys and the notification type
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_new text := $q$    when 'interview_not_found'        then 'NX260'
+    when 'interview_text_invalid'     then 'NX261'
+    when 'interview_closed'           then 'NX262'
+    else 'NX007'$q$;
+begin
+  if position('''interview_closed''' in v_def) = 0 then
+    if position($q$    else 'NX007'$q$ in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the interview error keys (ADR-173) by hand';
+    end if;
+    execute replace(v_def, $q$    else 'NX007'$q$, v_new);
+  end if;
+end;
+$do$;
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('company_interview', 'company', 'Interviewanfrage', 'NEXA Nachrichten möchte dich als Chef deiner Firma interviewen.',
+        'notif_company', true, true, false, 210)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Tables (internal: read and written only by the functions below)
+-- ---------------------------------------------------------------------------
+create table if not exists public.company_interviews (
+  id               bigint generated always as identity primary key,
+  company_id       uuid not null references public.companies (id) on delete cascade,
+  ceo_id           uuid not null references public.profiles (id) on delete cascade,
+  status           text not null default 'requested' check (status in ('requested', 'answered', 'declined', 'expired')),
+  -- [{key, when, text, quick: [{text, tone}], good: [...]}], texts already filled in
+  questions        jsonb not null,
+  -- [{text, quick, verdict, points, reaction}] once answered
+  answers          jsonb,
+  score            integer,
+  awareness_bps    integer not null default 0,
+  reputation_delta double precision not null default 0,
+  judge            text not null default 'mini' check (judge in ('mini', 'claude')),
+  requested_at     timestamptz not null default now(),
+  expires_at       timestamptz not null,
+  answered_at      timestamptz,
+  aired_at         timestamptz,
+  show_id          bigint
+);
+create unique index if not exists company_interviews_open_uq on public.company_interviews (company_id) where status = 'requested';
+create index if not exists company_interviews_company_idx on public.company_interviews (company_id, requested_at desc);
+create index if not exists company_interviews_ceo_idx on public.company_interviews (ceo_id, requested_at desc);
+create index if not exists company_interviews_unaired_idx on public.company_interviews (answered_at) where aired_at is null;
+alter table public.company_interviews enable row level security;
+comment on table public.company_interviews is
+  'CEO interviews of NEXA Nachrichten (ADR-173). No client access: get_company_interview() and the answer RPCs.';
+
+-- when every company last rolled for a request (one roll an hour)
+create table if not exists public.company_interview_rolls (
+  company_id uuid primary key references public.companies (id) on delete cascade,
+  rolled_at  timestamptz not null
+);
+alter table public.company_interview_rolls enable row level security;
+comment on table public.company_interview_rolls is 'Internal: last hourly roll for a CEO interview per company (ADR-173).';
+
+-- ---------------------------------------------------------------------------
+-- C. Helpers
+-- ---------------------------------------------------------------------------
+create or replace function public.interviews_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select value from public.game_config where key = 'interviews'), '{}'::jsonb);
+$$;
+
+-- What the show knows about a company when it asks (InterviewFacts in src/lib/sim/interviews.ts)
+create or replace function public.company_interview_facts(p_company uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'tier', pc.tier,
+    'listed', public.listed_is(pc.company_id),
+    'profit_cents', (select r.operating_profit_cents from public.player_company_reports r
+                      where r.company_id = pc.company_id order by r.game_quarter_id desc limit 1),
+    'satisfaction', (select round(l.satisfaction)::integer from public.listed_companies l
+                      where l.company_id = pc.company_id and public.listed_is(pc.company_id)),
+    'layoffs', (select count(*) from public.player_jobs j
+                 where j.company_id = pc.company_id and j.status::text = 'ended' and j.end_reason::text = 'fired'
+                   and j.ended_at >= p_now - make_interval(hours => coalesce((public.interviews_cfg() ->> 'layoffHours')::integer, 72))),
+    'scandal', exists (select 1 from public.news_shows s
+                        where s.status = 'aired'
+                          and s.started_at >= p_now - make_interval(hours => coalesce((public.interviews_cfg() ->> 'scandalHours')::integer, 24))
+                          and exists (select 1 from jsonb_array_elements(s.segments) x
+                                       where x ->> 'kind' = 'scandal' and x -> 'subject' ->> 'company_id' = pc.company_id::text)),
+    'staff', (select count(*) from public.player_jobs j where j.company_id = pc.company_id and j.status::text = 'active'),
+    'awareness_bps', round(coalesce(pc.awareness, 0) * 10000)::integer,
+    'name', c.name,
+    'ceo', p.nickname,
+    'ceo_id', pc.founder_id)
+    from public.player_companies pc
+    join public.companies c on c.id = pc.company_id
+    join public.profiles p on p.id = pc.founder_id
+   where pc.company_id = p_company and pc.status = 'active';
+$$;
+
+-- Does a question's "when" hold for these facts (whenHolds)
+create or replace function public.company_interview_when(p_when text, f jsonb, cfg jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(case p_when
+    when 'always'  then true
+    when 'profit'  then (f ->> 'profit_cents')::bigint > 0
+    when 'loss'    then (f ->> 'profit_cents')::bigint < 0
+    when 'listed'  then (f ->> 'listed')::boolean
+    when 'unhappy' then (f ->> 'satisfaction')::numeric < (cfg ->> 'unhappyBelow')::numeric
+    when 'happy'   then (f ->> 'satisfaction')::numeric >= (cfg ->> 'happyFrom')::numeric
+    when 'layoffs' then (f ->> 'layoffs')::integer > 0
+    when 'scandal' then (f ->> 'scandal')::boolean
+    when 'big'     then f ->> 'tier' in ('gmbh', 'ag')
+    when 'small'   then f ->> 'tier' in ('garage', 'small_business')
+    when 'solo'    then (f ->> 'staff')::integer = 0
+    when 'famous'  then (f ->> 'awareness_bps')::integer >= (cfg ->> 'awarenessFamousBps')::integer
+    when 'unknown' then (f ->> 'awareness_bps')::integer < (cfg ->> 'awarenessUnknownBps')::integer
+    else false end, false);
+$$;
+
+-- Chance of a request per day in bps (interviewChancePerDayBps)
+create or replace function public.company_interview_chance_bps(f jsonb, cfg jsonb)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select least(coalesce((cfg ->> 'maxChancePerDayBps')::integer, 9000),
+               coalesce((cfg ->> 'chancePerDayBps')::integer, 0)
+               + coalesce((cfg #>> array['tierBonusBps', f ->> 'tier'])::integer, 0)
+               + case when coalesce((f ->> 'listed')::boolean, false) then coalesce((cfg ->> 'listedBonusBps')::integer, 0) else 0 end
+               + case when coalesce((f ->> 'scandal')::boolean, false) or coalesce((f ->> 'layoffs')::integer, 0) > 0
+                           or coalesce((f ->> 'profit_cents')::bigint < 0, false)
+                      then coalesce((cfg ->> 'eventBonusBps')::integer, 0) else 0 end);
+$$;
+
+-- {name} placeholders filled in; unknown ones stay
+create or replace function public.company_interview_fill(p_text text, p_values jsonb)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_out text := coalesce(p_text, '');
+  k     text;
+  v     text;
+begin
+  for k, v in select key, value from jsonb_each_text(coalesce(p_values, '{}'::jsonb)) loop
+    v_out := replace(v_out, '{' || k || '}', coalesce(v, ''));
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- A random line of a jsonb array of texts
+create or replace function public.company_interview_line(p_lines jsonb)
+returns text
+language sql
+volatile
+set search_path = ''
+as $$
+  select x from jsonb_array_elements_text(coalesce(p_lines, '[]'::jsonb)) x order by random() limit 1;
+$$;
+
+-- The Mini-KI's judgement of one answer, points -2..+2 (judgeInterviewAnswer); {verdict, points, text}
+create or replace function public.company_interview_judge(p_question jsonb, p_answer jsonb, cfg jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  j       jsonb := coalesce(cfg -> 'judge', '{}'::jsonb);
+  v_quick numeric;
+  v_tone  text;
+  v_text  text;
+  v_lower text;
+  v_good  integer;
+  v_bad   integer;
+  v_pts   integer;
+begin
+  if jsonb_typeof(p_answer -> 'quick') = 'number' then
+    v_quick := (p_answer ->> 'quick')::numeric;
+    if v_quick % 1 = 0 and v_quick >= 0 and v_quick < jsonb_array_length(coalesce(p_question -> 'quick', '[]'::jsonb)) then
+      v_tone := p_question -> 'quick' -> v_quick::integer ->> 'tone';
+      return jsonb_build_object('verdict', v_tone, 'points', coalesce((j #>> array['quickPoints', v_tone])::integer, 0),
+                                'text', p_question -> 'quick' -> v_quick::integer ->> 'text', 'quick', v_quick::integer);
+    end if;
+  end if;
+  v_text := regexp_replace(regexp_replace(coalesce(case when jsonb_typeof(p_answer -> 'text') = 'string' then p_answer ->> 'text' end, ''),
+                                          '^\s+|\s+$', '', 'g'), '\s+', ' ', 'g');
+  if char_length(v_text) < coalesce((cfg ->> 'minChars')::integer, 2) then
+    return jsonb_build_object('verdict', 'none', 'points', coalesce((j ->> 'nonePoints')::integer, -1), 'text', '');
+  end if;
+  v_lower := lower(v_text);
+  select count(*) into v_good
+    from (select distinct w from (select jsonb_array_elements_text(coalesce(j -> 'good', '[]'::jsonb)) w
+                                  union all
+                                  select jsonb_array_elements_text(coalesce(p_question -> 'good', '[]'::jsonb))) a) d
+   where position(d.w in v_lower) > 0;
+  select count(*) into v_bad
+    from jsonb_array_elements_text(coalesce(j -> 'bad', '[]'::jsonb)) w where position(w in v_lower) > 0;
+  v_pts := least(v_good, coalesce((j ->> 'maxGood')::integer, 2)) - least(v_bad, coalesce((j ->> 'maxBad')::integer, 2))
+           + case when char_length(v_text) >= coalesce((j ->> 'longChars')::integer, 60) then 1 else 0 end
+           - case when char_length(v_text) < coalesce((j ->> 'shortChars')::integer, 8) then 1 else 0 end;
+  v_pts := greatest(-2, least(2, v_pts));
+  return jsonb_build_object('verdict', case when v_pts >= 1 then 'good' when v_pts <= -1 then 'bad' else 'ok' end,
+                            'points', v_pts, 'text', v_text);
+end;
+$$;
+
+-- Finishes an interview and applies its capped effects at once (interviewEffects)
+create or replace function public.company_interview_finish(p_id bigint, p_status text, p_answers jsonb, p_points integer,
+                                                           p_now timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.interviews_cfg();
+  e        jsonb := coalesce(public.interviews_cfg() -> 'effects', '{}'::jsonb);
+  iv       public.company_interviews;
+  v_listed boolean;
+  v_aw     integer;
+  v_rep    double precision;
+  v_max    integer := coalesce((e ->> 'maxAwarenessBps')::integer, 300);
+  v_maxr   double precision := coalesce((e ->> 'maxReputation')::double precision, 3);
+begin
+  select * into iv from public.company_interviews where id = p_id for update;
+  if iv.id is null or iv.status <> 'requested' then
+    return;
+  end if;
+  v_listed := public.listed_is(iv.company_id);
+  v_aw := case p_status
+            when 'answered' then greatest(-v_max, least(v_max, coalesce(p_points, 0) * coalesce((e ->> 'awarenessPerPointBps')::integer, 60)))
+            when 'declined' then coalesce((e ->> 'declineAwarenessBps')::integer, -80)
+            else coalesce((e ->> 'ignoreAwarenessBps')::integer, -120) end;
+  v_rep := case when not v_listed then 0
+                when p_status = 'answered' then greatest(-v_maxr, least(v_maxr, coalesce(p_points, 0) * coalesce((e ->> 'reputationPerPoint')::double precision, 0.5)))
+                when p_status = 'declined' then coalesce((e ->> 'declineReputation')::double precision, -0.5)
+                else coalesce((e ->> 'ignoreReputation')::double precision, -1) end;
+  update public.player_companies pc
+     set awareness = least(1, greatest(0, coalesce(pc.awareness, 0) + v_aw / 10000.0))
+   where pc.company_id = iv.company_id and pc.status = 'active';
+  if v_listed and v_rep <> 0 then
+    perform public.listed_ensure(iv.company_id);
+    update public.listed_companies l set reputation = least(100, greatest(0, l.reputation + v_rep)) where l.company_id = iv.company_id;
+  end if;
+  update public.company_interviews
+     set status = p_status, answers = p_answers, score = p_points, awareness_bps = v_aw, reputation_delta = v_rep,
+         answered_at = p_now
+   where id = p_id;
+end;
+$$;
+
+-- A new request for the company, if it has none open; null otherwise. Writes the questions and notifies the founder.
+create or replace function public.company_interview_request(p_company uuid, p_now timestamptz default null)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg    jsonb := public.interviews_cfg();
+  v_now  timestamptz := coalesce(p_now, public.game_now());
+  f      jsonb;
+  v_vals jsonb;
+  v_qs   jsonb;
+  v_id   bigint;
+begin
+  f := public.company_interview_facts(p_company, v_now);
+  if f is null or exists (select 1 from public.company_interviews i where i.company_id = p_company and i.status = 'requested') then
+    return null;
+  end if;
+  v_vals := jsonb_build_object(
+    'ceo', f ->> 'ceo', 'company', f ->> 'name',
+    'profit', case when f ->> 'profit_cents' is null then '' else public.format_eur(abs((f ->> 'profit_cents')::bigint)) end,
+    'satisfaction', coalesce(f ->> 'satisfaction', ''), 'staff', f ->> 'staff');
+  select jsonb_agg(jsonb_build_object(
+           'key', y.q ->> 'key', 'when', y.q ->> 'when',
+           'text', public.company_interview_fill(y.q ->> 'text', v_vals),
+           'quick', coalesce((select jsonb_agg(jsonb_build_object('text', public.company_interview_fill(a ->> 'text', v_vals),
+                                                                  'tone', a ->> 'tone') order by o)
+                                from jsonb_array_elements(y.q -> 'quick') with ordinality z(a, o)), '[]'::jsonb),
+           'good', coalesce(y.q -> 'good', '[]'::jsonb)) order by y.sit desc, y.r)
+    into v_qs
+    from (select x.q, x.sit, x.r
+            from (select q, (q ->> 'when') <> 'always' as sit, random() as r,
+                         row_number() over (partition by (q ->> 'when') <> 'always' order by random()) as prn
+                    from jsonb_array_elements(coalesce(cfg -> 'pool', '[]'::jsonb)) q
+                   where public.company_interview_when(q ->> 'when', f, cfg)) x
+           where not x.sit or x.prn <= coalesce((cfg ->> 'maxSituational')::integer, 2)
+           order by x.sit desc, x.r
+           limit coalesce((cfg ->> 'count')::integer, 3)) y;
+  if coalesce(jsonb_array_length(v_qs), 0) = 0 then
+    return null;
+  end if;
+  insert into public.company_interviews (company_id, ceo_id, questions, requested_at, expires_at)
+  values (p_company, (f ->> 'ceo_id')::uuid, v_qs, v_now,
+          v_now + make_interval(hours => coalesce((cfg ->> 'expiresHours')::integer, 6)))
+  on conflict do nothing
+  returning id into v_id;
+  if v_id is not null then
+    perform public.social_notify((f ->> 'ceo_id')::uuid, 'company_interview',
+      public.company_interview_fill(cfg #>> '{texts,notifyTitle}', v_vals),
+      public.company_interview_fill(cfg #>> '{texts,notifyBody}', v_vals || jsonb_build_object('hours', coalesce(cfg ->> 'expiresHours', '6'))),
+      jsonb_build_object('interview_id', v_id), '/company', 'interview:' || v_id::text);
+  end if;
+  return v_id;
+end;
+$$;
+
+-- The hourly job: expire what was ignored, then roll for new requests
+create or replace function public.company_interviews_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.interviews_cfg();
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  r         record;
+  v_expired integer := 0;
+  v_asked   integer := 0;
+begin
+  if cfg = '{}'::jsonb then
+    return jsonb_build_object('expired', 0, 'requested', 0);
+  end if;
+  for r in select i.id from public.company_interviews i where i.status = 'requested' and i.expires_at <= v_now
+            order by i.id for update skip locked loop
+    perform public.company_interview_finish(r.id, 'expired', null, null, v_now);
+    v_expired := v_expired + 1;
+  end loop;
+  for r in select pc.company_id
+             from public.player_companies pc
+             join public.profiles p on p.id = pc.founder_id and not p.is_deactivated
+            where pc.status = 'active'
+              and p.last_active_at >= v_now - make_interval(hours => coalesce((cfg ->> 'activeHours')::integer, 48))
+              and not exists (select 1 from public.company_interviews i
+                               where i.company_id = pc.company_id
+                                 and (i.status = 'requested'
+                                      or i.requested_at > v_now - make_interval(hours => coalesce((cfg ->> 'cooldownHours')::integer, 20))))
+              and not exists (select 1 from public.company_interview_rolls x
+                               where x.company_id = pc.company_id and x.rolled_at > v_now - interval '55 minutes') loop
+    insert into public.company_interview_rolls (company_id, rolled_at) values (r.company_id, v_now)
+    on conflict (company_id) do update set rolled_at = excluded.rolled_at;
+    if random() * 10000 * 24 < public.company_interview_chance_bps(public.company_interview_facts(r.company_id, v_now), cfg) then
+      if public.company_interview_request(r.company_id, v_now) is not null then
+        v_asked := v_asked + 1;
+      end if;
+    end if;
+  end loop;
+  return jsonb_build_object('expired', v_expired, 'requested', v_asked);
+end;
+$$;
+
+-- The caller's interview for the client: the open request, else the latest of the last day
+create or replace function public.company_interview_json(p_player uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'max_chars', coalesce((public.interviews_cfg() ->> 'maxChars')::integer, 240),
+    'interview', (
+      select jsonb_build_object(
+               'id', i.id, 'status', i.status, 'company', c.name, 'requested_at', i.requested_at, 'expires_at', i.expires_at,
+               'answered_at', i.answered_at, 'aired_at', i.aired_at,
+               'questions', (select coalesce(jsonb_agg(jsonb_build_object(
+                                 'text', q ->> 'text',
+                                 'quick', (select coalesce(jsonb_agg(a ->> 'text' order by o), '[]'::jsonb)
+                                             from jsonb_array_elements(q -> 'quick') with ordinality z(a, o))) order by n), '[]'::jsonb)
+                               from jsonb_array_elements(i.questions) with ordinality t(q, n)),
+               'answers', case when i.answers is null then null else
+                            (select coalesce(jsonb_agg(jsonb_build_object('text', a ->> 'text', 'verdict', a ->> 'verdict',
+                                                                          'reaction', a ->> 'reaction') order by n), '[]'::jsonb)
+                               from jsonb_array_elements(i.answers) with ordinality t(a, n)) end,
+               'awareness_bps', i.awareness_bps, 'reputation', i.reputation_delta)
+        from public.company_interviews i
+        join public.companies c on c.id = i.company_id
+       where i.ceo_id = p_player
+         and (i.status = 'requested' or i.requested_at > public.game_now() - interval '24 hours')
+       order by (i.status = 'requested') desc, i.requested_at desc
+       limit 1));
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. RPCs
+-- ---------------------------------------------------------------------------
+create or replace function public.get_company_interview()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+begin
+  return public.company_interview_json(v_player);
+end;
+$$;
+
+create or replace function public.answer_company_interview(p_request_id uuid, p_interview_id bigint, p_answers jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.interviews_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  iv       public.company_interviews;
+  a        jsonb;
+  v_text   text;
+  v_judged jsonb;
+  v_out    jsonb := '[]'::jsonb;
+  v_points integer := 0;
+  v_vals   jsonb;
+  k        integer;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_interview_id is null or jsonb_typeof(p_answers) is distinct from 'array' then
+    perform public.api_error('invalid_argument');
+  end if;
+  -- moderation before anything is stored: length, control characters, the word filter
+  for a in select x from jsonb_array_elements(p_answers) x loop
+    if jsonb_typeof(a) <> 'object' or (a ? 'text' and jsonb_typeof(a -> 'text') not in ('string', 'null'))
+       or (a ? 'quick' and jsonb_typeof(a -> 'quick') not in ('number', 'null')) then
+      perform public.api_error('invalid_argument');
+    end if;
+    v_text := coalesce(a ->> 'text', '');
+    if char_length(v_text) > coalesce((cfg ->> 'maxChars')::integer, 240) or v_text ~ '[\x00-\x08\x0b-\x1f]'
+       or public.text_has_profanity(v_text) then
+      perform public.api_error('interview_text_invalid');
+    end if;
+  end loop;
+  v_replay := public.request_begin(v_player, p_request_id, 'answer_company_interview');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into iv from public.company_interviews where id = p_interview_id and ceo_id = v_player for update;
+  if iv.id is null then
+    perform public.api_error('interview_not_found');
+  end if;
+  if iv.status <> 'requested' or iv.expires_at <= public.game_now() then
+    perform public.api_error('interview_closed');
+  end if;
+  if jsonb_array_length(p_answers) <> jsonb_array_length(iv.questions) then
+    perform public.api_error('invalid_argument');
+  end if;
+  select jsonb_build_object('ceo', p.nickname, 'company', c.name) into v_vals
+    from public.profiles p, public.companies c where p.id = v_player and c.id = iv.company_id;
+  for k in 0..jsonb_array_length(iv.questions) - 1 loop
+    v_judged := public.company_interview_judge(iv.questions -> k, p_answers -> k, cfg);
+    v_points := v_points + (v_judged ->> 'points')::integer;
+    v_out := v_out || (v_judged || jsonb_build_object(
+      'reaction', public.company_interview_fill(public.company_interview_line(cfg #> array['texts', 'reactions', v_judged ->> 'verdict']), v_vals)));
+  end loop;
+  perform public.company_interview_finish(iv.id, 'answered', v_out, v_points, public.game_now());
+  return public.request_complete(v_player, p_request_id, public.company_interview_json(v_player));
+end;
+$$;
+
+create or replace function public.decline_company_interview(p_request_id uuid, p_interview_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  iv       public.company_interviews;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_interview_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'decline_company_interview');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into iv from public.company_interviews where id = p_interview_id and ceo_id = v_player for update;
+  if iv.id is null then
+    perform public.api_error('interview_not_found');
+  end if;
+  if iv.status <> 'requested' or iv.expires_at <= public.game_now() then
+    perform public.api_error('interview_closed');
+  end if;
+  perform public.company_interview_finish(iv.id, 'declined', null, null, public.game_now());
+  return public.request_complete(v_player, p_request_id, public.company_interview_json(v_player));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. The show: segments of the next interview
+-- ---------------------------------------------------------------------------
+create or replace function public.news_show_interviews(p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.interviews_cfg();
+  tx      jsonb := coalesce(public.interviews_cfg() -> 'texts', '{}'::jsonb);
+  iv      record;
+  v_out   jsonb := '[]'::jsonb;
+  v_vals  jsonb;
+  v_n     integer;
+  v_k     integer;
+  v_eff   jsonb;
+  v_subj  jsonb;
+  v_ord   integer := coalesce((cfg ->> 'ord')::integer, 15);
+  v_ans   jsonb;
+begin
+  if cfg = '{}'::jsonb then
+    return v_out;
+  end if;
+  for iv in select i.*, c.name as company, p.nickname as ceo
+              from public.company_interviews i
+              join public.companies c on c.id = i.company_id
+              join public.profiles p on p.id = i.ceo_id and not p.is_deactivated
+             where i.status in ('answered', 'declined', 'expired') and i.aired_at is null
+               and i.answered_at >= p_now - make_interval(hours => coalesce((cfg ->> 'airWithinHours')::integer, 30))
+             order by i.answered_at, i.id
+             limit coalesce((cfg ->> 'perShow')::integer, 1) loop
+    v_vals := jsonb_build_object('ceo', iv.ceo, 'company', iv.company);
+    v_eff := jsonb_build_array(jsonb_build_object(
+      'label', coalesce(tx ->> 'effectAwareness', 'Bekanntheit') || ' '
+               || case when iv.awareness_bps > 0 then '+' when iv.awareness_bps < 0 then '−' else '±' end
+               || public.news_show_move(iv.awareness_bps),
+      'tone', case when iv.awareness_bps > 0 then 'gain' when iv.awareness_bps < 0 then 'loss' else 'neutral' end));
+    if iv.reputation_delta <> 0 then
+      v_eff := v_eff || jsonb_build_object(
+        'label', coalesce(tx ->> 'effectReputation', 'Ruf') || ' ' || case when iv.reputation_delta > 0 then '+' else '−' end
+                 || replace(to_char(abs(iv.reputation_delta), 'FM990.0'), '.', ','),
+        'tone', case when iv.reputation_delta > 0 then 'gain' else 'loss' end);
+    end if;
+    v_subj := jsonb_build_object('type', 'interview', 'player_id', iv.ceo_id, 'company_id', iv.company_id, 'name', iv.ceo,
+                                 'company', iv.company, 'interview_id', iv.id, 'ukey', 'fact:interview:' || iv.id::text,
+                                 'values', v_vals);
+    if iv.status = 'answered' and jsonb_typeof(iv.answers) = 'array' then
+      v_n := jsonb_array_length(iv.questions);
+      for v_k in 0..v_n - 1 loop
+        v_ans := iv.answers -> v_k;
+        v_out := v_out || jsonb_build_object(
+          'kind', 'interview',
+          'mood', coalesce(public.company_interview_line(cfg #> array['moods', coalesce(v_ans ->> 'verdict', 'ok')]), 'neutral'),
+          'headline', public.company_interview_fill(tx ->> 'headline', v_vals || jsonb_build_object('n', v_k + 1, 'total', v_n)),
+          'text', public.company_interview_fill(tx ->> 'text', v_vals || jsonb_build_object(
+                    'question', iv.questions -> v_k ->> 'text',
+                    'answer', coalesce(nullif(v_ans ->> 'text', ''), tx ->> 'noAnswer'),
+                    'reaction', coalesce(v_ans ->> 'reaction', ''))),
+          'effects', case when v_k = v_n - 1 then v_eff else '[]'::jsonb end,
+          'apply', case when v_k = 0 then jsonb_build_array(jsonb_build_object('type', 'interview', 'interview_id', iv.id))
+                        else '[]'::jsonb end,
+          'subject', v_subj,
+          'ord', v_ord + v_k);
+      end loop;
+    else
+      v_out := v_out || jsonb_build_object(
+        'kind', 'interview',
+        'mood', coalesce(public.company_interview_line(cfg #> '{moods,none}'), 'angry'),
+        'headline', public.company_interview_fill(tx ->> 'noCommentHeadline', v_vals),
+        'text', public.company_interview_fill(public.company_interview_line(
+                  tx -> case when iv.status = 'declined' then 'declined' else 'ignored' end), v_vals),
+        'effects', v_eff,
+        'apply', jsonb_build_array(jsonb_build_object('type', 'interview', 'interview_id', iv.id)),
+        'subject', v_subj,
+        'ord', v_ord);
+    end if;
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- news_show_build(): the interview joins the show before the topics are drawn (they then skip the CEO)
+do $do$
+declare
+  v_def  text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old  text := $t$  v_segs := v_segs || public.news_show_topics(p_now, v_seen, v_skip_p, v_segs);$t$;
+begin
+  if position('news_show_interviews' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the call of news_show_interviews() (ADR-173) by hand';
+    end if;
+    execute replace(v_def, v_old, $t$  -- 11. a CEO interview (ADR-173): the questions, the answers and his reactions
+  v_segs := v_segs || public.news_show_interviews(p_now);
+$t$ || v_old);
+  end if;
+end;
+$do$;
+
+-- news_show_start(): an aired interview is marked once; the feed files interviews under companies
+do $do$
+declare
+  v_def  text := pg_get_functiondef('public.news_show_start(bigint, timestamptz)'::regprocedure);
+  v_when text := $t$        when 'tasks' then$t$;
+  v_kind text := $t$when seg ->> 'kind' in ('scandal', 'hype', 'stock', 'tax', 'corp') then 'company'$t$;
+begin
+  if position('company_interviews' in v_def) = 0 then
+    if position(v_when in v_def) = 0 or position(v_kind in v_def) = 0 then
+      raise exception 'news_show_start() has an unexpected shape; add the apply type "interview" (ADR-173) by hand';
+    end if;
+    v_def := replace(v_def, v_when, $t$        when 'interview' then
+          update public.company_interviews i set aired_at = p_now, show_id = s.id
+           where i.id = (a ->> 'interview_id')::bigint and i.aired_at is null;
+$t$ || v_when);
+    v_def := replace(v_def, v_kind,
+      $t$when seg ->> 'kind' in ('scandal', 'hype', 'stock', 'tax', 'corp', 'interview') then 'company'$t$);
+    execute v_def;
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- F. Grants and the job
+-- ---------------------------------------------------------------------------
+revoke all on function public.interviews_cfg() from public, anon, authenticated;
+revoke all on function public.company_interview_facts(uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.company_interview_when(text, jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.company_interview_chance_bps(jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.company_interview_fill(text, jsonb) from public, anon, authenticated;
+revoke all on function public.company_interview_line(jsonb) from public, anon, authenticated;
+revoke all on function public.company_interview_judge(jsonb, jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public.company_interview_finish(bigint, text, jsonb, integer, timestamptz) from public, anon, authenticated;
+revoke all on function public.company_interview_request(uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.company_interviews_run_due(timestamptz) from public, anon, authenticated;
+revoke all on function public.company_interview_json(uuid) from public, anon, authenticated;
+revoke all on function public.news_show_interviews(timestamptz) from public, anon, authenticated;
+grant execute on function public.company_interviews_run_due(timestamptz) to service_role;
+revoke all on function public.get_company_interview() from public, anon;
+revoke all on function public.answer_company_interview(uuid, bigint, jsonb) from public, anon;
+revoke all on function public.decline_company_interview(uuid, bigint) from public, anon;
+grant execute on function public.get_company_interview() to authenticated;
+grant execute on function public.answer_company_interview(uuid, bigint, jsonb) to authenticated;
+grant execute on function public.decline_company_interview(uuid, bigint) to authenticated;
+comment on function public.get_company_interview() is
+  'RPC: the caller''s CEO interview (ADR-173): the open request with its questions and quick answers, or the latest result.';
+comment on function public.answer_company_interview(uuid, bigint, jsonb) is
+  'RPC: answers an interview, p_answers = [{text} | {quick}] per question; errors interview_text_invalid (NX261), '
+  'interview_not_found (NX260), interview_closed (NX262).';
+comment on function public.decline_company_interview(uuid, bigint) is
+  'RPC: "kein Kommentar" to an interview request (ADR-173); errors interview_not_found, interview_closed.';
+
+do $do$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-company-interviews';
+    perform cron.schedule('nexa-company-interviews', '17 * * * *', 'select public.company_interviews_run_due()');
+  end if;
+end;
+$do$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data

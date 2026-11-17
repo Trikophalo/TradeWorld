@@ -53,6 +53,7 @@ import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
 import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
+import { InterviewCard } from "@/features/company/components/interview-card";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
@@ -247,6 +248,33 @@ const SAMPLE_TASKS: CompanyTasks = {
   ],
 };
 
+/** A CEO interview request (ADR-173); sending goes to the demo engine, which knows no such id. */
+const SAMPLE_INTERVIEW = {
+  maxChars: 240,
+  interview: {
+    id: 999,
+    status: "requested" as const,
+    company: "Pixelwerft",
+    requestedAt: "2026-11-14T10:00:00.000Z",
+    expiresAt: "2099-11-14T16:00:00.000Z",
+    answeredAt: null,
+    airedAt: null,
+    questions: [
+      {
+        text: "Wo steht Pixelwerft in fünf Jahren? Und bitte nicht „auf dem Mond“.",
+        quick: ["Marktführer, mit glücklichen Kunden und Team.", "Hoffentlich noch da.", "Auf dem Mond."],
+      },
+      {
+        text: "Letzte Frage, sehr wichtig: Wie finden Sie meine Krawatte?",
+        quick: ["Mutig. Fast so mutig wie unser nächstes Produkt.", "Sie ist… eine Krawatte.", "Ehrlich? Furchtbar."],
+      },
+    ],
+    answers: null,
+    awarenessBps: 0,
+    reputation: 0,
+  },
+};
+
 /** Hands-on task games (ADR-144) with fixed puzzles; answers only go to the toast. */
 const SAMPLE_GAMES = [
   { game: "sort", taskKey: "pay_invoices", puzzle: { items: [5, 0, 3, 6, 1, 7, 2, 4] } },
@@ -255,13 +283,80 @@ const SAMPLE_GAMES = [
   { game: "match", taskKey: "file_documents", puzzle: { items: [4, 0, 7, 2, 3, 8], boxes: 3 } },
   { game: "path", taskKey: "office_route", puzzle: { size: 5, start: 10, goal: 9, walls: [1, 6, 11, 13, 18, 23, 8] } },
   { game: "math", taskKey: "payroll_check", puzzle: { a: 6, b: 24 } },
+  // ADR-173
+  { game: "memory", taskKey: "badge_pairs", puzzle: { cards: [2, 0, 3, 1, 0, 2, 1, 3] } },
+  { game: "timing", taskKey: "stamp_timing", puzzle: { targets: [30, 72, 51], sweep_ms: 1600 } },
+  {
+    game: "diff",
+    taskKey: "invoice_diff",
+    puzzle: { left: [0, 2, 4, 1, 3, 5, 0, 2, 4, 1, 3, 5], right: [0, 3, 4, 1, 3, 4, 0, 2, 4, 0, 3, 5] },
+  },
+  {
+    game: "quick",
+    taskKey: "cash_count",
+    puzzle: {
+      problems: [
+        { a: 34, b: 18, op: "add", options: [52, 49, 55] },
+        { a: 61, b: 27, op: "add", options: [80, 88, 96] },
+        { a: 12, b: 45, op: "add", options: [53, 57, 61] },
+      ],
+    },
+  },
+  {
+    game: "route",
+    taskKey: "delivery_tour",
+    puzzle: {
+      points: [
+        [0, 0],
+        [4, 1],
+        [1, 4],
+        [5, 5],
+        [2, 2],
+      ],
+    },
+  },
+  {
+    game: "haggle",
+    taskKey: "supplier_haggle",
+    puzzle: {
+      rounds: [
+        [1, 0, 2],
+        [2, 1, 0],
+        [0, 2, 1],
+      ],
+    },
+  },
+  { game: "pack", taskKey: "truck_pack", puzzle: { weights: [5, 2, 4, 3, 1, 2], values: [9, 3, 6, 5, 2, 4], cap: 8 } },
+  {
+    game: "catch",
+    taskKey: "spam_catch",
+    puzzle: {
+      events: [
+        { cell: 0, good: true },
+        { cell: 4, good: false },
+        { cell: 7, good: true },
+        { cell: 2, good: true },
+        { cell: 5, good: false },
+        { cell: 1, good: true },
+      ],
+      every_ms: 1100,
+      show_ms: 900,
+    },
+  },
 ] as const;
 
 function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
   const [round, setRound] = useState(0);
   return (
     <Card padding="lg" className="space-y-3 self-start">
-      <p className="label-pixel text-fg-3">Minispiel „{sample.game}“ (ADR-144)</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="label-pixel text-fg-3">Minispiel „{sample.game}“ (ADR-144, ADR-173)</p>
+        {sample.game === "catch" && (
+          <Button size="sm" variant="ghost" onClick={() => setRound((r) => r + 1)}>
+            Neu
+          </Button>
+        )}
+      </div>
       <TaskGameView
         key={round}
         game={sample.game}
@@ -270,7 +365,8 @@ function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
         disabled={false}
         onAnswer={(answer) => {
           toast.info(sample.game, JSON.stringify(answer));
-          setRound((r) => r + 1);
+          // the reaction game runs by itself: restart it only on demand, or it loops forever
+          if (sample.game !== "catch") setRound((r) => r + 1);
         }}
       />
     </Card>
@@ -926,6 +1022,7 @@ export function Showcase() {
         {SAMPLE_GAMES.map((sample) => (
           <SampleGame key={sample.game} sample={sample} />
         ))}
+        <InterviewCard preview={SAMPLE_INTERVIEW} />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />

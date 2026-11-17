@@ -19,6 +19,10 @@ export interface CompanyMoveConfig {
   readonly costFactor: number;
   /** Real minutes until the result. */
   readonly minutes: number;
+  /** ADR-173: only from this company tier on (garage < small_business < gmbh < ag). */
+  readonly minTier?: "small_business" | "gmbh" | "ag";
+  /** ADR-173: only for companies listed on the exchange. */
+  readonly listedOnly?: boolean;
 }
 
 export const COMPANY_MOVES: readonly CompanyMoveConfig[] = [
@@ -1146,6 +1150,151 @@ export const COMPANY_MOVES: readonly CompanyMoveConfig[] = [
     costFactor: 1.2,
     minutes: 35,
   },
+  // ADR-173: more variety; some only from a tier on or for listed companies
+  {
+    key: "customer_survey",
+    product: "*",
+    branch: "management",
+    kind: "quality",
+    risk: "safe",
+    costFactor: 0.7,
+    minutes: 25,
+  },
+  {
+    key: "trade_fair",
+    product: "*",
+    branch: "sales",
+    kind: "awareness",
+    risk: "normal",
+    costFactor: 1.4,
+    minutes: 45,
+    minTier: "small_business",
+  },
+  {
+    key: "supplier_switch",
+    product: "*",
+    branch: "logistics",
+    kind: "cash",
+    risk: "normal",
+    costFactor: 1.1,
+    minutes: 35,
+  },
+  {
+    key: "innovation_sprint",
+    product: "*",
+    branch: "it",
+    kind: "quality",
+    risk: "risky",
+    costFactor: 1.0,
+    minutes: 40,
+  },
+  {
+    key: "craft_masterclass",
+    product: "*",
+    branch: "craft",
+    kind: "quality",
+    risk: "safe",
+    costFactor: 0.8,
+    minutes: 30,
+  },
+  {
+    key: "factoring",
+    product: "*",
+    branch: "finance",
+    kind: "cash",
+    risk: "safe",
+    costFactor: 1.0,
+    minutes: 20,
+    minTier: "small_business",
+  },
+  {
+    key: "patent_filing",
+    product: "*",
+    branch: "law",
+    kind: "quality",
+    risk: "normal",
+    costFactor: 1.3,
+    minutes: 50,
+    minTier: "gmbh",
+  },
+  {
+    key: "lab_partnership",
+    product: "*",
+    branch: "science",
+    kind: "quality",
+    risk: "normal",
+    costFactor: 1.5,
+    minutes: 55,
+    minTier: "gmbh",
+  },
+  {
+    key: "small_acquisition",
+    product: "*",
+    branch: "management",
+    kind: "cash",
+    risk: "risky",
+    costFactor: 2.0,
+    minutes: 60,
+    minTier: "gmbh",
+  },
+  {
+    key: "tv_commercial",
+    product: "*",
+    branch: "sales",
+    kind: "awareness",
+    risk: "risky",
+    costFactor: 2.0,
+    minutes: 60,
+    minTier: "ag",
+  },
+  {
+    key: "bond_issue",
+    product: "*",
+    branch: "finance",
+    kind: "cash",
+    risk: "normal",
+    costFactor: 1.8,
+    minutes: 60,
+    minTier: "ag",
+  },
+  {
+    key: "capital_markets_day",
+    product: "*",
+    branch: "management",
+    kind: "awareness",
+    risk: "normal",
+    costFactor: 1.6,
+    minutes: 50,
+    listedOnly: true,
+  },
+  {
+    key: "buyback_signal",
+    product: "*",
+    branch: "finance",
+    kind: "cash",
+    risk: "risky",
+    costFactor: 1.5,
+    minutes: 45,
+    listedOnly: true,
+  },
+  {
+    key: "green_label",
+    product: "solar",
+    branch: "law",
+    kind: "awareness",
+    risk: "safe",
+    costFactor: 0.9,
+    minutes: 30,
+  },
+  {
+    key: "app_localization",
+    product: "mobile_app",
+    branch: "it",
+    kind: "cash",
+    risk: "normal",
+    costFactor: 1.2,
+    minutes: 40,
+  },
 ];
 
 export const COMPANY_MOVE_RULES = {
@@ -1166,6 +1315,8 @@ export const COMPANY_MOVE_RULES = {
   maxChanceBps: 9_500,
   /** After a move the same move rests this many times its duration. */
   cooldownFactor: 2,
+  /** ADR-173: order of the tiers for minTier. */
+  tierOrder: ["garage", "small_business", "gmbh", "ag"],
   /** Results kept for the history. */
   historyLimit: 12,
 } as const;

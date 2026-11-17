@@ -1,0 +1,37 @@
+{
+  "interview": {
+    "id": 7,
+    "status": "declined",
+    "answers": null,
+    "company": "Fixture Werke",
+    "aired_at": null,
+    "questions": [
+      {
+        "text": "Fixture Werke ist inzwischen riesig. Wollen Sie eigentlich die ganze Stadt kaufen?",
+        "quick": ["Wir wollen besser werden, nicht nur größer.", "Nur die schönen Ecken.", "Ja. Und danach das Land."]
+      },
+      {
+        "text": "Sie machen bei Fixture Werke alles allein. Reden Sie in der Mittagspause mit dem Drucker?",
+        "quick": [
+          "Noch, aber bald stelle ich die ersten Leute ein.",
+          "Der Drucker ist ein guter Zuhörer.",
+          "Ich brauche niemanden."
+        ]
+      },
+      {
+        "text": "Ersetzen bei Fixture Werke bald Roboter alle Menschen, auch den Chef?",
+        "quick": [
+          "Die KI hilft dem Team, sie ersetzt es nicht.",
+          "Den Chef hoffentlich zuletzt.",
+          "Am liebsten sofort, Menschen sind so teuer."
+        ]
+      }
+    ],
+    "expires_at": "2026-11-17T06:11:14.588355+00:00",
+    "reputation": 0,
+    "answered_at": "2026-11-17T00:11:14.592239+00:00",
+    "requested_at": "2026-11-17T00:11:14.588355+00:00",
+    "awareness_bps": -80
+  },
+  "max_chars": 240
+}

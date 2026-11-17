@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TASK_GAMES } from "@/config/company-tasks";
 import type { CompanyTaskPlay, CompanyTaskResult, CompanyTasks, GameEngine, NewsFeedItem } from "./types";
 import { rpc } from "./rpc";
 
@@ -6,7 +7,7 @@ import { rpc } from "./rpc";
  * Company tasks with mini-games and the news feed (ADR-129) against the server.
  */
 const tier = z.enum(["intern", "junior", "senior", "team_lead", "c_level"]);
-const game = z.enum(["pick", "count", "sort", "order", "seq", "math", "slider", "rotate", "match", "path"]);
+const game = z.enum(TASK_GAMES);
 
 const tasksSchema = z.object({
   role: z.enum(["founder", "employee"]),

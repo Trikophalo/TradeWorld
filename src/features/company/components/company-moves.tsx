@@ -22,7 +22,7 @@ import { playSound } from "@/lib/sound";
 import { useClockSkew, useServerClock } from "@/features/game/server-clock";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
-import { useCompanyRefresh } from "../hooks";
+import { useCompanyRefresh, useMyCompany } from "../hooks";
 
 type Filter = "all" | CompanyMoveOption["kind"];
 const FILTERS: readonly Filter[] = ["all", "cash", "awareness", "quality"];
@@ -312,6 +312,12 @@ function Progress({ ends, total, onDone }: { ends: number; total: number; onDone
 
 function HistoryList({ data }: { data: CompanyMoves }) {
   const t = useTranslations("companyMoves");
+  const company = useMyCompany().data?.company?.name ?? "";
+  /** ADR-173: a move with its own news line tells what happened ({company} filled in). */
+  const story = (key: string, won: boolean) => {
+    const path = `items.${key}.${won ? "ok" : "fail"}` as Parameters<typeof t>[0];
+    return company && t.has(path) ? (t.raw(path) as string).replace("{company}", company) : null;
+  };
   return (
     <div className="space-y-2 border-t border-line-1 pt-4" data-testid="moves-history">
       <p className="label-pixel text-fg-3">{t("history")}</p>
@@ -325,10 +331,15 @@ function HistoryList({ data }: { data: CompanyMoves }) {
               ? t("resultCash", { amount: formatMoney(h.payoutCents, { whole: true }) })
               : t("resultGain", { points: Math.round(h.gain * 100), what: t(`kinds.${kind}`) });
           return (
-            <li key={h.id} className="flex items-center gap-2 text-xs">
+            <li key={h.id} className="flex flex-wrap items-center gap-2 text-xs">
               <Badge tone={won ? "gain" : "loss"}>{won ? t("success") : t("failure")}</Badge>
               <span className="min-w-0 flex-1 truncate text-fg-2">{moveText(t, h.key, "name")}</span>
               <span className={cn("shrink-0 nums", won ? "text-gain" : "text-fg-3")}>{line}</span>
+              {story(h.key, won) && (
+                <span className="basis-full text-2xs text-pretty text-fg-3" data-testid="move-story">
+                  {story(h.key, won)}
+                </span>
+              )}
             </li>
           );
         })}

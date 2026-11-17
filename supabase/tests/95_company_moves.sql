@@ -24,14 +24,14 @@ select public.get_company_moves() as m0 \gset
 reset role;
 select tests.assert(
   (:'m0'::jsonb ->> 'slots')::int = 1 and (:'m0'::jsonb ->> 'used')::int = 0 and :'m0'::jsonb ->> 'product' = 'courier'
-  and jsonb_array_length(:'m0'::jsonb -> 'moves') = 12
+  and jsonb_array_length(:'m0'::jsonb -> 'moves') = 16
   and exists (select 1 from jsonb_array_elements(:'m0'::jsonb -> 'moves') x where x ->> 'key' = 'hospital_express')
   and not exists (select 1 from jsonb_array_elements(:'m0'::jsonb -> 'moves') x where x ->> 'key' = 'pentest_bank')
   and (select (x ->> 'cost_cents')::bigint = 120000 and (x ->> 'payout_cents')::bigint = 180000
               and (x ->> 'chance_bps')::int = 7000 and (x ->> 'refund_cents')::bigint = 36000
          from jsonb_array_elements(:'m0'::jsonb -> 'moves') x where x ->> 'key' = 'hospital_express')
   and (select (c.contract_work) from public.player_companies c where c.company_id = :'cid'),
-  'get_company_moves(): the 6 moves of the product plus 6 for every company, numbers from the tier; contract work is on');
+  'get_company_moves(): the 6 moves of the product plus the 10 for every company a garage may start (ADR-173), numbers from the tier; contract work is on');
 
 select tests.login_as('authenticated', :a);
 select public.start_company_move(:rq, 'hospital_express') as s1 \gset

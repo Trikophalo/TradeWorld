@@ -464,6 +464,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-ac96c020",
+        title: "CEO-Interviews",
+        text: "Mr. Doodle Dangle bittet Chefs manchmal zum Interview.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-1f3a2872",
+        title: "Mehr Firmenalltag",
+        text: "Acht neue Minispiele für Firmenaufgaben (Paare finden, Stempel im Takt, Fehlersuche, Kopfrechnen, Tour planen, Verhandeln, Einpacken, Zugreifen) und…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-efdf542e",
         title: "Karten-Boni und Sammlungen",
         text: "54 Nexamon-Karten bringen kleine Account-Boni (XP, Gehalt, Tresorzinsen, Tagesbonus, Auftragserlöse), solange du sie besitzt und nicht anbietest…",

@@ -54,6 +54,7 @@ import { createPackBattleEngine } from "./demo/pack-battle";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
+import { createInterviewEngine, type DemoInterviewState } from "./demo/interviews";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
 import { createNewsShowEngine, type DemoNewsShowState } from "./demo/news-show";
@@ -135,6 +136,8 @@ interface PlayerState {
   companyTasks?: DemoTasksState;
   /** NEXA Nachrichten (ADR-150). */
   newsShow?: DemoNewsShowState;
+  /** CEO interviews (ADR-173). */
+  interviews?: DemoInterviewState;
   pitches?: DemoPitch[];
   protests?: DemoProtest[];
   /** The friend code redeemed once (ADR-111). */
@@ -1552,6 +1555,7 @@ const stockNews = createStockNewsEngine({
 
 const companyMoves = createCompanyMovesEngine({
   company: () => p().company ?? null,
+  listed: () => ownStock() !== null,
   upgrades: () => p().upgrades ?? {},
   addCompanyCash: (cents) => {
     const c = p().company;
@@ -1638,6 +1642,36 @@ const SECTOR_NAMES: Record<string, string> = {
   pharma: "Pharma",
   logistics: "Logistik",
 };
+/** CEO interviews (ADR-173): requests, answers judged by the Mini-KI, aired in the next show. */
+const interviews = createInterviewEngine({
+  state: () => p().interviews,
+  setState: (s) => {
+    p().interviews = s;
+    persist();
+  },
+  nickname: () => p().nickname,
+  company: () => {
+    const c = p().company;
+    if (!c) return null;
+    return {
+      name: c.name,
+      tier: c.tier,
+      awareness: c.awareness,
+      profitCents: c.reports.at(-1)?.operatingProfitCents ?? null,
+      staff: 0,
+      listed: ownStock() !== null,
+    };
+  },
+  addAwareness: (bps) => {
+    const c = p().company;
+    if (c) c.awareness = Math.min(1, Math.max(0, c.awareness + bps / 10_000));
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+  random: () => Math.random(),
+});
+
 const newsShow = createNewsShowEngine({
   state: () => p().newsShow,
   setState: (s) => {
@@ -1658,6 +1692,7 @@ const newsShow = createNewsShowEngine({
     if (mid) st.mids.set(ticker, Math.max(10, Math.round(mid * (1 + moveBps / 10_000))));
   },
   company: () => p().company ?? null,
+  interviewSegments: () => interviews.airSegments(),
   // What the gossip can say about the demo player: the level (good), an empty purse (bad).
   facts: () => [
     { good: true, what: `Level ${levelFromTotalXp(p().xpTotal)} erreicht` },
@@ -1738,6 +1773,11 @@ export function demoForceBattleKind(kind: Parameters<typeof battles.forceKind>[0
 }
 export const demoForcedBattleKind = () => battles.forcedKind();
 
+/** Demo only (ADR-173): a CEO interview request right away, for trying it out and for tests. */
+export function demoRequestInterview(): void {
+  interviews.requestNow();
+}
+
 /** Demo only (ADR-150): airs a news show in a few seconds, for trying it out and for tests. */
 export function demoStartNewsShow(inMs?: number): void {
   newsShow.startNow(inMs);
@@ -1773,6 +1813,9 @@ export const demoEngine: GameEngine = {
   leaveBattle: battles.leaveBattle,
   syncBattle: battles.syncBattle,
   answerBattle: battles.answerBattle,
+  companyInterview: interviews.companyInterview,
+  answerCompanyInterview: interviews.answerCompanyInterview,
+  declineCompanyInterview: interviews.declineCompanyInterview,
   newsShow: newsShow.newsShow,
   postNewsShowMessage: newsShow.postNewsShowMessage,
   // The demo keeps seen tours in the browser only (the tutorial store does that).
