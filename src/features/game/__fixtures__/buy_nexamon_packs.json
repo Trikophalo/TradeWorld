@@ -1,0 +1,133 @@
+{
+  "set": "mystic_energy",
+  "count": 2,
+  "packs": [
+    {
+      "set": "mystic_energy",
+      "cards": [
+        {
+          "slot": 1,
+          "is_new": true,
+          "rarity": "common",
+          "serial": 9,
+          "copy_id": "402a2302-09c8-4118-8b27-7f470ee98692",
+          "card_key": "me-018",
+          "condition": "mint",
+          "population": 9,
+          "value_cents": 260
+        },
+        {
+          "slot": 2,
+          "is_new": true,
+          "rarity": "common",
+          "serial": 10,
+          "copy_id": "df274e54-d68d-4e1a-8212-2b5ab46e90a3",
+          "card_key": "me-019",
+          "condition": "good",
+          "population": 10,
+          "value_cents": 171
+        },
+        {
+          "slot": 3,
+          "is_new": true,
+          "rarity": "common",
+          "serial": 8,
+          "copy_id": "c2bcab0b-36c4-4010-acda-fd0546665cc9",
+          "card_key": "me-021",
+          "condition": "near_mint",
+          "population": 8,
+          "value_cents": 170
+        },
+        {
+          "slot": 4,
+          "is_new": false,
+          "rarity": "common",
+          "serial": 10,
+          "copy_id": "7f242089-f7df-45a9-baaa-8ef42f088d2f",
+          "card_key": "me-047",
+          "condition": "good",
+          "population": 10,
+          "value_cents": 504
+        },
+        {
+          "slot": 5,
+          "is_new": true,
+          "rarity": "common",
+          "serial": 13,
+          "copy_id": "38bba458-7eb8-4e6c-8d1c-4abd27d4968b",
+          "card_key": "me-035",
+          "condition": "good",
+          "population": 13,
+          "value_cents": 117
+        }
+      ],
+      "pack_id": "f85cf9b1-fe3e-4bfb-bcd8-1c2c28b67071",
+      "price_cents": 20000,
+      "packs_opened": 3
+    },
+    {
+      "set": "mystic_energy",
+      "cards": [
+        {
+          "slot": 1,
+          "is_new": true,
+          "rarity": "common",
+          "serial": 10,
+          "copy_id": "0864b48d-e51b-4092-899b-362629ffd418",
+          "card_key": "me-023",
+          "condition": "near_mint",
+          "population": 10,
+          "value_cents": 330
+        },
+        {
+          "slot": 2,
+          "is_new": true,
+          "rarity": "common",
+          "serial": 8,
+          "copy_id": "0247499f-5fd6-4526-b025-6008cba08a04",
+          "card_key": "me-034",
+          "condition": "near_mint",
+          "population": 8,
+          "value_cents": 210
+        },
+        {
+          "slot": 3,
+          "is_new": true,
+          "rarity": "common",
+          "serial": 8,
+          "copy_id": "e27ef0f3-4d5d-42c3-903c-8ecd22a412a1",
+          "card_key": "me-020",
+          "condition": "mint",
+          "population": 8,
+          "value_cents": 280
+        },
+        {
+          "slot": 4,
+          "is_new": false,
+          "rarity": "common",
+          "serial": 10,
+          "copy_id": "9b369e80-3ec2-4c31-889b-e2bc6547efee",
+          "card_key": "me-029",
+          "condition": "near_mint",
+          "population": 10,
+          "value_cents": 140
+        },
+        {
+          "slot": 5,
+          "is_new": false,
+          "rarity": "common",
+          "serial": 11,
+          "copy_id": "f01dea3d-37bb-4275-8754-ecec78fb76ac",
+          "card_key": "me-048",
+          "condition": "mint",
+          "population": 11,
+          "value_cents": 110
+        }
+      ],
+      "pack_id": "956c34ec-2d29-496f-bfda-a22f2e56e3d3",
+      "price_cents": 20000,
+      "packs_opened": 4
+    }
+  ],
+  "price_cents": 40000
+}
