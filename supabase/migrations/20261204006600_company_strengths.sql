@@ -237,11 +237,17 @@ begin
   if position('company_strengths_json' in v_def) > 0 then
     return;
   end if;
-  if position(v_a in v_def) = 0 then
-    raise exception 'company_state() has an unexpected shape; add the strengths (ADR-176) by hand';
-  end if;
-  execute replace(v_def, v_a, $t$'campaign_costs', public.company_campaign_costs(p_company),
+  if position(v_a in v_def) > 0 then
+    execute replace(v_def, v_a, $t$'campaign_costs', public.company_campaign_costs(p_company),
          -- ADR-176: slow strengths with their reward, and a stuck hourly close
          'strengths', public.company_strengths_json(p_company));$t$);
+  elsif v_def ~ $r$'campaign_costs',\s*public\.company_campaign_costs\(p_company\)\s*\)$r$ then
+    -- the live text can differ in white space: match it loosely
+    execute regexp_replace(v_def, $r$('campaign_costs',\s*public\.company_campaign_costs\(p_company\))(\s*\))$r$,
+      E'\\1,\n         ''strengths'', public.company_strengths_json(p_company)\\2');
+  else
+    -- never block the whole update on this read-only addition; the page treats a missing 'strengths' as empty
+    raise warning 'company_state() has an unexpected shape; strengths (ADR-176) are not added to it';
+  end if;
 end;
 $do$;
