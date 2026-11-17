@@ -108,12 +108,18 @@ select tests.assert(:sta::float8 > 0.5 * 100 * :awa::float8 / 0.6 and :sta::floa
   'strength "Bekanntheit" follows awareness / cap within hours (before: 2 % of the gap per hour)');
 select tests.login_as('authenticated', :a);
 select public.get_company_awareness() as j1 \gset
+select public.get_my_company() #>> '{company,awareness_bps}' as mybps \gset
 reset role;
 select tests.assert(tests.near((:'j1'::jsonb ->> 'strength')::double precision, :sta::float8)
                 and tests.near((:'j1'::jsonb ->> 'awareness')::double precision, :awa::float8)
                 and (:'j1'::jsonb -> 'last_hour' -> 'parts' ->> 'marketing')::double precision > 0
                 and jsonb_array_length(:'j1'::jsonb -> 'history') = 6,
   'get_company_awareness(): value, strength, last hour by source and history from the same field');
+-- dashboard and controlling both show get_my_company().awareness_bps against company_awareness_cap (awarenessView)
+select tests.assert(:mybps::int = round((:'j1'::jsonb ->> 'awareness')::numeric * 10000)::int
+                and tests.near((:'j1'::jsonb ->> 'cap')::double precision,
+                               public.company_awareness_cap('garage', (:'j1'::jsonb ->> 'stage')::int, 0)),
+  'one value: get_my_company and get_company_awareness send the same awareness and cap');
 
 -- ---------------------------------------------------------------------------
 -- 3. Jumps: a task, a campaign; the cap; the floor

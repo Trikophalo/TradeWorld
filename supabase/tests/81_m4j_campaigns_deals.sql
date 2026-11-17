@@ -209,9 +209,9 @@ select public.player_company_close_hour(:'aco', :'h0'::timestamptz + interval '1
 select (tests.m4j_hour(:'aco', :'h0'::timestamptz - interval '1 hour')).demand_cents as d_out \gset
 select (tests.m4j_hour(:'aco', :'h0'::timestamptz + interval '1 hour')).demand_cents as d_in \gset
 select tests.assert(
-  -- 20 250 at 40,5 % awareness before ADR-180, now the flyer brought 42 %
-  :d_out::bigint = 21000
-  and abs(:d_in::bigint - round(21000 * :c1_demand_factor::float8)) <= 1
+  -- 20 250 at 40,5 % awareness before ADR-180, 42 % with ADR-180's flyer, 43 % with ADR-188's (+3 points)
+  :d_out::bigint = 21500
+  and abs(:d_in::bigint - round(21500 * :c1_demand_factor::float8)) <= 1
   and (tests.m4j_hour(:'aco', :'h0'::timestamptz - interval '1 hour')).campaign_id is null
   and (tests.m4j_hour(:'aco', :'h0'::timestamptz + interval '1 hour')).campaign_id = :'c1_id'::uuid
   and (public.company_campaign_at(:'aco', :'c1_ends_at'::timestamptz)).id is null

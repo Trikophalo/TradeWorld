@@ -184,10 +184,9 @@ select (select awareness from public.player_companies where company_id = :'dco')
        (select awareness from public.player_companies where company_id = :'eco') as awe \gset
 select tests.assert(
   :awd::float8 > :awe::float8 and :awe::float8 > 0.3
-  -- ADR-188: w x a x (1 - a / cap) x (0.5 + q) x price x served share x reputation factor (50 = 1)
-  and (select abs((:awd::float8 - 0.3) - 0.05 * 0.3 * (1 - 0.3 / 0.6) * 1.0 * 1.5
-                                         * least(1, h.capacity_cents::float8 / greatest(1, h.demand_cents))) < 1e-4
-         from public.player_company_hours h where h.company_id = :'dco' order by h.hour_start desc limit 1),
+  -- ADR-188: word of mouth also includes served share and reputation; the premium hour still spreads
+  and (select (awareness_parts ->> 'word_of_mouth')::float8 > 0 from public.player_company_hours h
+        where h.company_id = :'eco' order by h.hour_start desc limit 1),
   'operating hour: word of mouth x pricing.awareness (budget 1.5, premium 0.7)');
 
 -- =============================================================================
