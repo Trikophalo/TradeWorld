@@ -58,9 +58,9 @@ select tests.assert(
   and (select count(*) from public.nexamon_copies where grade is not null) = :slabs0::bigint,
   'graded copies never leave circulation; the population is unchanged');
 
-select tests.set_cfg('nexamon', '{ai,stockCap,common}', :'nx_cfg'::jsonb #>> '{ai,stockCap,common}');
-select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', :'nx_cfg'::jsonb #>> '{ai,dailyBudgetPacks}');
-select tests.set_cfg('nexamon', '{ai,packsPerHour}', (:'nx_cfg'::jsonb #> '{ai,packsPerHour}')::text);
+select tests.set_cfg('nexamon', '{ai,stockCap,common}', :'nx_cfg'::jsonb #> '{ai,stockCap,common}');
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', :'nx_cfg'::jsonb #> '{ai,dailyBudgetPacks}');
+select tests.set_cfg('nexamon', '{ai,packsPerHour}', :'nx_cfg'::jsonb #> '{ai,packsPerHour}');
 update public.nexamon_meta set ai_reset_at = null;
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant: ' || tests.money_invariant());
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', :'nx_cfg'::jsonb #>> '{ai,buyChanceBps}');
+select tests.set_cfg('nexamon', '{ai,buyChanceBps}', :'nx_cfg'::jsonb #> '{ai,buyChanceBps}');
