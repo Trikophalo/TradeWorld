@@ -1452,3 +1452,26 @@ vervielfachen. Ein Master-Set von Mystic Energy bringt einmalig 15.000 € (75 �
 Erwartung je Cosmic-Winds-Pack ohne One of One wie bei den anderen Sets (½ Rare, 1/12 Ultra, 1/80 Prisma, 1/900
 Legendary). Eine One of One bringt im Mittel 24,5 Mio. € × 1/5.000 ≈ 4.900 € Erwartungswert je Pack, solange eine
 übrig ist; danach entfällt dieser Anteil.
+
+## Nachtrag: Kritiker-Urteil für NFTs (ADR-181)
+
+| Wert                            | Schlüssel                                            | Stand                                                   |
+| ------------------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
+| Gewichte der Teilwerte          | `nfts.quality.weights`                               | Sauberkeit 16, Farbwahl/Harmonie/Formen 12, Rest 10/8   |
+| Dämpfung ohne Bild              | `nfts.quality.gateBase`                              | Note × (30 % + 70 % × min(Füllung, Farbwahl, Detail))   |
+| Kopie / Beinahe-Kopie           | `nfts.quality.copyCap`, `nearCopyCap`, `nearCopyPct` | höchstens 5 / 15 Punkte, Beinahe = höchstens 2 % anders |
+| Bewertungsanker                 | `nfts.ai.quality.valueMinBps/valueMaxBps`            | 60 % bis 140 % (50 Punkte = 100 %)                      |
+| Chancen (Kauf, Angebot, Handel) | `nfts.ai.quality.chanceMinBps/chanceMaxBps`          | × 20 % bis 200 % (50 Punkte = 110 %)                    |
+| Kein Interesse unter            | `nfts.ai.quality.noInterestBelow`                    | 10 Punkte                                               |
+| Lowball-Verschiebung            | `nfts.ai.quality.lowballShiftBps`                    | ± 15 Prozentpunkte bei 0 / 100 Punkten                  |
+| Antwort im Chat                 | `nfts.ai.talk.replyDelayMinutes/replyWindowMinutes`  | nach 1 Minute, für Nachrichten bis 30 Minuten alt       |
+| Gegenangebot                    | `nfts.ai.talk.counterStepBps/counterCeilingBps`      | + 8 %, höchstens 95 % der Bewertung                     |
+| Erinnerung                      | `nfts.ai.talk.followupMinutes/followupChanceBps`     | nach 30 Minuten, 30 % je Minute, einmal                 |
+
+**Beispiele (Raster 32 × 32):** leeres Bild 0, ein Farbeimer über alles 16, Zufallsrauschen in 16 Farben 12, Kritzelei
+(Zufallslinie in Magenta/Grün) 46, sauberer Kreis mit Kontur und Glanzpunkt in drei Farben 83, Pilzhaus mit acht
+Farben 96, umgefärbte Kopie des Kreises 5, Kopie mit drei geänderten Pixeln 15.
+
+**Wirkung bei 1.000 € Prägekosten:** 96 Punkte → Anker 1.368 €, Angebote auf behaltene NFTs 4 % × 193 % = 7,7 % je
+Minute, Lowball 79–100 % des Werts. 50 Punkte → 1.000 €, 4,4 %, 65–90 %. 12 Punkte → 696 €, 1,7 %, 54–79 % mit
+Spotttexten. Kopie (5 Punkte) → 640 €, kein Angebot, kein Kauf.

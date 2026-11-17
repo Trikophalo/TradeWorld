@@ -18,8 +18,11 @@ import {
   nftFairCents,
   nftAiWouldBuy,
   nftLowballCents,
+  nftQualityChanceBps,
   nftSaleSplit,
 } from "@/lib/sim/nfts";
+import { artCopyKind, artQuality, artQualityExtremes, artSignature, type ArtQuality } from "@/lib/sim/art-quality";
+import { detectIntent, nftCounterCents, nftOfferPath, pickLine } from "@/lib/sim/nft-talk";
 import {
   GameError,
   type Artwork,
@@ -200,6 +203,23 @@ export function createArtEngine(host: ArtHost) {
   };
   const isCollector = (name: string | null) => name !== null && COLLECTORS.includes(name);
 
+  // ------------------------------------------------------------------ critic score (ADR-181)
+  const qualityCache = new Map<string, ArtQuality>();
+  /** The critics' score, against all older works (copies are flagged); the pixels never change, so it is cached. */
+  function qualityOf(w: DemoArtwork): ArtQuality {
+    let q = qualityCache.get(w.id);
+    if (!q) {
+      const older = works()
+        .filter(
+          (x) => x.id !== w.id && (x.createdAt < w.createdAt || (x.createdAt === w.createdAt && x.serial < w.serial)),
+        )
+        .map((x) => artSignature(x.pixels));
+      q = artQuality(w.pixels, artCopyKind(artSignature(w.pixels), older));
+      qualityCache.set(w.id, q);
+    }
+    return q;
+  }
+
   // ------------------------------------------------------------------ NFT rules (ADR-135)
   const likesOf = (w: DemoArtwork) => w.baseLikes + (state().likes.includes(w.id) ? 1 : 0);
   const creatorSales = (creator: string | null) =>
@@ -224,6 +244,7 @@ export function createArtEngine(host: ArtHost) {
         .filter((a) => a !== exclude),
     ).size,
     recentSales: recentSales(w, now),
+    quality: qualityOf(w).score,
   });
   const valueOf = (w: DemoArtwork, now = Date.now(), exclude: string | null = null) =>
     nftAiValueCents(valueInput(w, now, exclude));
@@ -238,12 +259,37 @@ export function createArtEngine(host: ArtHost) {
     s.chats = { ...s.chats, [artworkId]: [...chat(artworkId), message].slice(-nft.chat.history) };
     return message;
   }
+  /** ADR-181: the last AI lines of a chat, which a collector does not repeat. */
+  const recentAiLines = (artworkId: string) =>
+    chat(artworkId)
+      .filter((m) => m.ai)
+      .slice(-nft.ai.talk.recentLines)
+      .map((m) => m.text);
+  /** A line from ai.talk.lines by path ("offer" = the classic offer lines), sometimes the collector's catchphrase. */
+  function say(artworkId: string, name: string, path: string, at: number): string {
+    const talk = nft.ai.talk;
+    let lines: readonly string[] =
+      path === "offer"
+        ? nft.ai.lines.offer
+        : ((path.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], talk.lines) as
+            readonly string[] | undefined) ?? nft.ai.lines.offer);
+    const persona = (talk.personas as Record<string, readonly string[]>)[name];
+    if (
+      persona &&
+      ["offer", "praise", "followup", "reply.other"].includes(path) &&
+      unit(`${artworkId}:${at}:persona`) < talk.personaChanceBps / 10_000
+    )
+      lines = persona;
+    return pickLine(lines, unit(`${artworkId}:${at}:line`), recentAiLines(artworkId));
+  }
   const aiSay = (artworkId: string, name: string, lines: readonly string[], at: number) =>
+    aiText(artworkId, name, pickLine(lines, unit(`${artworkId}:${at}:line`), recentAiLines(artworkId)), at);
+  const aiText = (artworkId: string, name: string, text: string, at: number) =>
     post(artworkId, {
       author: name,
       ai: true,
       kind: "chat",
-      text: pick(lines, unit(`${artworkId}:${at}:line`)),
+      text,
       offerCents: null,
       offerStatus: null,
       expiresAt: null,
@@ -316,7 +362,13 @@ export function createArtEngine(host: ArtHost) {
         const roll = unit(`${w.id}:${until}:ai`);
         const value = valueOf(w, until);
         const ask = w.askCents ?? null;
-        if (w.owner === me && ask !== null && nftAiWouldBuy(ask, value) && roll < nft.ai.buyChanceBps / 10_000) {
+        const score = qualityOf(w).score;
+        if (
+          w.owner === me &&
+          ask !== null &&
+          nftAiWouldBuy(ask, value) &&
+          roll < nftQualityChanceBps(nft.ai.buyChanceBps, score) / 10_000
+        ) {
           const name = pick(COLLECTORS, unit(`${w.id}:${until}:who`));
           sell(w, name, ask, "ai", null, until);
           aiSay(w.id, name, nft.ai.lines.buy, until);
@@ -324,7 +376,12 @@ export function createArtEngine(host: ArtHost) {
         } else if (
           w.owner === me &&
           openOffers(w.id, until).filter((m) => m.ai).length < nft.ai.maxOpenAiOffers &&
-          roll < (ask !== null ? nft.ai.listedOfferChanceBps : nft.ai.unlistedOfferChanceBps * 10) / 10_000
+          roll <
+            nftQualityChanceBps(
+              ask !== null ? nft.ai.listedOfferChanceBps : nft.ai.unlistedOfferChanceBps * 10,
+              score,
+            ) /
+              10_000
         ) {
           offerFromAi(w, value, until);
         }
@@ -344,17 +401,71 @@ export function createArtEngine(host: ArtHost) {
     const free = COLLECTORS.filter((c) => !bidding.has(c));
     if (free.length === 0) return;
     const name = pick(free, unit(`${w.id}:${at}:who`));
+    const q = qualityOf(w);
+    const { best, worst } = artQualityExtremes(q.sub);
+    const path = nftOfferPath(q.score, q.copy, best, q.sub[best], worst, q.sub[worst], unit(`${w.id}:${at}:path`));
     post(w.id, {
       author: name,
       ai: true,
       kind: "offer",
-      text: pick(nft.ai.lines.offer, unit(`${w.id}:${at}:line`)),
-      offerCents: nftLowballCents(value, unit(`${w.id}:${at}:bps`)),
+      text: say(w.id, name, path, at),
+      offerCents: nftLowballCents(value, unit(`${w.id}:${at}:bps`), nft, q.score),
       offerStatus: "open",
       // ADR-170: collectors' offers run out sooner, then a new one comes
       expiresAt: at + nft.ai.offerHours * HOUR,
       at,
     });
+  }
+
+  /**
+   * ADR-181: collectors answer the newest player message of a chat after a minute (the AI owner or the collector who
+   * spoke there last), haggle when the owner asks for more, and nudge the owner when their offer is ignored.
+   */
+  function collectorsTalk(now: number) {
+    const talk = nft.ai.talk;
+    const me = host.nickname();
+    for (const [artworkId, messages] of Object.entries(state().chats ?? {})) {
+      const last = messages.at(-1);
+      const w = work(artworkId);
+      if (!last || !w) continue;
+      const at = last.at + talk.replyDelayMinutes * 60_000;
+      if (!last.ai && last.kind !== "sale" && at <= now && last.at > now - talk.replyWindowMinutes * 60_000) {
+        const speaker = isCollector(w.owner)
+          ? w.owner
+          : ([...messages].reverse().find((m) => m.ai && m.at > now - talk.memoryHours * HOUR)?.author ?? null);
+        if (!speaker) continue;
+        const intent = detectIntent(last.text);
+        const offer = openOffers(artworkId, at)
+          .filter((m) => m.ai && m.author === speaker)
+          .at(-1);
+        if ((intent === "higher" || intent === "no") && offer && w.owner === me && last.author === me) {
+          const next = nftCounterCents(offer.offerCents ?? 0, valueOf(w, at));
+          if (next !== null) {
+            offer.offerStatus = "closed";
+            post(artworkId, {
+              author: speaker,
+              ai: true,
+              kind: "offer",
+              text: say(artworkId, speaker, "counter", at),
+              offerCents: next,
+              offerStatus: "open",
+              expiresAt: at + nft.ai.offerHours * HOUR,
+              at,
+            });
+          } else aiText(artworkId, speaker, say(artworkId, speaker, "final", at), at);
+        } else aiText(artworkId, speaker, say(artworkId, speaker, `reply.${intent}`, at), at);
+        continue;
+      }
+      if (last.ai && last.kind === "offer" && last.offerStatus === "open" && w.owner === me) {
+        const nudge = last.at + talk.followupMinutes * 60_000;
+        if (
+          nudge <= now &&
+          (last.expiresAt ?? 0) > nudge &&
+          unit(`${artworkId}:${last.id}:nudge`) < talk.followupChanceBps / 10_000
+        )
+          aiText(artworkId, last.author!, say(artworkId, last.author!, "followup", nudge), nudge);
+      }
+    }
   }
 
   /** The gallery opens its daily auctions; the tycoons bid; due auctions end; collectors look around. */
@@ -398,6 +509,7 @@ export function createArtEngine(host: ArtHost) {
     for (const a of [...s.auctions]) if (a.endsAt <= now) close(a);
     collectorsLook(now);
     collectorsTrade(now);
+    collectorsTalk(now);
   }
 
   /**
@@ -421,7 +533,9 @@ export function createArtEngine(host: ArtHost) {
         if (last > until - nft.ai.trade.minHoldMinutes * 60_000) continue;
         const input = valueInput(w, until);
         // per minute chance, over ten minutes
-        const perMinute = nftAiTradeChanceBps(input.likes, input.openOffers, input.recentSales) / 10_000;
+        const perMinute =
+          nftQualityChanceBps(nftAiTradeChanceBps(input.likes, input.openOffers, input.recentSales), input.quality) /
+          10_000;
         if (unit(`${w.id}:${until}:trade`) >= 1 - (1 - perMinute) ** 10) continue;
         const buyer = pick(
           COLLECTORS.filter((c) => c !== w.owner),
@@ -534,6 +648,10 @@ export function createArtEngine(host: ArtHost) {
       liked,
       createdAt: new Date(w.createdAt).toISOString(),
       hot: hotScore(likes, a?.bids.length ?? 0, (now - w.createdAt) / HOUR),
+      quality: (() => {
+        const q = qualityOf(w);
+        return { score: q.score, ...artQualityExtremes(q.sub), copy: q.copy };
+      })(),
       auction: a
         ? {
             id: a.id,

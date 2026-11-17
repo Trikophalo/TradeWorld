@@ -1,3 +1,4 @@
+import type { ArtQualityKey } from "@/lib/sim/art-quality";
 /**
  * Client-side shapes of the game state. They mirror the JSON returned by the
  * Supabase RPCs (docs/DATA_MODEL.md, section "M1 API"), converted to camelCase.
@@ -297,6 +298,16 @@ export interface Artwork {
   createdAt: string;
   hot: number;
   auction: ArtworkAuction | null;
+  /** Critic score (ADR-181), computed by the server at minting; null when not rated yet. */
+  quality: ArtworkQuality | null;
+}
+
+/** The critics' verdict on an NFT (ADR-181): score 0..100, strongest and weakest aspect, copy flag. */
+export interface ArtworkQuality {
+  score: number;
+  best: ArtQualityKey;
+  worst: ArtQualityKey;
+  copy: "exact" | "near" | null;
 }
 
 /** wanted: most offers first; for_sale: only fixed prices, cheapest first (ADR-135). */

@@ -3885,3 +3885,54 @@ Kartenseite, Grading-Blatt und Desk zeigen die Faktoren der Karte.
   `render/arena-five.ts`; Demo mit Bots für alle fünf Spiele und denselben Preisregeln.
 - **Annahmen:** Der Demo-Gewinn landet sofort im Demo-Inventar. Ein Battle-Accessoire zählt nicht als Kauf (kein
   Feed-Eintrag für legendäre Käufe).
+
+## ADR-181: Kritiker-Urteil für NFTs und gesprächige Sammler — `Annahme`
+
+**Kontext:** Der Owner wünscht: „Die KI soll bei NFTs erkennen können, ob die Bilder gut aussehen oder nicht. Sie soll
+auch mehr Texte in den Chats der NFTs haben.“ Bisher bewerteten die KI-Sammler (ADR-135, ADR-141, ADR-163, ADR-170)
+ein NFT nur nach Prägekosten, Likes, Ruf, Alter und Nachfrage; ein Farbklecks war so viel wert wie ein Meisterwerk.
+Im Chat schrieben sie nur Angebote, Kauf-, Annahme- und Ablehnungssätze und reagierten nie auf Spieler.
+
+**Entscheidung:**
+
+- **Kritiker-Urteil** 0..100 aus dem Pixelraster, deterministisch und nur auf dem Server: `src/lib/sim/art-quality.ts`
+  und gleich in PL/pgSQL (`art_quality`, Migration `…7000`), nur Ganzzahl-Arithmetik, gemeinsame Fälle in
+  `supabase/tests/art_quality_cases.inc` (Vitest und `b9_nft_quality.sql` prüfen beide exakt). Neun Teilwerte:
+  Bildfüllung (Anteil gemalter Pixel, kein Vollflächen-Klecks), Farbwahl (Zahl der Farben, Streufarben kosten),
+  Farbharmonie (Farbtöne in 30°-Fächern, mehr als drei kosten), Kontrast (Helligkeitsspanne), Sauberkeit (Anteil
+  einzelner Pixel ohne gleichfarbigen Nachbarn, Zerfaserung in Regionen), Konturen (dunkle Pixel am Rand zur leeren
+  Fläche), Komposition (Schwerpunkt nahe der Mitte, Spiegelsymmetrie), Detailreichtum (Farbwechsel zwischen Nachbarn,
+  zu wenig und Rauschen kosten), Formen (Pixel mit drei gleichfarbigen Nachbarn). Gewichtet gemittelt, dann mit dem
+  schwächsten von Füllung, Farbwahl und Detail gedämpft (ohne die ist es kein Bild). Werte in `nfts.quality`.
+- **Kopien:** Signatur = Raster mit Farben in Reihenfolge des ersten Auftretens umbenannt (umgefärbte Kopien sind
+  gleich). Gleich wie ein älteres NFT → „exact“, höchstens 5 Punkte; höchstens 2 % der Pixel anders → „near“,
+  höchstens 15. Der Server vergleicht beim Prägen gegen alle älteren NFTs (`art_copy_kind`).
+- **Wann:** Trigger nach dem Einfügen in `artworks` (Prägen, Galerie), erneut wenn sich die Pixel ändern; die
+  Migration bewertet alle vorhandenen NFTs, ältestes zuerst; `nfts_run_due` bewertet bis zu 20 noch unbewertete je
+  Minute (Sicherheitsnetz, falls die Konfiguration später kam). Spalten `artworks.quality`, `quality_detail`,
+  `quality_sig`. Der Client schickt nur Pixel, nie eine Note.
+- **Wirkung auf die Sammler** (`nfts.ai.quality`): Der Bewertungsanker aus Prägekosten bzw. Mindestwert wird mit
+  60 % (0 Punkte) bis 140 % (100 Punkte) multipliziert, 50 Punkte = unverändert. Der letzte Verkaufspreis bleibt
+  unskaliert, damit sich der Faktor nicht über Weiterverkäufe aufschaukelt. Das bewegt Kaufgrenze, Angebote,
+  Auktionsgebote und den fairen Wert im Handel unter Sammlern (Preise driften zur Qualität). Chancen für Kauf,
+  Angebot und Handel × 20 % bis 200 % (50 Punkte = 110 %), unter 10 Punkten bietet niemand. Lowball-Angebote
+  verschieben sich um (Punkte − 50) / 50 × 15 Prozentpunkte (65–90 % werden bei 100 Punkten 80–100 %, bei 0 Punkten
+  50–75 %). Tagesbudget und Stunden-/Tagesgrenzen aus ADR-170 bleiben; Gegenangebote prüfen das Budget.
+- **Anzeige:** `artwork_json.quality` = Punkte, stärkster und schwächster Teilwert, Kopie-Flag (die Teilwerte bleiben
+  intern). Der Besitzer sieht „Kritiker-Urteil: 82/100 · Stark: Farbharmonie. Schwach: Konturen.“; die Karte im Markt
+  zeigt für alle ein kleines Abzeichen „Kritik 82“.
+- **Chat** (`nfts.ai.talk`, Migration `…7020`, `src/lib/sim/nft-talk.ts`): 167 neue Zeilen. Angebotstexte folgen dem
+  Urteil (Kopie → Kopie-Spott, unter 35 → Spott, ab 75 → Lob oder Kompliment für den besten Teilwert, dazwischen
+  Kommentar zum schwächsten oder besten Teilwert oder die alten Zeilen), dazu je Sammler drei Sprüche (25 % Chance).
+  Kein Satz wiederholt eine der letzten sechs KI-Zeilen im Chat. Spielernachrichten werden per Schlüsselwort
+  eingeordnet (Beleidigung, mehr, weniger, nein, ja, Frage, sonst) und nach einer Minute vom KI-Besitzer oder dem
+  Sammler beantwortet, der dort zuletzt schrieb (bis sechs Stunden zurück). Sagt der Besitzer „mehr“ oder „nein“ zu
+  einem offenen Sammlerangebot, erhöht der Sammler um 8 % bis höchstens 95 % seiner Bewertung, sonst „letztes Wort“.
+  Ein 30 Minuten unbeantwortetes Angebot bekommt mit 30 % eine Erinnerung (einmal). So entstehen Gespräche mit
+  mehreren Nachrichten. Ton wie ADR-078: albern, Spott nur über das Bild, nichts über Personen oder Merkmale.
+- **Claude:** Für NFTs gibt es keine Edge Function; ein Bild-Urteil per Vision wäre nur ein Bonus und ist bewusst nicht
+  gebaut. Alles läuft deterministisch ohne Secrets.
+- **Demo:** gleiche Formeln (Urteil, Bewertung, Chancen, Texte, Antworten, Erinnerungen) in
+  `src/features/game/demo/artworks.ts`.
+- **Tests:** frühere NFT-Tests (`9b`–`a9b`) malen absichtlich gleiche Bilder; sie laufen mit neutralem Kritiker und
+  stillen Sammlern, `b9_nft_quality.sql` stellt die echten Werte wieder her.

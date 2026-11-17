@@ -113,6 +113,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Kritiker für NFTs (ADR-181):** Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit
+  Stärke und Schwäche, der Markt als kleines Abzeichen). Gute Bilder bekommen mehr und höhere Angebote, Kopien keine,
+  und die Sammler reden jetzt zurück: sie antworten, feilschen, loben, lästern und erinnern an ihr Angebot.
 - **Stärken der Firma (ADR-176):** Ganz oben im Firmen-Dashboard zeigt ein Netz sechs Stärken. Sie wachsen nur langsam
   über Tage guter Stunden, zahlen dafür ab 50 Punkten einen Umsatzbonus von 2 % bis 15 %. Controlling ist in fünf
   Bereiche mit Sprungleiste geordnet; Strategie und CEO-Auszahlung melden nur noch Erfolg, wenn der Server sie übernimmt,

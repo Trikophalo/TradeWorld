@@ -21,6 +21,58 @@ export const NFT_RULES = {
     /** An offer is open this long, then it expires. */
     offerHours: 24,
   },
+  /**
+   * Art quality (ADR-181): a critic's score 0..100 from the pixel grid, computed once by the server when an NFT is
+   * minted (src/lib/sim/art-quality.ts, the same in SQL: public.art_quality). Sub-scores 0..100, weighted.
+   */
+  quality: {
+    /** Below this share of drawn pixels (percent) the coverage score falls linearly. */
+    coverageMinPct: 15,
+    /** One value (a colour or empty) covering more than this percent of the grid caps coverage at (100 - share) x 10. */
+    dominanceMaxPct: 90,
+    /** Score by number of distinct colours used (index = count, 16 and more use the last entry). */
+    colourScores: [0, 20, 55, 80, 100, 100, 100, 100, 100, 90, 85, 80, 75, 70, 65, 60, 55],
+    /** A colour on less than this percent of the drawn pixels is a stray; each costs this many points. */
+    strayPct: 1,
+    strayPenalty: 8,
+    /** Colours with saturation and value of at least this (percent) count for harmony; hues in 30-degree buckets. */
+    chromaMinPct: 20,
+    /** Up to this many hue buckets are harmonious; each further one costs huePenalty, down to hueFloor. */
+    hueBuckets: 3,
+    huePenalty: 14,
+    hueFloor: 20,
+    /** Luminance range (0..255) that gives full contrast. */
+    contrastFull: 160,
+    /** Isolated pixels (no same-coloured neighbour) up to this percent are fine, then -2 per percent. */
+    noiseFreePct: 5,
+    /** Regions (same-coloured, connected) per 100 drawn pixels up to this are fine, then -2 per step. */
+    fragmentFreePct: 10,
+    /** Edge transitions per mille of neighbour pairs: below detailMin the score falls, above detailMax as well. */
+    detailMin: 40,
+    detailMax: 350,
+    /** Percent of drawn pixels inside solid shapes (3+ same-coloured neighbours) for full shape score. */
+    shapeFullPct: 40,
+    /** Centre of mass within this percent of the middle is balanced, then -3 per percent. */
+    balanceFreePct: 10,
+    /** Near-copy: at most this percent of the pixels differ from an older NFT (after recolouring). */
+    nearCopyPct: 2,
+    /** Copies are capped at these scores. */
+    copyCap: 5,
+    nearCopyCap: 15,
+    /** Without coverage, colours or detail it is no picture: the score x (gateBase + gate x (100 - gateBase) / 100). */
+    gateBase: 30,
+    weights: {
+      coverage: 10,
+      colours: 12,
+      harmony: 12,
+      contrast: 10,
+      structure: 16,
+      outline: 8,
+      composition: 10,
+      detail: 10,
+      shapes: 12,
+    },
+  },
   /** AI collectors (households money; what they pay comes back to the households when they resell). */
   ai: {
     /** What a collector thinks an NFT is worth: anchor x (1 + bonuses). Anchor = max(last price, mint cost, floor). */
@@ -99,6 +151,335 @@ export const NFT_RULES = {
       tasteMaxBps: 12_500,
       /** The price moves this share of the way from the last price to the buyer's target. */
       reversionBps: 5_000,
+    },
+    /**
+     * Art quality (ADR-181) steers the collectors. Factor = min + (max - min) x score / 100 (score 50 = x 1.0):
+     * value on the mint cost / floor anchor (never on the last price, so it does not compound), chance of offers,
+     * purchases and trades among collectors. Below noInterestBelow nobody bids; lowball offers shift by
+     * (score - 50) / 50 x lowballShiftBps.
+     */
+    quality: {
+      neutral: 50,
+      valueMinBps: 6_000,
+      valueMaxBps: 14_000,
+      chanceMinBps: 2_000,
+      chanceMaxBps: 20_000,
+      noInterestBelow: 10,
+      lowballShiftBps: 1_500,
+      /** Offer texts: mocking below, praise from; comments on a sub-score from goodFrom / below badBelow. */
+      mockBelow: 35,
+      praiseFrom: 75,
+      goodFrom: 85,
+      badBelow: 45,
+    },
+    /**
+     * Chat (ADR-181): collectors answer players' messages (after replyDelayMinutes, while the message is at most
+     * replyWindowMinutes old) when they took part in the chat in the last memoryHours or hold the NFT; they nudge the
+     * owner when an offer is ignored, haggle (a "more" from the owner raises the offer by counterStepBps up to
+     * counterCeilingBps of the valuation) and never repeat one of the last recentLines lines of the chat.
+     * Intents: keywords (whole words, lower case), checked in this order.
+     */
+    talk: {
+      replyDelayMinutes: 1,
+      replyWindowMinutes: 30,
+      memoryHours: 6,
+      maxRepliesPerRun: 8,
+      followupMinutes: 30,
+      followupChanceBps: 3_000,
+      maxFollowupsPerRun: 4,
+      counterStepBps: 800,
+      counterCeilingBps: 9_500,
+      personaChanceBps: 2_500,
+      recentLines: 6,
+      intentOrder: ["insult", "higher", "lower", "no", "yes", "question"],
+      intents: {
+        insult: [
+          "idiot",
+          "blöd",
+          "doof",
+          "dumm",
+          "depp",
+          "trottel",
+          "lächerlich",
+          "unverschämt",
+          "halt die klappe",
+          "verpiss",
+          "penner",
+          "spinner",
+        ],
+        higher: [
+          "mehr",
+          "höher",
+          "zu wenig",
+          "zu niedrig",
+          "drauflegen",
+          "erhöhen",
+          "nachlegen",
+          "besseres angebot",
+          "aufstocken",
+          "legen sie was drauf",
+          "leg was drauf",
+        ],
+        lower: ["weniger", "billiger", "günstiger", "rabatt", "nachlass", "zu teuer", "runter", "preis senken"],
+        no: ["nein", "nö", "nee", "ne", "niemals", "nope", "vergiss es", "kein interesse", "auf keinen fall", "no"],
+        yes: [
+          "ja",
+          "jo",
+          "jap",
+          "ok",
+          "okay",
+          "deal",
+          "gerne",
+          "gern",
+          "einverstanden",
+          "abgemacht",
+          "klar",
+          "passt",
+          "yes",
+        ],
+        question: ["?", "warum", "wieso", "weshalb", "wer", "was", "wie", "wann", "wo"],
+      },
+      lines: {
+        praise: [
+          "Das ist kein NFT, das ist ein Fenster in eine bessere Welt. Mein Angebot.",
+          "Ich habe beim Anschauen spontan Gänsehaut bekommen. Oder es zieht. Egal, ich biete.",
+          "Endlich mal Pixel mit Haltung. Nimm mein Geld.",
+          "Meine Augen bedanken sich persönlich bei dir. Hier ein Angebot.",
+          "Das gehört ins Museum. Oder in mein Wohnzimmer, das ist fast dasselbe.",
+          "Wer hat dir so malen beigebracht? Ich will auch so ein Gehirn.",
+          "Ich habe es meiner Oma gezeigt. Sie hat ihr Testament geändert. Angebot!",
+          "Jeder Pixel sitzt. Das ist seltener als ein pünktlicher Zug.",
+          "So etwas sieht man nicht alle Tage. Eigentlich nie. Ich biete ordentlich.",
+          "Ich musste kurz sitzen. So schön ist das.",
+          "Das Bild hat mehr Charakter als mein Schwager. Mein Angebot.",
+          "Wenn das nicht in meine Sammlung kommt, kann ich nachts nicht schlafen.",
+          "Ich nenne das ab sofort mein Lieblingsbild. Sorry, Mona Lisa.",
+          "Das ist so gut, ich biete freiwillig mehr. Sag es keinem.",
+        ],
+        mock: [
+          "Sind das Pixel oder ein Unfall? Ich biete trotzdem was, aus Mitleid.",
+          "Mein Toaster hat beim Toasten ein schöneres Muster gemacht. Kleines Angebot.",
+          "Ich glaube, dein Bildschirm hat geniest. Ich zahle für das Taschentuch.",
+          "Das sieht aus wie ein Tastaturtest. Ich biete wenig, aber mit Herz.",
+          "Mutig! Sehr mutig. Zu mutig für viel Geld.",
+          "Hat das deine Katze gemalt? Grüß sie, ich biete ihr ein Leckerli.",
+          "Ich habe es umgedreht. Wurde nicht besser. Angebot steht trotzdem.",
+          "Abstrakt, sagst du? Ich sage: Restposten.",
+          "Ich nehme es als Untersetzer. Dafür reicht mein Angebot.",
+          "Ich hatte heute einen schlechten Tag. Jetzt hatte ich einen schlechteren. Ein kleines Angebot.",
+          "Das ist Kunst. Wahrscheinlich. Vielleicht. Wenig Geld dafür.",
+          "Mein Optiker will das Bild als Sehtest. Mehr ist es mir nicht wert.",
+          "Wenn ich die Augen zusammenkneife, sieht es fast nach etwas aus. Fast.",
+          "Ich biete das. Die Pixel sollen sich ja nicht einsam fühlen.",
+        ],
+        copy: [
+          "Moment mal. Das habe ich doch schon irgendwo gesehen. Fast genauso. Kleines Angebot.",
+          "Ein Original ist es nicht, aber ein sehr fleißiges Abbild. Ich biete wenig.",
+          "Kopieren ist auch eine Kunst. Eine billige. Mein Angebot.",
+          "Ich hatte ein Déjà-vu. Dann habe ich das Original gefunden. Angebot trotzdem.",
+          "Strg+C, Strg+V, Strg+Gewinn? Nicht mit mir. Aber ein kleines Angebot.",
+          "Das zweite Mal ist es nur halb so aufregend. Halber Preis.",
+        ],
+        good: {
+          coverage: [
+            "Die Fläche ist perfekt genutzt. Kein Pixel zu viel, keiner zu wenig.",
+            "Wunderbar gefüllt, ohne vollgestopft zu sein. Respekt.",
+          ],
+          colours: [
+            "Diese Farbauswahl! Da hat jemand nachgedacht.",
+            "Genau die richtige Zahl an Farben. Kein Farbeimer-Unfall.",
+          ],
+          harmony: ["Diese Farbpalette ist ein Gedicht.", "Die Farben vertragen sich besser als meine Verwandtschaft."],
+          contrast: ["Der Kontrast knallt, ohne zu schreien. Chef’s Kiss.", "Hell und Dunkel tanzen hier Walzer."],
+          structure: [
+            "So sauber gezeichnet, da könnte man vom Bild essen.",
+            "Kein einziger verirrter Pixel. Ich bin beeindruckt.",
+          ],
+          outline: ["Diese Konturen! Gestochen scharf.", "Die Umrisse sitzen wie ein Maßanzug."],
+          composition: [
+            "Die Komposition ist perfekt ausbalanciert. Feng-Shui für die Augen.",
+            "Alles steht genau da, wo es hingehört.",
+          ],
+          detail: [
+            "So viele kleine Details, ich entdecke immer noch neue.",
+            "Detailverliebt bis in den letzten Pixel.",
+          ],
+          shapes: [
+            "Klare Formen, sofort erkennbar. So muss das.",
+            "Die Formen sind so deutlich, sogar mein Opa erkennt sie ohne Brille.",
+          ],
+        },
+        bad: {
+          coverage: [
+            "Da ist ja kaum was drauf. Hast du das Bild im Dunkeln gemalt?",
+            "Viel Platz, wenig Bild. Wie mein Kühlschrank.",
+          ],
+          colours: ["Eine Farbe? Mutig. Oder sparsam. Oder beides.", "So viele Farben, da wird mir schwindelig."],
+          harmony: [
+            "Die Farben streiten sich hörbar. Ich höre es bis hier.",
+            "Diese Farbkombination sollte verboten werden. Ich biete trotzdem.",
+          ],
+          contrast: ["Alles so ähnlich hell, ich suche noch das Motiv.", "Mehr Kontrast hat mein Nebel im Badezimmer."],
+          structure: [
+            "So viele einzelne Pixel, ist das Kunst oder Pfeffer?",
+            "Da sind Krümel auf dem Bild. Ach, das sind Pixel.",
+          ],
+          outline: [
+            "Ein paar Konturen hätten nicht geschadet. Alles verschwimmt.",
+            "Wo hört das Ding auf und wo fängt der Rest an?",
+          ],
+          composition: [
+            "Alles hängt in einer Ecke. Ist das Bild umgekippt?",
+            "Das Bild hat Schlagseite. Ich halte mich fest.",
+          ],
+          detail: [
+            "Etwas wenig los auf dem Bild. Ich habe kurz geschlafen.",
+            "Das ist so unruhig, meine Augen haben gekündigt.",
+          ],
+          shapes: [
+            "Ich erkenne keine Form. Ist das ein Hund? Ein Haus? Ein Gefühl?",
+            "Mehr Gekritzel als Gestalt. Aber charmant.",
+          ],
+        },
+        followup: [
+          "Hallo? Mein Angebot steht noch. Ich warte. Geduldig. Fast.",
+          "Ich sehe, du hast mein Angebot gelesen. Oder nicht? Huhu!",
+          "Kleine Erinnerung: Mein Angebot wird nicht jünger. Ich auch nicht.",
+          "Ich habe extra einen Tee gekocht, um auf deine Antwort zu warten. Er ist jetzt kalt.",
+          "Klopf, klopf. Wer ist da? Mein Angebot.",
+          "Falls du schläfst: Mein Angebot schläft nicht.",
+          "Ich starre seit einer halben Stunde auf den Chat. Meine Familie macht sich Sorgen.",
+          "Schweigen ist Gold, aber mein Angebot ist Geld.",
+          "Ich habe mein Angebot nochmal angeschaut. Es ist immer noch gut. Nur so.",
+          "Bist du noch da? Blinzle zweimal, wenn du verkaufen willst.",
+          "Mein Angebot läuft bald ab. Wie meine Milch. Bitte entscheide dich vor der Milch.",
+          "Ich warte noch. Hab schon das Regal freigeräumt.",
+        ],
+        counter: [
+          "Na gut, na gut. Ich lege etwas drauf. Aber nur, weil heute Dienstag ist. Oder so.",
+          "Du verhandelst hart. Ich mag das. Neues Angebot.",
+          "Mein Portemonnaie weint, aber hier: etwas mehr.",
+          "Okay, ich erhöhe. Erzähl es nicht Baron von Bit.",
+          "Für dich lege ich nach. Meine Katze bekommt diese Woche nur Trockenfutter.",
+          "Ein letzter Schritt nach oben. Ich habe Höhenangst.",
+          "Du bist gut. Hier, mehr Geld. Aber dann ist Schluss. Wahrscheinlich.",
+          "Ich habe nochmal nachgezählt und noch ein paar Münzen im Sofa gefunden.",
+          "Gegenangebot! Ich fühle mich wie ein echter Händler.",
+          "Ich erhöhe, weil das Bild mich so treuherzig anschaut.",
+        ],
+        final: [
+          "Mehr geht wirklich nicht. Sonst muss ich mein Sofa verkaufen.",
+          "Das ist mein letztes Wort. Und mein vorletztes auch.",
+          "Höher gehe ich nicht. Ich habe Höhenangst, das sagte ich doch.",
+          "Mein Limit ist erreicht. Mein Bankberater hat mich blockiert.",
+          "Nein, mehr ist nicht drin. Nimm es oder lass es, aber nimm es.",
+          "Ich bin bei meinem Maximum. Ab hier zahlen nur noch Träume.",
+        ],
+        reply: {
+          yes: [
+            "Wunderbar! Dann klick auf Annehmen, bevor ich wieder vernünftig werde.",
+            "Ja? Ja! Dann drück den Knopf und es gehört mir.",
+            "Ich wusste, wir verstehen uns. Annehmen und fertig.",
+            "Herrlich. Ich halte den Rahmen schon bereit.",
+            "Abgemacht? Dann nimm mein Angebot an. Ich tanze schon.",
+            "Super, ich warte nur noch auf deinen Klick.",
+          ],
+          no: [
+            "Nein? Das tut weh. Aber ich komme wieder.",
+            "Schade. Ich weine kurz in mein Kissen und biete dann wieder.",
+            "Ein Nein ist nur ein Ja, das noch nicht weiß, dass es eins ist.",
+            "Okay, okay. Ich lasse das Angebot trotzdem liegen. Nur für alle Fälle.",
+            "Nein ist auch eine Antwort. Eine falsche, aber eine Antwort.",
+            "Verstanden. Ich bin nicht beleidigt. Nur ein bisschen. Sehr.",
+          ],
+          higher: [
+            "Mehr? Ich bin Sammler, kein Goldesel.",
+            "Du willst mehr? Ich will auch mehr. Wir haben so viel gemeinsam.",
+            "Mehr Geld? Hm. Ich denke darüber nach. Langsam.",
+            "Höher? Ich muss erst meine Sparschweine befragen.",
+            "Für mehr Geld müsste das Bild auch tanzen können.",
+            "Du klingst wie mein Vermieter. Ich überlege es mir.",
+          ],
+          lower: [
+            "Du willst weniger Geld? Du bist der netteste Mensch im ganzen Chat.",
+            "Billiger? Gern, ich bin immer für Rabatt zu haben.",
+            "Weniger? Ich lehne das nicht ab. Ich bin ja nicht verrückt.",
+            "Rabatt? Ich mag dich jetzt noch mehr.",
+            "Wenn du es mir billiger gibst, schreibe ich dir ein Gedicht. Ein kurzes.",
+          ],
+          insult: [
+            "Autsch. Ich bin Sammler, kein Sandsack. Mein Angebot bleibt trotzdem.",
+            "Na, na, na. Wir reden hier über Kunst, nicht über mich.",
+            "Ich ignoriere das, weil ich höflich bin. Und weil ich das Bild will.",
+            "So spricht man nicht mit seinem besten Kunden.",
+            "Ich habe das nicht gelesen. Wirklich nicht. Mein Angebot steht.",
+            "Hart, aber ich bin härter. Na gut, ich bin weich. Aber das Angebot steht.",
+          ],
+          question: [
+            "Gute Frage. Die Antwort ist: Ich mag das Bild. Und Geld habe ich auch.",
+            "Warum? Weil Kunst. Und weil mein Wohnzimmer leer ist.",
+            "Frag mich lieber, warum ich so gut aussehe. Ach, das war nicht die Frage.",
+            "Das weiß niemand genau. Nicht mal ich. Aber mein Angebot ist ernst.",
+            "Ich beantworte Fragen nur gegen Kunst. Verkauf mir das Bild, dann erkläre ich alles.",
+            "Hm, darüber muss ich nachdenken. Bis morgen. Oder übermorgen.",
+            "Meine Antwort: ein klares Vielleicht.",
+            "Das fragt mich meine Mutter auch immer. Antwort: weil ich es kann.",
+          ],
+          other: [
+            "Interessant. Ich nicke verständnisvoll und biete weiter.",
+            "Ich habe das gelesen und für sehr klug befunden.",
+            "Spannend. Ich schreibe es mir auf. Auf eine Serviette.",
+            "Ich verstehe. Also nicht ganz. Aber ich tu so.",
+            "Haha, du bist ja witzig. Verkauf mir trotzdem das Bild.",
+            "Notiert. Mein Papagei hat es auch gehört.",
+            "Wie auch immer: Das Bild ist toll und ich bin reich. Fast.",
+            "Ich mag, wie du schreibst. Fast so sehr wie dein Bild.",
+          ],
+        },
+      },
+      /** Each collector's own catchphrases, used now and then instead of the general line. */
+      personas: {
+        "Vera Vermeer": [
+          "Als Kennerin sage ich: Das Licht! Wo ist das Licht? Ach, da. Angebot.",
+          "Ich sammle seit 1987. Damals hatten Pixel noch Manieren.",
+          "Vera Vermeer bietet nie zweimal. Heute schon. Ausnahme.",
+        ],
+        "Konrad Kollektor": [
+          "Ich habe 4.000 Bilder und keine Wand mehr. Egal, ich biete.",
+          "Konrad hier. Ich katalogisiere das unter: haben wollen.",
+          "In meiner Excel-Tabelle ist noch eine Zeile frei. Für dich.",
+        ],
+        "Pixel-Paula": [
+          "Paula findet: mehr Pixel, mehr Liebe. Hier mein Angebot.",
+          "Ich zähle jeden Pixel einzeln. Es dauert. Es lohnt sich.",
+          "Pixel-Paula ist begeistert. Das passiert nur bei Vollmond.",
+        ],
+        "Baron von Bit": [
+          "Der Baron gestattet sich ein Angebot. Seien Sie geehrt.",
+          "In meinem Schloss ist noch ein Platz neben dem Rittersaal-Router frei.",
+          "Ein Baron feilscht nicht. Er verhandelt majestätisch.",
+        ],
+        "Mia Mosaik": [
+          "Mia hier. Ich setze dein Bild in mein großes Mosaik. Stück für Stück.",
+          "Ich sehe das Bild schon als Teil von etwas Größerem. Angebot!",
+          "Kleine Kacheln, große Gefühle. Ich biete.",
+        ],
+        "Otto Original": [
+          "Otto sammelt nur Originale. Ich hoffe, das ist eins.",
+          "Ich habe einen Echtheitsdetektor. Er piept. Das ist gut, oder?",
+          "Otto Original bietet original. Wortspiel beabsichtigt.",
+        ],
+        "Gräfin Glitzer": [
+          "Darling, das funkelt nicht genug. Ich biete trotzdem.",
+          "Die Gräfin wünscht dieses Bild. Mit Glitzer, wenn möglich.",
+          "Ich hänge es in den Ballsaal. Gleich neben die Diskokugel.",
+        ],
+        "Sammler Sam": [
+          "Sam hier. Ich war schon wieder zu langsam. Diesmal nicht!",
+          "Sammler Sam sammelt. Das ist mein Job. Und mein Hobby. Und mein Problem.",
+          "Ich habe ein Bauchgefühl. Es knurrt. Das heißt: kaufen.",
+        ],
+      },
     },
     collectors: [
       "Vera Vermeer",

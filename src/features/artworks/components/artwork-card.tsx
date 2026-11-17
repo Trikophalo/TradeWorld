@@ -95,6 +95,24 @@ export function LikeButton({ artwork, className }: { artwork: Artwork; className
   );
 }
 
+/** ADR-181: the critics' score as a small badge (good art in the gain colour, poor art muted). */
+export function CriticBadge({ artwork }: { artwork: Artwork }) {
+  const t = useTranslations("art");
+  const q = artwork.quality;
+  if (!q) return null;
+  const tone = q.score >= 75 ? "text-gain" : q.score < 35 ? "text-fg-3" : "text-fg-2";
+  return (
+    <span
+      className={`label-pixel nums text-2xs ${tone}`}
+      title={t("criticBadgeLabel", { score: q.score })}
+      aria-label={t("criticBadgeLabel", { score: q.score })}
+      data-testid="critic-badge"
+    >
+      {t("criticBadge", { score: q.score })}
+    </span>
+  );
+}
+
 /** One artwork in the marketplace: framed picture, label, price or auction, likes. */
 export function ArtworkCard({ artwork, onOpen, big }: { artwork: Artwork; onOpen: () => void; big?: boolean }) {
   const t = useTranslations("art");
@@ -127,7 +145,10 @@ export function ArtworkCard({ artwork, onOpen, big }: { artwork: Artwork; onOpen
       <div className="min-w-0 space-y-1">
         <div className="flex items-center justify-between gap-2">
           <span className="label-pixel nums text-2xs text-fg-3">{artwork.code}</span>
-          <OriginLabel artwork={artwork} />
+          <span className="flex items-center gap-1.5">
+            <CriticBadge artwork={artwork} />
+            <OriginLabel artwork={artwork} />
+          </span>
         </div>
         <p className="truncate font-semibold text-fg-1">{artwork.title}</p>
       </div>

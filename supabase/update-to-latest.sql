@@ -72984,6 +72984,1076 @@ begin
   execute replace(v_def, v_old, v_new);
 end;
 $do$;
+-- ===== idempotent copy of migrations/20261204007000_nft_quality.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7000 · Art quality: the critics judge every NFT (ADR-181)
+-- =============================================================================
+-- Every NFT gets a critic's score 0..100 from its pixel grid, computed by the server (never by the client) when it is
+-- inserted, and once for all existing NFTs (oldest first, so the original keeps its score and later copies are
+-- flagged). Port of src/lib/sim/art-quality.ts with the same integer arithmetic; shared cases in
+-- supabase/tests/art_quality_cases.inc. Sub-scores: coverage, colours, harmony, contrast, structure, outline,
+-- composition, detail, shapes (0..100 each, weights in nfts.quality). Identical or recoloured copies of an older NFT
+-- (copy = exact) and near-copies (at most nearCopyPct of the pixels differ) are capped and flagged.
+-- New columns: artworks.quality, quality_detail (sub-scores, best, worst, copy), quality_sig (copy signature).
+-- Idempotent: runs unchanged as supabase/updates/20261204007000_nft_quality.sql.
+
+alter table public.artworks add column if not exists quality smallint check (quality is null or quality between 0 and 100);
+alter table public.artworks add column if not exists quality_detail jsonb;
+alter table public.artworks add column if not exists quality_sig text;
+create index if not exists artworks_quality_sig_idx on public.artworks (md5(quality_sig)) where quality_sig is not null;
+comment on column public.artworks.quality is 'ADR-181: critic score 0..100 from the pixel grid (art_quality), set by the server.';
+comment on column public.artworks.quality_detail is
+  'ADR-181: {"sub": {coverage, colours, harmony, contrast, structure, outline, composition, detail, shapes}, "best", "worst", "copy": exact|near|null}.';
+comment on column public.artworks.quality_sig is 'ADR-181: grid with colours renamed by first appearance (copy detection).';
+
+-- The rating needs nfts.quality before the new game_config is written (update-to-latest writes it at the end)
+update public.game_config set value = jsonb_set(value, '{quality}', '{"coverageMinPct":15,"dominanceMaxPct":90,"colourScores":[0,20,55,80,100,100,100,100,100,90,85,80,75,70,65,60,55],"strayPct":1,"strayPenalty":8,"chromaMinPct":20,"hueBuckets":3,"huePenalty":14,"hueFloor":20,"contrastFull":160,"noiseFreePct":5,"fragmentFreePct":10,"detailMin":40,"detailMax":350,"shapeFullPct":40,"balanceFreePct":10,"nearCopyPct":2,"copyCap":5,"nearCopyCap":15,"gateBase":30,"weights":{"coverage":10,"colours":12,"harmony":12,"contrast":10,"structure":16,"outline":8,"composition":10,"detail":10,"shapes":12}}'::jsonb)
+ where key = 'nfts' and not (value ? 'quality');
+
+-- artSignature: "." empty, colours renamed a, b, c ... in order of first appearance (equal hex values are one colour)
+create or replace function public.art_signature(p_pixels jsonb)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_pal   jsonb := p_pixels -> 'palette';
+  v_np    integer := coalesce(jsonb_array_length(p_pixels -> 'palette'), 0);
+  v_size  integer := coalesce(jsonb_array_length(p_pixels -> 'grid'), 0);
+  v_hex   text[] := '{}';
+  v_name  text[] := '{}';
+  v_row   text;
+  v_ch    text;
+  v_i     integer;
+  v_h     text;
+  v_pos   integer;
+  v_out   text := '';
+begin
+  for y in 0 .. v_size - 1 loop
+    v_row := p_pixels -> 'grid' ->> y;
+    for x in 1 .. v_size loop
+      v_ch := substr(v_row, x, 1);
+      v_i := position(v_ch in '0123456789abcdef') - 1;
+      if v_ch = '' or v_i < 0 or v_i >= v_np then
+        v_out := v_out || '.';
+      else
+        v_h := lower(v_pal ->> v_i);
+        v_pos := array_position(v_hex, v_h);
+        if v_pos is null then
+          v_hex := v_hex || v_h;
+          v_pos := cardinality(v_hex);
+        end if;
+        v_out := v_out || substr('abcdefghijklmnop', v_pos, 1);
+      end if;
+    end loop;
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- artCopyKind against the older NFTs (created before p_self, or all when p_self is null): exact | near | null
+create or replace function public.art_copy_kind(p_sig text, p_self uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_limit integer := floor(char_length(p_sig) * coalesce((public.nfts_cfg() #>> '{quality,nearCopyPct}')::integer, 2) / 100.0)::integer;
+  v_drawn integer := char_length(replace(p_sig, '.', ''));
+  r       record;
+  v_diff  integer;
+  v_at    timestamptz := 'infinity';
+  v_ser   bigint := 9223372036854775807;
+begin
+  if p_sig is null or p_sig = '' then
+    return null;
+  end if;
+  if p_self is not null then
+    select a.created_at, a.serial into v_at, v_ser from public.artworks a where a.id = p_self;
+  end if;
+  if exists (select 1 from public.artworks a where md5(a.quality_sig) = md5(p_sig) and a.quality_sig = p_sig
+               and a.id is distinct from p_self and (a.created_at, a.serial) < (v_at, v_ser)) then
+    return 'exact';
+  end if;
+  for r in select a.quality_sig as sig from public.artworks a
+            where a.quality_sig is not null and a.id is distinct from p_self and (a.created_at, a.serial) < (v_at, v_ser)
+              and char_length(a.quality_sig) = char_length(p_sig)
+              and abs(char_length(replace(a.quality_sig, '.', '')) - v_drawn) <= v_limit
+            limit 500 loop
+    select count(*) into v_diff from generate_series(1, char_length(p_sig)) i
+     where substr(r.sig, i, 1) <> substr(p_sig, i, 1);
+    if v_diff <= v_limit then
+      return 'near';
+    end if;
+  end loop;
+  return null;
+end;
+$$;
+
+-- artQuality: the critic's score and sub-scores (see src/lib/sim/art-quality.ts)
+create or replace function public.art_quality(p_pixels jsonb, p_copy text default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  q        jsonb := public.nfts_cfg() -> 'quality';
+  v_pal    jsonb := p_pixels -> 'palette';
+  v_np     integer := coalesce(jsonb_array_length(p_pixels -> 'palette'), 0);
+  v_size   integer := coalesce(jsonb_array_length(p_pixels -> 'grid'), 0);
+  v_n      integer;
+  v_hex    text[] := '{}';
+  v_idof   integer[] := '{}';
+  v_r      integer[] := '{}';
+  v_g      integer[] := '{}';
+  v_b      integer[] := '{}';
+  v_lum    integer[] := '{}';
+  v_cells  integer[];
+  v_cnt    integer[];
+  v_empty  integer := 0;
+  v_drawn  integer := 0;
+  v_sx     bigint := 0;
+  v_sy     bigint := 0;
+  v_row    text;
+  v_i      integer;
+  v_c      integer;
+  v_o      integer;
+  v_k      integer := 0;
+  v_stray  integer := 0;
+  v_maxc   integer;
+  v_dom    integer;
+  v_cov    integer;
+  v_col    integer;
+  v_harm   integer;
+  v_con    integer;
+  v_str    integer;
+  v_out    integer;
+  v_comp   integer;
+  v_det    integer;
+  v_shp    integer;
+  v_minl   integer := 1000;
+  v_maxl   integer := -1;
+  v_thr    integer;
+  v_bk     integer[] := '{}';
+  v_mx     integer;
+  v_mn     integer;
+  v_d      integer;
+  v_h      integer;
+  v_iso    integer := 0;
+  v_solid  integer := 0;
+  v_bound  integer := 0;
+  v_dark   integer := 0;
+  v_trans  integer := 0;
+  v_same   integer;
+  v_isemp  boolean;
+  v_seen   boolean[];
+  v_stack  integer[];
+  v_top    integer;
+  v_j      integer;
+  v_reg    integer := 0;
+  v_noise  integer;
+  v_frag   integer;
+  v_off    integer;
+  v_bal    integer;
+  v_ph     integer := 0;
+  v_mh     integer := 0;
+  v_pv     integer := 0;
+  v_mv     integer := 0;
+  v_sym    integer;
+  v_e      integer;
+  v_sum    bigint := 0;
+  v_sumw   bigint := 0;
+  v_score  integer;
+  v_gate   integer;
+  v_sub    jsonb;
+  v_best   text;
+  v_worst  text;
+  v_keys   text[] := array['coverage', 'colours', 'harmony', 'contrast', 'structure', 'outline', 'composition', 'detail', 'shapes'];
+  v_key    text;
+  v_tab    jsonb := q -> 'colourScores';
+  v_chroma integer := (q ->> 'chromaMinPct')::integer;
+begin
+  -- palette: equal hex values share one colour id (1-based here)
+  for v_i in 0 .. v_np - 1 loop
+    v_row := lower(v_pal ->> v_i);
+    v_c := array_position(v_hex, v_row);
+    if v_c is null then
+      v_hex := v_hex || v_row;
+      v_c := cardinality(v_hex);
+      v_r := v_r || ('x' || substr(v_row, 2, 2))::bit(8)::integer;
+      v_g := v_g || ('x' || substr(v_row, 4, 2))::bit(8)::integer;
+      v_b := v_b || ('x' || substr(v_row, 6, 2))::bit(8)::integer;
+      v_lum := v_lum || ((299 * v_r[v_c] + 587 * v_g[v_c] + 114 * v_b[v_c]) / 1000);
+    end if;
+    v_idof := v_idof || v_c;
+  end loop;
+  v_n := v_size * v_size;
+  v_cells := array_fill(0, array[greatest(v_n, 1)]);
+  v_cnt := array_fill(0, array[greatest(cardinality(v_hex), 1)]);
+  for y in 0 .. v_size - 1 loop
+    v_row := p_pixels -> 'grid' ->> y;
+    for x in 0 .. v_size - 1 loop
+      v_i := position(substr(coalesce(v_row, ''), x + 1, 1) in '0123456789abcdef') - 1;
+      if substr(coalesce(v_row, ''), x + 1, 1) <> '' and v_i >= 0 and v_i < v_np then
+        v_c := v_idof[v_i + 1];
+        v_cells[y * v_size + x + 1] := v_c;
+        v_cnt[v_c] := v_cnt[v_c] + 1;
+        v_drawn := v_drawn + 1;
+        v_sx := v_sx + x;
+        v_sy := v_sy + y;
+      else
+        v_empty := v_empty + 1;
+      end if;
+    end loop;
+  end loop;
+  if v_drawn = 0 or v_size < 2 then
+    return jsonb_build_object('score', 0, 'sub', (select jsonb_object_agg(k, 0) from unnest(v_keys) k),
+                              'best', 'coverage', 'worst', 'coverage', 'copy', p_copy);
+  end if;
+
+  -- coverage
+  v_cov := least(100, (v_drawn::bigint * 10000 / (v_n * (q ->> 'coverageMinPct')::integer))::integer);
+  v_maxc := v_empty;
+  for v_c in 1 .. cardinality(v_hex) loop
+    v_maxc := greatest(v_maxc, v_cnt[v_c]);
+    if v_cnt[v_c] > 0 then
+      v_k := v_k + 1;
+      if v_cnt[v_c] * 100 < v_drawn * (q ->> 'strayPct')::integer then
+        v_stray := v_stray + 1;
+      end if;
+      v_minl := least(v_minl, v_lum[v_c]);
+      v_maxl := greatest(v_maxl, v_lum[v_c]);
+      -- hue bucket of a saturated colour
+      v_mx := greatest(v_r[v_c], v_g[v_c], v_b[v_c]);
+      v_mn := least(v_r[v_c], v_g[v_c], v_b[v_c]);
+      v_d := v_mx - v_mn;
+      if v_mx > 0 and v_d > 0 and v_d * 100 / v_mx >= v_chroma and v_mx * 100 / 255 >= v_chroma then
+        if v_mx = v_r[v_c] then
+          v_h := (60 * (v_g[v_c] - v_b[v_c]) + 360 * v_d) / v_d;
+        elsif v_mx = v_g[v_c] then
+          v_h := (60 * (v_b[v_c] - v_r[v_c]) + 120 * v_d) / v_d;
+        else
+          v_h := (60 * (v_r[v_c] - v_g[v_c]) + 240 * v_d) / v_d;
+        end if;
+        v_h := (v_h % 360) / 30;
+        if array_position(v_bk, v_h) is null then
+          v_bk := v_bk || v_h;
+        end if;
+      end if;
+    end if;
+  end loop;
+  v_dom := v_maxc * 100 / v_n;
+  if v_dom > (q ->> 'dominanceMaxPct')::integer then
+    v_cov := least(v_cov, (100 - v_dom) * 10);
+  end if;
+
+  -- colours, harmony, contrast
+  v_col := greatest(0, least(100, (v_tab ->> least(v_k, jsonb_array_length(v_tab) - 1))::integer
+                                  - v_stray * (q ->> 'strayPenalty')::integer));
+  v_harm := case when cardinality(v_bk) <= (q ->> 'hueBuckets')::integer then 100
+                 else greatest((q ->> 'hueFloor')::integer,
+                               100 - (cardinality(v_bk) - (q ->> 'hueBuckets')::integer) * (q ->> 'huePenalty')::integer) end;
+  v_con := least(100, (v_maxl - v_minl) * 100 / (q ->> 'contrastFull')::integer);
+  v_thr := v_minl + (v_maxl - v_minl) / 3;
+
+  -- neighbours
+  for y in 0 .. v_size - 1 loop
+    for x in 0 .. v_size - 1 loop
+      v_i := y * v_size + x + 1;
+      v_c := v_cells[v_i];
+      if x + 1 < v_size and v_cells[v_i + 1] <> v_c then
+        v_trans := v_trans + 1;
+      end if;
+      if y + 1 < v_size and v_cells[v_i + v_size] <> v_c then
+        v_trans := v_trans + 1;
+      end if;
+      continue when v_c = 0;
+      v_same := 0;
+      v_isemp := false;
+      if x > 0 then
+        v_o := v_cells[v_i - 1];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if x + 1 < v_size then
+        v_o := v_cells[v_i + 1];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if y > 0 then
+        v_o := v_cells[v_i - v_size];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if y + 1 < v_size then
+        v_o := v_cells[v_i + v_size];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if v_same = 0 then v_iso := v_iso + 1; end if;
+      if v_same >= 3 then v_solid := v_solid + 1; end if;
+      if v_isemp then
+        v_bound := v_bound + 1;
+        if v_lum[v_c] <= v_thr then v_dark := v_dark + 1; end if;
+      end if;
+    end loop;
+  end loop;
+
+  -- regions: 4-connected, same colour (iterative flood fill)
+  v_seen := array_fill(false, array[v_n]);
+  v_stack := array_fill(0, array[v_n]);
+  for v_i in 1 .. v_n loop
+    continue when v_cells[v_i] = 0 or v_seen[v_i];
+    v_reg := v_reg + 1;
+    v_seen[v_i] := true;
+    v_top := 1;
+    v_stack[1] := v_i;
+    while v_top > 0 loop
+      v_j := v_stack[v_top];
+      v_top := v_top - 1;
+      v_c := v_cells[v_j];
+      -- left, right, up, down (0-based x = (v_j - 1) % size)
+      if (v_j - 1) % v_size > 0 and not v_seen[v_j - 1] and v_cells[v_j - 1] = v_c then
+        v_seen[v_j - 1] := true; v_top := v_top + 1; v_stack[v_top] := v_j - 1;
+      end if;
+      if (v_j - 1) % v_size + 1 < v_size and not v_seen[v_j + 1] and v_cells[v_j + 1] = v_c then
+        v_seen[v_j + 1] := true; v_top := v_top + 1; v_stack[v_top] := v_j + 1;
+      end if;
+      if v_j > v_size and not v_seen[v_j - v_size] and v_cells[v_j - v_size] = v_c then
+        v_seen[v_j - v_size] := true; v_top := v_top + 1; v_stack[v_top] := v_j - v_size;
+      end if;
+      if v_j + v_size <= v_n and not v_seen[v_j + v_size] and v_cells[v_j + v_size] = v_c then
+        v_seen[v_j + v_size] := true; v_top := v_top + 1; v_stack[v_top] := v_j + v_size;
+      end if;
+    end loop;
+  end loop;
+  v_noise := v_iso * 100 / v_drawn;
+  v_frag := v_reg * 100 / v_drawn;
+  v_str := (case when v_noise <= (q ->> 'noiseFreePct')::integer then 100
+                 else greatest(0, 100 - (v_noise - (q ->> 'noiseFreePct')::integer) * 2) end
+          + case when v_frag <= (q ->> 'fragmentFreePct')::integer then 100
+                 else greatest(0, 100 - (v_frag - (q ->> 'fragmentFreePct')::integer) * 2) end) / 2;
+  v_out := case when v_k < 2 then 40 when v_bound = 0 then 70 else 40 + v_dark * 60 / v_bound end;
+
+  -- composition
+  v_off := (abs(2 * v_sx - (v_size - 1)::bigint * v_drawn) * 100 / (v_drawn::bigint * v_size))::integer
+         + (abs(2 * v_sy - (v_size - 1)::bigint * v_drawn) * 100 / (v_drawn::bigint * v_size))::integer;
+  v_bal := case when v_off <= (q ->> 'balanceFreePct')::integer then 100
+                else greatest(0, 100 - (v_off - (q ->> 'balanceFreePct')::integer) * 3) end;
+  for a in 0 .. v_size - 1 loop
+    for b in 0 .. v_size / 2 - 1 loop
+      v_c := v_cells[a * v_size + b + 1];
+      v_o := v_cells[a * v_size + v_size - b];
+      if v_c <> 0 or v_o <> 0 then
+        v_ph := v_ph + 1;
+        if v_c = v_o then v_mh := v_mh + 1; end if;
+      end if;
+      v_c := v_cells[b * v_size + a + 1];
+      v_o := v_cells[(v_size - 1 - b) * v_size + a + 1];
+      if v_c <> 0 or v_o <> 0 then
+        v_pv := v_pv + 1;
+        if v_c = v_o then v_mv := v_mv + 1; end if;
+      end if;
+    end loop;
+  end loop;
+  v_sym := greatest(case when v_ph = 0 then 0 else v_mh * 100 / v_ph end, case when v_pv = 0 then 0 else v_mv * 100 / v_pv end);
+  v_comp := (v_bal * 2 + v_sym) / 3;
+
+  v_e := v_trans * 1000 / (2 * v_size * (v_size - 1));
+  v_det := case when v_e < (q ->> 'detailMin')::integer then v_e * 100 / (q ->> 'detailMin')::integer
+                when v_e <= (q ->> 'detailMax')::integer then 100
+                else greatest(0, 100 - (v_e - (q ->> 'detailMax')::integer) / 4) end;
+  v_shp := least(100, (v_solid::bigint * 10000 / (v_drawn::bigint * (q ->> 'shapeFullPct')::integer))::integer);
+
+  v_sub := jsonb_build_object('coverage', v_cov, 'colours', v_col, 'harmony', v_harm, 'contrast', v_con,
+                              'structure', v_str, 'outline', v_out, 'composition', v_comp, 'detail', v_det, 'shapes', v_shp);
+  v_best := v_keys[1];
+  v_worst := v_keys[1];
+  foreach v_key in array v_keys loop
+    v_sumw := v_sumw + (q #>> array['weights', v_key])::integer;
+    v_sum := v_sum + (q #>> array['weights', v_key])::integer * (v_sub ->> v_key)::integer;
+    if (v_sub ->> v_key)::integer > (v_sub ->> v_best)::integer then v_best := v_key; end if;
+    if (v_sub ->> v_key)::integer < (v_sub ->> v_worst)::integer then v_worst := v_key; end if;
+  end loop;
+  v_gate := least(v_cov, v_col, v_det);
+  v_score := ((v_sum / v_sumw) * ((q ->> 'gateBase')::integer * 100 + v_gate * (100 - (q ->> 'gateBase')::integer)) / 10000)::integer;
+  if p_copy = 'exact' then
+    v_score := least(v_score, (q ->> 'copyCap')::integer);
+  elsif p_copy = 'near' then
+    v_score := least(v_score, (q ->> 'nearCopyCap')::integer);
+  end if;
+  return jsonb_build_object('score', v_score, 'sub', v_sub, 'best', v_best, 'worst', v_worst, 'copy', p_copy);
+end;
+$$;
+comment on function public.art_quality(jsonb, text) is 'Port of artQuality (src/lib/sim/art-quality.ts, ADR-181).';
+
+-- Scores one NFT (copy check against older NFTs) and stores the result
+create or replace function public.artwork_rate_quality(p_artwork uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  a     public.artworks;
+  v_sig text;
+  v_q   jsonb;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if a.id is null or public.nfts_cfg() -> 'quality' is null then
+    return null;
+  end if;
+  v_sig := public.art_signature(a.pixels);
+  v_q := public.art_quality(a.pixels, public.art_copy_kind(v_sig, a.id));
+  update public.artworks set quality = (v_q ->> 'score')::smallint, quality_detail = v_q - 'score', quality_sig = v_sig
+   where id = a.id;
+  return (v_q ->> 'score')::integer;
+end;
+$$;
+
+-- Every new NFT (player mint, gallery seed) is rated once, after insert; changing the pixels rates it again
+create or replace function public.artworks_quality_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.artwork_rate_quality(new.id);
+  return null;
+end;
+$$;
+drop trigger if exists artworks_quality_ins on public.artworks;
+create trigger artworks_quality_ins after insert on public.artworks
+  for each row execute function public.artworks_quality_trigger();
+drop trigger if exists artworks_quality_upd on public.artworks;
+create trigger artworks_quality_upd after update of pixels on public.artworks
+  for each row when (old.pixels is distinct from new.pixels) execute function public.artworks_quality_trigger();
+
+revoke all on function public.art_signature(jsonb) from public, anon, authenticated;
+revoke all on function public.art_copy_kind(text, uuid) from public, anon, authenticated;
+revoke all on function public.art_quality(jsonb, text) from public, anon, authenticated;
+revoke all on function public.artwork_rate_quality(uuid) from public, anon, authenticated;
+revoke all on function public.artworks_quality_trigger() from public, anon, authenticated;
+grant execute on function public.art_signature(jsonb) to service_role;
+grant execute on function public.art_copy_kind(text, uuid) to service_role;
+grant execute on function public.art_quality(jsonb, text) to service_role;
+grant execute on function public.artwork_rate_quality(uuid) to service_role;
+
+-- Backfill: oldest first, so an original is rated before its copies
+do $do$
+declare
+  r record;
+begin
+  if public.nfts_cfg() -> 'quality' is null then
+    return;
+  end if;
+  for r in select a.id from public.artworks a where a.quality is null order by a.created_at, a.serial loop
+    perform public.artwork_rate_quality(r.id);
+  end loop;
+end;
+$do$;
+-- ===== idempotent copy of migrations/20261204007010_nft_quality_value.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7010 · The collectors pay for quality (ADR-181)
+-- =============================================================================
+-- The critic score (artworks.quality, 7000) scales the collectors' valuation anchor (mint cost or floor, never the
+-- last price, so it does not compound) by nfts.ai.quality.valueMinBps..valueMaxBps (score 50 = x 1.0). This moves
+-- every purchase ceiling, offer, auction bid (nft_ai_value_cents) and the trades among collectors (nft_fair_cents).
+-- Lowball offers shift with the score (nft_lowball_cents with p_quality). Ports of src/lib/sim/nfts.ts.
+-- Copies of 20261204001400 (nft_fair_cents, nft_ai_value_excluding), the anchor changed.
+-- Idempotent: runs unchanged as supabase/updates/20261204007010_nft_quality_value.sql.
+
+-- ADR-181 effects need nfts.ai.quality before the new game_config is written (update-to-latest writes it at the end)
+update public.game_config
+   set value = jsonb_set(value, '{ai,quality}', '{"neutral":50,"valueMinBps":6000,"valueMaxBps":14000,"chanceMinBps":2000,"chanceMaxBps":20000,"noInterestBelow":10,"lowballShiftBps":1500,"mockBelow":35,"praiseFrom":75,"goodFrom":85,"badBelow":45}'::jsonb)
+ where key = 'nfts' and value ? 'ai' and not (value -> 'ai' ? 'quality');
+
+-- nftQualityValueBps / the factor of nftQualityChanceBps: min + (max - min) x score / 100, null = neutral
+create or replace function public.nft_quality_factor_bps(p_quality integer, p_min text, p_max text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((q ->> p_min)::integer, 10000)
+         + (coalesce((q ->> p_max)::integer, 10000) - coalesce((q ->> p_min)::integer, 10000))
+           * greatest(0, least(100, coalesce(p_quality, (q ->> 'neutral')::integer, 50))) / 100
+    from (select coalesce(public.nfts_cfg() #> '{ai,quality}', '{}'::jsonb) as q) c;
+$$;
+
+-- nftQualityChanceBps: a chance scaled by the score, 0 below noInterestBelow
+create or replace function public.nft_quality_chance_bps(p_base numeric, p_quality integer)
+returns numeric
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_quality is not null
+                   and p_quality < coalesce((public.nfts_cfg() #>> '{ai,quality,noInterestBelow}')::integer, 0) then 0
+              else floor(coalesce(p_base, 0) * public.nft_quality_factor_bps(p_quality, 'chanceMinBps', 'chanceMaxBps') / 10000) end;
+$$;
+
+-- the valuation anchor from mint cost (or gallery start price) and floor, scaled by quality
+create or replace function public.nft_quality_base_cents(p_artwork uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select floor(greatest(coalesce(a.mint_cents, case when a.origin = 'game' then public.artwork_gallery_start_cents(a.rarity) end, 0),
+                        coalesce((public.nfts_cfg() #>> '{ai,floorCents}')::bigint, 100000))::numeric
+               * public.nft_quality_factor_bps(a.quality, 'valueMinBps', 'valueMaxBps') / 10000)::bigint
+    from public.artworks a where a.id = p_artwork;
+$$;
+
+create or replace function public.nft_fair_cents(p_artwork uuid, p_now timestamptz default null)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  ai      jsonb := public.nfts_cfg() -> 'ai';
+  a       public.artworks;
+  v_base  bigint;
+  v_likes bigint;
+  v_sales bigint := 0;
+  v_days  bigint;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if a.id is null then
+    return null;
+  end if;
+  v_base := public.nft_quality_base_cents(a.id);
+  select count(*) into v_likes from public.artwork_likes l where l.artwork_id = a.id;
+  if a.creator_id is not null then
+    select count(*) into v_sales from public.artwork_sales s join public.artworks x on x.id = s.artwork_id
+     where x.creator_id = a.creator_id;
+  end if;
+  v_days := greatest(0, floor(extract(epoch from (coalesce(p_now, public.game_now()) - a.created_at)) / 86400))::bigint;
+  return floor(v_base::numeric * (10000
+           + (ai ->> 'likeBps')::bigint * least(v_likes, (ai ->> 'maxLikes')::bigint)
+           + (ai ->> 'creatorSaleBps')::bigint * least(v_sales, (ai ->> 'maxCreatorSales')::bigint)
+           + (ai ->> 'ageBpsPerDay')::bigint * least(v_days, (ai ->> 'maxAgeDays')::bigint)
+           + public.nft_demand_bps(a.id, p_now)) / 10000)::bigint;
+end;
+$$;
+
+-- The valuation without the demand of one bidder: their own offer must not raise the price they have to beat.
+create or replace function public.nft_ai_value_excluding(p_artwork uuid, p_now timestamptz, p_exclude uuid)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  ai       jsonb := public.nfts_cfg() -> 'ai';
+  a        public.artworks;
+  v_anchor bigint;
+  v_likes  bigint;
+  v_sales  bigint := 0;
+  v_days   bigint;
+  v_bonus  bigint;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if a.id is null then
+    return null;
+  end if;
+  -- ADR-181: the last price as it is, mint cost / floor scaled by the critic score
+  v_anchor := greatest(coalesce(a.value_cents, 0), public.nft_quality_base_cents(a.id));
+  select count(*) into v_likes from public.artwork_likes l where l.artwork_id = a.id;
+  if a.creator_id is not null then
+    select count(*) into v_sales from public.artwork_sales s join public.artworks x on x.id = s.artwork_id
+     where x.creator_id = a.creator_id;
+  end if;
+  v_days := greatest(0, floor(extract(epoch from (coalesce(p_now, public.game_now()) - a.created_at)) / 86400))::bigint;
+  v_bonus := coalesce((ai ->> 'likeBps')::bigint, 400) * least(v_likes, coalesce((ai ->> 'maxLikes')::bigint, 40))
+           + coalesce((ai ->> 'creatorSaleBps')::bigint, 300) * least(v_sales, coalesce((ai ->> 'maxCreatorSales')::bigint, 10))
+           + coalesce((ai ->> 'ageBpsPerDay')::bigint, 100) * least(v_days, coalesce((ai ->> 'maxAgeDays')::bigint, 30))
+           + public.nft_demand_bps(a.id, p_now, p_exclude);
+  return floor(v_anchor::numeric * (10000 + v_bonus) / 10000)::bigint;
+end;
+$$;
+
+-- nftLowballCents with the score: the band shifts by trunc((score - 50) x lowballShiftBps / 50), at most 100 %
+create or replace function public.nft_lowball_cents(p_value bigint, p_u double precision, p_quality integer)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg   jsonb := public.nfts_cfg();
+  v_min integer := (cfg #>> '{ai,lowballMinBps}')::integer;
+  v_max integer := (cfg #>> '{ai,lowballMaxBps}')::integer;
+  v_bps integer;
+begin
+  v_bps := v_min + floor(least(greatest(coalesce(p_u, 0), 0), 0.999999) * (v_max - v_min))::integer;
+  if p_quality is not null then
+    v_bps := v_bps + (greatest(0, least(100, p_quality)) - 50) * coalesce((cfg #>> '{ai,quality,lowballShiftBps}')::integer, 0) / 50;
+  end if;
+  v_bps := least(10000, v_bps);
+  return greatest((cfg ->> 'minOfferCents')::bigint, (floor(p_value::numeric * v_bps / 10000 / 100) * 100)::bigint);
+end;
+$$;
+
+revoke all on function public.nft_quality_factor_bps(integer, text, text) from public, anon, authenticated;
+revoke all on function public.nft_quality_chance_bps(numeric, integer) from public, anon, authenticated;
+revoke all on function public.nft_quality_base_cents(uuid) from public, anon, authenticated;
+revoke all on function public.nft_lowball_cents(bigint, double precision, integer) from public, anon, authenticated;
+grant execute on function public.nft_quality_factor_bps(integer, text, text) to service_role;
+grant execute on function public.nft_quality_chance_bps(numeric, integer) to service_role;
+grant execute on function public.nft_quality_base_cents(uuid) to service_role;
+grant execute on function public.nft_lowball_cents(bigint, double precision, integer) to service_role;
+-- ===== idempotent copy of migrations/20261204007020_nft_talk.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7020 · The collectors talk: reactions to the art and to the players (ADR-181)
+-- =============================================================================
+-- 1. Offer texts follow the critic score (nft_offer_text): copies and poor art get mocking lines, great art praise
+--    or a compliment on its best sub-score, the middle a comment on the weakest or best sub-score or the classic
+--    lines; now and then a collector's own catchphrase (nfts.ai.talk.personas). No line repeats one of the last
+--    talk.recentLines AI lines of the chat (nft_line).
+-- 2. Collectors answer players (nfts_run_due step 3b): a player's message that is the newest in the chat for at least
+--    talk.replyDelayMinutes gets an answer from the AI owner or the collector who spoke there last, by keyword intent
+--    (nft_intent: insult, higher, lower, no, yes, question, other). Asked for more (or told no) by the owner, the
+--    collector raises its open offer by talk.counterStepBps up to talk.counterCeilingBps of its valuation (within the
+--    daily budget of ADR-170), else says it is final. Every reply invites the next message: conversations go on.
+-- 3. An offer ignored for talk.followupMinutes gets one nudge (step 3c).
+-- 4. Purchases, offers and trades among collectors are as likely as nft_quality_chance_bps says (none below
+--    ai.quality.noInterestBelow), lowball offers shift with the score (7010).
+-- Ports of src/lib/sim/nft-talk.ts. Without nfts.ai.talk in game_config the collectors keep their old lines.
+-- Idempotent: runs unchanged as supabase/updates/20261204007020_nft_talk.sql.
+
+-- detectIntent: the first intent of talk.intentOrder with a keyword as a whole word (or phrase), else 'other'
+create or replace function public.nft_intent(p_text text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  talk     jsonb := public.nfts_cfg() #> '{ai,talk}';
+  v_t      text;
+  v_intent text;
+begin
+  v_t := ' ' || btrim(regexp_replace(replace(lower(coalesce(p_text, '')), '?', ' ? '), '[^a-z0-9äöüß?]+', ' ', 'g')) || ' ';
+  for v_intent in select jsonb_array_elements_text(coalesce(talk -> 'intentOrder', '[]'::jsonb)) loop
+    if exists (select 1 from jsonb_array_elements_text(coalesce(talk #> array['intents', v_intent], '[]'::jsonb)) w
+                where position(' ' || w || ' ' in v_t) > 0) then
+      return v_intent;
+    end if;
+  end loop;
+  return 'other';
+end;
+$$;
+
+-- pickLine: the line at u, moving on while it is one of the last talk.recentLines AI lines of this chat
+create or replace function public.nft_line(p_artwork uuid, p_lines jsonb, p_u double precision)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_len    integer := coalesce(jsonb_array_length(p_lines), 0);
+  v_start  integer;
+  v_recent text[];
+  v_line   text;
+begin
+  if v_len = 0 then
+    return null;
+  end if;
+  v_start := least(v_len - 1, floor(greatest(coalesce(p_u, 0), 0) * v_len)::integer);
+  select coalesce(array_agg(x.body), '{}') into v_recent
+    from (select m.body from public.artwork_messages m where m.artwork_id = p_artwork and m.ai_name is not null
+           order by m.id desc limit coalesce((public.nfts_cfg() #>> '{ai,talk,recentLines}')::integer, 0)) x;
+  for k in 0 .. v_len - 1 loop
+    v_line := p_lines ->> ((v_start + k) % v_len);
+    if not (v_line = any (v_recent)) then
+      return v_line;
+    end if;
+  end loop;
+  return p_lines ->> v_start;
+end;
+$$;
+
+-- A collector's line from a list below nfts.ai (e.g. {lines,buy}, {talk,lines,reply,yes}); for offers, praise,
+-- nudges and small talk sometimes the collector's own catchphrase; unknown lists fall back to {lines,offer}.
+create or replace function public.nft_say(p_artwork uuid, p_name text, p_path text[], p_u double precision)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  ai      jsonb := public.nfts_cfg() -> 'ai';
+  v_lines jsonb := ai #> p_path;
+begin
+  if p_path::text in ('{lines,offer}', '{talk,lines,praise}', '{talk,lines,followup}', '{talk,lines,reply,other}')
+     and jsonb_typeof(ai #> array['talk', 'personas', p_name]) = 'array'
+     and random() * 10000 < coalesce((ai #>> '{talk,personaChanceBps}')::integer, 0) then
+    v_lines := ai #> array['talk', 'personas', p_name];
+  end if;
+  if jsonb_typeof(v_lines) is distinct from 'array' or jsonb_array_length(v_lines) = 0 then
+    v_lines := ai #> '{lines,offer}';
+  end if;
+  return coalesce(public.nft_line(p_artwork, v_lines, p_u), '…');
+end;
+$$;
+
+-- nftOfferPath: which offer text fits the critic score ('copy', 'mock', 'praise', 'good.<key>', 'bad.<key>', 'offer')
+create or replace function public.nft_offer_path(p_quality integer, p_copy text, p_best text, p_best_score integer,
+                                                 p_worst text, p_worst_score integer, p_u double precision)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+           when p_copy is not null then 'copy'
+           when p_quality is null then 'offer'
+           when p_quality < (q ->> 'mockBelow')::integer then 'mock'
+           when p_quality >= (q ->> 'praiseFrom')::integer then
+             case when p_u < 0.5 or p_best is null then 'praise' else 'good.' || p_best end
+           when p_u < 1.0 / 3 and p_worst is not null and p_worst_score < (q ->> 'badBelow')::integer then 'bad.' || p_worst
+           when p_u >= 1.0 / 3 and p_u < 2.0 / 3 and p_best is not null and p_best_score >= (q ->> 'goodFrom')::integer
+             then 'good.' || p_best
+           else 'offer' end
+    from (select coalesce(public.nfts_cfg() #> '{ai,quality}', '{}'::jsonb) as q) c;
+$$;
+
+-- The text of a collector's offer on an NFT
+create or replace function public.nft_offer_text(p_artwork uuid, p_name text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  a      public.artworks;
+  v_path text;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if public.nfts_cfg() #> '{ai,talk,lines}' is null then
+    return public.nft_say(p_artwork, p_name, '{lines,offer}', random());
+  end if;
+  v_path := public.nft_offer_path(a.quality, a.quality_detail ->> 'copy', a.quality_detail ->> 'best',
+                                  (a.quality_detail #>> array['sub', a.quality_detail ->> 'best'])::integer,
+                                  a.quality_detail ->> 'worst',
+                                  (a.quality_detail #>> array['sub', a.quality_detail ->> 'worst'])::integer, random());
+  return public.nft_say(p_artwork, p_name,
+                        case when v_path = 'offer' then '{lines,offer}'::text[]
+                             else array['talk', 'lines'] || string_to_array(v_path, '.') end, random());
+end;
+$$;
+
+-- nftCounterCents: the open offer + counterStepBps (whole euros), at most counterCeilingBps of the valuation
+create or replace function public.nft_counter_cents(p_previous bigint, p_value bigint)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when v_next > p_previous then v_next end
+    from (select least(floor(p_value::numeric * (t ->> 'counterCeilingBps')::integer / 10000 / 100)::bigint * 100,
+                       floor(p_previous::numeric * (10000 + (t ->> 'counterStepBps')::integer) / 10000 / 100)::bigint * 100) as v_next
+            from (select public.nfts_cfg() #> '{ai,talk}' as t) c) x;
+$$;
+
+revoke all on function public.nft_intent(text) from public, anon, authenticated;
+revoke all on function public.nft_line(uuid, jsonb, double precision) from public, anon, authenticated;
+revoke all on function public.nft_say(uuid, text, text[], double precision) from public, anon, authenticated;
+revoke all on function public.nft_offer_path(integer, text, text, integer, text, integer, double precision) from public, anon, authenticated;
+revoke all on function public.nft_offer_text(uuid, text) from public, anon, authenticated;
+revoke all on function public.nft_counter_cents(bigint, bigint) from public, anon, authenticated;
+grant execute on function public.nft_intent(text) to service_role;
+grant execute on function public.nft_line(uuid, jsonb, double precision) to service_role;
+grant execute on function public.nft_say(uuid, text, text[], double precision) to service_role;
+grant execute on function public.nft_offer_path(integer, text, text, integer, text, integer, double precision) to service_role;
+grant execute on function public.nft_offer_text(uuid, text) to service_role;
+grant execute on function public.nft_counter_cents(bigint, bigint) to service_role;
+
+-- nfts_run_due: copy of the latest definition (20261204006110 on top of 5000 and 1400), with the critic score and the chat
+create or replace function public.nfts_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  cfg       jsonb := public.nfts_cfg();
+  ai        jsonb := public.nfts_cfg() -> 'ai';
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  v_day     timestamptz := ((coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date)::timestamp
+                           at time zone 'Europe/Berlin';
+  v_house   uuid := public.ledger_system_account('households');
+  v_buys    integer;
+  v_msgs    integer := 0;
+  v_sold    integer := 0;
+  v_answers integer := 0;
+  v_expired integer;
+  v_value   bigint;
+  v_name    text;
+  v_id      bigint;
+  v_cash    bigint;
+  a         public.artworks;
+  r         record;
+  v_trades  integer;
+  v_traded  integer := 0;
+  v_price   bigint;
+  v_hbuys    integer;
+  v_htrades  integer;
+  v_spent    bigint;
+  v_replies  integer := 0;
+  v_follow   integer := 0;
+  v_intent   text;
+  v_offer    public.artwork_messages;
+  talk       jsonb := coalesce(public.nfts_cfg() #> '{ai,talk}', '{}'::jsonb);
+begin
+  if cfg = '{}'::jsonb or ai is null then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  update public.artwork_messages set offer_status = 'expired' where offer_status = 'open' and expires_at <= v_now;
+  get diagnostics v_expired = row_count;
+  -- ADR-181: NFTs without a critic score yet (e.g. from before the config) are rated now
+  for r in select x.id from public.artworks x where x.quality is null order by x.created_at, x.serial limit 20 loop
+    perform public.artwork_rate_quality(r.id);
+  end loop;
+  -- purchases from players; trades between collectors have their own cap (ADR-141)
+  select count(*) into v_buys from public.artwork_sales s where s.buyer_ai is not null and s.seller_ai is null and s.at >= v_day;
+  -- ADR-170: hourly caps and a daily budget spread the collectors' activity over the day
+  select count(*) into v_hbuys from public.artwork_sales s
+   where s.buyer_ai is not null and s.seller_ai is null and s.at > v_now - interval '1 hour';
+  v_spent := public.nft_ai_spent_today(v_now);
+
+  -- 1. fixed-price listings of players: bought at a good price, else maybe a lowball offer
+  for r in select x.id, x.ask_cents from public.artworks x
+            where x.ask_cents is not null and x.owner_id is not null
+              and not exists (select 1 from public.artwork_auctions au where au.artwork_id = x.id and au.status = 'open')
+            order by x.listed_at, x.id limit 100 loop
+    select * into a from public.artworks where id = r.id for update skip locked;
+    continue when a.id is null or a.ask_cents is distinct from r.ask_cents or a.owner_id is null;
+    v_value := public.nft_ai_value_cents(a.id, v_now);
+    if a.ask_cents <= v_value then
+      continue when v_buys >= (ai ->> 'maxBuysPerDay')::integer
+                    or random() * 10000 >= public.nft_quality_chance_bps((ai ->> 'buyChanceBps')::numeric, a.quality)
+                    or v_hbuys >= coalesce((ai ->> 'maxBuysPerHour')::integer, 1000000)
+                    or v_spent + a.ask_cents > coalesce((ai ->> 'budgetCentsPerDay')::bigint, 9000000000000000000);
+      select x.balance_cents into v_cash from public.ledger_accounts x where x.id = v_house;
+      continue when coalesce(v_cash, 0) < a.ask_cents;
+      v_name := public.nft_pick('{ai,collectors}', random());
+      perform public.nft_sell(a.id, null, v_name, a.ask_cents, 'ai',
+                              'art:ai:' || a.id::text || ':' || floor(extract(epoch from v_now))::bigint::text);
+      perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{lines,buy}', random()), null);
+      v_buys := v_buys + 1;
+      v_hbuys := v_hbuys + 1;
+      v_spent := v_spent + a.ask_cents;
+      v_sold := v_sold + 1;
+    elsif v_msgs < (ai ->> 'maxMessagesPerRun')::integer
+          and random() * 10000 < public.nft_quality_chance_bps((ai ->> 'listedOfferChanceBps')::numeric, a.quality)
+          and (select count(*) from public.artwork_messages m where m.artwork_id = a.id and m.ai_name is not null
+                 and m.offer_status = 'open') < coalesce((ai ->> 'maxOpenAiOffers')::integer, 1)
+          and public.nft_free_collector(a.id, random()) is not null then
+      v_name := public.nft_free_collector(a.id, random());
+      v_id := public.nft_ai_post(a.id, v_name, 'offer', public.nft_offer_text(a.id, v_name),
+                                 public.nft_lowball_cents(v_value, random(), a.quality::integer));
+      update public.artwork_messages
+       set expires_at = least(expires_at, v_now + make_interval(mins => round(coalesce((ai ->> 'offerHours')::numeric, 24) * 60)::integer))
+     where id = v_id;
+    perform public.nft_notify_offer(v_id);
+      v_msgs := v_msgs + 1;
+    end if;
+  end loop;
+
+  -- 2. NFTs players keep: now and then a lowball offer
+  for r in select x.id, x.quality from public.artworks x
+            where x.owner_id is not null and x.ask_cents is null
+              and not exists (select 1 from public.artwork_auctions au where au.artwork_id = x.id and au.status = 'open')
+              and (select count(*) from public.artwork_messages m where m.artwork_id = x.id and m.ai_name is not null
+                     and m.offer_status = 'open') < coalesce((ai ->> 'maxOpenAiOffers')::integer, 1)
+            order by random() limit greatest(0, (ai ->> 'maxMessagesPerRun')::integer - v_msgs) loop
+    continue when random() * 10000 >= public.nft_quality_chance_bps((ai ->> 'unlistedOfferChanceBps')::numeric, r.quality);
+    continue when public.nft_free_collector(r.id, 0.5) is null;
+    v_name := public.nft_free_collector(r.id, random());
+    v_id := public.nft_ai_post(r.id, v_name, 'offer', public.nft_offer_text(r.id, v_name),
+                               public.nft_lowball_cents(public.nft_ai_value_cents(r.id, v_now), random(), r.quality::integer));
+    update public.artwork_messages
+       set expires_at = least(expires_at, v_now + make_interval(mins => round(coalesce((ai ->> 'offerHours')::numeric, 24) * 60)::integer))
+     where id = v_id;
+    perform public.nft_notify_offer(v_id);
+    v_msgs := v_msgs + 1;
+  end loop;
+
+  -- 3. NFTs the AI holds: player offers from acceptBps of the value are accepted, others declined
+  for r in select m.id, m.artwork_id, m.author_id, m.offer_cents from public.artwork_messages m
+             join public.artworks x on x.id = m.artwork_id
+            where x.ai_owner is not null and m.offer_status = 'open' and m.author_id is not null
+            order by m.id limit 50 loop
+    select * into a from public.artworks where id = r.artwork_id for update skip locked;
+    continue when a.id is null or a.ai_owner is null;
+    v_value := public.nft_ai_value_excluding(a.id, v_now, r.author_id);
+    select x.balance_cents into v_cash from public.ledger_accounts x where x.owner_player_id = r.author_id and x.kind = 'player_cash';
+    if r.offer_cents::numeric * 10000 >= v_value::numeric * (ai ->> 'acceptBps')::integer and coalesce(v_cash, 0) >= r.offer_cents then
+      update public.artwork_messages set offer_status = 'accepted' where id = r.id;
+      v_name := a.ai_owner;
+      perform public.nft_sell(a.id, r.author_id, null, r.offer_cents, 'offer', 'art:offer:' || r.id::text, r.id);
+      perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{lines,accept}', random()), null);
+    else
+      update public.artwork_messages set offer_status = 'declined' where id = r.id;
+      perform public.nft_ai_post(a.id, a.ai_owner, 'chat', public.nft_say(a.id, a.ai_owner, '{lines,decline}', random()), null);
+    end if;
+    v_answers := v_answers + 1;
+  end loop;
+
+  -- 3b. ADR-181: collectors answer players in the chat (the AI owner, else the collector who spoke last). Asked for
+  --     more (or told no) by the owner, a collector raises its open offer up to its ceiling, within the budget.
+  if talk ? 'lines' then
+    for r in select m.id, m.artwork_id, m.author_id, m.body from public.artwork_messages m
+              where m.author_id is not null
+                and m.created_at > v_now - make_interval(mins => coalesce((talk ->> 'replyWindowMinutes')::integer, 30))
+                and m.created_at <= v_now - make_interval(mins => coalesce((talk ->> 'replyDelayMinutes')::integer, 1))
+                and not exists (select 1 from public.artwork_messages n where n.artwork_id = m.artwork_id and n.id > m.id)
+              order by m.id limit 50 loop
+      exit when v_replies >= coalesce((talk ->> 'maxRepliesPerRun')::integer, 0);
+      select * into a from public.artworks where id = r.artwork_id for update skip locked;
+      continue when a.id is null;
+      v_name := a.ai_owner;
+      if v_name is null then
+        select m.ai_name into v_name from public.artwork_messages m
+         where m.artwork_id = a.id and m.ai_name is not null
+           and m.created_at > v_now - make_interval(hours => coalesce((talk ->> 'memoryHours')::integer, 6))
+         order by m.id desc limit 1;
+      end if;
+      continue when v_name is null;
+      v_intent := public.nft_intent(r.body);
+      v_offer := null;
+      select * into v_offer from public.artwork_messages m
+       where m.artwork_id = a.id and m.ai_name = v_name and m.offer_status = 'open' and m.expires_at > v_now
+       order by m.id desc limit 1;
+      if v_intent in ('higher', 'no') and v_offer.id is not null and a.owner_id = r.author_id then
+        v_price := public.nft_counter_cents(v_offer.offer_cents, public.nft_ai_value_cents(a.id, v_now));
+        if v_price is not null
+           and public.nft_ai_spent_today(v_now) + v_price <= coalesce((ai ->> 'budgetCentsPerDay')::bigint, 9000000000000000000) then
+          update public.artwork_messages set offer_status = 'closed' where id = v_offer.id;
+          v_id := public.nft_ai_post(a.id, v_name, 'offer', public.nft_say(a.id, v_name, '{talk,lines,counter}', random()), v_price);
+          update public.artwork_messages
+             set expires_at = least(expires_at, v_now + make_interval(mins => round(coalesce((ai ->> 'offerHours')::numeric, 24) * 60)::integer))
+           where id = v_id;
+          perform public.nft_notify_offer(v_id);
+        else
+          perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{talk,lines,final}', random()), null);
+        end if;
+      else
+        perform public.nft_ai_post(a.id, v_name, 'chat',
+                                   public.nft_say(a.id, v_name, array['talk', 'lines', 'reply', v_intent], random()), null);
+      end if;
+      v_replies := v_replies + 1;
+    end loop;
+
+    -- 3c. ADR-181: an ignored offer gets a nudge (once: the nudge is the newest message then)
+    for r in select m.id, m.artwork_id, m.ai_name from public.artwork_messages m
+               join public.artworks x on x.id = m.artwork_id
+              where m.offer_status = 'open' and m.ai_name is not null and m.expires_at > v_now and x.owner_id is not null
+                and m.created_at <= v_now - make_interval(mins => coalesce((talk ->> 'followupMinutes')::integer, 30))
+                and not exists (select 1 from public.artwork_messages n where n.artwork_id = m.artwork_id and n.id > m.id)
+              order by m.id limit 50 loop
+      exit when v_follow >= coalesce((talk ->> 'maxFollowupsPerRun')::integer, 0);
+      continue when random() * 10000 >= coalesce((talk ->> 'followupChanceBps')::integer, 0);
+      perform public.nft_ai_post(r.artwork_id, r.ai_name, 'chat',
+                                 public.nft_say(r.artwork_id, r.ai_name, '{talk,lines,followup}', random()), null);
+      v_follow := v_follow + 1;
+    end loop;
+  end if;
+
+  -- 4. The collectors trade among themselves (ADR-141): popular NFTs change hands more often; the price follows the
+  --    buyer's taste around the fair value and moves only part of the way from the last price.
+  select count(*) into v_trades from public.artwork_sales s
+   where s.seller_ai is not null and s.buyer_ai is not null and s.at >= v_day;
+  select count(*) into v_htrades from public.artwork_sales s
+   where s.seller_ai is not null and s.buyer_ai is not null and s.at > v_now - interval '1 hour';
+  for r in select x.id, x.ai_owner, x.value_cents, x.quality,
+                  (select count(*) from public.artwork_likes l where l.artwork_id = x.id) as likes,
+                  (select count(distinct coalesce(m.author_id::text, m.ai_name)) from public.artwork_messages m
+                    where m.artwork_id = x.id and m.offer_status = 'open') as offers,
+                  (select count(*) from public.artwork_sales s where s.artwork_id = x.id
+                    and s.at >= v_now - make_interval(days => (ai #>> '{demand,days}')::integer)) as sales
+             from public.artworks x
+            where x.ai_owner is not null and x.owner_id is null
+              and coalesce(x.listed_at, x.created_at) <= v_now - make_interval(mins => (ai #>> '{trade,minHoldMinutes}')::integer)
+              and not exists (select 1 from public.artwork_auctions au where au.artwork_id = x.id and au.status = 'open')
+            order by random() limit 200 loop
+    exit when v_traded >= (ai #>> '{trade,perRun}')::integer or v_trades >= (ai #>> '{trade,perDay}')::integer
+              or v_htrades >= coalesce((ai #>> '{trade,perHour}')::integer, 1000000);
+    continue when random() * 10000 >= public.nft_quality_chance_bps(least((ai #>> '{trade,maxChanceBps}')::numeric,
+      floor((ai #>> '{trade,chanceBps}')::numeric * (10000 + (ai #>> '{trade,likeWeightBps}')::numeric * r.likes
+            + (ai #>> '{trade,offerWeightBps}')::numeric * r.offers + (ai #>> '{trade,saleWeightBps}')::numeric * r.sales) / 10000)),
+      r.quality);
+    select * into a from public.artworks where id = r.id for update skip locked;
+    continue when a.id is null or a.ai_owner is distinct from r.ai_owner;
+    -- the buyer is always another collector
+    select c into v_name from jsonb_array_elements_text(ai -> 'collectors') c where c <> a.ai_owner order by random() limit 1;
+    continue when v_name is null;
+    v_price := public.nft_ai_trade_price_cents(a.value_cents, public.nft_fair_cents(a.id, v_now), random());
+    perform public.nft_sell(a.id, null, v_name, v_price, 'ai',
+                            'art:trade:' || a.id::text || ':' || floor(extract(epoch from v_now))::bigint::text);
+    perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{lines,trade}', random()), null);
+    v_traded := v_traded + 1;
+    v_trades := v_trades + 1;
+    v_htrades := v_htrades + 1;
+  end loop;
+
+  return jsonb_build_object('bids', public.nft_ai_bid_auctions(v_now), 'sold', v_sold, 'offers', v_msgs, 'answered', v_answers, 'replies', v_replies, 'followups', v_follow, 'expired', v_expired,
+                            'traded', v_traded);
+end;
+$function$;
+-- ===== idempotent copy of migrations/20261204007030_nft_quality_json.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7030 · The critics' verdict in the NFT JSON (ADR-181)
+-- =============================================================================
+-- artwork_json gets 'quality': {score, best, worst, copy} (null while unrated). The market shows the score as a
+-- small badge, the owner sees the verdict with the strongest and the weakest aspect. Sub-scores stay internal.
+-- Idempotent: runs unchanged as supabase/updates/20261204007030_nft_quality_json.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.artwork_json(uuid, uuid)'::regprocedure);
+  v_a   text := $t$    'ai_owner', a.ai_owner,
+$t$;
+begin
+  if position('''quality''' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'artwork_json() has an unexpected shape; add the critic score (ADR-181) by hand';
+  end if;
+  execute replace(v_def, v_a, v_a || $t$    'quality', case when a.quality is null then null else jsonb_build_object(
+      'score', a.quality, 'best', a.quality_detail ->> 'best', 'worst', a.quality_detail ->> 'worst',
+      'copy', a.quality_detail ->> 'copy') end,
+$t$);
+end;
+$do$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -73031,7 +74101,7 @@ insert into public.game_config (key, value, description) values
   ('interviews', '{"count":3,"maxSituational":2,"chancePerDayBps":2500,"tierBonusBps":{"garage":0,"small_business":1000,"gmbh":2500,"ag":4000},"listedBonusBps":3000,"eventBonusBps":2500,"maxChancePerDayBps":9000,"activeHours":48,"cooldownHours":20,"expiresHours":6,"maxChars":240,"minChars":2,"layoffHours":72,"scandalHours":24,"awarenessFamousBps":3000,"awarenessUnknownBps":1000,"unhappyBelow":40,"happyFrom":75,"judge":{"longChars":60,"shortChars":8,"maxGood":2,"maxBad":2,"good":["kunde","team","danke","verantwort","transparen","qualität","fair","investier","zuhör","gelernt"],"bad":["kein kommentar","egal","lüge","dumm","idiot","pleite","faul","schuld sind","keine ahnung","halt die"],"quickPoints":{"good":1,"ok":0,"bad":-1},"nonePoints":-1},"effects":{"awarenessPerPointBps":60,"maxAwarenessBps":300,"reputationPerPoint":0.5,"maxReputation":3,"declineAwarenessBps":-80,"declineReputation":-0.5,"ignoreAwarenessBps":-120,"ignoreReputation":-1},"perShow":1,"ord":15,"airWithinHours":30,"texts":{"notifyTitle":"Interviewanfrage von NEXA Nachrichten","notifyBody":"Mr. Doodle Dangle will {company} interviewen. Antworte innerhalb von {hours} Stunden.","headline":"Interview mit {ceo} ({company}) · Frage {n}/{total}","text":"{question} {ceo} sagt: »{answer}« {reaction}","noAnswer":"…","noCommentHeadline":"{company}: kein Kommentar","declined":["Wir wollten mit {ceo} von {company} sprechen. Antwort: „Kein Kommentar.“ Wie mutig. Ich notiere: hat etwas zu verbergen.","{ceo} hat unser Interview abgelehnt. {company} schweigt. Das Schweigen war übrigens sehr laut.","Kein Kommentar von {company}. {ceo}, ich nehme das persönlich. Und meine Krawatte auch."],"ignored":["Sechs Stunden haben wir auf {ceo} von {company} gewartet. Nichts. Ich habe in der Zeit drei Kaffee und eine Krise gehabt.","{company} hat unsere Interviewanfrage einfach liegen lassen. {ceo}, wir sehen uns. Wir sehen alles.","Funkstille bei {company}. Entweder ist {ceo} sehr beschäftigt oder sehr ängstlich. Ich tippe auf beides."],"reactions":{"good":["Oh. Das war tatsächlich gut. Ich bin fast gerührt.","Starke Antwort. Ich hasse es, wenn Leute vorbereitet sind.","Applaus aus der Regie! Na gut, von einer Person.","Sehr souverän. Notiert: {ceo} kann reden."],"ok":["Hm. Das war eine Antwort. Technisch gesehen.","Lauwarm, wie der Kaffee in unserer Kantine.","Geht so. Ich gebe eine Fünf von Zehn.","Diplomatisch. Langweilig, aber diplomatisch."],"bad":["Autsch. Das schneiden wir nicht raus.","Die PR-Abteilung von {company} weint gerade leise.","Ich habe mich verhört, oder? Nein? Wunderbar.","Das kommt in den Jahresrückblick. Unter Peinlichkeiten."],"none":["Schweigen. Sehr tiefgründig. Oder einfach nichts.","Keine Antwort ist auch eine Antwort. Eine schlechte."]},"effectAwareness":"Bekanntheit","effectReputation":"Ruf"},"moods":{"good":["proud","laughing"],"ok":["smug","confused"],"bad":["shocked","angry"],"none":["angry","crying"]},"pool":[{"key":"profit_secret","when":"profit","text":"{company} hat zuletzt {profit} Gewinn gemacht. Verraten Sie uns das Geheimnis, oder ist es Glück?","quick":[{"text":"Ein starkes Team und zufriedene Kunden. Kein Glück.","tone":"good"},{"text":"Ein bisschen von beidem, ehrlich gesagt.","tone":"ok"},{"text":"Das Geheimnis behalte ich schön für mich.","tone":"bad"}],"good":["team","kunde","qualität","fleiß","arbeit"]},{"key":"profit_bonus","when":"profit","text":"Bei so viel Gewinn: Bekommt das Team einen Bonus oder kauft sich {ceo} eine Yacht?","quick":[{"text":"Das Team bekommt einen Bonus, die Yacht kann warten.","tone":"good"},{"text":"Wir investieren erst mal in die Firma.","tone":"ok"},{"text":"Die Yacht ist schon bestellt.","tone":"bad"}],"good":["bonus","team","investier","mitarbeit"]},{"key":"loss_plan","when":"loss","text":"{company} schreibt rote Zahlen, zuletzt {profit}. Wie lange schauen Sie sich das noch an?","quick":[{"text":"Wir haben einen klaren Plan und sparen an den richtigen Stellen.","tone":"good"},{"text":"Das wird schon wieder.","tone":"ok"},{"text":"Schuld sind die Kunden, nicht wir.","tone":"bad"}],"good":["plan","spar","kosten","verbesser","umbau"]},{"key":"loss_blame","when":"loss","text":"Wer ist schuld am Verlust: der Markt, das Team oder der Chef im Spiegel?","quick":[{"text":"Am Ende trage ich die Verantwortung.","tone":"good"},{"text":"Der Markt war schwierig.","tone":"ok"},{"text":"Das Team, ganz klar.","tone":"bad"}],"good":["verantwort","ich","lernen","fehler"]},{"key":"listed_price","when":"listed","text":"Die Aktie von {company} hüpft auf und ab. Was sagen Sie den Aktionären, die nachts nicht schlafen können?","quick":[{"text":"Wir denken langfristig, und das zahlt sich aus.","tone":"good"},{"text":"Baldrian hilft.","tone":"ok"},{"text":"Die sollen halt verkaufen.","tone":"bad"}],"good":["langfristig","dividende","vertrauen","strategie","wachstum"]},{"key":"listed_dividend","when":"listed","text":"Wann gibt es endlich eine ordentliche Dividende, oder geht alles in neue Bürostühle?","quick":[{"text":"Die Dividende wächst mit dem Gewinn, versprochen.","tone":"good"},{"text":"Wir prüfen das im Geschäftsrat.","tone":"ok"},{"text":"Die Bürostühle sind wirklich sehr bequem.","tone":"bad"}],"good":["dividende","aktionär","gewinn","ausschütt"]},{"key":"unhappy_staff","when":"unhappy","text":"Die Stimmung bei {company} liegt bei {satisfaction} Prozent. Ist das Büro ein Gefängnis mit Kaffeemaschine?","quick":[{"text":"Wir hören zu und ändern konkret etwas, ab Montag.","tone":"good"},{"text":"Es gibt bessere Tage.","tone":"ok"},{"text":"Wem es nicht passt, der kann gehen.","tone":"bad"}],"good":["zuhören","gehalt","stimmung","ändern","mitarbeit"]},{"key":"happy_staff","when":"happy","text":"Bei {company} sind {satisfaction} Prozent zufrieden. Was gibt es da in der Kantine, Glückspillen?","quick":[{"text":"Faire Gehälter und echtes Vertrauen.","tone":"good"},{"text":"Sehr guten Kuchen.","tone":"ok"},{"text":"Ich weiß auch nicht, ehrlich.","tone":"bad"}],"good":["vertrauen","fair","gehalt","team"]},{"key":"layoffs","when":"layoffs","text":"Bei {company} wurden zuletzt Leute rausgeworfen. War das nötig oder hatten Sie einfach schlechte Laune?","quick":[{"text":"Es war schwer, und wir helfen allen beim Neuanfang.","tone":"good"},{"text":"Es musste leider sein.","tone":"ok"},{"text":"Die waren eh faul.","tone":"bad"}],"good":["helfen","schwer","leid","fair","abfindung"]},{"key":"scandal","when":"scandal","text":"Ganz NEXA spricht über den Skandal bei {company}. Ihre Entschuldigung, bitte. Jetzt. Live.","quick":[{"text":"Wir entschuldigen uns und machen alles transparent.","tone":"good"},{"text":"Wir prüfen die Vorwürfe.","tone":"ok"},{"text":"Welcher Skandal?","tone":"bad"}],"good":["entschuldig","transparen","aufklär","verantwort"]},{"key":"big_monopoly","when":"big","text":"{company} ist inzwischen riesig. Wollen Sie eigentlich die ganze Stadt kaufen?","quick":[{"text":"Wir wollen besser werden, nicht nur größer.","tone":"good"},{"text":"Nur die schönen Ecken.","tone":"ok"},{"text":"Ja. Und danach das Land.","tone":"bad"}],"good":["besser","kunde","verantwort","qualität"]},{"key":"small_dream","when":"small","text":"{company} ist noch klein. Wann sehen wir Sie auf dem Cover der Wirtschaftspresse?","quick":[{"text":"Wenn unsere Kunden uns weiterempfehlen. Bald.","tone":"good"},{"text":"Gut Ding will Weile haben.","tone":"ok"},{"text":"Nächste Woche, ich habe schon ein Foto gemacht.","tone":"bad"}],"good":["kunde","geduld","schritt","wachs"]},{"key":"solo_founder","when":"solo","text":"Sie machen bei {company} alles allein. Reden Sie in der Mittagspause mit dem Drucker?","quick":[{"text":"Noch, aber bald stelle ich die ersten Leute ein.","tone":"good"},{"text":"Der Drucker ist ein guter Zuhörer.","tone":"ok"},{"text":"Ich brauche niemanden.","tone":"bad"}],"good":["einstell","team","suche","wachs"]},{"key":"famous","when":"famous","text":"Jeder kennt {company}. Wie fühlt es sich an, berühmter zu sein als ich?","quick":[{"text":"Das verdanken wir unseren Kunden.","tone":"good"},{"text":"Ungewohnt, aber schön.","tone":"ok"},{"text":"Das war ja auch nicht schwer.","tone":"bad"}],"good":["kunde","danke","dankbar","team"]},{"key":"unknown","when":"unknown","text":"Ehrlich gesagt kannte ich {company} bis heute nicht. Warum sollte sich das ändern?","quick":[{"text":"Weil wir ein Problem lösen, das alle kennen.","tone":"good"},{"text":"Weil Sie uns jetzt kennen.","tone":"ok"},{"text":"Ihr Problem, nicht meins.","tone":"bad"}],"good":["problem","lösung","kunde","besser","produkt"]},{"key":"vision","when":"always","text":"Wo steht {company} in fünf Jahren? Und bitte nicht „auf dem Mond“.","quick":[{"text":"Marktführer, mit glücklichen Kunden und Team.","tone":"good"},{"text":"Hoffentlich noch da.","tone":"ok"},{"text":"Auf dem Mond.","tone":"bad"}],"good":["kunde","team","wachs","nachhaltig","marktführer"]},{"key":"morning","when":"always","text":"Wie sieht der Morgen eines CEOs aus? Kalte Dusche, grüner Smoothie, Kurse checken?","quick":[{"text":"Kaffee mit dem Team und ein Blick auf die Zahlen.","tone":"good"},{"text":"Schlummertaste, dreimal.","tone":"ok"},{"text":"Ich stehe nie vor zwölf auf.","tone":"bad"}],"good":["team","zahlen","kunde","früh"]},{"key":"competition","when":"always","text":"Was sagen Sie Ihrer Konkurrenz, die gerade zuschaut?","quick":[{"text":"Danke, ihr macht uns besser.","tone":"good"},{"text":"Gute Unterhaltung.","tone":"ok"},{"text":"Ihr seid bald pleite.","tone":"bad"}],"good":["danke","respekt","besser","fair"]},{"key":"mistake","when":"always","text":"Was war Ihr teuerster Fehler als Chef von {company}? Wir haben Zeit.","quick":[{"text":"Zu spät zugehört. Daraus habe ich gelernt.","tone":"good"},{"text":"Die neue Kaffeemaschine.","tone":"ok"},{"text":"Ich mache keine Fehler.","tone":"bad"}],"good":["gelernt","lernen","fehler","zuhören"]},{"key":"product_pitch","when":"always","text":"Sie haben zehn Sekunden: Warum sollen unsere Zuschauer bei {company} kaufen?","quick":[{"text":"Beste Qualität zum fairen Preis, mit Service.","tone":"good"},{"text":"Weil es da ist.","tone":"ok"},{"text":"Weil die anderen noch schlechter sind.","tone":"bad"}],"good":["qualität","preis","service","fair","kunde"]},{"key":"ai_workers","when":"always","text":"Ersetzen bei {company} bald Roboter alle Menschen, auch den Chef?","quick":[{"text":"Die KI hilft dem Team, sie ersetzt es nicht.","tone":"good"},{"text":"Den Chef hoffentlich zuletzt.","tone":"ok"},{"text":"Am liebsten sofort, Menschen sind so teuer.","tone":"bad"}],"good":["helfen","team","mensch","unterstütz"]},{"key":"doodle_tie","when":"always","text":"Letzte Frage, sehr wichtig: Wie finden Sie meine Krawatte?","quick":[{"text":"Mutig. Fast so mutig wie unser nächstes Produkt.","tone":"good"},{"text":"Sie ist… eine Krawatte.","tone":"ok"},{"text":"Ehrlich? Furchtbar.","tone":"bad"}],"good":["schön","mutig","toll","elegant","super"]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "interviews"'),
   ('pitches', '{"minChars":12,"maxChars":280,"judgeWaitSeconds":90,"eventMinutes":20,"moveMinutes":30,"orderCooldownMinutes":60,"chanceBaseBps":1000,"chancePerFitBps":80,"maxChanceBps":9000,"eventCostUnits":2,"moveCostFactor":1.2,"mitigationBase":0.35,"mitigationPerFit":0.005,"maxMitigation":0.9,"movePayoutBase":1.3,"movePayoutPerFit":0.012,"moveGainBase":0.02,"moveGainPerFit":0.0006,"moveRefundBps":2000,"backfireAwareness":0.05,"mini":{"fitBase":25,"fitPerHit":12,"maxHits":4,"longTextChars":60,"longTextBonus":10,"maxFit":85,"backfireBase":10,"backfirePerRisky":20,"maxBackfire":70,"risky":["imagefilm","werbung","werbekampagne","influencer","pr-","greenwashing","ignorieren","leugnen","abstreiten","lügen","vertuschen","schweigen","aussitzen","drohen","verklagen","entlassen","billiger","bestechen"],"good":{"regulation":["anwalt","recht","prüfen","anpassen","lobby","verband","gutachten","umstellen","dialog"],"special_tax":["steuer","berater","kalkul","preis","rohstoff","ersatz","sparen","lieferant"],"supply_shortage":["lieferant","lager","alternativ","vorrat","zweit","ersatz","vertrag","regional"],"quality_scandal":["rückruf","entschuldig","prüf","qualität","kontroll","ersetzen","transparen","entschädig"],"tax_audit":["unterlagen","beleg","steuerberater","anwalt","kooper","offen","nachzahl","ordnung"],"data_breach":["sicherheit","passwort","verschlüssel","melden","experten","informieren","update","audit"],"price_war":["qualität","service","treue","nische","kosten","bündel","mehrwert","marke"],"strike":["lohn","gehalt","verhandl","bonus","gespräch","kompromiss","zuhören","arbeitszeit","tarif"],"protest":["dialog","einladen","zuhören","ändern","nachhaltig","transparen","spenden","fair"],"patent_claim":["anwalt","patent","lizenz","einigung","gutachten","umgehen","vergleich","eigene"],"bad_review":["verbessern","test","feedback","kunden","nachbessern","qualität","gratis","update"],"viral_trend":["nachproduz","lager","social","video","aktion","schnell","limitiert","community"],"big_contract":["kapazität","personal","einstellen","termin","liefer","verhandl","vertrag","schicht"],"award":["pressemitteilung","werbung","feiern","kunden","messe","präsentieren","website","siegel"],"subsidy":["antrag","förder","investieren","forschung","berater","unterlagen","frist","projekt"],"partnership":["vertrag","gemeinsam","partner","teilen","kooperation","verhandl","netzwerk","vertrieb"],"cash":["verkauf","auftrag","kunden","rabatt","angebot","großkunde","export","abo","online"],"awareness":["werbung","messe","social","video","presse","influencer","sponsor","event","kampagne"],"quality":["schulung","test","prüfen","verbessern","material","zertifi","forschung","feedback"]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "pitches"'),
   ('protests', '{"kinds":["boycott","shitstorm","petition","protest_march"],"startCostCents":50000,"goal":20,"aiMax":16,"aiJoinChanceBps":3000,"aiPerMinuteMax":2,"durationHours":6,"starterCooldownHours":6,"visibleAfterMinutes":60,"effectChanceBaseBps":600,"effectChancePerPlayerBps":300,"effectChanceMaxBps":3500,"priceHitMinBps":150,"priceHitMaxBps":450,"awarenessHit":0.03,"minLevel":4}'::jsonb, 'Defaults from src/config/balance.ts, section "protests"'),
-  ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":1500,"unlistedOfferChanceBps":400,"maxOpenAiOffers":3,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":100,"maxBuysPerHour":6,"maxMessagesPerRun":10,"budgetCentsPerDay":30000000,"offerHours":2,"auction":{"bidChanceBps":1000,"maxBidsPerRun":3},"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":250,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":4000,"minHoldMinutes":10,"perRun":6,"perHour":24,"perDay":480,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
+  ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"quality":{"coverageMinPct":15,"dominanceMaxPct":90,"colourScores":[0,20,55,80,100,100,100,100,100,90,85,80,75,70,65,60,55],"strayPct":1,"strayPenalty":8,"chromaMinPct":20,"hueBuckets":3,"huePenalty":14,"hueFloor":20,"contrastFull":160,"noiseFreePct":5,"fragmentFreePct":10,"detailMin":40,"detailMax":350,"shapeFullPct":40,"balanceFreePct":10,"nearCopyPct":2,"copyCap":5,"nearCopyCap":15,"gateBase":30,"weights":{"coverage":10,"colours":12,"harmony":12,"contrast":10,"structure":16,"outline":8,"composition":10,"detail":10,"shapes":12}},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":1500,"unlistedOfferChanceBps":400,"maxOpenAiOffers":3,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":100,"maxBuysPerHour":6,"maxMessagesPerRun":10,"budgetCentsPerDay":30000000,"offerHours":2,"auction":{"bidChanceBps":1000,"maxBidsPerRun":3},"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":250,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":4000,"minHoldMinutes":10,"perRun":6,"perHour":24,"perDay":480,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"quality":{"neutral":50,"valueMinBps":6000,"valueMaxBps":14000,"chanceMinBps":2000,"chanceMaxBps":20000,"noInterestBelow":10,"lowballShiftBps":1500,"mockBelow":35,"praiseFrom":75,"goodFrom":85,"badBelow":45},"talk":{"replyDelayMinutes":1,"replyWindowMinutes":30,"memoryHours":6,"maxRepliesPerRun":8,"followupMinutes":30,"followupChanceBps":3000,"maxFollowupsPerRun":4,"counterStepBps":800,"counterCeilingBps":9500,"personaChanceBps":2500,"recentLines":6,"intentOrder":["insult","higher","lower","no","yes","question"],"intents":{"insult":["idiot","blöd","doof","dumm","depp","trottel","lächerlich","unverschämt","halt die klappe","verpiss","penner","spinner"],"higher":["mehr","höher","zu wenig","zu niedrig","drauflegen","erhöhen","nachlegen","besseres angebot","aufstocken","legen sie was drauf","leg was drauf"],"lower":["weniger","billiger","günstiger","rabatt","nachlass","zu teuer","runter","preis senken"],"no":["nein","nö","nee","ne","niemals","nope","vergiss es","kein interesse","auf keinen fall","no"],"yes":["ja","jo","jap","ok","okay","deal","gerne","gern","einverstanden","abgemacht","klar","passt","yes"],"question":["?","warum","wieso","weshalb","wer","was","wie","wann","wo"]},"lines":{"praise":["Das ist kein NFT, das ist ein Fenster in eine bessere Welt. Mein Angebot.","Ich habe beim Anschauen spontan Gänsehaut bekommen. Oder es zieht. Egal, ich biete.","Endlich mal Pixel mit Haltung. Nimm mein Geld.","Meine Augen bedanken sich persönlich bei dir. Hier ein Angebot.","Das gehört ins Museum. Oder in mein Wohnzimmer, das ist fast dasselbe.","Wer hat dir so malen beigebracht? Ich will auch so ein Gehirn.","Ich habe es meiner Oma gezeigt. Sie hat ihr Testament geändert. Angebot!","Jeder Pixel sitzt. Das ist seltener als ein pünktlicher Zug.","So etwas sieht man nicht alle Tage. Eigentlich nie. Ich biete ordentlich.","Ich musste kurz sitzen. So schön ist das.","Das Bild hat mehr Charakter als mein Schwager. Mein Angebot.","Wenn das nicht in meine Sammlung kommt, kann ich nachts nicht schlafen.","Ich nenne das ab sofort mein Lieblingsbild. Sorry, Mona Lisa.","Das ist so gut, ich biete freiwillig mehr. Sag es keinem."],"mock":["Sind das Pixel oder ein Unfall? Ich biete trotzdem was, aus Mitleid.","Mein Toaster hat beim Toasten ein schöneres Muster gemacht. Kleines Angebot.","Ich glaube, dein Bildschirm hat geniest. Ich zahle für das Taschentuch.","Das sieht aus wie ein Tastaturtest. Ich biete wenig, aber mit Herz.","Mutig! Sehr mutig. Zu mutig für viel Geld.","Hat das deine Katze gemalt? Grüß sie, ich biete ihr ein Leckerli.","Ich habe es umgedreht. Wurde nicht besser. Angebot steht trotzdem.","Abstrakt, sagst du? Ich sage: Restposten.","Ich nehme es als Untersetzer. Dafür reicht mein Angebot.","Ich hatte heute einen schlechten Tag. Jetzt hatte ich einen schlechteren. Ein kleines Angebot.","Das ist Kunst. Wahrscheinlich. Vielleicht. Wenig Geld dafür.","Mein Optiker will das Bild als Sehtest. Mehr ist es mir nicht wert.","Wenn ich die Augen zusammenkneife, sieht es fast nach etwas aus. Fast.","Ich biete das. Die Pixel sollen sich ja nicht einsam fühlen."],"copy":["Moment mal. Das habe ich doch schon irgendwo gesehen. Fast genauso. Kleines Angebot.","Ein Original ist es nicht, aber ein sehr fleißiges Abbild. Ich biete wenig.","Kopieren ist auch eine Kunst. Eine billige. Mein Angebot.","Ich hatte ein Déjà-vu. Dann habe ich das Original gefunden. Angebot trotzdem.","Strg+C, Strg+V, Strg+Gewinn? Nicht mit mir. Aber ein kleines Angebot.","Das zweite Mal ist es nur halb so aufregend. Halber Preis."],"good":{"coverage":["Die Fläche ist perfekt genutzt. Kein Pixel zu viel, keiner zu wenig.","Wunderbar gefüllt, ohne vollgestopft zu sein. Respekt."],"colours":["Diese Farbauswahl! Da hat jemand nachgedacht.","Genau die richtige Zahl an Farben. Kein Farbeimer-Unfall."],"harmony":["Diese Farbpalette ist ein Gedicht.","Die Farben vertragen sich besser als meine Verwandtschaft."],"contrast":["Der Kontrast knallt, ohne zu schreien. Chef’s Kiss.","Hell und Dunkel tanzen hier Walzer."],"structure":["So sauber gezeichnet, da könnte man vom Bild essen.","Kein einziger verirrter Pixel. Ich bin beeindruckt."],"outline":["Diese Konturen! Gestochen scharf.","Die Umrisse sitzen wie ein Maßanzug."],"composition":["Die Komposition ist perfekt ausbalanciert. Feng-Shui für die Augen.","Alles steht genau da, wo es hingehört."],"detail":["So viele kleine Details, ich entdecke immer noch neue.","Detailverliebt bis in den letzten Pixel."],"shapes":["Klare Formen, sofort erkennbar. So muss das.","Die Formen sind so deutlich, sogar mein Opa erkennt sie ohne Brille."]},"bad":{"coverage":["Da ist ja kaum was drauf. Hast du das Bild im Dunkeln gemalt?","Viel Platz, wenig Bild. Wie mein Kühlschrank."],"colours":["Eine Farbe? Mutig. Oder sparsam. Oder beides.","So viele Farben, da wird mir schwindelig."],"harmony":["Die Farben streiten sich hörbar. Ich höre es bis hier.","Diese Farbkombination sollte verboten werden. Ich biete trotzdem."],"contrast":["Alles so ähnlich hell, ich suche noch das Motiv.","Mehr Kontrast hat mein Nebel im Badezimmer."],"structure":["So viele einzelne Pixel, ist das Kunst oder Pfeffer?","Da sind Krümel auf dem Bild. Ach, das sind Pixel."],"outline":["Ein paar Konturen hätten nicht geschadet. Alles verschwimmt.","Wo hört das Ding auf und wo fängt der Rest an?"],"composition":["Alles hängt in einer Ecke. Ist das Bild umgekippt?","Das Bild hat Schlagseite. Ich halte mich fest."],"detail":["Etwas wenig los auf dem Bild. Ich habe kurz geschlafen.","Das ist so unruhig, meine Augen haben gekündigt."],"shapes":["Ich erkenne keine Form. Ist das ein Hund? Ein Haus? Ein Gefühl?","Mehr Gekritzel als Gestalt. Aber charmant."]},"followup":["Hallo? Mein Angebot steht noch. Ich warte. Geduldig. Fast.","Ich sehe, du hast mein Angebot gelesen. Oder nicht? Huhu!","Kleine Erinnerung: Mein Angebot wird nicht jünger. Ich auch nicht.","Ich habe extra einen Tee gekocht, um auf deine Antwort zu warten. Er ist jetzt kalt.","Klopf, klopf. Wer ist da? Mein Angebot.","Falls du schläfst: Mein Angebot schläft nicht.","Ich starre seit einer halben Stunde auf den Chat. Meine Familie macht sich Sorgen.","Schweigen ist Gold, aber mein Angebot ist Geld.","Ich habe mein Angebot nochmal angeschaut. Es ist immer noch gut. Nur so.","Bist du noch da? Blinzle zweimal, wenn du verkaufen willst.","Mein Angebot läuft bald ab. Wie meine Milch. Bitte entscheide dich vor der Milch.","Ich warte noch. Hab schon das Regal freigeräumt."],"counter":["Na gut, na gut. Ich lege etwas drauf. Aber nur, weil heute Dienstag ist. Oder so.","Du verhandelst hart. Ich mag das. Neues Angebot.","Mein Portemonnaie weint, aber hier: etwas mehr.","Okay, ich erhöhe. Erzähl es nicht Baron von Bit.","Für dich lege ich nach. Meine Katze bekommt diese Woche nur Trockenfutter.","Ein letzter Schritt nach oben. Ich habe Höhenangst.","Du bist gut. Hier, mehr Geld. Aber dann ist Schluss. Wahrscheinlich.","Ich habe nochmal nachgezählt und noch ein paar Münzen im Sofa gefunden.","Gegenangebot! Ich fühle mich wie ein echter Händler.","Ich erhöhe, weil das Bild mich so treuherzig anschaut."],"final":["Mehr geht wirklich nicht. Sonst muss ich mein Sofa verkaufen.","Das ist mein letztes Wort. Und mein vorletztes auch.","Höher gehe ich nicht. Ich habe Höhenangst, das sagte ich doch.","Mein Limit ist erreicht. Mein Bankberater hat mich blockiert.","Nein, mehr ist nicht drin. Nimm es oder lass es, aber nimm es.","Ich bin bei meinem Maximum. Ab hier zahlen nur noch Träume."],"reply":{"yes":["Wunderbar! Dann klick auf Annehmen, bevor ich wieder vernünftig werde.","Ja? Ja! Dann drück den Knopf und es gehört mir.","Ich wusste, wir verstehen uns. Annehmen und fertig.","Herrlich. Ich halte den Rahmen schon bereit.","Abgemacht? Dann nimm mein Angebot an. Ich tanze schon.","Super, ich warte nur noch auf deinen Klick."],"no":["Nein? Das tut weh. Aber ich komme wieder.","Schade. Ich weine kurz in mein Kissen und biete dann wieder.","Ein Nein ist nur ein Ja, das noch nicht weiß, dass es eins ist.","Okay, okay. Ich lasse das Angebot trotzdem liegen. Nur für alle Fälle.","Nein ist auch eine Antwort. Eine falsche, aber eine Antwort.","Verstanden. Ich bin nicht beleidigt. Nur ein bisschen. Sehr."],"higher":["Mehr? Ich bin Sammler, kein Goldesel.","Du willst mehr? Ich will auch mehr. Wir haben so viel gemeinsam.","Mehr Geld? Hm. Ich denke darüber nach. Langsam.","Höher? Ich muss erst meine Sparschweine befragen.","Für mehr Geld müsste das Bild auch tanzen können.","Du klingst wie mein Vermieter. Ich überlege es mir."],"lower":["Du willst weniger Geld? Du bist der netteste Mensch im ganzen Chat.","Billiger? Gern, ich bin immer für Rabatt zu haben.","Weniger? Ich lehne das nicht ab. Ich bin ja nicht verrückt.","Rabatt? Ich mag dich jetzt noch mehr.","Wenn du es mir billiger gibst, schreibe ich dir ein Gedicht. Ein kurzes."],"insult":["Autsch. Ich bin Sammler, kein Sandsack. Mein Angebot bleibt trotzdem.","Na, na, na. Wir reden hier über Kunst, nicht über mich.","Ich ignoriere das, weil ich höflich bin. Und weil ich das Bild will.","So spricht man nicht mit seinem besten Kunden.","Ich habe das nicht gelesen. Wirklich nicht. Mein Angebot steht.","Hart, aber ich bin härter. Na gut, ich bin weich. Aber das Angebot steht."],"question":["Gute Frage. Die Antwort ist: Ich mag das Bild. Und Geld habe ich auch.","Warum? Weil Kunst. Und weil mein Wohnzimmer leer ist.","Frag mich lieber, warum ich so gut aussehe. Ach, das war nicht die Frage.","Das weiß niemand genau. Nicht mal ich. Aber mein Angebot ist ernst.","Ich beantworte Fragen nur gegen Kunst. Verkauf mir das Bild, dann erkläre ich alles.","Hm, darüber muss ich nachdenken. Bis morgen. Oder übermorgen.","Meine Antwort: ein klares Vielleicht.","Das fragt mich meine Mutter auch immer. Antwort: weil ich es kann."],"other":["Interessant. Ich nicke verständnisvoll und biete weiter.","Ich habe das gelesen und für sehr klug befunden.","Spannend. Ich schreibe es mir auf. Auf eine Serviette.","Ich verstehe. Also nicht ganz. Aber ich tu so.","Haha, du bist ja witzig. Verkauf mir trotzdem das Bild.","Notiert. Mein Papagei hat es auch gehört.","Wie auch immer: Das Bild ist toll und ich bin reich. Fast.","Ich mag, wie du schreibst. Fast so sehr wie dein Bild."]}},"personas":{"Vera Vermeer":["Als Kennerin sage ich: Das Licht! Wo ist das Licht? Ach, da. Angebot.","Ich sammle seit 1987. Damals hatten Pixel noch Manieren.","Vera Vermeer bietet nie zweimal. Heute schon. Ausnahme."],"Konrad Kollektor":["Ich habe 4.000 Bilder und keine Wand mehr. Egal, ich biete.","Konrad hier. Ich katalogisiere das unter: haben wollen.","In meiner Excel-Tabelle ist noch eine Zeile frei. Für dich."],"Pixel-Paula":["Paula findet: mehr Pixel, mehr Liebe. Hier mein Angebot.","Ich zähle jeden Pixel einzeln. Es dauert. Es lohnt sich.","Pixel-Paula ist begeistert. Das passiert nur bei Vollmond."],"Baron von Bit":["Der Baron gestattet sich ein Angebot. Seien Sie geehrt.","In meinem Schloss ist noch ein Platz neben dem Rittersaal-Router frei.","Ein Baron feilscht nicht. Er verhandelt majestätisch."],"Mia Mosaik":["Mia hier. Ich setze dein Bild in mein großes Mosaik. Stück für Stück.","Ich sehe das Bild schon als Teil von etwas Größerem. Angebot!","Kleine Kacheln, große Gefühle. Ich biete."],"Otto Original":["Otto sammelt nur Originale. Ich hoffe, das ist eins.","Ich habe einen Echtheitsdetektor. Er piept. Das ist gut, oder?","Otto Original bietet original. Wortspiel beabsichtigt."],"Gräfin Glitzer":["Darling, das funkelt nicht genug. Ich biete trotzdem.","Die Gräfin wünscht dieses Bild. Mit Glitzer, wenn möglich.","Ich hänge es in den Ballsaal. Gleich neben die Diskokugel."],"Sammler Sam":["Sam hier. Ich war schon wieder zu langsam. Diesmal nicht!","Sammler Sam sammelt. Das ist mein Job. Und mein Hobby. Und mein Problem.","Ich habe ein Bauchgefühl. Es knurrt. Das heißt: kaufen."]}},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
   ('accessories', '{"slots":["back","body","face","head","hand","pet"],"feedRarities":["legendary","mythic"],"items":[{"key":"party_hat","name":"Partyhütchen","description":"Jeder Tag ist ein Feiertag, wenn das Depot grün ist.","slot":"head","rarity":"common","priceCents":75000,"minLevel":1,"set":"holidays"},{"key":"paper_crown","name":"Pappkrone","description":"Vom Burgerladen. Fühlt sich trotzdem königlich an.","slot":"head","rarity":"common","priceCents":135000,"minLevel":1},{"key":"beanie","name":"Bommelmütze","description":"Hält warm, wenn der Markt eiskalt ist.","slot":"head","rarity":"common","priceCents":180000,"minLevel":1},{"key":"traffic_cone","name":"Leitkegel","description":"Vom Heimweg mitgenommen. Niemand fragt nach.","slot":"head","rarity":"common","priceCents":240000,"minLevel":1,"set":"absurd"},{"key":"propeller_cap","name":"Propellermütze","description":"Dreht sich bei jedem Kursanstieg ein bisschen schneller.","slot":"head","rarity":"rare","priceCents":1250000,"minLevel":2,"set":"absurd"},{"key":"chef_hat","name":"Kochmütze","description":"Für alle, die ihr Depot nach Gefühl würzen.","slot":"head","rarity":"rare","priceCents":1500000,"minLevel":2,"set":"chef"},{"key":"bunny_ears","name":"Hasenohren","description":"Hört Gerüchte schon, bevor sie in den Nachrichten sind.","slot":"head","rarity":"rare","priceCents":2000000,"minLevel":3,"set":"zoo"},{"key":"cowboy_hat","name":"Cowboyhut","description":"Yeehaw! Der Wilde Westen heißt jetzt Börse.","slot":"head","rarity":"rare","priceCents":3250000,"minLevel":3},{"key":"pirate_hat","name":"Piratenhut","description":"Arrr! Für Leute, die Dividenden lieber entern.","slot":"head","rarity":"epic","priceCents":24500000,"minLevel":5,"set":"pirate"},{"key":"viking_helmet","name":"Wikingerhelm","description":"Plündert keine Dörfer, nur Short-Positionen.","slot":"head","rarity":"epic","priceCents":42000000,"minLevel":6,"set":"knight"},{"key":"top_hat","name":"Zylinder","description":"Ab hier redet man nur noch über Rendite und Pferde.","slot":"head","rarity":"epic","priceCents":105000000,"minLevel":10,"set":"royal"},{"key":"halo","name":"Heiligenschein","description":"Garantiert nie Insiderhandel betrieben. Ehrlich.","slot":"head","rarity":"legendary","priceCents":750000000,"minLevel":15},{"key":"crown","name":"Goldkrone","description":"Massives Pixelgold mit echten Fake-Diamanten.","slot":"head","rarity":"legendary","priceCents":5000000000,"minLevel":25,"set":"royal"},{"key":"clown_nose","name":"Clownsnase","description":"Macht jeden Verlust ein bisschen lustiger. Hupt nicht.","slot":"face","rarity":"common","priceCents":75000,"minLevel":1,"set":"absurd"},{"key":"sunglasses","name":"Sonnenbrille","description":"Die Zukunft ist so hell, man braucht eine.","slot":"face","rarity":"common","priceCents":105000,"minLevel":1,"set":"rock"},{"key":"fake_moustache","name":"Falscher Schnurrbart","description":"Perfekte Tarnung. Niemand erkennt dich. Wirklich niemand.","slot":"face","rarity":"common","priceCents":120000,"minLevel":1,"set":"absurd"},{"key":"heart_glasses","name":"Herzchenbrille","description":"Verliebt in jede Aktie, die man gerade gekauft hat.","slot":"face","rarity":"rare","priceCents":900000,"minLevel":2},{"key":"glasses_3d","name":"3D-Brille","description":"Endlich sieht man den Kurs auch in die Tiefe fallen.","slot":"face","rarity":"rare","priceCents":1100000,"minLevel":3},{"key":"monocle","name":"Monokel","description":"Ein Auge auf den Markt, das andere auf den Butler.","slot":"face","rarity":"epic","priceCents":31500000,"minLevel":7,"set":"royal"},{"key":"vr_goggles","name":"VR-Brille","description":"Lebt halb im Metaversum, halb im Minus.","slot":"face","rarity":"epic","priceCents":84000000,"minLevel":8},{"key":"deal_shades","name":"Pixel-Sonnenbrille","description":"Fällt aus dem Nichts ins Gesicht. Deal with it.","slot":"face","rarity":"epic","priceCents":56000000,"minLevel":6,"set":"rock"},{"key":"laser_eyes","name":"Laseraugen","description":"Nur echt mit mindestens einem Coin, der zum Mond fliegt.","slot":"face","rarity":"legendary","priceCents":2500000000,"minLevel":20},{"key":"bathrobe","name":"Bademantel","description":"Homeoffice-Uniform. Trading geht auch im Liegen.","slot":"body","rarity":"common","priceCents":150000,"minLevel":1,"set":"office"},{"key":"tracksuit","name":"Trainingsanzug","description":"Raschelt bei jeder Bewegung. Sehr sportlich, nie gejoggt.","slot":"body","rarity":"common","priceCents":210000,"minLevel":1,"set":"sports"},{"key":"hawaiian_shirt","name":"Hawaiihemd","description":"Urlaubsmodus an, Depot läuft trotzdem.","slot":"body","rarity":"common","priceCents":270000,"minLevel":2},{"key":"banana_costume","name":"Bananenkostüm","description":"Krumm, gelb und immer ein Hingucker. Nicht ausrutschen.","slot":"body","rarity":"rare","priceCents":2500000,"minLevel":2,"set":"absurd"},{"key":"hotdog_costume","name":"Hotdog-Kostüm","description":"Mit extra Senf. Riecht zum Glück nur nach Stoff.","slot":"body","rarity":"rare","priceCents":3750000,"minLevel":3,"set":"absurd"},{"key":"tuxedo","name":"Smoking","description":"Für Börsengänge, Galas und das Abendessen zu Hause.","slot":"body","rarity":"rare","priceCents":6000000,"minLevel":4,"set":"royal"},{"key":"shark_costume","name":"Haikostüm","description":"Für echte Finanzhaie. Beißt nur bei Leerverkäufen.","slot":"body","rarity":"epic","priceCents":28000000,"minLevel":5,"set":"zoo"},{"key":"dino_onesie","name":"Dino-Onesie","description":"Rawr! Uralte Anlagestrategie, extrem kuschelig.","slot":"body","rarity":"epic","priceCents":38500000,"minLevel":6,"set":"zoo"},{"key":"astronaut_suit","name":"Raumanzug","description":"Wer zum Mond will, muss sich passend anziehen.","slot":"body","rarity":"epic","priceCents":140000000,"minLevel":12,"set":"space"},{"key":"gold_suit","name":"Goldanzug","description":"Glänzt so sehr, dass die Konkurrenz eine Sonnenbrille braucht.","slot":"body","rarity":"legendary","priceCents":3000000000,"minLevel":20,"set":"royal"},{"key":"balloon","name":"Luftballon","description":"Steigt wie deine Lieblingsaktie. Platzt hoffentlich nicht.","slot":"hand","rarity":"common","priceCents":45000,"minLevel":1,"set":"holidays"},{"key":"baguette","name":"Baguette","description":"Knusprig, französisch, als Zeigestab bestens geeignet.","slot":"hand","rarity":"common","priceCents":60000,"minLevel":1,"set":"chef"},{"key":"rubber_chicken","name":"Gummihuhn","description":"Quietscht bei jedem Verlust. Also oft.","slot":"hand","rarity":"common","priceCents":90000,"minLevel":1,"set":"absurd"},{"key":"ice_cream","name":"Eistüte","description":"Drei Kugeln: Gewinn, Verlust und Pistazie.","slot":"hand","rarity":"common","priceCents":75000,"minLevel":1,"set":"chef"},{"key":"foam_finger","name":"Schaumstoffhand","description":"Nummer eins! Zumindest in der eigenen Wochenliga.","slot":"hand","rarity":"rare","priceCents":750000,"minLevel":2,"set":"sports"},{"key":"megaphone","name":"Megafon","description":"KAUFEN! VERKAUFEN! Hauptsache laut.","slot":"hand","rarity":"rare","priceCents":1750000,"minLevel":3,"set":"office"},{"key":"money_bag","name":"Geldsack","description":"Mit Dollarzeichen drauf, damit es auch jeder versteht.","slot":"hand","rarity":"rare","priceCents":4999900,"minLevel":4,"set":"office"},{"key":"laser_sword","name":"Laserschwert","description":"Schneidet Gebühren und Spreads in der Mitte durch.","slot":"hand","rarity":"epic","priceCents":49000000,"minLevel":8,"set":"space"},{"key":"golden_toilet_brush","name":"Goldene Klobürste","description":"Wahrer Reichtum zeigt sich im Badezimmer.","slot":"hand","rarity":"legendary","priceCents":1500000000,"minLevel":18,"set":"absurd"},{"key":"rubber_duck","name":"Quietscheente","description":"Hört zu, wenn du deine Trades erklärst. Urteilt nie.","slot":"pet","rarity":"common","priceCents":120000,"minLevel":1,"set":"zoo"},{"key":"hamster","name":"Hamster","description":"Hamstert alles, besonders Dividenden.","slot":"pet","rarity":"rare","priceCents":600000,"minLevel":2,"set":"zoo"},{"key":"parrot","name":"Papagei","description":"Plappert jeden Börsentipp nach. Auch die schlechten.","slot":"pet","rarity":"rare","priceCents":4000000,"minLevel":4,"set":"pirate"},{"key":"pug","name":"Mops","description":"Schnauft beim Laden der Kurse. Bester Freund an der Börse.","slot":"pet","rarity":"epic","priceCents":21000000,"minLevel":5,"set":"zoo"},{"key":"mini_dragon","name":"Minidrache","description":"Bewacht deinen Goldschatz und röstet Marshmallows.","slot":"pet","rarity":"legendary","priceCents":4000000000,"minLevel":22,"set":"wizard"},{"key":"superhero_cape","name":"Superheldenumhang","description":"Rettet Depots, aber leider nur die eigenen.","slot":"back","rarity":"rare","priceCents":2250000,"minLevel":2},{"key":"butterfly_wings","name":"Schmetterlingsflügel","description":"Ein Flügelschlag hier, ein Kurssturz in Tokio.","slot":"back","rarity":"rare","priceCents":4500000,"minLevel":3,"set":"zoo"},{"key":"bat_wings","name":"Fledermausflügel","description":"Für Nachteulen, die nachbörslich handeln.","slot":"back","rarity":"epic","priceCents":52500000,"minLevel":7,"set":"holidays"},{"key":"angel_wings","name":"Engelsflügel","description":"Himmlische Renditen, garantiert ohne Garantie.","slot":"back","rarity":"epic","priceCents":175000000,"minLevel":12},{"key":"jetpack","name":"Jetpack","description":"To the moon! Tank voll, Sicherheitsgurt optional.","slot":"back","rarity":"legendary","priceCents":1000000000,"minLevel":15,"set":"space"},{"key":"toilet_paper_crown","name":"Klopapierkrone","description":"Krisensicher angelegt. Hält drei Lockdowns und einen Crash.","slot":"head","rarity":"common","priceCents":99000,"minLevel":1,"set":"absurd"},{"key":"tinfoil_hat","name":"Aluhut","description":"Schirmt Kursmanipulation ab. Und WLAN. Und Vernunft.","slot":"head","rarity":"common","priceCents":150000,"minLevel":1,"set":"absurd"},{"key":"santa_hat","name":"Weihnachtsmütze","description":"Ho ho ho! Die Jahresendrallye kommt bestimmt.","slot":"head","rarity":"common","priceCents":165000,"minLevel":1,"set":"holidays"},{"key":"cat_ears","name":"Katzenohren","description":"In deiner Haarfarbe. Hören Dividenden schon von Weitem schnurren.","slot":"head","rarity":"common","priceCents":195000,"minLevel":1,"set":"zoo"},{"key":"tie_headband","name":"Krawatte als Stirnband","description":"Nach der Weihnachtsfeier der Investmentbank. Nicht fragen.","slot":"head","rarity":"common","priceCents":225000,"minLevel":2,"set":"office"},{"key":"alien_antennae","name":"Alien-Fühler","description":"Empfangen Börsentipps aus einer fernen Galaxie. Meist falsche.","slot":"head","rarity":"common","priceCents":260000,"minLevel":2,"set":"space"},{"key":"frog_hat","name":"Froschmütze","description":"Quak! Springt von Aktie zu Aktie und landet meist im Teich.","slot":"head","rarity":"rare","priceCents":1800000,"minLevel":2,"set":"zoo"},{"key":"reindeer_antlers","name":"Rentiergeweih","description":"Zieht den Schlitten voller Gewinne. Rudolph ist neidisch.","slot":"head","rarity":"rare","priceCents":2400000,"minLevel":3,"set":"holidays"},{"key":"sombrero","name":"Sombrero","description":"Spendet Schatten für den ganzen Handelsraum. Olé!","slot":"head","rarity":"rare","priceCents":2900000,"minLevel":3},{"key":"jester_hat","name":"Narrenkappe","description":"Für alle, die zum Höchstkurs gekauft haben. Klingelt beim Verkaufen.","slot":"head","rarity":"rare","priceCents":3600000,"minLevel":4,"set":"absurd"},{"key":"graduation_cap","name":"Doktorhut","description":"Dr. rer. pol. in Kaffeesatzlesen. Mit Auszeichnung.","slot":"head","rarity":"rare","priceCents":4500000,"minLevel":4,"set":"office"},{"key":"pumpkin_head","name":"Kürbiskopf","description":"Gruselig wie ein Depot im Oktober.","slot":"head","rarity":"epic","priceCents":33000000,"minLevel":7,"set":"holidays"},{"key":"knight_helmet","name":"Ritterhelm","description":"Schützt vor Gegenwind, Kritik und Margin Calls.","slot":"head","rarity":"epic","priceCents":68000000,"minLevel":9,"set":"knight"},{"key":"wizard_hat","name":"Zauberhut","description":"Zaubert Gewinne herbei. Behauptet zumindest der Prospekt.","slot":"head","rarity":"epic","priceCents":90000000,"minLevel":10,"set":"wizard"},{"key":"unicorn_horn","name":"Einhorn-Horn","description":"Für Gründer mit Milliardenbewertung und ohne Umsatz.","slot":"head","rarity":"epic","priceCents":125000000,"minLevel":12,"set":"zoo"},{"key":"disco_ball","name":"Discokugel","description":"Die Party geht weiter, solange der Kurs steigt.","slot":"head","rarity":"legendary","priceCents":1900000000,"minLevel":19,"set":"absurd"},{"key":"money_cloud","name":"Geldregenwolke","description":"Der Wetterbericht für Superreiche: Es regnet Scheine.","slot":"head","rarity":"mythic","priceCents":75000000000,"minLevel":40,"set":"royal"},{"key":"bubblegum","name":"Kaugummiblase","description":"Wie eine Spekulationsblase, nur leckerer. Platzt auch.","slot":"face","rarity":"common","priceCents":65000,"minLevel":1,"set":"absurd"},{"key":"eye_patch","name":"Augenklappe","description":"Ein Auge auf den Markt reicht völlig, sagt der Kapitän.","slot":"face","rarity":"common","priceCents":85000,"minLevel":1,"set":"pirate"},{"key":"facepaint","name":"Fan-Schminke","description":"In den Farben des Teams mit der besten Rendite. Wechselt wöchentlich.","slot":"face","rarity":"common","priceCents":95000,"minLevel":1,"set":"sports"},{"key":"nerd_glasses","name":"Hornbrille","description":"Mit Klebeband geflickt. Hat schon jede Tabellenkalkulation gesehen.","slot":"face","rarity":"common","priceCents":110000,"minLevel":1,"set":"office"},{"key":"snorkel_mask","name":"Taucherbrille","description":"Bestens gerüstet für den nächsten Kurstaucher.","slot":"face","rarity":"rare","priceCents":1400000,"minLevel":2},{"key":"star_glasses","name":"Sternchenbrille","description":"Rockstar-Look für alle, die den Depotauszug nicht sehen wollen.","slot":"face","rarity":"rare","priceCents":2200000,"minLevel":3,"set":"rock"},{"key":"hero_mask","name":"Superheldenmaske","description":"Geheime Identität: Kleinanleger. Superkraft: Durchhalten.","slot":"face","rarity":"rare","priceCents":3900000,"minLevel":4},{"key":"wizard_beard","name":"Zauberbart","description":"Hundert Jahre Börsenerfahrung. Oder zwei Wochen sehr viel Stress.","slot":"face","rarity":"epic","priceCents":64000000,"minLevel":10,"set":"wizard"},{"key":"diamond_grill","name":"Diamant-Grillz","description":"Ein Lächeln wie ein Tresor: glänzend, hart und sehr teuer.","slot":"face","rarity":"legendary","priceCents":2100000000,"minLevel":21,"set":"royal"},{"key":"diamond_monocle","name":"Diamantmonokel","description":"Sieht alles. Besonders gern das eigene Spiegelbild.","slot":"face","rarity":"mythic","priceCents":25000000000,"minLevel":35,"set":"royal"},{"key":"barrel","name":"Pleite-Fass","description":"Das Outfit nach dem Margin Call. Hosenträger gibt es gratis dazu.","slot":"body","rarity":"common","priceCents":49000,"minLevel":1,"set":"office"},{"key":"chef_apron","name":"Kochschürze","description":"Hier werden keine Bilanzen gekocht. Nur Nudeln.","slot":"body","rarity":"common","priceCents":125000,"minLevel":1,"set":"chef"},{"key":"duck_float","name":"Entchen-Schwimmring","description":"Hält dich über Wasser, wenn das Depot absäuft.","slot":"body","rarity":"common","priceCents":145000,"minLevel":1,"set":"absurd"},{"key":"jersey","name":"Trikot Nr. 1","description":"Die Nummer eins im Depot-Derby. Steht ja drauf.","slot":"body","rarity":"common","priceCents":240000,"minLevel":2,"set":"sports"},{"key":"xmas_sweater","name":"Weihnachtspulli","description":"Hässlich, kratzig und trotzdem jedes Jahr wieder dabei.","slot":"body","rarity":"rare","priceCents":1900000,"minLevel":2,"set":"holidays"},{"key":"leather_jacket","name":"Lederjacke","description":"Rock ''n'' Roll im Depot: laut, wild und sehr volatil.","slot":"body","rarity":"rare","priceCents":5500000,"minLevel":4,"set":"rock"},{"key":"pirate_coat","name":"Piratenmantel","description":"Mit Goldknöpfen aus erbeuteten Dividenden.","slot":"body","rarity":"rare","priceCents":6500000,"minLevel":5,"set":"pirate"},{"key":"garden_gnome","name":"Gartenzwergkostüm","description":"Steht stoisch im Vorgarten und wartet auf die Erholung.","slot":"body","rarity":"rare","priceCents":7700000,"minLevel":5,"set":"absurd"},{"key":"pinstripe_suit","name":"Nadelstreifenanzug","description":"Riecht nach Bonus, Espresso und Überstunden.","slot":"body","rarity":"epic","priceCents":72000000,"minLevel":8,"set":"office"},{"key":"knight_armor","name":"Ritterrüstung","description":"Panzert gegen Kursstürze. Rostet leider bei Regen.","slot":"body","rarity":"epic","priceCents":115000000,"minLevel":11,"set":"knight"},{"key":"wizard_robe","name":"Zaubermantel","description":"Mit Sternen bestickt und Geheimtaschen für Geheimformeln.","slot":"body","rarity":"epic","priceCents":150000000,"minLevel":12,"set":"wizard"},{"key":"ermine_robe","name":"Königsmantel","description":"Hermelin, Samt und Gold. Untertanen sind nicht im Preis enthalten.","slot":"body","rarity":"mythic","priceCents":60000000000,"minLevel":45,"set":"royal"},{"key":"sparkler","name":"Wunderkerze","description":"Funkelt kurz und hell. Wie mancher Börsengang.","slot":"hand","rarity":"common","priceCents":50000,"minLevel":1,"set":"holidays"},{"key":"candy_cane","name":"Zuckerstange","description":"Rot-weiß gestreift wie ein Chart an einem nervösen Tag.","slot":"hand","rarity":"common","priceCents":55000,"minLevel":1,"set":"holidays"},{"key":"frying_pan","name":"Bratpfanne","description":"Mit Spiegelei. Frühstück und Selbstverteidigung in einem.","slot":"hand","rarity":"common","priceCents":70000,"minLevel":1,"set":"chef"},{"key":"coffee_mug","name":"Kaffeebecher","description":"Treibstoff für den Börsenstart um neun. Und den um zehn.","slot":"hand","rarity":"common","priceCents":80000,"minLevel":1,"set":"office"},{"key":"plunger","name":"Pümpel","description":"Für verstopfte Orderbücher und andere Notfälle.","slot":"hand","rarity":"common","priceCents":99900,"minLevel":1,"set":"absurd"},{"key":"tennis_racket","name":"Tennisschläger","description":"Schlägt jeden Aufschlag zurück. Nur keine Gebühren.","slot":"hand","rarity":"common","priceCents":200000,"minLevel":2,"set":"sports"},{"key":"shopping_cart","name":"Einkaufswagen","description":"Randvoll mit Klopapier. Die sicherste Anlage überhaupt.","slot":"hand","rarity":"rare","priceCents":1600000,"minLevel":2,"set":"absurd"},{"key":"magic_wand","name":"Zauberstab","description":"Ein Schwung, und das Minus ist weg. Leider nur im Traum.","slot":"hand","rarity":"rare","priceCents":2700000,"minLevel":3,"set":"wizard"},{"key":"cutlass","name":"Säbel","description":"Entert jede Hauptversammlung. Arrr!","slot":"hand","rarity":"rare","priceCents":4200000,"minLevel":4,"set":"pirate"},{"key":"ray_gun","name":"Strahlenpistole","description":"Pew, pew! Schießt Kurse in die Umlaufbahn.","slot":"hand","rarity":"rare","priceCents":4800000,"minLevel":4,"set":"space"},{"key":"electric_guitar","name":"E-Gitarre","description":"Spielt im Plus nur Dur. Im Minus Blues.","slot":"hand","rarity":"epic","priceCents":47000000,"minLevel":8,"set":"rock"},{"key":"broadsword","name":"Ritterschwert","description":"Für epische Duelle in der Börsenliga.","slot":"hand","rarity":"epic","priceCents":60000000,"minLevel":9,"set":"knight"},{"key":"trophy","name":"Goldpokal","description":"Für den ersten Platz. Selbst gekauft zählt auch.","slot":"hand","rarity":"epic","priceCents":99000000,"minLevel":11,"set":"sports"},{"key":"briefcase_money","name":"Geldkoffer","description":"Prall gefüllt und ganz sicher nicht aus dunklen Geschäften. Fast.","slot":"hand","rarity":"legendary","priceCents":1250000000,"minLevel":17,"set":"office"},{"key":"sceptre","name":"Zepter","description":"Wer das hält, bestimmt den Leitzins. Zumindest auf dem Platz.","slot":"hand","rarity":"mythic","priceCents":40000000000,"minLevel":38,"set":"royal"},{"key":"pet_rock","name":"Haustierstein","description":"Frisst nichts, bellt nicht und schwankt nie im Kurs.","slot":"pet","rarity":"common","priceCents":49900,"minLevel":1,"set":"absurd"},{"key":"snail","name":"Turbo-Schnecke","description":"Schneller als jede Überweisung am Wochenende.","slot":"pet","rarity":"common","priceCents":135000,"minLevel":1,"set":"zoo"},{"key":"cat","name":"Katze","description":"Läuft über die Tastatur und kauft dabei zufällig Aktien.","slot":"pet","rarity":"common","priceCents":280000,"minLevel":2,"set":"zoo"},{"key":"goldfish","name":"Goldfisch im Glas","description":"Vergisst jeden Verlust nach drei Sekunden. Ein Vorbild.","slot":"pet","rarity":"rare","priceCents":1200000,"minLevel":2,"set":"zoo"},{"key":"lobster","name":"Hummer","description":"Kneift bei schlechten Trades. Also ziemlich oft.","slot":"pet","rarity":"rare","priceCents":2600000,"minLevel":3,"set":"chef"},{"key":"ghost","name":"Gespenst","description":"Der Geist vergangener Verluste. Buh!","slot":"pet","rarity":"rare","priceCents":3100000,"minLevel":3,"set":"holidays"},{"key":"owl","name":"Eule","description":"Weise Anlagetipps, aber nur nach Mitternacht.","slot":"pet","rarity":"rare","priceCents":3400000,"minLevel":4,"set":"wizard"},{"key":"penguin","name":"Pinguin","description":"Trägt immer Frack. Perfekt für die Hauptversammlung.","slot":"pet","rarity":"rare","priceCents":5000000,"minLevel":4,"set":"zoo"},{"key":"bear","name":"Bärenmarkt-Bär","description":"Kuschelig, aber jeder Kurs fällt, wenn er brummt.","slot":"pet","rarity":"epic","priceCents":25000000,"minLevel":6,"set":"office"},{"key":"robo_dog","name":"Robohund","description":"Holt die Zeitung, liest sie und handelt sofort.","slot":"pet","rarity":"epic","priceCents":88000000,"minLevel":10,"set":"space"},{"key":"ufo","name":"Mini-UFO","description":"Entführt Kühe. Und manchmal Aktien in ungeahnte Höhen.","slot":"pet","rarity":"legendary","priceCents":3500000000,"minLevel":24,"set":"space"},{"key":"golden_bull","name":"Goldener Bulle","description":"Das Wappentier der Hausse. Massiv vergoldet, schnaubt Optimismus.","slot":"pet","rarity":"mythic","priceCents":90000000000,"minLevel":50,"set":"royal"},{"key":"school_bag","name":"Schulranzen","description":"Für den ersten Schultag an der Börse. Pausenbrot inklusive.","slot":"back","rarity":"common","priceCents":115000,"minLevel":1},{"key":"bee_wings","name":"Bienenflügel","description":"Fleißig wie eine Biene. Summt beim Sparen.","slot":"back","rarity":"common","priceCents":185000,"minLevel":2,"set":"zoo"},{"key":"turtle_shell","name":"Schildkrötenpanzer","description":"Langsam, aber sicher: die Strategie für Geduldige.","slot":"back","rarity":"rare","priceCents":2300000,"minLevel":3,"set":"zoo"},{"key":"surfboard","name":"Surfbrett","description":"Reitet jede Welle. Auch die nach unten.","slot":"back","rarity":"rare","priceCents":3000000,"minLevel":3},{"key":"knight_shield","name":"Ritterschild","description":"Hält Anrufe von Anlageberatern zuverlässig ab.","slot":"back","rarity":"rare","priceCents":5200000,"minLevel":5,"set":"knight"},{"key":"peacock_tail","name":"Pfauenrad","description":"Schlägt ein Rad, sobald der Kontostand stimmt.","slot":"back","rarity":"epic","priceCents":160000000,"minLevel":13,"set":"royal"},{"key":"dragon_wings","name":"Drachenflügel","description":"Für Flüge über den eigenen Goldschatz. Feuer inklusive.","slot":"back","rarity":"legendary","priceCents":7500000000,"minLevel":26,"set":"wizard"},{"key":"phoenix_wings","name":"Phönixflügel","description":"Steigt aus der Asche jedes Crashs wieder auf.","slot":"back","rarity":"mythic","priceCents":15000000000,"minLevel":42,"set":"royal"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "accessories"'),
   ('battles', '{"lobby":{"minLevel":2,"minPlayers":3,"maxPlayers":10,"perHour":1,"countdownSeconds":30,"idleSeconds":15,"introMs":6000,"recentSeconds":120},"demo":{"countdownSeconds":6,"botsMin":3,"botsMax":5},"weights":{"floor":12,"bulls":12,"coins":12,"sumo":12,"potato":12,"pump":10,"quiz":12,"estimate":8,"bell":10,"bear":12,"dash":12,"margin":12,"elevator":10,"laser":12,"rodeo":10,"zone":12,"tag":12,"tiles":12,"paint":12,"crash":12,"vault":8,"ticker":10,"higher":10,"auction":8},"net":{"tickMs":50,"graceMs":1000,"aheadTicks":10,"disconnectTicks":80,"sendEveryMs":250,"checkEveryMs":1000},"arena":{"w":11,"h":9,"stepTicks":4,"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,4],[7,4]]},"games":{"floor":{"maxTicks":1400,"firstWave":60,"waveEvery":50,"waveEveryMin":18,"waveEveryStep":2,"crackStart":3,"crackMax":9,"crackGrowEvery":2,"warnTicks":24,"stompTicks":50,"endgameTiles":8},"bulls":{"maxTicks":1300,"hearts":3,"firstSpawn":40,"spawnEvery":50,"spawnEveryMin":14,"spawnEveryStep":2,"countGrowEvery":5,"countMax":4,"warnTicks":26,"ticksPerTile":2,"stunTicks":16,"invulnTicks":40},"coins":{"durationTicks":900,"firstDrop":20,"dropEvery":6,"dropEveryMin":3,"fallTicks":16,"lifeTicks":80,"bearPct":12,"goldPct":8,"goldValue":3,"bearStunTicks":30,"bearLoss":2,"jackpotTicks":200,"jackpotGoldPct":25},"sumo":{"maxTicks":1500,"firstShrink":300,"shrinkEvery":220,"warnTicks":40,"stunTicks":0,"recoverTicks":7,"powerCooldown":40,"cornerCut":8,"spawns":[[2,2],[8,6],[8,2],[2,6],[5,1],[5,7],[2,4],[8,4],[4,3],[6,5]]},"potato":{"maxTicks":1800,"firstRound":40,"pauseTicks":40,"holderStepTicks":3,"passBackTicks":20,"receiverStunTicks":8,"fuseBaseSeconds":13,"fuseMinSeconds":4,"fuseJitterSeconds":4,"walls":[[2,2],[8,2],[2,6],[8,6],[5,4]]},"pump":{"durationTicks":600,"greenMin":40,"greenJitter":60,"yellowTicks":12,"redMin":20,"redJitter":20,"goldEvery":4,"goldTicks":20,"goldValue":3,"bustFreezeTicks":20,"bustLossBps":2500},"bear":{"maxTicks":1600,"bearTicks":[60,380,740,1100],"stepStart":7,"stepMin":4,"speedEvery":280,"eatTicks":30,"den":[5,4],"pillars":[[3,3],[7,3],[3,5],[7,5]],"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,1],[7,7]]},"dash":{"maxTicks":1200,"target":15,"firstCoin":20,"coinsPerPlayers":4,"coinsMax":3,"spawnDelay":24,"goldEvery":5,"goldValue":2,"tackleStun":24,"tackleCool":40},"margin":{"maxTicks":1800,"firstRound":30,"showTicks":100,"showMin":44,"showStep":8,"pauseTicks":34,"warmupRounds":3},"elevator":{"maxTicks":1600,"firstRise":60,"riseStart":30,"riseMin":9,"riseStep":1,"riseStepEvery":2,"barrierEvery":3,"gapStart":4,"gapMin":1,"gapShrinkEvery":12},"laser":{"maxTicks":1400,"hearts":3,"firstSpawn":50,"spawnEvery":64,"spawnEveryMin":26,"spawnEveryStep":2,"countGrowEvery":4,"countMax":3,"staggerTicks":20,"warnTicks":24,"ticksPerTile":2,"gapPct":35,"jumpTicks":8,"jumpCool":6,"invulnTicks":16},"rodeo":{"maxTicks":1400,"grip":3,"firstCue":40,"windowStart":26,"windowMin":9,"windowStep":1,"gapMin":8,"gapJitter":18},"zone":{"maxTicks":1200,"firstShrink":240,"shrinkEvery":170,"warnTicks":60,"radiusMin":1,"firstCoin":20,"coinsPerPlayers":3,"coinsMax":4,"spawnDelay":12,"goldEvery":5,"goldValue":3},"tag":{"maxTicks":1200,"bearStepTicks":3,"freezeTicks":24},"tiles":{"maxTicks":1600,"breakStart":40,"breakMin":14,"breakStepEvery":80,"regrowStart":140,"regrowGrowEvery":8,"idleMax":30},"paint":{"durationTicks":900,"bombCool":160,"bombRadius":1},"crash":{"maxTicks":1500,"hearts":3,"firstWave":40,"waveEvery":64,"waveEveryMin":26,"waveEveryStep":2,"warnTicks":30,"countStart":3,"countPerPlayers":3,"countMax":12,"invulnTicks":16},"quiz":{"rounds":7,"answerMs":8000,"revealMs":3000,"hearts":2,"basePoints":500,"speedPoints":500},"estimate":{"rounds":4,"answerMs":12000,"revealMs":4000,"bullseyeBps":100,"bullseyeBonus":2,"lastRoundFactor":2,"stockRounds":1},"bell":{"maxRounds":9,"readyMs":1000,"waitMinMs":1500,"waitMaxMs":4500,"windowMs":2000,"resultMs":2500,"smallGroup":5,"heartsSmall":2,"heartsLarge":1},"vault":{"rounds":3,"answerMs":24000,"revealMs":4000,"digits":3,"symbols":6,"maxTries":8,"basePoints":400,"speedPoints":600,"tryBonus":25},"ticker":{"rounds":8,"answerMs":6000,"revealMs":2500,"options":6,"basePoints":200,"speedPoints":800,"wrongPoints":300},"higher":{"rounds":10,"answerMs":5000,"revealMs":2500,"smallGroup":5,"heartsSmall":3,"heartsLarge":2,"history":14,"trendPct":65,"moveMinBps":80,"moveMaxBps":450,"basePoints":100,"speedPoints":100},"auction":{"rounds":6,"answerMs":10000,"revealMs":3500,"budget":1000}},"prizes":{"weights":{"xp":25,"money":25,"skin":15,"nft":15,"accessory":15,"packs":15},"accessoryTiers":{"rare":60,"epic":30,"legendary":10},"packsCapCents":2000000,"packsMax":8,"xpBase":1000,"xpPerPlayer":150,"moneyBaseCents":300000,"moneyPerPlayerCents":75000,"dailyPrizeCap":3},"accessories":[{"key":"battle_crown","name":"Battle-Krone","description":"Gewonnen, nicht gekauft. Samt, Gold und ein Rubin so groß wie dein Ego.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"laurel_wreath","name":"Lorbeerkranz","description":"Wie bei den alten Griechen, nur mit mehr Aktien.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"champion_belt","name":"Champion-Gürtel","description":"Schwergewichtsmeister im Kurssturz-Springen.","slot":"body","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"victory_cape","name":"Siegerumhang","description":"Flattert dramatisch, auch wenn kein Wind weht.","slot":"back","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"star_shades","name":"Siegerbrille","description":"Wer gewinnt, muss die Blicke der Verlierer nicht sehen.","slot":"face","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"golden_joystick","name":"Goldener Joystick","description":"WASD in purem Gold. Nicht zum Zocken, zum Angeben.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"winner_trophy","name":"Siegerpokal","description":"Glänzt. Wiegt. Wird jeden Abend poliert.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"mini_bull","name":"Mini-Bulle","description":"Ein Bulle, der dich nicht über den Haufen rennt. Meistens.","slot":"pet","rarity":"legendary","exclusive":true,"minLevel":1}],"doodle":{"lobby":["Na, ihr Sofa-Börsianer? Wer traut sich in die Arena?","Ich brauche drei Mutige. Oder drei Ahnungslose. Geht beides.","Kommt rein, kommt rein! Hier gewinnt nur einer, die anderen weinen live.","Meine Mutter würde sofort mitmachen. Und gewinnen.","Ein Preis, ein Sieger, null Mitleid. Willkommen im Battle!"],"countdown":["Gleich geht''s los! Letzte Chance, noch feige wegzurennen.","Die Arena wird gewischt. Gleich fließen Tränen.","Ich habe Popcorn. Ihr habt keine Chance."],"intro":{"floor":"Der Kurs stürzt, der Boden auch! Bleibt in Bewegung, sonst geht''s abwärts!","bulls":"Die Bullen sind los! Wer stehen bleibt, wird zum Teppich.","coins":"Es regnet Geld! Vorsicht vor den Bären, die beißen.","sumo":"Rempeln erlaubt, Weinen auch. Wer rausfliegt, fliegt raus!","potato":"Wer die Giftaktie hält, wenn es knallt, ist raus. Weitergeben!","pump":"Pumpt die Aktie! Aber wehe, ihr tippt im Crash.","quiz":"Quizzeit! Zwei Herzen, null Ahnung. Zeigt, was ihr wisst!","estimate":"Schätzt mal! Wer am nächsten dran ist, kriegt die Punkte.","bell":"Wenn die Glocke läutet, drückt ihr. Vorher drücken? Raus!","bear":"Die Bären haben Hunger! Lauft, und zwar weg von ihnen, nicht hin.","dash":"Dividende für alle! Also für den Schnellsten. Rempeln ist ausdrücklich erwünscht.","margin":"Margin Call! Wer beim Gong nicht im Grünen steht, wird glattgestellt.","elevator":"Diese Aktie kennt nur eine Richtung: nach oben. Wer unten bleibt, bleibt unten.","laser":"Die Laserschranke! Springt im richtigen Moment, sonst gibt''s gegrillte Börsianer.","rodeo":"Haltet euch fest! Der Bulle bockt, und er hat heute richtig schlechte Laune.","zone":"Goldrausch! Die Zone schrumpft, das Gold bleibt. Wer draußen steht, ist pleite.","tag":"Bulle und Bär! Einer jagt, alle rennen. Und keiner will der Bär sein. Ich auch nicht.","tiles":"Das Parkett wackelt! Wo ihr wart, ist gleich nichts mehr. Stehenbleiben ist keine Strategie.","paint":"Farbrausch! Malt das Parkett an. Die Reinigungskosten zahlt der Verlierer.","crash":"Es regnet Kursstürze! Achtet auf die roten Kreuze, die meinen es ernst.","vault":"Der Tresor der Zentralbank! Knackt den Code, bevor die Polizei kommt. War ein Witz. Oder?","ticker":"Kürzel-Alarm! Wer das richtige Tickersymbol zuerst erwischt, ist der Börsenprofi.","higher":"Höher oder tiefer? Mein Schnurrbart sagt höher. Mein Schnurrbart lag noch nie richtig.","auction":"Wer bietet mehr? Spielgeld weg, Punkte her! Nur nicht alles für eine Gummiente ausgeben."},"win":["{name} gewinnt! Ich habe es immer gewusst. Also seit gerade eben.","Applaus für {name}! Die anderen dürfen jetzt heimlich weinen.","{name} räumt ab! Das schreibe ich mir auf die Krawatte.","Was für ein Battle! {name} ist der Champion des Tages.","{name} siegt, die Börse bebt, mein Schnurrbart zittert!"],"out":["Und weg ist {name}! Tschüss, war nett.","{name} fliegt raus. Ich habe nichts gesehen. Doch, alles.","Autsch, {name}! Das gibt einen blauen Fleck im Depot."],"chat":{"start":"🏟️ BATTLE! {count} Zuschauer kämpfen jetzt in „{game}“ um {prize}. Viel Glück, ihr Pfeifen!","win":"🏆 {name} gewinnt „{game}“ und kassiert {prize}! Glückwunsch, du Glückspilz."}},"names":{"floor":"Kurssturz","bulls":"Bullenreiten","coins":"Geldregen","sumo":"Sumo am Parkett","potato":"Giftaktie","pump":"Aktie pumpen","quiz":"Börsenquiz","estimate":"Schätz den Kurs","bell":"Die Glocke","bear":"Bärenjagd","dash":"Dividenden-Dash","margin":"Margin Call","elevator":"Fahrstuhl zum Mond","laser":"Laserschranke","rodeo":"Bullen-Rodeo","zone":"Goldrausch-Zone","tag":"Bulle und Bär","tiles":"Wackelparkett","paint":"Farbrausch","crash":"Crash-Regen","vault":"Tresorknacker","ticker":"Ticker-Tippen","higher":"Mehr oder Weniger","auction":"Wer bietet mehr?"},"demoBots":[{"nickname":"Bärbel Bärenmarkt","avatarKey":"seller","accessories":["cowboy_hat"]},{"nickname":"Kalle Kursrakete","avatarKey":"punk","accessories":["sunglasses","superhero_cape"]},{"nickname":"Dividenden-Dieter","avatarKey":"analyst","accessories":["top_hat"]},{"nickname":"Moni Moneymaker","avatarKey":"scientist","accessories":["party_hat","balloon"]},{"nickname":"Börsen-Bernd","avatarKey":"rookie","accessories":["beanie","hamster"]},{"nickname":"Lisa Leerverkauf","avatarKey":"finn_fan","accessories":["bunny_ears"]},{"nickname":"Hedge-Horst","avatarKey":"rookie","accessories":["viking_helmet","pug"]},{"nickname":"Penny Stock","avatarKey":"seller","accessories":["heart_glasses"]},{"nickname":"Ralf Rendite","avatarKey":"analyst","accessories":["chef_hat","baguette"]}],"quiz":[{"q":"Wie viel Startkapital bekommt man bei NEXA?","a":"10.000 €","wrong":["1.000 €","50.000 €","100.000 €"]},{"q":"Wer moderiert die NEXA Nachrichten?","a":"Mr. Doodle Dangle","wrong":["Finn","Mira","Dr. Dax"]},{"q":"Wann laufen die NEXA Nachrichten?","a":"Zu jeder vollen Stunde","wrong":["Einmal am Tag","Nur sonntags","Alle 5 Minuten"]},{"q":"Was ist ein Bullenmarkt?","a":"Steigende Kurse","wrong":["Fallende Kurse","Ein Viehmarkt","Ein Markt ohne Händler"]},{"q":"Was ist ein Bärenmarkt?","a":"Fallende Kurse","wrong":["Steigende Kurse","Ein Zoo","Ein Honigmarkt"]},{"q":"Was ist eine Dividende?","a":"Gewinnanteil für Aktionäre","wrong":["Eine Gebühr","Ein Kredit","Eine Steuer"]},{"q":"Was ist ein IPO?","a":"Ein Börsengang","wrong":["Eine Insolvenz","Ein Aktiensplit","Eine Fusion"]},{"q":"Was bedeutet Leerverkauf?","a":"Auf fallende Kurse wetten","wrong":["Alles verkaufen","Ohne Gebühr kaufen","Eine leere Order"]},{"q":"Was ist eine Anleihe?","a":"Ein Schuldpapier mit Zinsen","wrong":["Ein Firmenanteil","Eine Kryptowährung","Ein Sparbuch"]},{"q":"Was misst ein Aktienindex?","a":"Die Entwicklung vieler Aktien","wrong":["Den Goldpreis","Die Inflation","Nur eine Aktie"]},{"q":"Was ist eine Limit-Order?","a":"Kauf oder Verkauf zu einem Wunschpreis","wrong":["Ein Kauf ohne Geld","Eine Order mit Zeitlimit","Ein Verbot zu handeln"]},{"q":"Was ist ein Stop-Loss?","a":"Automatischer Verkauf bei Verlust","wrong":["Ein Handelsverbot","Eine Gewinnsteuer","Ein Börsenfeiertag"]},{"q":"Was ist Market Cap?","a":"Börsenwert einer Firma","wrong":["Die Kappe des Händlers","Der Tageshöchstkurs","Die Anzahl der Mitarbeiter"]},{"q":"Was passiert bei einem Aktiensplit?","a":"Mehr Aktien zum kleineren Preis","wrong":["Die Firma teilt sich","Die Aktie wird gelöscht","Der Kurs verdoppelt sich"]},{"q":"Was ist Volatilität?","a":"Wie stark ein Kurs schwankt","wrong":["Wie alt eine Firma ist","Ein Börsenfeiertag","Die Höhe der Dividende"]},{"q":"Welches Tier steht für steigende Kurse?","a":"Bulle","wrong":["Bär","Hase","Schildkröte"]},{"q":"Was ist ein NFT bei NEXA?","a":"Ein einzigartiges Pixel-Kunstwerk","wrong":["Eine Aktie","Eine Kreditkarte","Ein Firmenlogo"]},{"q":"Wie viele Spieler braucht ein News-Battle mindestens?","a":"3","wrong":["1","2","5"]},{"q":"Wie viele Spieler passen höchstens in ein News-Battle?","a":"10","wrong":["4","8","20"]},{"q":"Was bekommt der Sieger eines News-Battles?","a":"XP, Geld, einen Skin oder ein NFT","wrong":["Nur ein Lob","Eine echte Aktie","Einen Kredit"]},{"q":"Was ist ein Rug Pull?","a":"Die Macher hauen mit dem Geld ab","wrong":["Ein Teppichverkauf","Ein Kurssprung","Eine Gratis-Aktie"]},{"q":"Was ist Inflation?","a":"Steigende Preise, sinkende Kaufkraft","wrong":["Sinkende Preise","Ein Luftballon","Eine Börsenregel"]},{"q":"Was heißt „Buy the Dip“?","a":"Nach einem Kursrutsch kaufen","wrong":["Chips kaufen","Alles verkaufen","Nur Anleihen kaufen"]},{"q":"Was ist ein Portfolio?","a":"Alle eigenen Anlagen zusammen","wrong":["Eine Aktentasche","Ein Börsenticker","Ein Kredit"]},{"q":"Was ist ein Ticker?","a":"Das Kürzel einer Aktie","wrong":["Eine Uhr","Ein Händler","Eine Gebühr"]},{"q":"Wie heißt die Hauptstadt von Australien?","a":"Canberra","wrong":["Sydney","Melbourne","Perth"]},{"q":"Wie viele Beine hat eine Spinne?","a":"8","wrong":["6","10","12"]},{"q":"Welcher Planet ist der Sonne am nächsten?","a":"Merkur","wrong":["Venus","Mars","Erde"]},{"q":"Wie viele Minuten hat ein Tag?","a":"1.440","wrong":["1.200","2.400","960"]},{"q":"Welche Farbe entsteht aus Blau und Gelb?","a":"Grün","wrong":["Lila","Orange","Braun"]},{"q":"Was ist das größte Säugetier der Welt?","a":"Blauwal","wrong":["Elefant","Giraffe","Pottwal"]},{"q":"Wie viele Seiten hat ein Würfel?","a":"6","wrong":["4","8","12"]},{"q":"In welchem Land steht der Eiffelturm?","a":"Frankreich","wrong":["Italien","Belgien","Spanien"]},{"q":"Was ist H₂O?","a":"Wasser","wrong":["Wasserstoff","Sauerstoff","Salz"]},{"q":"Wie viele Spieler hat eine Fußballmannschaft auf dem Feld?","a":"11","wrong":["9","10","12"]},{"q":"Welches Tier legt Eier und ist ein Säugetier?","a":"Schnabeltier","wrong":["Pinguin","Delfin","Fledermaus"]},{"q":"Wie viele Kontinente gibt es?","a":"7","wrong":["5","6","8"]},{"q":"Wer hat die Glühbirne bekannt gemacht?","a":"Thomas Edison","wrong":["Albert Einstein","Isaac Newton","Nikola Tesla"]},{"q":"Was ist die Wurzel aus 144?","a":"12","wrong":["14","11","16"]},{"q":"Welche Sprache hat die meisten Muttersprachler?","a":"Chinesisch (Mandarin)","wrong":["Englisch","Spanisch","Hindi"]},{"q":"Wie heißt der längste Fluss Europas?","a":"Wolga","wrong":["Donau","Rhein","Elbe"]},{"q":"Was zeigt ein grüner Kurs bei NEXA?","a":"Der Kurs ist gestiegen","wrong":["Der Kurs ist gefallen","Die Börse ist zu","Ein Fehler"]},{"q":"Was kostet es, eine Order bei NEXA aufzugeben?","a":"Eine kleine Gebühr","wrong":["Nichts, niemals","Die Hälfte des Werts","Ein Level"]},{"q":"Was passiert, wenn eine Firma insolvent ist?","a":"Sie kann ihre Schulden nicht zahlen","wrong":["Sie geht an die Börse","Sie zahlt Dividende","Sie wird verdoppelt"]},{"q":"Wie viele Zähne hat ein erwachsener Mensch normalerweise?","a":"32","wrong":["28","30","36"]},{"q":"Welches Gas atmen Pflanzen ein?","a":"Kohlendioxid","wrong":["Sauerstoff","Stickstoff","Helium"]}],"tickers":[{"ticker":"BULL","name":"Bullen & Söhne AG"},{"ticker":"BAER","name":"Bärenbräu Holding"},{"ticker":"MOND","name":"Mondfahrt Raketen"},{"ticker":"GOLD","name":"Goldgrube Minen"},{"ticker":"PIZZ","name":"Pizza Pronto Gruppe"},{"ticker":"KAFE","name":"Kaffeekanne Kontor"},{"ticker":"NXA","name":"NEXA Börse"},{"ticker":"ROBO","name":"Robo Rasenmäher"},{"ticker":"DUCK","name":"Gummiente International"},{"ticker":"SOFA","name":"Sofa-Börsianer e. V."},{"ticker":"ZUGI","name":"Zugspitz Seilbahnen"},{"ticker":"KRAK","name":"Krakenkabel Telekom"}],"auctionItems":[{"name":"Goldbarren aus dem Tresor","points":300,"icon":"gold_bar"},{"name":"Signierte Bullen-Statue","points":250,"icon":"bull"},{"name":"Mondticket erster Klasse","points":220,"icon":"moon"},{"name":"Koffer voller Aktien","points":200,"icon":"briefcase"},{"name":"Glücksmünze von Mr. Doodle Dangle","points":180,"icon":"coin"},{"name":"Edelstein des Vorstands","points":160,"icon":"gem"},{"name":"Geheimer Insider-Tipp (ganz legal)","points":140,"icon":"key"},{"name":"Geschenkbox mit Überraschung","points":120,"icon":"gift"},{"name":"Ausgestopfter Bärenmarkt-Bär","points":100,"icon":"bear"},{"name":"Vergilbte Zeitung von 1929","points":80,"icon":"newspaper"},{"name":"Wecker für Frühaufsteher","points":60,"icon":"alarm_clock"},{"name":"Herz eines Börsianers","points":50,"icon":"heart"}],"estimate":[{"q":"Wie hoch ist der Eiffelturm (mit Antenne) in Metern?","value":330,"unit":"m"},{"q":"Wie viele Knochen hat ein erwachsener Mensch?","value":206,"unit":"Knochen"},{"q":"Wie viele Tasten hat ein Klavier?","value":88,"unit":"Tasten"},{"q":"Wie viele Länder gibt es in der EU?","value":27,"unit":"Länder"},{"q":"Wie schnell fährt ein ICE höchstens (km/h)?","value":300,"unit":"km/h"},{"q":"Wie viele Herzschläge hat ein Mensch in Ruhe pro Minute (etwa)?","value":70,"unit":"Schläge"},{"q":"Wie tief ist der Marianengraben in Metern (etwa)?","value":11000,"unit":"m"},{"q":"Wie viele Einwohner hat Berlin (in Tausend, etwa)?","value":3850,"unit":"Tsd."},{"q":"Wie viel wiegt ein erwachsener Afrikanischer Elefant in kg (etwa)?","value":6000,"unit":"kg"},{"q":"Wie lang ist die Chinesische Mauer in km (etwa)?","value":21000,"unit":"km"},{"q":"Wie viele Stunden hat ein Jahr (kein Schaltjahr)?","value":8760,"unit":"Stunden"},{"q":"Wie hoch ist die Zugspitze in Metern?","value":2962,"unit":"m"},{"q":"Wie viele Felder hat ein Schachbrett?","value":64,"unit":"Felder"},{"q":"Wie viele Kilometer ist der Mond von der Erde entfernt (in Tausend, etwa)?","value":384,"unit":"Tsd. km"},{"q":"Wie viele Liter Blut hat ein erwachsener Mensch (etwa)?","value":5,"unit":"Liter"},{"q":"Wie viele Kalorien hat eine Tafel Vollmilchschokolade (100 g, etwa)?","value":535,"unit":"kcal"},{"q":"Wie viele Spiele hat eine Bundesliga-Saison pro Team?","value":34,"unit":"Spiele"},{"q":"Wie viele Sekunden hat ein Tag?","value":86400,"unit":"Sekunden"},{"q":"Wie alt wurde Johann Wolfgang von Goethe?","value":82,"unit":"Jahre"},{"q":"Wie viele Stockwerke hat der Burj Khalifa (etwa)?","value":163,"unit":"Stockwerke"},{"q":"Wie viele Zähne hat ein Hai im Leben (etwa, in Tausend)?","value":30,"unit":"Tsd."},{"q":"Wie heiß ist die Oberfläche der Sonne in °C (etwa)?","value":5500,"unit":"°C"},{"q":"Wie viele Kaffeebohnen braucht ein Espresso (etwa)?","value":50,"unit":"Bohnen"},{"q":"Wie viele Wörter spricht ein Mensch am Tag (etwa, in Tausend)?","value":16,"unit":"Tsd."}]}'::jsonb, 'Defaults from src/config/balance.ts, section "battles"'),
   ('nexamon', '{"packSize":5,"sets":{"mystic_energy":{"name":"Nexamon: Mystic Energy","packPriceCents":20000},"super_apex":{"name":"Nexamon: Super Apex","packPriceCents":100000},"prismatic_peak":{"name":"Nexamon: Prismatic Peak","packPriceCents":1000000},"cosmic_winds":{"name":"Nexamon: Cosmic Winds","packPriceCents":500000}},"packs":{"perMinute":20},"odds":{"denominator":3600,"slot4":{"legendary":0,"prisma":0,"ultra":150,"rare":900},"slot5":{"legendary":4,"prisma":45,"ultra":150,"rare":900}},"oneOfOne":{"slot":5,"packs":5000},"packRules":{},"conditions":{"order":["poor","good","near_mint","mint"],"weightBps":{"poor":200,"good":1800,"near_mint":5000,"mint":3000},"valueBps":{"poor":7000,"good":9000,"near_mint":10000,"mint":10000}},"grading":{"feeBps":4000,"minFeeCents":100,"minutes":60,"maxOpen":10,"grades":[1,2,3,4,5,6,7,8,8.5,9,9.5,10],"gradeWeightsBps":{"poor":[800,1200,1500,2000,2000,1500,700,200,50,30,15,5],"good":[0,0,0,750,1200,2000,2500,1700,1000,600,200,50],"near_mint":[0,0,0,0,0,500,1200,2200,2400,2400,950,350],"mint":[0,0,0,0,0,0,500,1200,1800,3000,2000,1500]},"valueBps":[3000,4000,5000,6000,7000,8000,9000,12000,14000,17000,23000,40000],"tenFactorRange":[25000,40000],"nineHalfFactorRange":[18000,26000],"blackLabel":{"chanceBps":{"near_mint":100,"mint":500},"valueBps":100000}},"market":{"feeBps":500,"minPriceCents":10,"maxPriceCents":100000000000,"maxListings":30,"actionsPerMinute":30,"pageSize":24,"recentSales":20,"historyDays":60},"value":{"floorBps":2000,"capBaseBps":30000,"capPerDayBps":200,"capPerTradeBps":50,"capMaxBps":200000,"dayMaxRiseBps":1500,"dayMaxFallBps":2000,"trade":{"bandBps":2500,"weightBps":2000,"maxStepBps":200,"pairHours":24,"perPlayerDay":3,"minPopularityBps":2500},"aiBuyBumpBps":50,"popularity":{"rarityBps":{"common":500,"rare":1500,"ultra":4000,"prisma":7000,"legendary":9000,"one_of_one":10000},"scarceBonusBps":3000,"popRef":{"common":2000,"rare":800,"ultra":150,"prisma":30,"legendary":4,"one_of_one":1}},"pressure":{"everyMinutes":60,"upStepBps":30,"downStepBps":30,"want":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":1,"one_of_one":1},"buyWeightMilli":500,"buyDays":7,"maxBuys":10,"perRun":80},"tradeOnlyRarities":["one_of_one"]},"ai":{"sellers":["Karten-Kalle","Booster-Berta","Holo-Hanna","Sammel-Sven"],"askBps":11000,"seedCopies":{"common":6,"rare":4,"ultra":2,"prisma":1,"legendary":0,"one_of_one":0},"seedPrismaCards":2,"listedPerCard":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":0,"one_of_one":0},"legendaryListChanceBps":20,"packsPerHour":{"mystic_energy":4,"super_apex":2,"prismatic_peak":1,"cosmic_winds":1},"maxPacksPerRun":5,"buyChanceBps":3000,"atMaxChanceBps":2000,"premiumBps":{"poor":0,"good":300,"near_mint":800,"mint":1200},"gradePremiumBps":[0,0,0,0,0,0,0,500,700,1000,1200,1500],"blackLabelPremiumBps":2000,"buysPerCardWindow":{"common":6,"rare":6,"ultra":4,"prisma":3,"legendary":2,"one_of_one":0},"buyWindowDays":1,"maxBuysPerRun":100,"dailyBudgetPacks":300,"excludedRarities":["one_of_one"],"listingResetHours":6,"stockCap":{"common":12,"rare":8,"ultra":4,"prisma":2,"legendary":1,"one_of_one":0}},"quickSell":{"rarities":["common","rare"],"setRarities":{},"bps":6500,"maxPerCall":500,"callsPerMinute":10,"dropBps":25},"feedRarities":["legendary"],"presence":{"pingSeconds":15,"presenceSeconds":60,"maxPlayers":24},"battles":{"challengeSeconds":60,"perHour":6,"cooldownSeconds":20,"startDelayMs":3000,"tearMs":2400,"slotMs":1800,"leadMs":800,"outroMs":8000,"gossipMinCents":500000},"live":{"staleMs":10000,"fallbackSlotMs":2500,"lingerMs":8000,"maxMs":120000,"viewerSeconds":10,"reactions":["🔥","😱","👏","💎","😂"],"reactionsPerMinute":30,"maxSessions":12},"bonuses":{"kinds":["xp","mission_xp","trade_xp","wage","vault","daily","company"],"typeKind":{"fire":"company","dragon":"company","water":"vault","grass":"daily","electric":"trade_xp","psychic":"mission_xp","fairy":"mission_xp","rock":"wage","steel":"wage","dark":"xp","cosmic":"xp"},"rarities":["ultra","prisma","legendary","one_of_one"],"extraNumbers":[60],"rarityBps":{"common":25,"rare":50,"ultra":50,"prisma":100,"legendary":250,"one_of_one":500},"setBps":{"mystic_energy":10000,"super_apex":12500,"prismatic_peak":15000,"cosmic_winds":15000},"slab":{"minGrade":9,"gradeBps":15000,"blackLabelBps":20000},"caps":{"xp":1000,"mission_xp":1500,"trade_xp":1500,"wage":1000,"vault":1500,"daily":2000,"company":1000},"kneeShareBps":5000,"tailBps":5000,"sets":{"type":{"bps":50,"rewardPacks":3,"rewardXp":300},"complete":{"kind":"xp","bps":200,"rewardPacks":20,"rewardXp":2500},"master":{"bps":100,"rewardPacks":75,"rewardXp":10000},"masterMinGrade":9,"masterRarities":["prisma","legendary"],"excludeRarities":["one_of_one"]}},"blackLabelHype":{"rarityChanceBps":{"common":5,"rare":10,"ultra":25,"prisma":60,"legendary":120,"one_of_one":200},"blRef":3,"minJumpBps":1000,"maxJumpBps":6000,"capBps":250000,"decayBps":100,"bigJumpBps":4000,"historyPoints":30}}'::jsonb, 'Defaults from src/config/balance.ts, section "nexamon"'),

@@ -886,4 +886,1082 @@ begin
 end;
 $do$;
 
+-- ===== supabase/updates/20261204007000_nft_quality.sql =====
+-- ===== idempotent copy of migrations/20261204007000_nft_quality.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7000 · Art quality: the critics judge every NFT (ADR-181)
+-- =============================================================================
+-- Every NFT gets a critic's score 0..100 from its pixel grid, computed by the server (never by the client) when it is
+-- inserted, and once for all existing NFTs (oldest first, so the original keeps its score and later copies are
+-- flagged). Port of src/lib/sim/art-quality.ts with the same integer arithmetic; shared cases in
+-- supabase/tests/art_quality_cases.inc. Sub-scores: coverage, colours, harmony, contrast, structure, outline,
+-- composition, detail, shapes (0..100 each, weights in nfts.quality). Identical or recoloured copies of an older NFT
+-- (copy = exact) and near-copies (at most nearCopyPct of the pixels differ) are capped and flagged.
+-- New columns: artworks.quality, quality_detail (sub-scores, best, worst, copy), quality_sig (copy signature).
+-- Idempotent: runs unchanged as supabase/updates/20261204007000_nft_quality.sql.
+
+alter table public.artworks add column if not exists quality smallint check (quality is null or quality between 0 and 100);
+alter table public.artworks add column if not exists quality_detail jsonb;
+alter table public.artworks add column if not exists quality_sig text;
+create index if not exists artworks_quality_sig_idx on public.artworks (md5(quality_sig)) where quality_sig is not null;
+comment on column public.artworks.quality is 'ADR-181: critic score 0..100 from the pixel grid (art_quality), set by the server.';
+comment on column public.artworks.quality_detail is
+  'ADR-181: {"sub": {coverage, colours, harmony, contrast, structure, outline, composition, detail, shapes}, "best", "worst", "copy": exact|near|null}.';
+comment on column public.artworks.quality_sig is 'ADR-181: grid with colours renamed by first appearance (copy detection).';
+
+-- The rating needs nfts.quality before the new game_config is written (update-to-latest writes it at the end)
+update public.game_config set value = jsonb_set(value, '{quality}', '{"coverageMinPct":15,"dominanceMaxPct":90,"colourScores":[0,20,55,80,100,100,100,100,100,90,85,80,75,70,65,60,55],"strayPct":1,"strayPenalty":8,"chromaMinPct":20,"hueBuckets":3,"huePenalty":14,"hueFloor":20,"contrastFull":160,"noiseFreePct":5,"fragmentFreePct":10,"detailMin":40,"detailMax":350,"shapeFullPct":40,"balanceFreePct":10,"nearCopyPct":2,"copyCap":5,"nearCopyCap":15,"gateBase":30,"weights":{"coverage":10,"colours":12,"harmony":12,"contrast":10,"structure":16,"outline":8,"composition":10,"detail":10,"shapes":12}}'::jsonb)
+ where key = 'nfts' and not (value ? 'quality');
+
+-- artSignature: "." empty, colours renamed a, b, c ... in order of first appearance (equal hex values are one colour)
+create or replace function public.art_signature(p_pixels jsonb)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_pal   jsonb := p_pixels -> 'palette';
+  v_np    integer := coalesce(jsonb_array_length(p_pixels -> 'palette'), 0);
+  v_size  integer := coalesce(jsonb_array_length(p_pixels -> 'grid'), 0);
+  v_hex   text[] := '{}';
+  v_name  text[] := '{}';
+  v_row   text;
+  v_ch    text;
+  v_i     integer;
+  v_h     text;
+  v_pos   integer;
+  v_out   text := '';
+begin
+  for y in 0 .. v_size - 1 loop
+    v_row := p_pixels -> 'grid' ->> y;
+    for x in 1 .. v_size loop
+      v_ch := substr(v_row, x, 1);
+      v_i := position(v_ch in '0123456789abcdef') - 1;
+      if v_ch = '' or v_i < 0 or v_i >= v_np then
+        v_out := v_out || '.';
+      else
+        v_h := lower(v_pal ->> v_i);
+        v_pos := array_position(v_hex, v_h);
+        if v_pos is null then
+          v_hex := v_hex || v_h;
+          v_pos := cardinality(v_hex);
+        end if;
+        v_out := v_out || substr('abcdefghijklmnop', v_pos, 1);
+      end if;
+    end loop;
+  end loop;
+  return v_out;
+end;
+$$;
+
+-- artCopyKind against the older NFTs (created before p_self, or all when p_self is null): exact | near | null
+create or replace function public.art_copy_kind(p_sig text, p_self uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_limit integer := floor(char_length(p_sig) * coalesce((public.nfts_cfg() #>> '{quality,nearCopyPct}')::integer, 2) / 100.0)::integer;
+  v_drawn integer := char_length(replace(p_sig, '.', ''));
+  r       record;
+  v_diff  integer;
+  v_at    timestamptz := 'infinity';
+  v_ser   bigint := 9223372036854775807;
+begin
+  if p_sig is null or p_sig = '' then
+    return null;
+  end if;
+  if p_self is not null then
+    select a.created_at, a.serial into v_at, v_ser from public.artworks a where a.id = p_self;
+  end if;
+  if exists (select 1 from public.artworks a where md5(a.quality_sig) = md5(p_sig) and a.quality_sig = p_sig
+               and a.id is distinct from p_self and (a.created_at, a.serial) < (v_at, v_ser)) then
+    return 'exact';
+  end if;
+  for r in select a.quality_sig as sig from public.artworks a
+            where a.quality_sig is not null and a.id is distinct from p_self and (a.created_at, a.serial) < (v_at, v_ser)
+              and char_length(a.quality_sig) = char_length(p_sig)
+              and abs(char_length(replace(a.quality_sig, '.', '')) - v_drawn) <= v_limit
+            limit 500 loop
+    select count(*) into v_diff from generate_series(1, char_length(p_sig)) i
+     where substr(r.sig, i, 1) <> substr(p_sig, i, 1);
+    if v_diff <= v_limit then
+      return 'near';
+    end if;
+  end loop;
+  return null;
+end;
+$$;
+
+-- artQuality: the critic's score and sub-scores (see src/lib/sim/art-quality.ts)
+create or replace function public.art_quality(p_pixels jsonb, p_copy text default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  q        jsonb := public.nfts_cfg() -> 'quality';
+  v_pal    jsonb := p_pixels -> 'palette';
+  v_np     integer := coalesce(jsonb_array_length(p_pixels -> 'palette'), 0);
+  v_size   integer := coalesce(jsonb_array_length(p_pixels -> 'grid'), 0);
+  v_n      integer;
+  v_hex    text[] := '{}';
+  v_idof   integer[] := '{}';
+  v_r      integer[] := '{}';
+  v_g      integer[] := '{}';
+  v_b      integer[] := '{}';
+  v_lum    integer[] := '{}';
+  v_cells  integer[];
+  v_cnt    integer[];
+  v_empty  integer := 0;
+  v_drawn  integer := 0;
+  v_sx     bigint := 0;
+  v_sy     bigint := 0;
+  v_row    text;
+  v_i      integer;
+  v_c      integer;
+  v_o      integer;
+  v_k      integer := 0;
+  v_stray  integer := 0;
+  v_maxc   integer;
+  v_dom    integer;
+  v_cov    integer;
+  v_col    integer;
+  v_harm   integer;
+  v_con    integer;
+  v_str    integer;
+  v_out    integer;
+  v_comp   integer;
+  v_det    integer;
+  v_shp    integer;
+  v_minl   integer := 1000;
+  v_maxl   integer := -1;
+  v_thr    integer;
+  v_bk     integer[] := '{}';
+  v_mx     integer;
+  v_mn     integer;
+  v_d      integer;
+  v_h      integer;
+  v_iso    integer := 0;
+  v_solid  integer := 0;
+  v_bound  integer := 0;
+  v_dark   integer := 0;
+  v_trans  integer := 0;
+  v_same   integer;
+  v_isemp  boolean;
+  v_seen   boolean[];
+  v_stack  integer[];
+  v_top    integer;
+  v_j      integer;
+  v_reg    integer := 0;
+  v_noise  integer;
+  v_frag   integer;
+  v_off    integer;
+  v_bal    integer;
+  v_ph     integer := 0;
+  v_mh     integer := 0;
+  v_pv     integer := 0;
+  v_mv     integer := 0;
+  v_sym    integer;
+  v_e      integer;
+  v_sum    bigint := 0;
+  v_sumw   bigint := 0;
+  v_score  integer;
+  v_gate   integer;
+  v_sub    jsonb;
+  v_best   text;
+  v_worst  text;
+  v_keys   text[] := array['coverage', 'colours', 'harmony', 'contrast', 'structure', 'outline', 'composition', 'detail', 'shapes'];
+  v_key    text;
+  v_tab    jsonb := q -> 'colourScores';
+  v_chroma integer := (q ->> 'chromaMinPct')::integer;
+begin
+  -- palette: equal hex values share one colour id (1-based here)
+  for v_i in 0 .. v_np - 1 loop
+    v_row := lower(v_pal ->> v_i);
+    v_c := array_position(v_hex, v_row);
+    if v_c is null then
+      v_hex := v_hex || v_row;
+      v_c := cardinality(v_hex);
+      v_r := v_r || ('x' || substr(v_row, 2, 2))::bit(8)::integer;
+      v_g := v_g || ('x' || substr(v_row, 4, 2))::bit(8)::integer;
+      v_b := v_b || ('x' || substr(v_row, 6, 2))::bit(8)::integer;
+      v_lum := v_lum || ((299 * v_r[v_c] + 587 * v_g[v_c] + 114 * v_b[v_c]) / 1000);
+    end if;
+    v_idof := v_idof || v_c;
+  end loop;
+  v_n := v_size * v_size;
+  v_cells := array_fill(0, array[greatest(v_n, 1)]);
+  v_cnt := array_fill(0, array[greatest(cardinality(v_hex), 1)]);
+  for y in 0 .. v_size - 1 loop
+    v_row := p_pixels -> 'grid' ->> y;
+    for x in 0 .. v_size - 1 loop
+      v_i := position(substr(coalesce(v_row, ''), x + 1, 1) in '0123456789abcdef') - 1;
+      if substr(coalesce(v_row, ''), x + 1, 1) <> '' and v_i >= 0 and v_i < v_np then
+        v_c := v_idof[v_i + 1];
+        v_cells[y * v_size + x + 1] := v_c;
+        v_cnt[v_c] := v_cnt[v_c] + 1;
+        v_drawn := v_drawn + 1;
+        v_sx := v_sx + x;
+        v_sy := v_sy + y;
+      else
+        v_empty := v_empty + 1;
+      end if;
+    end loop;
+  end loop;
+  if v_drawn = 0 or v_size < 2 then
+    return jsonb_build_object('score', 0, 'sub', (select jsonb_object_agg(k, 0) from unnest(v_keys) k),
+                              'best', 'coverage', 'worst', 'coverage', 'copy', p_copy);
+  end if;
+
+  -- coverage
+  v_cov := least(100, (v_drawn::bigint * 10000 / (v_n * (q ->> 'coverageMinPct')::integer))::integer);
+  v_maxc := v_empty;
+  for v_c in 1 .. cardinality(v_hex) loop
+    v_maxc := greatest(v_maxc, v_cnt[v_c]);
+    if v_cnt[v_c] > 0 then
+      v_k := v_k + 1;
+      if v_cnt[v_c] * 100 < v_drawn * (q ->> 'strayPct')::integer then
+        v_stray := v_stray + 1;
+      end if;
+      v_minl := least(v_minl, v_lum[v_c]);
+      v_maxl := greatest(v_maxl, v_lum[v_c]);
+      -- hue bucket of a saturated colour
+      v_mx := greatest(v_r[v_c], v_g[v_c], v_b[v_c]);
+      v_mn := least(v_r[v_c], v_g[v_c], v_b[v_c]);
+      v_d := v_mx - v_mn;
+      if v_mx > 0 and v_d > 0 and v_d * 100 / v_mx >= v_chroma and v_mx * 100 / 255 >= v_chroma then
+        if v_mx = v_r[v_c] then
+          v_h := (60 * (v_g[v_c] - v_b[v_c]) + 360 * v_d) / v_d;
+        elsif v_mx = v_g[v_c] then
+          v_h := (60 * (v_b[v_c] - v_r[v_c]) + 120 * v_d) / v_d;
+        else
+          v_h := (60 * (v_r[v_c] - v_g[v_c]) + 240 * v_d) / v_d;
+        end if;
+        v_h := (v_h % 360) / 30;
+        if array_position(v_bk, v_h) is null then
+          v_bk := v_bk || v_h;
+        end if;
+      end if;
+    end if;
+  end loop;
+  v_dom := v_maxc * 100 / v_n;
+  if v_dom > (q ->> 'dominanceMaxPct')::integer then
+    v_cov := least(v_cov, (100 - v_dom) * 10);
+  end if;
+
+  -- colours, harmony, contrast
+  v_col := greatest(0, least(100, (v_tab ->> least(v_k, jsonb_array_length(v_tab) - 1))::integer
+                                  - v_stray * (q ->> 'strayPenalty')::integer));
+  v_harm := case when cardinality(v_bk) <= (q ->> 'hueBuckets')::integer then 100
+                 else greatest((q ->> 'hueFloor')::integer,
+                               100 - (cardinality(v_bk) - (q ->> 'hueBuckets')::integer) * (q ->> 'huePenalty')::integer) end;
+  v_con := least(100, (v_maxl - v_minl) * 100 / (q ->> 'contrastFull')::integer);
+  v_thr := v_minl + (v_maxl - v_minl) / 3;
+
+  -- neighbours
+  for y in 0 .. v_size - 1 loop
+    for x in 0 .. v_size - 1 loop
+      v_i := y * v_size + x + 1;
+      v_c := v_cells[v_i];
+      if x + 1 < v_size and v_cells[v_i + 1] <> v_c then
+        v_trans := v_trans + 1;
+      end if;
+      if y + 1 < v_size and v_cells[v_i + v_size] <> v_c then
+        v_trans := v_trans + 1;
+      end if;
+      continue when v_c = 0;
+      v_same := 0;
+      v_isemp := false;
+      if x > 0 then
+        v_o := v_cells[v_i - 1];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if x + 1 < v_size then
+        v_o := v_cells[v_i + 1];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if y > 0 then
+        v_o := v_cells[v_i - v_size];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if y + 1 < v_size then
+        v_o := v_cells[v_i + v_size];
+        if v_o = v_c then v_same := v_same + 1; elsif v_o = 0 then v_isemp := true; end if;
+      end if;
+      if v_same = 0 then v_iso := v_iso + 1; end if;
+      if v_same >= 3 then v_solid := v_solid + 1; end if;
+      if v_isemp then
+        v_bound := v_bound + 1;
+        if v_lum[v_c] <= v_thr then v_dark := v_dark + 1; end if;
+      end if;
+    end loop;
+  end loop;
+
+  -- regions: 4-connected, same colour (iterative flood fill)
+  v_seen := array_fill(false, array[v_n]);
+  v_stack := array_fill(0, array[v_n]);
+  for v_i in 1 .. v_n loop
+    continue when v_cells[v_i] = 0 or v_seen[v_i];
+    v_reg := v_reg + 1;
+    v_seen[v_i] := true;
+    v_top := 1;
+    v_stack[1] := v_i;
+    while v_top > 0 loop
+      v_j := v_stack[v_top];
+      v_top := v_top - 1;
+      v_c := v_cells[v_j];
+      -- left, right, up, down (0-based x = (v_j - 1) % size)
+      if (v_j - 1) % v_size > 0 and not v_seen[v_j - 1] and v_cells[v_j - 1] = v_c then
+        v_seen[v_j - 1] := true; v_top := v_top + 1; v_stack[v_top] := v_j - 1;
+      end if;
+      if (v_j - 1) % v_size + 1 < v_size and not v_seen[v_j + 1] and v_cells[v_j + 1] = v_c then
+        v_seen[v_j + 1] := true; v_top := v_top + 1; v_stack[v_top] := v_j + 1;
+      end if;
+      if v_j > v_size and not v_seen[v_j - v_size] and v_cells[v_j - v_size] = v_c then
+        v_seen[v_j - v_size] := true; v_top := v_top + 1; v_stack[v_top] := v_j - v_size;
+      end if;
+      if v_j + v_size <= v_n and not v_seen[v_j + v_size] and v_cells[v_j + v_size] = v_c then
+        v_seen[v_j + v_size] := true; v_top := v_top + 1; v_stack[v_top] := v_j + v_size;
+      end if;
+    end loop;
+  end loop;
+  v_noise := v_iso * 100 / v_drawn;
+  v_frag := v_reg * 100 / v_drawn;
+  v_str := (case when v_noise <= (q ->> 'noiseFreePct')::integer then 100
+                 else greatest(0, 100 - (v_noise - (q ->> 'noiseFreePct')::integer) * 2) end
+          + case when v_frag <= (q ->> 'fragmentFreePct')::integer then 100
+                 else greatest(0, 100 - (v_frag - (q ->> 'fragmentFreePct')::integer) * 2) end) / 2;
+  v_out := case when v_k < 2 then 40 when v_bound = 0 then 70 else 40 + v_dark * 60 / v_bound end;
+
+  -- composition
+  v_off := (abs(2 * v_sx - (v_size - 1)::bigint * v_drawn) * 100 / (v_drawn::bigint * v_size))::integer
+         + (abs(2 * v_sy - (v_size - 1)::bigint * v_drawn) * 100 / (v_drawn::bigint * v_size))::integer;
+  v_bal := case when v_off <= (q ->> 'balanceFreePct')::integer then 100
+                else greatest(0, 100 - (v_off - (q ->> 'balanceFreePct')::integer) * 3) end;
+  for a in 0 .. v_size - 1 loop
+    for b in 0 .. v_size / 2 - 1 loop
+      v_c := v_cells[a * v_size + b + 1];
+      v_o := v_cells[a * v_size + v_size - b];
+      if v_c <> 0 or v_o <> 0 then
+        v_ph := v_ph + 1;
+        if v_c = v_o then v_mh := v_mh + 1; end if;
+      end if;
+      v_c := v_cells[b * v_size + a + 1];
+      v_o := v_cells[(v_size - 1 - b) * v_size + a + 1];
+      if v_c <> 0 or v_o <> 0 then
+        v_pv := v_pv + 1;
+        if v_c = v_o then v_mv := v_mv + 1; end if;
+      end if;
+    end loop;
+  end loop;
+  v_sym := greatest(case when v_ph = 0 then 0 else v_mh * 100 / v_ph end, case when v_pv = 0 then 0 else v_mv * 100 / v_pv end);
+  v_comp := (v_bal * 2 + v_sym) / 3;
+
+  v_e := v_trans * 1000 / (2 * v_size * (v_size - 1));
+  v_det := case when v_e < (q ->> 'detailMin')::integer then v_e * 100 / (q ->> 'detailMin')::integer
+                when v_e <= (q ->> 'detailMax')::integer then 100
+                else greatest(0, 100 - (v_e - (q ->> 'detailMax')::integer) / 4) end;
+  v_shp := least(100, (v_solid::bigint * 10000 / (v_drawn::bigint * (q ->> 'shapeFullPct')::integer))::integer);
+
+  v_sub := jsonb_build_object('coverage', v_cov, 'colours', v_col, 'harmony', v_harm, 'contrast', v_con,
+                              'structure', v_str, 'outline', v_out, 'composition', v_comp, 'detail', v_det, 'shapes', v_shp);
+  v_best := v_keys[1];
+  v_worst := v_keys[1];
+  foreach v_key in array v_keys loop
+    v_sumw := v_sumw + (q #>> array['weights', v_key])::integer;
+    v_sum := v_sum + (q #>> array['weights', v_key])::integer * (v_sub ->> v_key)::integer;
+    if (v_sub ->> v_key)::integer > (v_sub ->> v_best)::integer then v_best := v_key; end if;
+    if (v_sub ->> v_key)::integer < (v_sub ->> v_worst)::integer then v_worst := v_key; end if;
+  end loop;
+  v_gate := least(v_cov, v_col, v_det);
+  v_score := ((v_sum / v_sumw) * ((q ->> 'gateBase')::integer * 100 + v_gate * (100 - (q ->> 'gateBase')::integer)) / 10000)::integer;
+  if p_copy = 'exact' then
+    v_score := least(v_score, (q ->> 'copyCap')::integer);
+  elsif p_copy = 'near' then
+    v_score := least(v_score, (q ->> 'nearCopyCap')::integer);
+  end if;
+  return jsonb_build_object('score', v_score, 'sub', v_sub, 'best', v_best, 'worst', v_worst, 'copy', p_copy);
+end;
+$$;
+comment on function public.art_quality(jsonb, text) is 'Port of artQuality (src/lib/sim/art-quality.ts, ADR-181).';
+
+-- Scores one NFT (copy check against older NFTs) and stores the result
+create or replace function public.artwork_rate_quality(p_artwork uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  a     public.artworks;
+  v_sig text;
+  v_q   jsonb;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if a.id is null or public.nfts_cfg() -> 'quality' is null then
+    return null;
+  end if;
+  v_sig := public.art_signature(a.pixels);
+  v_q := public.art_quality(a.pixels, public.art_copy_kind(v_sig, a.id));
+  update public.artworks set quality = (v_q ->> 'score')::smallint, quality_detail = v_q - 'score', quality_sig = v_sig
+   where id = a.id;
+  return (v_q ->> 'score')::integer;
+end;
+$$;
+
+-- Every new NFT (player mint, gallery seed) is rated once, after insert; changing the pixels rates it again
+create or replace function public.artworks_quality_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.artwork_rate_quality(new.id);
+  return null;
+end;
+$$;
+drop trigger if exists artworks_quality_ins on public.artworks;
+create trigger artworks_quality_ins after insert on public.artworks
+  for each row execute function public.artworks_quality_trigger();
+drop trigger if exists artworks_quality_upd on public.artworks;
+create trigger artworks_quality_upd after update of pixels on public.artworks
+  for each row when (old.pixels is distinct from new.pixels) execute function public.artworks_quality_trigger();
+
+revoke all on function public.art_signature(jsonb) from public, anon, authenticated;
+revoke all on function public.art_copy_kind(text, uuid) from public, anon, authenticated;
+revoke all on function public.art_quality(jsonb, text) from public, anon, authenticated;
+revoke all on function public.artwork_rate_quality(uuid) from public, anon, authenticated;
+revoke all on function public.artworks_quality_trigger() from public, anon, authenticated;
+grant execute on function public.art_signature(jsonb) to service_role;
+grant execute on function public.art_copy_kind(text, uuid) to service_role;
+grant execute on function public.art_quality(jsonb, text) to service_role;
+grant execute on function public.artwork_rate_quality(uuid) to service_role;
+
+-- Backfill: oldest first, so an original is rated before its copies
+do $do$
+declare
+  r record;
+begin
+  if public.nfts_cfg() -> 'quality' is null then
+    return;
+  end if;
+  for r in select a.id from public.artworks a where a.quality is null order by a.created_at, a.serial loop
+    perform public.artwork_rate_quality(r.id);
+  end loop;
+end;
+$do$;
+
+-- ===== supabase/updates/20261204007010_nft_quality_value.sql =====
+-- ===== idempotent copy of migrations/20261204007010_nft_quality_value.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7010 · The collectors pay for quality (ADR-181)
+-- =============================================================================
+-- The critic score (artworks.quality, 7000) scales the collectors' valuation anchor (mint cost or floor, never the
+-- last price, so it does not compound) by nfts.ai.quality.valueMinBps..valueMaxBps (score 50 = x 1.0). This moves
+-- every purchase ceiling, offer, auction bid (nft_ai_value_cents) and the trades among collectors (nft_fair_cents).
+-- Lowball offers shift with the score (nft_lowball_cents with p_quality). Ports of src/lib/sim/nfts.ts.
+-- Copies of 20261204001400 (nft_fair_cents, nft_ai_value_excluding), the anchor changed.
+-- Idempotent: runs unchanged as supabase/updates/20261204007010_nft_quality_value.sql.
+
+-- ADR-181 effects need nfts.ai.quality before the new game_config is written (update-to-latest writes it at the end)
+update public.game_config
+   set value = jsonb_set(value, '{ai,quality}', '{"neutral":50,"valueMinBps":6000,"valueMaxBps":14000,"chanceMinBps":2000,"chanceMaxBps":20000,"noInterestBelow":10,"lowballShiftBps":1500,"mockBelow":35,"praiseFrom":75,"goodFrom":85,"badBelow":45}'::jsonb)
+ where key = 'nfts' and value ? 'ai' and not (value -> 'ai' ? 'quality');
+
+-- nftQualityValueBps / the factor of nftQualityChanceBps: min + (max - min) x score / 100, null = neutral
+create or replace function public.nft_quality_factor_bps(p_quality integer, p_min text, p_max text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((q ->> p_min)::integer, 10000)
+         + (coalesce((q ->> p_max)::integer, 10000) - coalesce((q ->> p_min)::integer, 10000))
+           * greatest(0, least(100, coalesce(p_quality, (q ->> 'neutral')::integer, 50))) / 100
+    from (select coalesce(public.nfts_cfg() #> '{ai,quality}', '{}'::jsonb) as q) c;
+$$;
+
+-- nftQualityChanceBps: a chance scaled by the score, 0 below noInterestBelow
+create or replace function public.nft_quality_chance_bps(p_base numeric, p_quality integer)
+returns numeric
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_quality is not null
+                   and p_quality < coalesce((public.nfts_cfg() #>> '{ai,quality,noInterestBelow}')::integer, 0) then 0
+              else floor(coalesce(p_base, 0) * public.nft_quality_factor_bps(p_quality, 'chanceMinBps', 'chanceMaxBps') / 10000) end;
+$$;
+
+-- the valuation anchor from mint cost (or gallery start price) and floor, scaled by quality
+create or replace function public.nft_quality_base_cents(p_artwork uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select floor(greatest(coalesce(a.mint_cents, case when a.origin = 'game' then public.artwork_gallery_start_cents(a.rarity) end, 0),
+                        coalesce((public.nfts_cfg() #>> '{ai,floorCents}')::bigint, 100000))::numeric
+               * public.nft_quality_factor_bps(a.quality, 'valueMinBps', 'valueMaxBps') / 10000)::bigint
+    from public.artworks a where a.id = p_artwork;
+$$;
+
+create or replace function public.nft_fair_cents(p_artwork uuid, p_now timestamptz default null)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  ai      jsonb := public.nfts_cfg() -> 'ai';
+  a       public.artworks;
+  v_base  bigint;
+  v_likes bigint;
+  v_sales bigint := 0;
+  v_days  bigint;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if a.id is null then
+    return null;
+  end if;
+  v_base := public.nft_quality_base_cents(a.id);
+  select count(*) into v_likes from public.artwork_likes l where l.artwork_id = a.id;
+  if a.creator_id is not null then
+    select count(*) into v_sales from public.artwork_sales s join public.artworks x on x.id = s.artwork_id
+     where x.creator_id = a.creator_id;
+  end if;
+  v_days := greatest(0, floor(extract(epoch from (coalesce(p_now, public.game_now()) - a.created_at)) / 86400))::bigint;
+  return floor(v_base::numeric * (10000
+           + (ai ->> 'likeBps')::bigint * least(v_likes, (ai ->> 'maxLikes')::bigint)
+           + (ai ->> 'creatorSaleBps')::bigint * least(v_sales, (ai ->> 'maxCreatorSales')::bigint)
+           + (ai ->> 'ageBpsPerDay')::bigint * least(v_days, (ai ->> 'maxAgeDays')::bigint)
+           + public.nft_demand_bps(a.id, p_now)) / 10000)::bigint;
+end;
+$$;
+
+-- The valuation without the demand of one bidder: their own offer must not raise the price they have to beat.
+create or replace function public.nft_ai_value_excluding(p_artwork uuid, p_now timestamptz, p_exclude uuid)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  ai       jsonb := public.nfts_cfg() -> 'ai';
+  a        public.artworks;
+  v_anchor bigint;
+  v_likes  bigint;
+  v_sales  bigint := 0;
+  v_days   bigint;
+  v_bonus  bigint;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if a.id is null then
+    return null;
+  end if;
+  -- ADR-181: the last price as it is, mint cost / floor scaled by the critic score
+  v_anchor := greatest(coalesce(a.value_cents, 0), public.nft_quality_base_cents(a.id));
+  select count(*) into v_likes from public.artwork_likes l where l.artwork_id = a.id;
+  if a.creator_id is not null then
+    select count(*) into v_sales from public.artwork_sales s join public.artworks x on x.id = s.artwork_id
+     where x.creator_id = a.creator_id;
+  end if;
+  v_days := greatest(0, floor(extract(epoch from (coalesce(p_now, public.game_now()) - a.created_at)) / 86400))::bigint;
+  v_bonus := coalesce((ai ->> 'likeBps')::bigint, 400) * least(v_likes, coalesce((ai ->> 'maxLikes')::bigint, 40))
+           + coalesce((ai ->> 'creatorSaleBps')::bigint, 300) * least(v_sales, coalesce((ai ->> 'maxCreatorSales')::bigint, 10))
+           + coalesce((ai ->> 'ageBpsPerDay')::bigint, 100) * least(v_days, coalesce((ai ->> 'maxAgeDays')::bigint, 30))
+           + public.nft_demand_bps(a.id, p_now, p_exclude);
+  return floor(v_anchor::numeric * (10000 + v_bonus) / 10000)::bigint;
+end;
+$$;
+
+-- nftLowballCents with the score: the band shifts by trunc((score - 50) x lowballShiftBps / 50), at most 100 %
+create or replace function public.nft_lowball_cents(p_value bigint, p_u double precision, p_quality integer)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg   jsonb := public.nfts_cfg();
+  v_min integer := (cfg #>> '{ai,lowballMinBps}')::integer;
+  v_max integer := (cfg #>> '{ai,lowballMaxBps}')::integer;
+  v_bps integer;
+begin
+  v_bps := v_min + floor(least(greatest(coalesce(p_u, 0), 0), 0.999999) * (v_max - v_min))::integer;
+  if p_quality is not null then
+    v_bps := v_bps + (greatest(0, least(100, p_quality)) - 50) * coalesce((cfg #>> '{ai,quality,lowballShiftBps}')::integer, 0) / 50;
+  end if;
+  v_bps := least(10000, v_bps);
+  return greatest((cfg ->> 'minOfferCents')::bigint, (floor(p_value::numeric * v_bps / 10000 / 100) * 100)::bigint);
+end;
+$$;
+
+revoke all on function public.nft_quality_factor_bps(integer, text, text) from public, anon, authenticated;
+revoke all on function public.nft_quality_chance_bps(numeric, integer) from public, anon, authenticated;
+revoke all on function public.nft_quality_base_cents(uuid) from public, anon, authenticated;
+revoke all on function public.nft_lowball_cents(bigint, double precision, integer) from public, anon, authenticated;
+grant execute on function public.nft_quality_factor_bps(integer, text, text) to service_role;
+grant execute on function public.nft_quality_chance_bps(numeric, integer) to service_role;
+grant execute on function public.nft_quality_base_cents(uuid) to service_role;
+grant execute on function public.nft_lowball_cents(bigint, double precision, integer) to service_role;
+
+-- ===== supabase/updates/20261204007020_nft_talk.sql =====
+-- ===== idempotent copy of migrations/20261204007020_nft_talk.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7020 · The collectors talk: reactions to the art and to the players (ADR-181)
+-- =============================================================================
+-- 1. Offer texts follow the critic score (nft_offer_text): copies and poor art get mocking lines, great art praise
+--    or a compliment on its best sub-score, the middle a comment on the weakest or best sub-score or the classic
+--    lines; now and then a collector's own catchphrase (nfts.ai.talk.personas). No line repeats one of the last
+--    talk.recentLines AI lines of the chat (nft_line).
+-- 2. Collectors answer players (nfts_run_due step 3b): a player's message that is the newest in the chat for at least
+--    talk.replyDelayMinutes gets an answer from the AI owner or the collector who spoke there last, by keyword intent
+--    (nft_intent: insult, higher, lower, no, yes, question, other). Asked for more (or told no) by the owner, the
+--    collector raises its open offer by talk.counterStepBps up to talk.counterCeilingBps of its valuation (within the
+--    daily budget of ADR-170), else says it is final. Every reply invites the next message: conversations go on.
+-- 3. An offer ignored for talk.followupMinutes gets one nudge (step 3c).
+-- 4. Purchases, offers and trades among collectors are as likely as nft_quality_chance_bps says (none below
+--    ai.quality.noInterestBelow), lowball offers shift with the score (7010).
+-- Ports of src/lib/sim/nft-talk.ts. Without nfts.ai.talk in game_config the collectors keep their old lines.
+-- Idempotent: runs unchanged as supabase/updates/20261204007020_nft_talk.sql.
+
+-- detectIntent: the first intent of talk.intentOrder with a keyword as a whole word (or phrase), else 'other'
+create or replace function public.nft_intent(p_text text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  talk     jsonb := public.nfts_cfg() #> '{ai,talk}';
+  v_t      text;
+  v_intent text;
+begin
+  v_t := ' ' || btrim(regexp_replace(replace(lower(coalesce(p_text, '')), '?', ' ? '), '[^a-z0-9äöüß?]+', ' ', 'g')) || ' ';
+  for v_intent in select jsonb_array_elements_text(coalesce(talk -> 'intentOrder', '[]'::jsonb)) loop
+    if exists (select 1 from jsonb_array_elements_text(coalesce(talk #> array['intents', v_intent], '[]'::jsonb)) w
+                where position(' ' || w || ' ' in v_t) > 0) then
+      return v_intent;
+    end if;
+  end loop;
+  return 'other';
+end;
+$$;
+
+-- pickLine: the line at u, moving on while it is one of the last talk.recentLines AI lines of this chat
+create or replace function public.nft_line(p_artwork uuid, p_lines jsonb, p_u double precision)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_len    integer := coalesce(jsonb_array_length(p_lines), 0);
+  v_start  integer;
+  v_recent text[];
+  v_line   text;
+begin
+  if v_len = 0 then
+    return null;
+  end if;
+  v_start := least(v_len - 1, floor(greatest(coalesce(p_u, 0), 0) * v_len)::integer);
+  select coalesce(array_agg(x.body), '{}') into v_recent
+    from (select m.body from public.artwork_messages m where m.artwork_id = p_artwork and m.ai_name is not null
+           order by m.id desc limit coalesce((public.nfts_cfg() #>> '{ai,talk,recentLines}')::integer, 0)) x;
+  for k in 0 .. v_len - 1 loop
+    v_line := p_lines ->> ((v_start + k) % v_len);
+    if not (v_line = any (v_recent)) then
+      return v_line;
+    end if;
+  end loop;
+  return p_lines ->> v_start;
+end;
+$$;
+
+-- A collector's line from a list below nfts.ai (e.g. {lines,buy}, {talk,lines,reply,yes}); for offers, praise,
+-- nudges and small talk sometimes the collector's own catchphrase; unknown lists fall back to {lines,offer}.
+create or replace function public.nft_say(p_artwork uuid, p_name text, p_path text[], p_u double precision)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  ai      jsonb := public.nfts_cfg() -> 'ai';
+  v_lines jsonb := ai #> p_path;
+begin
+  if p_path::text in ('{lines,offer}', '{talk,lines,praise}', '{talk,lines,followup}', '{talk,lines,reply,other}')
+     and jsonb_typeof(ai #> array['talk', 'personas', p_name]) = 'array'
+     and random() * 10000 < coalesce((ai #>> '{talk,personaChanceBps}')::integer, 0) then
+    v_lines := ai #> array['talk', 'personas', p_name];
+  end if;
+  if jsonb_typeof(v_lines) is distinct from 'array' or jsonb_array_length(v_lines) = 0 then
+    v_lines := ai #> '{lines,offer}';
+  end if;
+  return coalesce(public.nft_line(p_artwork, v_lines, p_u), '…');
+end;
+$$;
+
+-- nftOfferPath: which offer text fits the critic score ('copy', 'mock', 'praise', 'good.<key>', 'bad.<key>', 'offer')
+create or replace function public.nft_offer_path(p_quality integer, p_copy text, p_best text, p_best_score integer,
+                                                 p_worst text, p_worst_score integer, p_u double precision)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+           when p_copy is not null then 'copy'
+           when p_quality is null then 'offer'
+           when p_quality < (q ->> 'mockBelow')::integer then 'mock'
+           when p_quality >= (q ->> 'praiseFrom')::integer then
+             case when p_u < 0.5 or p_best is null then 'praise' else 'good.' || p_best end
+           when p_u < 1.0 / 3 and p_worst is not null and p_worst_score < (q ->> 'badBelow')::integer then 'bad.' || p_worst
+           when p_u >= 1.0 / 3 and p_u < 2.0 / 3 and p_best is not null and p_best_score >= (q ->> 'goodFrom')::integer
+             then 'good.' || p_best
+           else 'offer' end
+    from (select coalesce(public.nfts_cfg() #> '{ai,quality}', '{}'::jsonb) as q) c;
+$$;
+
+-- The text of a collector's offer on an NFT
+create or replace function public.nft_offer_text(p_artwork uuid, p_name text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  a      public.artworks;
+  v_path text;
+begin
+  select * into a from public.artworks where id = p_artwork;
+  if public.nfts_cfg() #> '{ai,talk,lines}' is null then
+    return public.nft_say(p_artwork, p_name, '{lines,offer}', random());
+  end if;
+  v_path := public.nft_offer_path(a.quality, a.quality_detail ->> 'copy', a.quality_detail ->> 'best',
+                                  (a.quality_detail #>> array['sub', a.quality_detail ->> 'best'])::integer,
+                                  a.quality_detail ->> 'worst',
+                                  (a.quality_detail #>> array['sub', a.quality_detail ->> 'worst'])::integer, random());
+  return public.nft_say(p_artwork, p_name,
+                        case when v_path = 'offer' then '{lines,offer}'::text[]
+                             else array['talk', 'lines'] || string_to_array(v_path, '.') end, random());
+end;
+$$;
+
+-- nftCounterCents: the open offer + counterStepBps (whole euros), at most counterCeilingBps of the valuation
+create or replace function public.nft_counter_cents(p_previous bigint, p_value bigint)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when v_next > p_previous then v_next end
+    from (select least(floor(p_value::numeric * (t ->> 'counterCeilingBps')::integer / 10000 / 100)::bigint * 100,
+                       floor(p_previous::numeric * (10000 + (t ->> 'counterStepBps')::integer) / 10000 / 100)::bigint * 100) as v_next
+            from (select public.nfts_cfg() #> '{ai,talk}' as t) c) x;
+$$;
+
+revoke all on function public.nft_intent(text) from public, anon, authenticated;
+revoke all on function public.nft_line(uuid, jsonb, double precision) from public, anon, authenticated;
+revoke all on function public.nft_say(uuid, text, text[], double precision) from public, anon, authenticated;
+revoke all on function public.nft_offer_path(integer, text, text, integer, text, integer, double precision) from public, anon, authenticated;
+revoke all on function public.nft_offer_text(uuid, text) from public, anon, authenticated;
+revoke all on function public.nft_counter_cents(bigint, bigint) from public, anon, authenticated;
+grant execute on function public.nft_intent(text) to service_role;
+grant execute on function public.nft_line(uuid, jsonb, double precision) to service_role;
+grant execute on function public.nft_say(uuid, text, text[], double precision) to service_role;
+grant execute on function public.nft_offer_path(integer, text, text, integer, text, integer, double precision) to service_role;
+grant execute on function public.nft_offer_text(uuid, text) to service_role;
+grant execute on function public.nft_counter_cents(bigint, bigint) to service_role;
+
+-- nfts_run_due: copy of the latest definition (20261204006110 on top of 5000 and 1400), with the critic score and the chat
+create or replace function public.nfts_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  cfg       jsonb := public.nfts_cfg();
+  ai        jsonb := public.nfts_cfg() -> 'ai';
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  v_day     timestamptz := ((coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date)::timestamp
+                           at time zone 'Europe/Berlin';
+  v_house   uuid := public.ledger_system_account('households');
+  v_buys    integer;
+  v_msgs    integer := 0;
+  v_sold    integer := 0;
+  v_answers integer := 0;
+  v_expired integer;
+  v_value   bigint;
+  v_name    text;
+  v_id      bigint;
+  v_cash    bigint;
+  a         public.artworks;
+  r         record;
+  v_trades  integer;
+  v_traded  integer := 0;
+  v_price   bigint;
+  v_hbuys    integer;
+  v_htrades  integer;
+  v_spent    bigint;
+  v_replies  integer := 0;
+  v_follow   integer := 0;
+  v_intent   text;
+  v_offer    public.artwork_messages;
+  talk       jsonb := coalesce(public.nfts_cfg() #> '{ai,talk}', '{}'::jsonb);
+begin
+  if cfg = '{}'::jsonb or ai is null then
+    return jsonb_build_object('skipped', 'no config');
+  end if;
+  update public.artwork_messages set offer_status = 'expired' where offer_status = 'open' and expires_at <= v_now;
+  get diagnostics v_expired = row_count;
+  -- ADR-181: NFTs without a critic score yet (e.g. from before the config) are rated now
+  for r in select x.id from public.artworks x where x.quality is null order by x.created_at, x.serial limit 20 loop
+    perform public.artwork_rate_quality(r.id);
+  end loop;
+  -- purchases from players; trades between collectors have their own cap (ADR-141)
+  select count(*) into v_buys from public.artwork_sales s where s.buyer_ai is not null and s.seller_ai is null and s.at >= v_day;
+  -- ADR-170: hourly caps and a daily budget spread the collectors' activity over the day
+  select count(*) into v_hbuys from public.artwork_sales s
+   where s.buyer_ai is not null and s.seller_ai is null and s.at > v_now - interval '1 hour';
+  v_spent := public.nft_ai_spent_today(v_now);
+
+  -- 1. fixed-price listings of players: bought at a good price, else maybe a lowball offer
+  for r in select x.id, x.ask_cents from public.artworks x
+            where x.ask_cents is not null and x.owner_id is not null
+              and not exists (select 1 from public.artwork_auctions au where au.artwork_id = x.id and au.status = 'open')
+            order by x.listed_at, x.id limit 100 loop
+    select * into a from public.artworks where id = r.id for update skip locked;
+    continue when a.id is null or a.ask_cents is distinct from r.ask_cents or a.owner_id is null;
+    v_value := public.nft_ai_value_cents(a.id, v_now);
+    if a.ask_cents <= v_value then
+      continue when v_buys >= (ai ->> 'maxBuysPerDay')::integer
+                    or random() * 10000 >= public.nft_quality_chance_bps((ai ->> 'buyChanceBps')::numeric, a.quality)
+                    or v_hbuys >= coalesce((ai ->> 'maxBuysPerHour')::integer, 1000000)
+                    or v_spent + a.ask_cents > coalesce((ai ->> 'budgetCentsPerDay')::bigint, 9000000000000000000);
+      select x.balance_cents into v_cash from public.ledger_accounts x where x.id = v_house;
+      continue when coalesce(v_cash, 0) < a.ask_cents;
+      v_name := public.nft_pick('{ai,collectors}', random());
+      perform public.nft_sell(a.id, null, v_name, a.ask_cents, 'ai',
+                              'art:ai:' || a.id::text || ':' || floor(extract(epoch from v_now))::bigint::text);
+      perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{lines,buy}', random()), null);
+      v_buys := v_buys + 1;
+      v_hbuys := v_hbuys + 1;
+      v_spent := v_spent + a.ask_cents;
+      v_sold := v_sold + 1;
+    elsif v_msgs < (ai ->> 'maxMessagesPerRun')::integer
+          and random() * 10000 < public.nft_quality_chance_bps((ai ->> 'listedOfferChanceBps')::numeric, a.quality)
+          and (select count(*) from public.artwork_messages m where m.artwork_id = a.id and m.ai_name is not null
+                 and m.offer_status = 'open') < coalesce((ai ->> 'maxOpenAiOffers')::integer, 1)
+          and public.nft_free_collector(a.id, random()) is not null then
+      v_name := public.nft_free_collector(a.id, random());
+      v_id := public.nft_ai_post(a.id, v_name, 'offer', public.nft_offer_text(a.id, v_name),
+                                 public.nft_lowball_cents(v_value, random(), a.quality::integer));
+      update public.artwork_messages
+       set expires_at = least(expires_at, v_now + make_interval(mins => round(coalesce((ai ->> 'offerHours')::numeric, 24) * 60)::integer))
+     where id = v_id;
+    perform public.nft_notify_offer(v_id);
+      v_msgs := v_msgs + 1;
+    end if;
+  end loop;
+
+  -- 2. NFTs players keep: now and then a lowball offer
+  for r in select x.id, x.quality from public.artworks x
+            where x.owner_id is not null and x.ask_cents is null
+              and not exists (select 1 from public.artwork_auctions au where au.artwork_id = x.id and au.status = 'open')
+              and (select count(*) from public.artwork_messages m where m.artwork_id = x.id and m.ai_name is not null
+                     and m.offer_status = 'open') < coalesce((ai ->> 'maxOpenAiOffers')::integer, 1)
+            order by random() limit greatest(0, (ai ->> 'maxMessagesPerRun')::integer - v_msgs) loop
+    continue when random() * 10000 >= public.nft_quality_chance_bps((ai ->> 'unlistedOfferChanceBps')::numeric, r.quality);
+    continue when public.nft_free_collector(r.id, 0.5) is null;
+    v_name := public.nft_free_collector(r.id, random());
+    v_id := public.nft_ai_post(r.id, v_name, 'offer', public.nft_offer_text(r.id, v_name),
+                               public.nft_lowball_cents(public.nft_ai_value_cents(r.id, v_now), random(), r.quality::integer));
+    update public.artwork_messages
+       set expires_at = least(expires_at, v_now + make_interval(mins => round(coalesce((ai ->> 'offerHours')::numeric, 24) * 60)::integer))
+     where id = v_id;
+    perform public.nft_notify_offer(v_id);
+    v_msgs := v_msgs + 1;
+  end loop;
+
+  -- 3. NFTs the AI holds: player offers from acceptBps of the value are accepted, others declined
+  for r in select m.id, m.artwork_id, m.author_id, m.offer_cents from public.artwork_messages m
+             join public.artworks x on x.id = m.artwork_id
+            where x.ai_owner is not null and m.offer_status = 'open' and m.author_id is not null
+            order by m.id limit 50 loop
+    select * into a from public.artworks where id = r.artwork_id for update skip locked;
+    continue when a.id is null or a.ai_owner is null;
+    v_value := public.nft_ai_value_excluding(a.id, v_now, r.author_id);
+    select x.balance_cents into v_cash from public.ledger_accounts x where x.owner_player_id = r.author_id and x.kind = 'player_cash';
+    if r.offer_cents::numeric * 10000 >= v_value::numeric * (ai ->> 'acceptBps')::integer and coalesce(v_cash, 0) >= r.offer_cents then
+      update public.artwork_messages set offer_status = 'accepted' where id = r.id;
+      v_name := a.ai_owner;
+      perform public.nft_sell(a.id, r.author_id, null, r.offer_cents, 'offer', 'art:offer:' || r.id::text, r.id);
+      perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{lines,accept}', random()), null);
+    else
+      update public.artwork_messages set offer_status = 'declined' where id = r.id;
+      perform public.nft_ai_post(a.id, a.ai_owner, 'chat', public.nft_say(a.id, a.ai_owner, '{lines,decline}', random()), null);
+    end if;
+    v_answers := v_answers + 1;
+  end loop;
+
+  -- 3b. ADR-181: collectors answer players in the chat (the AI owner, else the collector who spoke last). Asked for
+  --     more (or told no) by the owner, a collector raises its open offer up to its ceiling, within the budget.
+  if talk ? 'lines' then
+    for r in select m.id, m.artwork_id, m.author_id, m.body from public.artwork_messages m
+              where m.author_id is not null
+                and m.created_at > v_now - make_interval(mins => coalesce((talk ->> 'replyWindowMinutes')::integer, 30))
+                and m.created_at <= v_now - make_interval(mins => coalesce((talk ->> 'replyDelayMinutes')::integer, 1))
+                and not exists (select 1 from public.artwork_messages n where n.artwork_id = m.artwork_id and n.id > m.id)
+              order by m.id limit 50 loop
+      exit when v_replies >= coalesce((talk ->> 'maxRepliesPerRun')::integer, 0);
+      select * into a from public.artworks where id = r.artwork_id for update skip locked;
+      continue when a.id is null;
+      v_name := a.ai_owner;
+      if v_name is null then
+        select m.ai_name into v_name from public.artwork_messages m
+         where m.artwork_id = a.id and m.ai_name is not null
+           and m.created_at > v_now - make_interval(hours => coalesce((talk ->> 'memoryHours')::integer, 6))
+         order by m.id desc limit 1;
+      end if;
+      continue when v_name is null;
+      v_intent := public.nft_intent(r.body);
+      v_offer := null;
+      select * into v_offer from public.artwork_messages m
+       where m.artwork_id = a.id and m.ai_name = v_name and m.offer_status = 'open' and m.expires_at > v_now
+       order by m.id desc limit 1;
+      if v_intent in ('higher', 'no') and v_offer.id is not null and a.owner_id = r.author_id then
+        v_price := public.nft_counter_cents(v_offer.offer_cents, public.nft_ai_value_cents(a.id, v_now));
+        if v_price is not null
+           and public.nft_ai_spent_today(v_now) + v_price <= coalesce((ai ->> 'budgetCentsPerDay')::bigint, 9000000000000000000) then
+          update public.artwork_messages set offer_status = 'closed' where id = v_offer.id;
+          v_id := public.nft_ai_post(a.id, v_name, 'offer', public.nft_say(a.id, v_name, '{talk,lines,counter}', random()), v_price);
+          update public.artwork_messages
+             set expires_at = least(expires_at, v_now + make_interval(mins => round(coalesce((ai ->> 'offerHours')::numeric, 24) * 60)::integer))
+           where id = v_id;
+          perform public.nft_notify_offer(v_id);
+        else
+          perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{talk,lines,final}', random()), null);
+        end if;
+      else
+        perform public.nft_ai_post(a.id, v_name, 'chat',
+                                   public.nft_say(a.id, v_name, array['talk', 'lines', 'reply', v_intent], random()), null);
+      end if;
+      v_replies := v_replies + 1;
+    end loop;
+
+    -- 3c. ADR-181: an ignored offer gets a nudge (once: the nudge is the newest message then)
+    for r in select m.id, m.artwork_id, m.ai_name from public.artwork_messages m
+               join public.artworks x on x.id = m.artwork_id
+              where m.offer_status = 'open' and m.ai_name is not null and m.expires_at > v_now and x.owner_id is not null
+                and m.created_at <= v_now - make_interval(mins => coalesce((talk ->> 'followupMinutes')::integer, 30))
+                and not exists (select 1 from public.artwork_messages n where n.artwork_id = m.artwork_id and n.id > m.id)
+              order by m.id limit 50 loop
+      exit when v_follow >= coalesce((talk ->> 'maxFollowupsPerRun')::integer, 0);
+      continue when random() * 10000 >= coalesce((talk ->> 'followupChanceBps')::integer, 0);
+      perform public.nft_ai_post(r.artwork_id, r.ai_name, 'chat',
+                                 public.nft_say(r.artwork_id, r.ai_name, '{talk,lines,followup}', random()), null);
+      v_follow := v_follow + 1;
+    end loop;
+  end if;
+
+  -- 4. The collectors trade among themselves (ADR-141): popular NFTs change hands more often; the price follows the
+  --    buyer's taste around the fair value and moves only part of the way from the last price.
+  select count(*) into v_trades from public.artwork_sales s
+   where s.seller_ai is not null and s.buyer_ai is not null and s.at >= v_day;
+  select count(*) into v_htrades from public.artwork_sales s
+   where s.seller_ai is not null and s.buyer_ai is not null and s.at > v_now - interval '1 hour';
+  for r in select x.id, x.ai_owner, x.value_cents, x.quality,
+                  (select count(*) from public.artwork_likes l where l.artwork_id = x.id) as likes,
+                  (select count(distinct coalesce(m.author_id::text, m.ai_name)) from public.artwork_messages m
+                    where m.artwork_id = x.id and m.offer_status = 'open') as offers,
+                  (select count(*) from public.artwork_sales s where s.artwork_id = x.id
+                    and s.at >= v_now - make_interval(days => (ai #>> '{demand,days}')::integer)) as sales
+             from public.artworks x
+            where x.ai_owner is not null and x.owner_id is null
+              and coalesce(x.listed_at, x.created_at) <= v_now - make_interval(mins => (ai #>> '{trade,minHoldMinutes}')::integer)
+              and not exists (select 1 from public.artwork_auctions au where au.artwork_id = x.id and au.status = 'open')
+            order by random() limit 200 loop
+    exit when v_traded >= (ai #>> '{trade,perRun}')::integer or v_trades >= (ai #>> '{trade,perDay}')::integer
+              or v_htrades >= coalesce((ai #>> '{trade,perHour}')::integer, 1000000);
+    continue when random() * 10000 >= public.nft_quality_chance_bps(least((ai #>> '{trade,maxChanceBps}')::numeric,
+      floor((ai #>> '{trade,chanceBps}')::numeric * (10000 + (ai #>> '{trade,likeWeightBps}')::numeric * r.likes
+            + (ai #>> '{trade,offerWeightBps}')::numeric * r.offers + (ai #>> '{trade,saleWeightBps}')::numeric * r.sales) / 10000)),
+      r.quality);
+    select * into a from public.artworks where id = r.id for update skip locked;
+    continue when a.id is null or a.ai_owner is distinct from r.ai_owner;
+    -- the buyer is always another collector
+    select c into v_name from jsonb_array_elements_text(ai -> 'collectors') c where c <> a.ai_owner order by random() limit 1;
+    continue when v_name is null;
+    v_price := public.nft_ai_trade_price_cents(a.value_cents, public.nft_fair_cents(a.id, v_now), random());
+    perform public.nft_sell(a.id, null, v_name, v_price, 'ai',
+                            'art:trade:' || a.id::text || ':' || floor(extract(epoch from v_now))::bigint::text);
+    perform public.nft_ai_post(a.id, v_name, 'chat', public.nft_say(a.id, v_name, '{lines,trade}', random()), null);
+    v_traded := v_traded + 1;
+    v_trades := v_trades + 1;
+    v_htrades := v_htrades + 1;
+  end loop;
+
+  return jsonb_build_object('bids', public.nft_ai_bid_auctions(v_now), 'sold', v_sold, 'offers', v_msgs, 'answered', v_answers, 'replies', v_replies, 'followups', v_follow, 'expired', v_expired,
+                            'traded', v_traded);
+end;
+$function$;
+
+-- ===== supabase/updates/20261204007030_nft_quality_json.sql =====
+-- ===== idempotent copy of migrations/20261204007030_nft_quality_json.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 7030 · The critics' verdict in the NFT JSON (ADR-181)
+-- =============================================================================
+-- artwork_json gets 'quality': {score, best, worst, copy} (null while unrated). The market shows the score as a
+-- small badge, the owner sees the verdict with the strongest and the weakest aspect. Sub-scores stay internal.
+-- Idempotent: runs unchanged as supabase/updates/20261204007030_nft_quality_json.sql.
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.artwork_json(uuid, uuid)'::regprocedure);
+  v_a   text := $t$    'ai_owner', a.ai_owner,
+$t$;
+begin
+  if position('''quality''' in v_def) > 0 then
+    return;
+  end if;
+  if position(v_a in v_def) = 0 then
+    raise exception 'artwork_json() has an unexpected shape; add the critic score (ADR-181) by hand';
+  end if;
+  execute replace(v_def, v_a, v_a || $t$    'quality', case when a.quality is null then null else jsonb_build_object(
+      'score', a.quality, 'best', a.quality_detail ->> 'best', 'worst', a.quality_detail ->> 'worst',
+      'copy', a.quality_detail ->> 'copy') end,
+$t$);
+end;
+$do$;
+
 commit;
