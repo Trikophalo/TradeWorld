@@ -11,7 +11,7 @@
       "minutes": 15,
       "chance_bps": 9000,
       "cost_cents": 900000,
-      "available_at": "2026-11-17T00:52:05.20969+00:00",
+      "available_at": "2026-11-17T00:56:14.507657+00:00",
       "payout_cents": 0,
       "refund_cents": 450000,
       "rest_minutes": 45,
@@ -228,7 +228,7 @@
       "skill_bonus_bps": 0
     },
     {
-      "key": "hackathon",
+      "key": "innovation_sprint",
       "gain": 0.08,
       "kind": "quality",
       "risk": "risky",
@@ -326,7 +326,7 @@
       "gain": 0.02,
       "status": "success",
       "cost_cents": 900000,
-      "resolved_at": "2026-11-17T02:07:05.242945+00:00",
+      "resolved_at": "2026-11-17T02:11:14.54751+00:00",
       "payout_cents": 0
     }
   ],

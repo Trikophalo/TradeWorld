@@ -1,22 +1,22 @@
 {
   "chat": {
-    "id": 7,
+    "id": 6,
     "kind": "direct",
     "last": {
-      "id": 58,
+      "id": 27,
       "body": "Hallo Kunst 👋",
       "kind": "player",
       "is_me": false,
       "author": "Fixture_Gmbh",
       "avatar_key": "rookie",
-      "created_at": "2026-11-17T00:07:05.963283+00:00"
+      "created_at": "2026-11-16T19:43:59.674968+00:00"
     },
     "name": "Fixture_Gmbh",
     "unread": 1,
-    "last_at": "2026-11-17T00:07:05.963283+00:00",
+    "last_at": "2026-11-16T19:43:59.674968+00:00",
     "members": [
       {
-        "tag": "HTCR",
+        "tag": "93JT",
         "level": 15,
         "online": true,
         "is_admin": false,
@@ -32,13 +32,13 @@
   "has_more": false,
   "messages": [
     {
-      "id": 58,
+      "id": 27,
       "body": "Hallo Kunst 👋",
       "kind": "player",
       "is_me": false,
       "author": "Fixture_Gmbh",
       "avatar_key": "rookie",
-      "created_at": "2026-11-17T00:07:05.963283+00:00"
+      "created_at": "2026-11-16T19:43:59.674968+00:00"
     }
   ]
 }

@@ -1,19 +1,19 @@
 {
   "interview": {
-    "id": 5,
+    "id": 6,
     "status": "answered",
     "answers": [
       {
         "text": "Danke an das ganze Team und unsere Kunden.",
         "verdict": "good",
-        "reaction": "Starke Antwort. Ich hasse es, wenn Leute vorbereitet sind."
+        "reaction": "Sehr souverän. Notiert: Fixture_Gmbh kann reden."
       },
       {
         "text": "Noch, aber bald stelle ich die ersten Leute ein.",
         "verdict": "good",
         "reaction": "Starke Antwort. Ich hasse es, wenn Leute vorbereitet sind."
       },
-      { "text": "", "verdict": "none", "reaction": "Schweigen. Sehr tiefgründig. Oder einfach nichts." }
+      { "text": "", "verdict": "none", "reaction": "Keine Antwort ist auch eine Antwort. Eine schlechte." }
     ],
     "company": "Fixture Werke",
     "aired_at": null,
@@ -31,14 +31,14 @@
         ]
       },
       {
-        "text": "Was sagen Sie Ihrer Konkurrenz, die gerade zuschaut?",
-        "quick": ["Danke, ihr macht uns besser.", "Gute Unterhaltung.", "Ihr seid bald pleite."]
+        "text": "Wo steht Fixture Werke in fünf Jahren? Und bitte nicht „auf dem Mond“.",
+        "quick": ["Marktführer, mit glücklichen Kunden und Team.", "Hoffentlich noch da.", "Auf dem Mond."]
       }
     ],
-    "expires_at": "2026-11-17T06:07:05.264734+00:00",
+    "expires_at": "2026-11-17T06:11:14.574968+00:00",
     "reputation": 0,
-    "answered_at": "2026-11-17T00:07:05.270502+00:00",
-    "requested_at": "2026-11-17T00:07:05.264734+00:00",
+    "answered_at": "2026-11-17T00:11:14.581222+00:00",
+    "requested_at": "2026-11-17T00:11:14.574968+00:00",
     "awareness_bps": 120
   },
   "max_chars": 240

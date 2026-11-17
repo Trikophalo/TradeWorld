@@ -1,6 +1,6 @@
 {
   "coin": {
-    "id": "33955653-f28a-4f66-9451-055b2c553187",
+    "id": "39c46394-1253-4b02-b8c7-d5ab41fb91e8",
     "logo": {
       "grid": [
         "................",
@@ -27,7 +27,7 @@
     "stats": { "hype": 8.0, "tech": 35.0, "utility": 0.0 },
     "action": null,
     "launch": {
-      "at": "2026-11-17T00:07:04.811014+00:00",
+      "at": "2026-11-16T19:43:58.550233+00:00",
       "start_price_e4": 1000,
       "team_share_bps": 2000,
       "liquidity_cents": 1000000
@@ -43,12 +43,12 @@
       { "key": "staking", "hours": 12, "available": true, "cost_cents": 500000, "success_bps": 10000 },
       { "key": "bugfix", "hours": 3, "available": true, "cost_cents": 100000, "success_bps": 10000 }
     ],
-    "creator": { "tag": "ZCFV", "trust": { "band": "shaky", "score": 30 }, "nickname": "Fixture_Coiner" },
+    "creator": { "tag": "D2NU", "trust": { "band": "shaky", "score": 30 }, "nickname": "Fixture_Coiner" },
     "fee_bps": 100,
     "category": "player",
     "price_e4": 1032,
     "burn_hype": 8,
-    "created_at": "2026-11-17T00:07:04.747157+00:00",
+    "created_at": "2026-11-16T19:43:58.470575+00:00",
     "low_24h_e4": 1000,
     "pool_cents": 1016989,
     "burn_min_e6": 250000000,
@@ -59,7 +59,7 @@
     "team_tokens_e6": 17250000000,
     "market_cap_cents": 1287420,
     "volume_24h_cents": 182811,
-    "burn_available_at": "2026-11-17T01:07:04.842332+00:00",
+    "burn_available_at": "2026-11-16T20:43:58.584531+00:00",
     "team_at_launch_e6": 25000000000,
     "team_sold_window_e6": 7500000000
   }

@@ -1,6 +1,6 @@
 {
   "interview": {
-    "id": 5,
+    "id": 6,
     "status": "requested",
     "answers": null,
     "company": "Fixture Werke",
@@ -19,14 +19,14 @@
         ]
       },
       {
-        "text": "Was sagen Sie Ihrer Konkurrenz, die gerade zuschaut?",
-        "quick": ["Danke, ihr macht uns besser.", "Gute Unterhaltung.", "Ihr seid bald pleite."]
+        "text": "Wo steht Fixture Werke in fünf Jahren? Und bitte nicht „auf dem Mond“.",
+        "quick": ["Marktführer, mit glücklichen Kunden und Team.", "Hoffentlich noch da.", "Auf dem Mond."]
       }
     ],
-    "expires_at": "2026-11-17T06:07:05.264734+00:00",
+    "expires_at": "2026-11-17T06:11:14.574968+00:00",
     "reputation": 0,
     "answered_at": null,
-    "requested_at": "2026-11-17T00:07:05.264734+00:00",
+    "requested_at": "2026-11-17T00:11:14.574968+00:00",
     "awareness_bps": 0
   },
   "max_chars": 240

@@ -9,29 +9,29 @@
       "capacity_factor": 0.96475
     },
     "name": "Fixture Labor",
-    "board": { "to_vote": 1, "can_convene": true, "my_share_bps": 8000, "open_motions": 1 },
+    "board": { "to_vote": 1, "can_convene": true, "my_share_bps": 7472, "open_motions": 1 },
     "books": {
       "stage": "none",
       "streak": 1,
-      "last_day": "2026-11-17",
+      "last_day": "2026-11-16",
       "rate_bps": 1500,
       "receipts": [
-        { "id": 1, "key": "electricity", "amount_cents": 19595 },
-        { "id": 2, "key": "raw_material", "amount_cents": 37189 },
-        { "id": 3, "key": "online_shop_payout", "amount_cents": 45526 }
+        { "id": 1, "key": "customer_invoice", "amount_cents": 36562 },
+        { "id": 2, "key": "team_dinner", "amount_cents": 8493 },
+        { "id": 3, "key": "payslip", "amount_cents": 10261 }
       ],
       "can_close": false,
       "done_today": true,
       "hours_open": 0.0,
       "by_category": { "penalty": -5000 },
       "costs_cents": 0,
-      "estimate_at": "2026-11-19T12:07:01.52768+00:00",
-      "late_fee_at": "2026-11-18T18:07:01.52768+00:00",
-      "reminder_at": "2026-11-18T06:07:01.52768+00:00",
-      "period_start": "2026-11-17T00:07:01.52768+00:00",
+      "estimate_at": "2026-11-19T07:43:54.510043+00:00",
+      "late_fee_at": "2026-11-18T13:43:54.510043+00:00",
+      "reminder_at": "2026-11-18T01:43:54.510043+00:00",
+      "period_start": "2026-11-16T19:43:54.510043+00:00",
       "profit_cents": 0,
       "revenue_cents": 0,
-      "loss_carry_cents": 157473,
+      "loss_carry_cents": 157800,
       "receipt_categories": ["revenue", "goods", "wages", "fixed", "research", "benefit"],
       "estimated_tax_cents": 0
     },
@@ -44,7 +44,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 383238,
+        "cost_cents": 382266,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -56,7 +56,7 @@
         "missing": ["r_quality_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1149714,
+        "cost_cents": 1146798,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -68,7 +68,7 @@
         "missing": ["r_quality_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 3065904,
+        "cost_cents": 3058128,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -92,7 +92,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 383238,
+        "cost_cents": 382266,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -104,7 +104,7 @@
         "missing": ["r_efficiency_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1149714,
+        "cost_cents": 1146798,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -116,7 +116,7 @@
         "missing": ["r_efficiency_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 3065904,
+        "cost_cents": 3058128,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -140,7 +140,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 383238,
+        "cost_cents": 382266,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -152,7 +152,7 @@
         "missing": ["r_brand_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1149714,
+        "cost_cents": 1146798,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -164,7 +164,7 @@
         "missing": ["r_brand_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 3065904,
+        "cost_cents": 3058128,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -188,7 +188,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 383238,
+        "cost_cents": 382266,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -200,7 +200,7 @@
         "missing": ["r_automation_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1149714,
+        "cost_cents": 1146798,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -212,7 +212,7 @@
         "missing": ["r_automation_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 3065904,
+        "cost_cents": 3058128,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -236,7 +236,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 383238,
+        "cost_cents": 382266,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -248,7 +248,7 @@
         "missing": ["r_logistics_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1149714,
+        "cost_cents": 1146798,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -260,7 +260,7 @@
         "missing": ["r_logistics_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 3065904,
+        "cost_cents": 3058128,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -284,7 +284,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 383238,
+        "cost_cents": 382266,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -296,7 +296,7 @@
         "missing": ["r_sustainability_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1149714,
+        "cost_cents": 1146798,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -308,7 +308,7 @@
         "missing": ["r_sustainability_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 3065904,
+        "cost_cents": 3058128,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -332,7 +332,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 383238,
+        "cost_cents": 382266,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -344,7 +344,7 @@
         "missing": ["r_finance_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1149714,
+        "cost_cents": 1146798,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -356,7 +356,7 @@
         "missing": ["r_finance_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 3065904,
+        "cost_cents": 3058128,
         "upkeep_cents": 0,
         "cooldown_until": null
       },
@@ -380,8 +380,8 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 766476,
-        "upkeep_cents": 958,
+        "cost_cents": 764532,
+        "upkeep_cents": 956,
         "cooldown_until": null
       },
       {
@@ -392,8 +392,8 @@
         "missing": ["r_efficiency_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1021968,
-        "upkeep_cents": 1277,
+        "cost_cents": 1019376,
+        "upkeep_cents": 1274,
         "cooldown_until": null
       },
       {
@@ -404,8 +404,8 @@
         "missing": ["r_quality_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1916190,
-        "upkeep_cents": 1916,
+        "cost_cents": 1911330,
+        "upkeep_cents": 1911,
         "cooldown_until": null
       },
       {
@@ -416,8 +416,8 @@
         "missing": ["p_second", "r_brand_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2299428,
-        "upkeep_cents": 2236,
+        "cost_cents": 2293596,
+        "upkeep_cents": 2230,
         "cooldown_until": null
       },
       {
@@ -428,8 +428,8 @@
         "missing": ["r_brand_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 510984,
-        "upkeep_cents": 639,
+        "cost_cents": 509688,
+        "upkeep_cents": 637,
         "cooldown_until": null
       },
       {
@@ -441,7 +441,7 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 6000000,
-        "upkeep_cents": 3194,
+        "upkeep_cents": 3186,
         "cooldown_until": null
       },
       {
@@ -452,8 +452,8 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1277460,
-        "upkeep_cents": 1277,
+        "cost_cents": 1274220,
+        "upkeep_cents": 1274,
         "cooldown_until": null
       },
       {
@@ -464,8 +464,8 @@
         "missing": ["g_south"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2554920,
-        "upkeep_cents": 1916,
+        "cost_cents": 2548440,
+        "upkeep_cents": 1911,
         "cooldown_until": null
       },
       {
@@ -477,7 +477,7 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 6000000,
-        "upkeep_cents": 2555,
+        "upkeep_cents": 2548,
         "cooldown_until": null
       },
       {
@@ -489,7 +489,7 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 15000000,
-        "upkeep_cents": 3194,
+        "upkeep_cents": 3186,
         "cooldown_until": null
       },
       {
@@ -501,7 +501,7 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 30000000,
-        "upkeep_cents": 3832,
+        "upkeep_cents": 3823,
         "cooldown_until": null
       },
       {
@@ -512,7 +512,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 5,
-        "cost_cents": 638730,
+        "cost_cents": 637110,
         "upkeep_cents": 319,
         "cooldown_until": null
       },
@@ -524,8 +524,8 @@
         "missing": [],
         "ready_at": null,
         "max_level": 3,
-        "cost_cents": 894222,
-        "upkeep_cents": 383,
+        "cost_cents": 891954,
+        "upkeep_cents": 382,
         "cooldown_until": null
       },
       {
@@ -536,8 +536,8 @@
         "missing": [],
         "ready_at": null,
         "max_level": 3,
-        "cost_cents": 766476,
-        "upkeep_cents": 383,
+        "cost_cents": 764532,
+        "upkeep_cents": 382,
         "cooldown_until": null
       },
       {
@@ -549,7 +549,7 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 8000000,
-        "upkeep_cents": 1277,
+        "upkeep_cents": 1274,
         "cooldown_until": null
       },
       {
@@ -561,7 +561,7 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 10000000,
-        "upkeep_cents": 1597,
+        "upkeep_cents": 1593,
         "cooldown_until": null
       },
       {
@@ -573,7 +573,7 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 12000000,
-        "upkeep_cents": 1277,
+        "upkeep_cents": 1274,
         "cooldown_until": null
       },
       {
@@ -584,8 +584,8 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 638730,
-        "upkeep_cents": 639,
+        "cost_cents": 637110,
+        "upkeep_cents": 637,
         "cooldown_until": null
       },
       {
@@ -596,8 +596,8 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 638730,
-        "upkeep_cents": 766,
+        "cost_cents": 637110,
+        "upkeep_cents": 765,
         "cooldown_until": null
       },
       {
@@ -608,7 +608,7 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 958095,
+        "cost_cents": 955665,
         "upkeep_cents": 319,
         "cooldown_until": null
       },
@@ -833,41 +833,41 @@
       "advisor": false,
       "periods": [
         {
-          "id": 10,
+          "id": 9,
           "kind": "books",
           "stage": 0,
-          "due_at": "2026-11-18T00:07:01.52768+00:00",
+          "due_at": "2026-11-17T19:43:54.510043+00:00",
           "status": "paid",
-          "paid_at": "2026-11-17T00:07:01.52768+00:00",
+          "paid_at": "2026-11-16T19:43:54.510043+00:00",
           "rate_bps": 1500,
           "closed_by": "founder",
           "tax_cents": 0,
           "paid_cents": 0,
-          "period_end": "2026-11-17T00:07:01.52768+00:00",
-          "costs_cents": 281079,
-          "period_start": "2026-11-17T00:07:01.424371+00:00",
-          "profit_cents": -157473,
-          "check_correct": 0,
+          "period_end": "2026-11-16T19:43:54.510043+00:00",
+          "costs_cents": 281042,
+          "period_start": "2026-11-16T19:43:54.347981+00:00",
+          "profit_cents": -157800,
+          "check_correct": 1,
           "penalty_cents": 0,
-          "revenue_cents": 123606,
+          "revenue_cents": 123242,
           "taxable_cents": 0,
           "discount_cents": 0,
           "loss_used_cents": 0
         },
         {
-          "id": 9,
+          "id": 8,
           "kind": "late_fee",
           "stage": 0,
-          "due_at": "2026-11-18T00:07:01.52495+00:00",
+          "due_at": "2026-11-17T19:43:54.505489+00:00",
           "status": "paid",
-          "paid_at": "2026-11-17T00:07:01.544028+00:00",
+          "paid_at": "2026-11-16T19:43:54.529752+00:00",
           "rate_bps": 0,
           "closed_by": "finanzamt",
           "tax_cents": 0,
           "paid_cents": 5000,
-          "period_end": "2026-11-17T00:07:01.52495+00:00",
+          "period_end": "2026-11-16T19:43:54.505489+00:00",
           "costs_cents": 0,
-          "period_start": "2026-11-15T00:07:01.52495+00:00",
+          "period_start": "2026-11-14T19:43:54.505489+00:00",
           "profit_cents": 0,
           "check_correct": null,
           "penalty_cents": 5000,
@@ -879,7 +879,7 @@
       ],
       "rate_bps": 1500,
       "due_cents": 0,
-      "loss_carry_cents": 157473,
+      "loss_carry_cents": 157800,
       "advisor_wage_cents": 4000,
       "advisor_discount_bps": 800
     },
@@ -900,7 +900,7 @@
     },
     "history": [
       {
-        "at": "2026-11-16T21:00:00+00:00",
+        "at": "2026-11-16T16:00:00+00:00",
         "reputation": 49.2,
         "satisfaction": 52.95,
         "upkeep_cents": 0,
@@ -914,29 +914,29 @@
           "id": 2,
           "source": "founder",
           "holders": 2,
-          "paid_at": "2026-11-17T00:07:01.485497+00:00",
-          "float_cents": 3995,
+          "paid_at": "2026-11-16T19:43:54.442865+00:00",
+          "float_cents": 5052,
           "total_cents": 20000,
-          "players_cents": 16005
+          "players_cents": 14948
         }
       ],
       "streak": 1,
-      "total_e6": 1000000000000,
-      "max_cents": 10452384,
+      "total_e6": 1070639000000,
+      "max_cents": 13984152,
       "min_cents": 10000,
       "can_declare": false,
-      "founder_share_bps": 8000
+      "founder_share_bps": 7472
     },
     "headcount": 4,
-    "cash_cents": 20904768,
-    "company_id": "41be32ab-f02a-4d27-b736-9e2c20a07828",
+    "cash_cents": 27968304,
+    "company_id": "1c462785-7e09-4852-98ad-29cc282698d8",
     "reputation": {
       "value": 49.2,
       "target": 40.0,
       "drivers": { "base": 50, "greed": -35, "items": 0, "scandal": 0, "reinvest": 12, "dividends": 13 },
       "price_factor": 0.996,
       "demand_factor": 0.9968,
-      "payout_ratio_bps": 52187
+      "payout_ratio_bps": 52320
     },
     "restrictions": {
       "price_lock": null,
@@ -967,8 +967,8 @@
     },
     "unpaid_cents": 0,
     "reserved_cents": 0,
-    "free_cash_cents": 20904768,
-    "ref_revenue_cents": 63873,
+    "free_cash_cents": 27968304,
+    "ref_revenue_cents": 63711,
     "founder_payout_bps": 0,
     "upkeep_per_hour_cents": 0
   },

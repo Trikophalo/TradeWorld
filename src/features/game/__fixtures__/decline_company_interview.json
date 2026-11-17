@@ -1,11 +1,15 @@
 {
   "interview": {
-    "id": 6,
+    "id": 7,
     "status": "declined",
     "answers": null,
     "company": "Fixture Werke",
     "aired_at": null,
     "questions": [
+      {
+        "text": "Fixture Werke ist inzwischen riesig. Wollen Sie eigentlich die ganze Stadt kaufen?",
+        "quick": ["Wir wollen besser werden, nicht nur größer.", "Nur die schönen Ecken.", "Ja. Und danach das Land."]
+      },
       {
         "text": "Sie machen bei Fixture Werke alles allein. Reden Sie in der Mittagspause mit dem Drucker?",
         "quick": [
@@ -15,22 +19,18 @@
         ]
       },
       {
-        "text": "Fixture Werke ist inzwischen riesig. Wollen Sie eigentlich die ganze Stadt kaufen?",
-        "quick": ["Wir wollen besser werden, nicht nur größer.", "Nur die schönen Ecken.", "Ja. Und danach das Land."]
-      },
-      {
-        "text": "Sie haben zehn Sekunden: Warum sollen unsere Zuschauer bei Fixture Werke kaufen?",
+        "text": "Ersetzen bei Fixture Werke bald Roboter alle Menschen, auch den Chef?",
         "quick": [
-          "Beste Qualität zum fairen Preis, mit Service.",
-          "Weil es da ist.",
-          "Weil die anderen noch schlechter sind."
+          "Die KI hilft dem Team, sie ersetzt es nicht.",
+          "Den Chef hoffentlich zuletzt.",
+          "Am liebsten sofort, Menschen sind so teuer."
         ]
       }
     ],
-    "expires_at": "2026-11-17T06:07:05.277687+00:00",
+    "expires_at": "2026-11-17T06:11:14.588355+00:00",
     "reputation": 0,
-    "answered_at": "2026-11-17T00:07:05.280847+00:00",
-    "requested_at": "2026-11-17T00:07:05.277687+00:00",
+    "answered_at": "2026-11-17T00:11:14.592239+00:00",
+    "requested_at": "2026-11-17T00:11:14.588355+00:00",
     "awareness_bps": -80
   },
   "max_chars": 240
