@@ -402,8 +402,8 @@ describe("Nexamon conditions and grading (ADR-165)", () => {
       expect(weights).toHaveLength(12);
       expect(weights.reduce((a: number, b: number) => a + b, 0)).toBe(10_000);
     }
-    // a 10 (without the Black Label): poor 0.05 %, good 0.5 %, near mint 2.5 %, mint 10 %
-    expect(NEXAMON_CONDITIONS.map((c) => nexamonGradeChanceBps(c, 10))).toEqual([5, 50, 250, 1_000]);
+    // a 10 (without the Black Label): poor 0.05 %, good 0.5 %, near mint 2.5 %, mint 35 % (ADR-198)
+    expect(NEXAMON_CONDITIONS.map((c) => nexamonGradeChanceBps(c, 10))).toEqual([5, 50, 250, 3_500]);
     // stochastic dominance: for every grade g, P(grade >= g) grows with the condition
     const atLeast = (condition: NexamonCondition, i: number) =>
       cfg.grading.gradeWeightsBps[condition].slice(i).reduce((a: number, b: number) => a + b, 0);
@@ -419,7 +419,7 @@ describe("Nexamon conditions and grading (ADR-165)", () => {
     const black = NEXAMON_BLACK_LABEL_GRADE;
     const table = (c: NexamonCondition) =>
       [black, 10, 9.5, 9, 8.5, 8, 7, 6, 5, 4, 3, 2, 1].map((g) => nexamonGradeChanceBps(c, g));
-    expect(table("mint")).toEqual([500, 1_000, 2_000, 3_000, 1_800, 1_200, 500, 0, 0, 0, 0, 0, 0]);
+    expect(table("mint")).toEqual([500, 3_500, 2_000, 2_300, 1_000, 500, 200, 0, 0, 0, 0, 0, 0]);
     expect(table("near_mint")).toEqual([100, 250, 950, 2_400, 2_400, 2_200, 1_200, 500, 0, 0, 0, 0, 0]);
     expect(table("good")).toEqual([0, 50, 200, 600, 1_000, 1_700, 2_500, 2_000, 1_200, 750, 0, 0, 0]);
     expect(table("poor")).toEqual([0, 5, 15, 30, 50, 200, 700, 1_500, 2_000, 2_000, 1_500, 1_200, 800]);
@@ -431,9 +431,9 @@ describe("Nexamon conditions and grading (ADR-165)", () => {
   it("rolls grades from the distribution, every one of the 10 000 rolls counted", () => {
     expect(nexamonRollGrade("mint", 0)).toBe(7);
     expect(nexamonRollGrade("mint", 0.05)).toBe(8);
-    expect(nexamonRollGrade("mint", 0.17)).toBe(8.5);
+    expect(nexamonRollGrade("mint", 0.1)).toBe(8.5);
     expect(nexamonRollGrade("mint", 0.35)).toBe(9);
-    expect(nexamonRollGrade("mint", 0.65)).toBe(9.5);
+    expect(nexamonRollGrade("mint", 0.5)).toBe(9.5);
     expect(nexamonRollGrade("mint", 0.85)).toBe(10);
     expect(nexamonRollGrade("mint", 0.9499)).toBe(10);
     expect(nexamonRollGrade("mint", 0.95)).toBe(NEXAMON_BLACK_LABEL_GRADE);
@@ -463,7 +463,7 @@ describe("Nexamon conditions and grading (ADR-165)", () => {
       ...cfg,
       grading: { ...cfg.grading, blackLabel: { chanceBps: { mint: 20_000 }, valueBps: 100_000 } },
     };
-    expect(nexamonGradeChanceBps("mint", black, all as unknown as typeof cfg)).toBe(1_500);
+    expect(nexamonGradeChanceBps("mint", black, all as unknown as typeof cfg)).toBe(4_000);
     expect(nexamonGradeChanceBps("mint", 10, all as unknown as typeof cfg)).toBe(0);
     expect(nexamonRollGrade("mint", 0.86, all as unknown as typeof cfg)).toBe(black);
   });
@@ -490,20 +490,22 @@ describe("Nexamon conditions and grading (ADR-165)", () => {
   it("keeps grading a gamble: expected factors per condition against the 40 % fee", () => {
     expect(cfg.grading.feeBps).toBe(4_000);
     const fee = (c: NexamonCondition) => (cfg.grading.feeBps * nexamonConditionBps(c)) / 10_000;
-    expect(nexamonExpectedGradeFactorBps("mint")).toBe(23_110);
+    // ADR-198: a mint grading is a 10 or better in 40 % of the cases (was 15 %, expected factor 23 110)
+    expect(nexamonExpectedGradeFactorBps("mint")).toBe(29_690);
     expect(nexamonExpectedGradeFactorBps("near_mint")).toBe(15_745);
     expect(nexamonExpectedGradeFactorBps("good")).toBe(10_260);
     expect(nexamonExpectedGradeFactorBps("poor")).toBeCloseTo(6_315.5, 5);
-    // after the fee good and poor lose on average, near mint and mint win on average
+    // after the fee good and poor lose on average, near mint and mint win on average; mint by far (+157 %)
     for (const c of ["poor", "good"] as const)
       expect(nexamonExpectedGradeFactorBps(c) - fee(c)).toBeLessThan(nexamonConditionBps(c));
     for (const c of ["near_mint", "mint"] as const)
       expect(nexamonExpectedGradeFactorBps(c) - fee(c)).toBeGreaterThan(nexamonConditionBps(c));
-    // but a mint copy still loses money in 17 % of the gradings (an 8 or a 7)
+    expect(nexamonExpectedGradeFactorBps("mint") - fee("mint") - nexamonConditionBps("mint")).toBe(15_690);
+    // but a mint copy still loses money in 7 % of the gradings (an 8 or a 7)
     const losing = cfg.grading.grades
       .filter((g) => nexamonCopyFactorBps("mint", g) - fee("mint") < 10_000)
       .reduce((sum, g) => sum + nexamonGradeChanceBps("mint", g), 0);
-    expect(losing).toBe(1_700);
+    expect(losing).toBe(700);
   });
 
   it("makes grades 8 to 10 always worth more than the raw card, lower grades less", () => {

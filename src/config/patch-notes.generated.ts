@@ -598,6 +598,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Fertigkeiten für Firmen",
         text: "Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-d8d70fb8",
+        title: "Mint-Karten graden lohnt sich mehr",
+        text: "Eine Mint-Karte bekommt bei ASP jetzt in 40 % der Fälle eine 10 oder besser (35 % 10, 5 % Black Label), vorher 15 %.",
+      },
     ],
   },
   {

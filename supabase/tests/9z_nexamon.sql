@@ -89,8 +89,8 @@ select tests.assert(
   and public.nexamon_roll_condition(0.2) = 'near_mint' and public.nexamon_roll_condition(0.7) = 'mint'
   and public.nexamon_roll_condition(0.999999) = 'mint'
   and public.nexamon_roll_asp_grade('mint', 0) = 7 and public.nexamon_roll_asp_grade('mint', 0.05) = 8
-  and public.nexamon_roll_asp_grade('mint', 0.17) = 8.5 and public.nexamon_roll_asp_grade('mint', 0.35) = 9
-  and public.nexamon_roll_asp_grade('mint', 0.65) = 9.5 and public.nexamon_roll_asp_grade('mint', 0.85) = 10
+  and public.nexamon_roll_asp_grade('mint', 0.1) = 8.5 and public.nexamon_roll_asp_grade('mint', 0.35) = 9
+  and public.nexamon_roll_asp_grade('mint', 0.5) = 9.5 and public.nexamon_roll_asp_grade('mint', 0.85) = 10
   and public.nexamon_roll_asp_grade('near_mint', 0.9649) = 9.5 and public.nexamon_roll_asp_grade('near_mint', 0.965) = 10
   and public.nexamon_roll_asp_grade('good', 0) = 4 and public.nexamon_roll_asp_grade('good', 0.9949) = 9.5
   and public.nexamon_roll_asp_grade('good', 0.9995) = 10

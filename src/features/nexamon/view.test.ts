@@ -333,11 +333,11 @@ describe("copies", () => {
     // Mint: Black Label (grade 11) 5 %, worth ten times the card; half grades in the table
     expect(mint.chances.map((c) => c.grade)).toEqual([11, 10, 9.5, 9, 8.5, 8, 7]);
     expect(mint.chances[0]).toEqual({ grade: 11, chanceBps: 500, factorBps: 100_000 });
-    expect(mint.chances[1]).toEqual({ grade: 10, chanceBps: 1_000, factorBps: 40_000 });
+    expect(mint.chances[1]).toEqual({ grade: 10, chanceBps: 3_500, factorBps: 40_000 });
     expect(mint.chances[2]).toEqual({ grade: 9.5, chanceBps: 2_000, factorBps: 23_000 });
     expect(mint.blackLabel).toEqual({ grade: 11, chanceBps: 500, factorBps: 100_000 });
-    expect(mint.betterBps).toBe(9_500);
-    expect(mint.expectedFactorBps).toBe(23_110);
+    expect(mint.betterBps).toBe(9_800);
+    expect(mint.expectedFactorBps).toBe(29_690);
     const nearMint = gradingQuote({ condition: "near_mint", valueCents: 10_000 });
     expect(nearMint.chances.map((c) => c.grade)).toEqual([11, 10, 9.5, 9, 8.5, 8, 7, 6]);
     expect(nearMint.blackLabel.chanceBps).toBe(100);

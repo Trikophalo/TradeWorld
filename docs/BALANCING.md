@@ -1271,16 +1271,21 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   | Poor       | 8   | 12  | 15  | 20  | 20  | 15  | 7   | 2   | 0,5 | 0,3 | 0,15 | 0,05 | 0   |
   | Good       | 0   | 0   | 0   | 7,5 | 12  | 20  | 25  | 17  | 10  | 6   | 2    | 0,5  | 0   |
   | Near Mint  | 0   | 0   | 0   | 0   | 0   | 5   | 12  | 22  | 24  | 24  | 9,5  | 2,5  | 1   |
-  | Mint       | 0   | 0   | 0   | 0   | 0   | 0   | 5   | 12  | 18  | 30  | 20   | 10   | 5   |
+  | Mint       | 0   | 0   | 0   | 0   | 0   | 0   | 2   | 5   | 10  | 23  | 20   | 35   | 5   |
   | Wertfaktor | 0,3 | 0,4 | 0,5 | 0,6 | 0,7 | 0,8 | 0,9 | 1,2 | 1,4 | 1,7 | 2,3  | 4    | 10  |
 
   **Black Label** (`grading.blackLabel.chanceBps`): Mint 5 %, Near Mint 1 %, aus der Chance für die 10 genommen
   (`gradeWeightsBps` enthält in der letzten Spalte 10 und Black Label zusammen). Good und Poor: 0 %.
 
-  Erwarteter Faktor nach dem Grading (`nexamonExpectedGradeFactorBps`): Mint 2,311, Near Mint 1,5745, Good 1,026,
+  Erwarteter Faktor nach dem Grading (`nexamonExpectedGradeFactorBps`): Mint 2,969 (vor ADR-198: 2,311), Near Mint 1,5745, Good 1,026,
   Poor 0,632. Abzüglich der Gebühr (Mint und Near Mint 0,4, Good 0,36, Poor 0,28) lohnt sich Grading im Schnitt für
-  Mint (1,91 statt 1,0) und knapp für Near Mint (1,17), nicht für Good (0,67 statt 0,9) und Poor (0,35 statt 0,7).
-  Mint verliert in 17 % der Gradings Geld (Note 8 oder 7).
+  Mint (2,57 statt 1,0; vor ADR-198 1,91) und knapp für Near Mint (1,17), nicht für Good (0,67 statt 0,9) und Poor (0,35 statt 0,7).
+  Mint verliert in 7 % der Gradings Geld (Note 8 oder 7; vorher 17 %).
+
+  **ADR-198:** Eine Mint-Karte wird in 40 % der Gradings eine 10 oder besser (35 % 10, 5 % Black Label; vorher 15 %).
+  Netto-Erwartung je Mint-Grading nach Gebühr: + 157 % des Kartenwerts (vorher + 91 %). Mint-Grading ist damit klar
+  profitabel, gewollt. Der KI-Aufschlag für rohe Mint-Karten (`premiumBps.mint` 12 %) bleibt: Der Marktwert der
+  Karte ist der Rohpreis, wer eine Mint-Karte hat, gradet sie lieber, als sie an die KI zu verkaufen.
 
 - **Marktwert** (ein Wert je Karte): Schritt je gezähltem Verkauf 20 % des Weges zum Preis je Karte, höchstens 2 %,
   aufwärts × Beliebtheit (mindestens 25 %); Band für plausible Preise ± 25 %; KI-Kauf + 0,5 % × Beliebtheit;

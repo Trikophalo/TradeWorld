@@ -36,12 +36,12 @@ select tests.assert(
   (select jsonb_object_agg(g, n order by g)
      from (select public.nexamon_roll_asp_grade('mint', (i + 0.5) / 10000) as g, count(*) as n
              from generate_series(0, 9999) i group by 1) x)
-    = '{"7": 500, "8": 1200, "8.5": 1800, "9": 3000, "9.5": 2000, "10": 1000, "11": 500}'::jsonb
+    = '{"7": 200, "8": 500, "8.5": 1000, "9": 2300, "9.5": 2000, "10": 3500, "11": 500}'::jsonb
   and (select count(*) from generate_series(0, 9999) i, unnest(array['poor', 'good']) c
         where public.nexamon_roll_asp_grade(c, (i + 0.5) / 10000) > 10) = 0
   and (select count(*) from generate_series(0, 9999) i where public.nexamon_roll_asp_grade('near_mint', (i + 0.5) / 10000) = 11) = 100
   and (select count(*) from generate_series(0, 9999) i where public.nexamon_roll_asp_grade('near_mint', (i + 0.5) / 10000) = 10) = 250,
-  'exact odds over the 10 000 rolls: mint 5 % Black Label, 10 % 10, 20 % 9.5 …; near mint 1 % Black Label, 2.5 % 10');
+  'exact odds over the 10 000 rolls: mint 5 % Black Label, 35 % 10, 20 % 9.5 …; near mint 1 % Black Label, 2.5 % 10');
 select tests.assert(
   public.nexamon_copy_factor_bps('mint', 11) = 100000 and public.nexamon_copy_factor_bps('mint', 10) = 40000
   and public.nexamon_copy_factor_bps('poor', 11) = 100000
@@ -51,7 +51,7 @@ select tests.assert(
   'nexamon_copy_factor_bps(): a Black Label is worth ten times the card, a plain 10 2.5 to 4 times by popularity (ADR-174)');
 -- the configured chances are honoured; never more than the chance for a 10
 select tests.set_cfg('nexamon', '{grading,blackLabel,chanceBps}', '{"mint": 20000}');
-select public.nexamon_roll_asp_grade('mint', 0.84) as r_nine, public.nexamon_roll_asp_grade('mint', 0.86) as r_all,
+select public.nexamon_roll_asp_grade('mint', 0.55) as r_nine, public.nexamon_roll_asp_grade('mint', 0.86) as r_all,
        public.nexamon_roll_asp_grade('near_mint', 0.9999) as r_nm \gset
 select tests.set_cfg('nexamon', '{grading,blackLabel,valueBps}', '50000');
 select public.nexamon_copy_factor_bps('mint', 11) as r_factor \gset
