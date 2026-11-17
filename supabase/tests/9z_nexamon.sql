@@ -204,14 +204,16 @@ reset role;
 select tests.assert(
   not (:'locked'::jsonb ->> 'unlocked')::boolean and (:'locked'::jsonb ->> 'unlock_level')::integer = 10
   and (:'locked'::jsonb ->> 'pack_size')::integer = 5
-  and jsonb_array_length(:'locked'::jsonb -> 'sets') = 4
+  and jsonb_array_length(:'locked'::jsonb -> 'sets') = 6
   and :'locked'::jsonb #>> '{sets,0,key}' = 'mystic_energy' and (:'locked'::jsonb #>> '{sets,0,pack_price_cents}')::bigint = 20000
   and :'locked'::jsonb #>> '{sets,0,name}' = 'Nexamon: Mystic Energy'
   and :'locked'::jsonb #>> '{sets,1,key}' = 'super_apex' and (:'locked'::jsonb #>> '{sets,1,pack_price_cents}')::bigint = 100000
-  and :'locked'::jsonb #>> '{sets,2,key}' = 'cosmic_winds' and (:'locked'::jsonb #>> '{sets,2,pack_price_cents}')::bigint = 500000
-  and :'locked'::jsonb #>> '{sets,3,key}' = 'prismatic_peak' and (:'locked'::jsonb #>> '{sets,3,pack_price_cents}')::bigint = 1000000
+  and :'locked'::jsonb #>> '{sets,2,key}' = 'yin_yang' and (:'locked'::jsonb #>> '{sets,2,pack_price_cents}')::bigint = 200000
+  and :'locked'::jsonb #>> '{sets,3,key}' = 'cosmic_winds' and (:'locked'::jsonb #>> '{sets,3,pack_price_cents}')::bigint = 500000
+  and :'locked'::jsonb #>> '{sets,4,key}' = 'prismatic_peak' and (:'locked'::jsonb #>> '{sets,4,pack_price_cents}')::bigint = 1000000
+  and :'locked'::jsonb #>> '{sets,5,key}' = 'titans_revenge' and (:'locked'::jsonb #>> '{sets,5,pack_price_cents}')::bigint = 10000000
   and (:'locked'::jsonb #>> '{sets,0,cards}')::integer = 77 and (:'locked'::jsonb #>> '{collection,copies}')::integer = 0,
-  'get_nexamon(): unlock at level 10, four sets at 200 / 1.000 / 5.000 / 10.000 € with 77 cards and 5 cards per pack');
+  'get_nexamon(): unlock at level 10, six sets from 200 to 100.000 € by pack price, 5 cards per pack');
 
 -- =============================================================================
 -- D. Packs: paid to the households, five pulls, populations, idempotent

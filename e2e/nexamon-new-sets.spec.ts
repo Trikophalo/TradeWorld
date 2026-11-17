@@ -82,6 +82,8 @@ test("the Yin Yang pack is in the shop and its popup shows the lower chase odds"
 });
 
 test("a uranium card, a warrior card and Yin and Yang render on /dev/ui", async ({ page }) => {
+  // with NEXA_SHOTS every screenshot waits for the canvases to paint
+  test.setTimeout(120_000);
   await page.goto("/dev/ui");
   const uranium = page.getByTestId("showcase-uranium");
   await uranium.scrollIntoViewIfNeeded();

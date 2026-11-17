@@ -403,10 +403,11 @@ export function composePack(set: NexamonSetKey): PackRasters {
   } else if (set === "titans_revenge") drawMicroTextCentered(full, title, PW / 2, PH - CRIMP - 11, ink.light);
   else drawMicroTextCentered(full, title, PW / 2, PH - CRIMP - 11, ink.pale);
 
-  // Crimped seals: ridges of foil, a shadow line where the body begins, teeth on the outer edge.
+  // Crimped seals: ridges of foil, a shadow line where the body begins, teeth on the outer edge. Yin Yang keeps its
+  // seals in black and grey: the red of its stamp is the only colour on the pack (ADR-182).
+  const ridge = set === "yin_yang" ? [ink.deep, ink.dark, ink.base] : [ink.dark, ink.base, ink.light];
   for (const y0 of [0, PH - CRIMP]) {
-    for (let y = y0; y < y0 + CRIMP; y++)
-      for (let x = 0; x < PW; x++) setPixel(full, x, y, x % 3 === 0 ? ink.dark : x % 3 === 1 ? ink.base : ink.light);
+    for (let y = y0; y < y0 + CRIMP; y++) for (let x = 0; x < PW; x++) setPixel(full, x, y, ridge[x % 3]!);
     fillRect(full, 0, y0 === 0 ? CRIMP - 1 : y0, PW, 1, ink.deep, 0.75);
     fillRect(full, 0, y0 === 0 ? CRIMP : y0 - 1, PW, 1, "#ffffff", 0.35);
   }
