@@ -146,6 +146,25 @@ describe("RPC contract", () => {
     for (const m of moves.moves) expect(m.rest_minutes).toBeGreaterThan(0);
   });
 
+  it("business figures at the stock exchange: AI from quarterly reports, player companies from their hours (ADR-184)", () => {
+    const read = (file: string) => JSON.parse(readFileSync(dir + file, "utf8"));
+    const list = RPC_SCHEMAS.get_stock_revenue.parse(read("get_stock_revenue.json")).figures;
+    const snapshot = RPC_SCHEMAS.get_market_snapshot.parse(read("get_market_snapshot.json"));
+    const ai = list.filter((f) => f.company_kind === "ai");
+    expect(ai.length).toBeGreaterThanOrEqual(25);
+    for (const f of ai) expect(f.period).toBe("quarter");
+    for (const f of list) expect(f.history).toEqual([]);
+    expect(list.some((f) => f.ticker === snapshot.securities.find((s) => s.kind === "stock")!.ticker)).toBe(true);
+
+    const [detail] = RPC_SCHEMAS.get_stock_revenue.parse(read("get_stock_revenue_detail.json")).figures;
+    expect(detail!.company_kind).toBe("player");
+    expect(detail!.period).toBe("day");
+    expect(detail!.history).toHaveLength(detail!.hours!);
+    expect(detail!.history.reduce((sum, v) => sum + v, 0)).toBe(detail!.revenue_cents);
+    expect(detail!.history.at(-1)).toBe(detail!.last_hour_revenue_cents);
+    expect(detail!.reputation).toBeGreaterThanOrEqual(0);
+  });
+
   it("orders report fill, fee and XP", () => {
     const market = RPC_SCHEMAS.place_order.parse(JSON.parse(readFileSync(dir + "place_order_market.json", "utf8")));
     expect(market.status).toBe("filled");

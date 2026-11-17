@@ -69,6 +69,7 @@ import { FriendCodeCard } from "@/features/friends/components/friend-code";
 import { NewsAudienceDemo } from "@/features/news/show/audience-demo";
 import { NewsStudioDemo } from "@/features/news/show/studio-demo";
 import { StockNewsCard } from "@/features/news/stock-news";
+import { StockFiguresCard } from "@/features/market/components/stock-figures";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { PatchNotesButton, PatchNotesList } from "@/features/patch-notes/components/patch-notes";
 import { usePatchNotesSeen } from "@/features/patch-notes/seen";
@@ -639,6 +640,7 @@ export function Showcase() {
         </Card>
         <FriendCodeCard />
         <StockNewsCard />
+        <StockFiguresCard ticker="VLT" />
       </Section>
 
       <Section id="buttons" title={t("buttons")} className="grid gap-4 lg:grid-cols-2">

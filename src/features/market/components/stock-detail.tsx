@@ -26,6 +26,7 @@ import { CompanyLogo } from "./company-logo";
 import { OrderBook } from "./order-book";
 import { OrderSheet, type OrderSide } from "./order-sheet";
 import { PriceChart } from "./price-chart";
+import { StockFiguresCard } from "./stock-figures";
 
 const format = (value: number) => formatPrice(Math.round(value));
 const RANGE_OPTIONS = CHART_RANGES.map((value) => ({ value, label: value }));
@@ -224,6 +225,12 @@ export function StockDetail({ ticker }: { ticker: string }) {
               </p>
             )}
           </Card>
+
+          {security?.kind === "stock" && (
+            <Reveal feature="stockFigures">
+              <StockFiguresCard ticker={ticker} />
+            </Reveal>
+          )}
 
           <Card padding="lg">
             <CardHeader>

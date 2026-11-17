@@ -1,0 +1,20 @@
+{
+  "figures": [
+    {
+      "hours": 3,
+      "period": "day",
+      "ticker": "FIX",
+      "history": [272511, 51656, 52361],
+      "quarter": null,
+      "game_year": null,
+      "reputation": 48,
+      "company_kind": "player",
+      "last_hour_at": "2026-11-17T15:00:00+00:00",
+      "profit_cents": -5469,
+      "awareness_bps": 604,
+      "revenue_cents": 376528,
+      "prev_revenue_cents": null,
+      "last_hour_revenue_cents": 52361
+    }
+  ]
+}

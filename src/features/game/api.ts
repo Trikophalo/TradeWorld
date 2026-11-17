@@ -33,6 +33,7 @@ import {
   type OrderResult,
   type Portfolio,
   type SecurityDetails,
+  type StockFigures,
   type CompanyMoves,
   type MissionsState,
 } from "./types";
@@ -107,6 +108,27 @@ const detailsSchema = z.object({
   net_income_cents: nnum,
   margin_bps: nnum,
   news: z.array(z.object({ published_at: iso, headline: z.string(), body: z.string().nullable() })),
+});
+
+const stockFiguresSchema = z.object({
+  figures: z.array(
+    z.object({
+      ticker: z.string(),
+      company_kind: z.enum(["ai", "player"]),
+      period: z.enum(["day", "quarter"]),
+      revenue_cents: num,
+      profit_cents: num,
+      prev_revenue_cents: nnum,
+      hours: nnum,
+      last_hour_at: iso.nullable(),
+      last_hour_revenue_cents: nnum,
+      game_year: nnum,
+      quarter: nnum,
+      reputation: nnum,
+      awareness_bps: nnum,
+      history: z.array(num),
+    }),
+  ),
 });
 
 const portfolioSchema = z.object({
@@ -494,6 +516,7 @@ export const RPC_SCHEMAS = {
   get_candles: z.array(candleSchema),
   get_order_book: bookSchema,
   get_security_details: detailsSchema,
+  get_stock_revenue: stockFiguresSchema,
   get_my_portfolio: portfolioSchema,
   place_order: orderResultSchema,
   cancel_order: z.object({ order_id: z.string(), status: z.literal("cancelled") }),
@@ -764,6 +787,26 @@ export const liveEngine: GameEngine = {
       marginBps: d.margin_bps,
       news: d.news.map((n) => ({ publishedAt: n.published_at, headline: n.headline, body: n.body })),
     };
+  },
+
+  async stockFigures(ticker): Promise<StockFigures[]> {
+    const r = await rpc("get_stock_revenue", ticker ? { p_ticker: ticker } : {}, stockFiguresSchema);
+    return r.figures.map((f) => ({
+      ticker: f.ticker,
+      companyKind: f.company_kind,
+      period: f.period,
+      revenueCents: f.revenue_cents,
+      profitCents: f.profit_cents,
+      prevRevenueCents: f.prev_revenue_cents,
+      hours: f.hours,
+      lastHourAt: f.last_hour_at,
+      lastHourRevenueCents: f.last_hour_revenue_cents,
+      gameYear: f.game_year,
+      quarter: f.quarter,
+      reputation: f.reputation,
+      awarenessBps: f.awareness_bps,
+      history: f.history,
+    }));
   },
 
   async portfolio(): Promise<Portfolio> {

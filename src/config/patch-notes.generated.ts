@@ -543,6 +543,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Firma aufgeräumt",
         text: "klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-bedb198f",
+        title: "Umsätze an der Börse",
+        text: "Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.",
+      },
     ],
   },
   {

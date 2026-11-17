@@ -270,7 +270,34 @@
     "bookBid": "Kaufgebote",
     "bookAsk": "Verkaufsangebote",
     "bookPlayers": "Enthält Limit-Orders von Spielern",
-    "bookSpread": "Spread {spread}"
+    "bookSpread": "Spread {spread}",
+    "figures": {
+      "rowDay": "Umsatz 24 h {amount}",
+      "rowQuarter": "Umsatz Quartal {amount}",
+      "trend": {
+        "up": "steigend",
+        "down": "fallend",
+        "flat": "gleich"
+      },
+      "title": "Geschäftszahlen",
+      "sourceDay": "Aus dem laufenden Betrieb, jede volle Stunde neu",
+      "sourceQuarter": "Letzter Quartalsbericht",
+      "sourceQuarterOf": "Quartalsbericht Q{quarter} · Jahr {year}",
+      "revenueDay": "Umsatz 24 h",
+      "profitDay": "Gewinn 24 h",
+      "lastHour": "Umsatz letzte Stunde",
+      "revenueQuarter": "Umsatz Quartal",
+      "profitQuarter": "Gewinn Quartal",
+      "reputation": "Ruf",
+      "reputationValue": "{value} / 100",
+      "awareness": "Bekanntheit",
+      "versusDay": "gegenüber den 24 h davor",
+      "versusQuarter": "gegenüber dem Quartal davor",
+      "historyDay": "Umsatz je Stunde, letzte 24 h",
+      "historyQuarter": "Umsatz der letzten Quartale",
+      "historyLabel": "{count} Werte von {from} bis {to}",
+      "noHours": "Noch keine abgeschlossene Stunde. Die Zahlen kommen mit der nächsten vollen Stunde."
+    }
   },
   "order": {
     "buyTitle": "{ticker} kaufen",

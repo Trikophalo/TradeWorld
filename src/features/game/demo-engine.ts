@@ -99,6 +99,7 @@ import {
   type RichList,
   type RichListEntry,
   type Security,
+  type StockFigures,
   type Session,
   type Trade,
 } from "./types";
@@ -592,6 +593,57 @@ function securityOf(ticker: string): Security {
     // The demo has no profile page for the own company; its stock links to the company tab instead.
     companyId: info.company && !own ? `demo-company-${ticker}` : null,
     popularity: info.company ? popularityOf(ticker) : 0,
+  };
+}
+
+/**
+ * Business figures at the stock exchange (ADR-184): the own listed company from its kept hours, the AI companies a
+ * steady quarter derived from their size (like `details`), slightly different per quarter.
+ */
+function demoStockFigures(c: DemoCompany, withHistory: boolean): StockFigures {
+  const own = ownStock()?.ticker === c.ticker ? p().company : null;
+  if (own) {
+    const now = Date.now();
+    const all = own.hours ?? [];
+    const day = all.filter((h) => h.at >= now - DAY);
+    const prev = all.filter((h) => h.at >= now - 2 * DAY && h.at < now - DAY);
+    const sum = (hours: typeof all) => hours.reduce((total, h) => total + h.revenueCents, 0);
+    const last = all.at(-1);
+    return {
+      ticker: c.ticker,
+      companyKind: "player",
+      period: "day",
+      revenueCents: sum(day),
+      profitCents: day.reduce((total, h) => total + h.profitCents, 0),
+      prevRevenueCents: prev.length > 0 && day.length > 0 ? Math.round((sum(prev) * day.length) / prev.length) : null,
+      hours: day.length,
+      lastHourAt: last ? new Date(last.at).toISOString() : null,
+      lastHourRevenueCents: last?.revenueCents ?? null,
+      gameYear: null,
+      quarter: null,
+      reputation: Math.round(own.reputation ?? 50),
+      awarenessBps: Math.round(own.awareness * 10_000),
+      history: withHistory ? day.slice(-24).map((h) => h.revenueCents) : [],
+    };
+  }
+  const seed = [...c.ticker].reduce((total, ch) => total + ch.charCodeAt(0), 0);
+  const quarterRevenue = (i: number) => Math.round((c.marketCapCents / 9) * (1 + (((seed * (i + 3)) % 13) - 6) / 100));
+  const history = Array.from({ length: 8 }, (_, i) => quarterRevenue(i));
+  return {
+    ticker: c.ticker,
+    companyKind: "ai",
+    period: "quarter",
+    revenueCents: history[7]!,
+    profitCents: Math.round(c.marketCapCents / 70),
+    prevRevenueCents: history[6]!,
+    hours: null,
+    lastHourAt: null,
+    lastHourRevenueCents: null,
+    gameYear: null,
+    quarter: null,
+    reputation: null,
+    awarenessBps: null,
+    history: withHistory ? history : [],
   };
 }
 
@@ -2140,6 +2192,12 @@ export const demoEngine: GameEngine = {
       marginBps: c ? { bluechip: 1200, midcap: 800, penny: -400 }[c.tier] : null,
       news: [],
     });
+  },
+
+  stockFigures: (ticker) => {
+    if (ticker) meta(ticker);
+    const list = stocks().filter((c) => !ticker || c.ticker === ticker);
+    return Promise.resolve(list.map((c) => demoStockFigures(c, Boolean(ticker))));
   },
 
   portfolio: () => {
