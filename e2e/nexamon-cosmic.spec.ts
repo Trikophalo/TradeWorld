@@ -31,7 +31,7 @@ const shot = async (page: Page, name: string, target = page.locator("body")) => 
   if (!dir) return;
   await target.scrollIntoViewIfNeeded();
   // the pixel canvases paint after they come into view
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(2500);
   await target.screenshot({ path: `${dir}/${name}-${page.viewportSize()?.width}.png` });
 };
 

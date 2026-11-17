@@ -8685,7 +8685,8 @@
     "event": "Ereignis",
     "eventLabel": "{name}, Ereigniskarte, {rarity}",
     "oneOfOne": "One of One",
-    "oneOfOneSerial": "1/1"
+    "oneOfOneSerial": "1/1",
+    "eventLine": "Ereignis · {type}"
   },
   "nexamon": {
     "title": "Collectibles",

@@ -114,11 +114,10 @@ export const NexamonCardFace = memo(function NexamonCardFace({
       : `${u * 0.34}px 0 0 ${inks.halo}, ${-u * 0.34}px 0 0 ${inks.halo}, 0 ${u * 0.34}px 0 ${inks.halo}, 0 ${-u * 0.34}px 0 ${inks.halo}`;
 
   // Name and attack end before the number to their right: long ones are squeezed, very long ones get smaller.
-  const nameRoom = roomBeforeNumber(
-    layout.name.x,
-    layout.hp.x + layout.hp.w,
-    hpBlockWidth(card.hp, full ? t("hp") : ""),
-  );
+  // an event card ends its name before the "Ereignis" plate
+  const nameRoom = event
+    ? EVENT_LABEL.x - 1 - layout.name.x
+    : roomBeforeNumber(layout.name.x, layout.hp.x + layout.hp.w, hpBlockWidth(card.hp, full ? t("hp") : ""));
   const nameFit = fitText(card.name, FACE_TEXT.name, nameRoom);
   const attackRoom = roomBeforeNumber(
     layout.attackName.x,
@@ -128,16 +127,18 @@ export const NexamonCardFace = memo(function NexamonCardFace({
   const attackFit = fitText(card.attack.name, FACE_TEXT.attack, attackRoom);
 
   const from = card.evolvesFrom ? (evolvesFromName ?? nexamonCard(card.evolvesFrom)?.name ?? null) : null;
-  const stage = t(`stage.${card.stage}`);
+  const stage = event ? t("event") : t(`stage.${card.stage}`);
   const stageLine = layout.strip || !from ? stage : `${stage} · ${t("evolvesShort", { name: from })}`;
   const stageFit = fitText(stageLine.toUpperCase(), FACE_TEXT.stage, layout.stage?.w ?? 0);
-  const stripLine = from
-    ? layout.stage
-      ? t("evolvesFrom", { name: from })
-      : `${stage} · ${t("evolvesFrom", { name: from })}`
-    : layout.stage
-      ? t("typeLine", { type })
-      : `${stage} · ${t("typeLine", { type })}`;
+  const stripLine = event
+    ? t("eventLine", { type })
+    : from
+      ? layout.stage
+        ? t("evolvesFrom", { name: from })
+        : `${stage} · ${t("evolvesFrom", { name: from })}`
+      : layout.stage
+        ? t("typeLine", { type })
+        : `${stage} · ${t("typeLine", { type })}`;
 
   return (
     <div
