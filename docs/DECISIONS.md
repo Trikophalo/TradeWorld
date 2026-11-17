@@ -4683,3 +4683,16 @@ einmal.
 - `FoldBlock`: Kopf als Knopf mit `aria-expanded`, zugeklappt eine kurze Zusammenfassung (Anzahl), Zustand je
   Spieler in `localStorage` (nach der Hydration), Einblenden nur über `opacity`/`transform` mit Motion-Tokens. Ein
   Link auf die Stelle klappt sie für diesen Besuch auf. „Was jeder leistet“ startet ab sechs Personen zugeklappt.
+
+## ADR-197: Grundeinkommen stark verbesserbar — `Annahme`
+
+**Kontext.** Der Besitzer will das Grundeinkommen in den Verbesserungen stark ausbauen können; bisher drei Stufen
+mit je +10 % (höchstens +30 %).
+
+**Entscheidung.** `upgrades.income`: 12 Stufen, je +25 % (`perLevel` 2 500 bps, höchstens +300 %, also das
+Vierfache), freigeschaltet ab Level 3 alle 2 Level (3, 5, …, 25; letzte Stufe bis Level 30 wie bei allen Verbesserungen), Preis 4.000 € · 2^Stufe (bis 8.192.000 €).
+Server liest alles aus `game_config` (`upgrade_cost_cents`, `upgrade_stage_level`, `player_basic_income_cents_per_hour`),
+daher keine Migration. Das Geld bleibt geschlossen (ADR-041): Käufe fließen in die Staatskasse, die das Grundeinkommen
+zahlt; der Kassenfaktor (`basicIncome.treasuryTargetCents`, `minFactor`) dämpft weiter, wenn sie leer wird.
+
+**Folgen.** Frühe Stufen lohnen sich nach etwa ein bis zwei Wochen, die oberen sind ein langes Geldziel.

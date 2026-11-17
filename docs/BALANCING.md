@@ -1177,8 +1177,9 @@ Alle Werte stehen in `src/config/upgrades.ts`, `src/config/deals.ts` und `src/co
 (`careers.promotion`, `startups.campaigns`).
 
 - **Verbesserungen:** Preise wachsen je Stufe um den Faktor 2 bis 3. Der Tresor amortisiert sich bei zwei
-  Leerungen am Tag nach ein bis zwei Wochen (Stufe 1, nur wenn er sonst überläuft), das Grundeinkommen +10 % nach
-  etwa vier Wochen. Absichtlich
+  Leerungen am Tag nach ein bis zwei Wochen (Stufe 1, nur wenn er sonst überläuft), das Grundeinkommen
+  (ADR-197: 12 Stufen ab Level 3 alle 2 Level bis 25, je +25 %, bis 4-fach; 4.000 € verdoppelnd bis 8.192.000 €) Stufe 1
+  nach etwa zehn Tagen, die oberen Stufen sind ein langes Geldziel. Absichtlich
   langsam: Verbesserungen sind ein Geldziel für die Zeit, nicht der schnellste Weg zu Vermögen.
 - **Beförderung:** Grundchance 40 %, +8 % je Punkt über der Anforderung, +5 % je Rhetorik-Stufe, höchstens 90 %.
   Stunden im Rang (12, 36, 72, 120) entsprechen bei 12 bezahlten Stunden am Tag 1, 3, 6 und 10 Tagen.

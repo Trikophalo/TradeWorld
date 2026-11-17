@@ -63,8 +63,9 @@ select public.config_double('economy', '{vaultCapHours}', 8) as cap0,
 select tests.assert(
   (select array_agg(public.upgrade_cost_cents('vault', l) order by l) from generate_series(0, 8) l)
     = array[300000, 600000, 1200000, 2400000, 4800000, 9600000, 19200000, 38400000, null]::bigint[]
-  and (select array_agg(public.upgrade_cost_cents('income', l) order by l) from generate_series(0, 3) l)
-    = array[400000, 1200000, 3600000, null]::bigint[]
+  and (select array_agg(public.upgrade_cost_cents('income', l) order by l) from generate_series(0, 12) l)
+    = array[400000, 800000, 1600000, 3200000, 6400000, 12800000, 25600000, 51200000, 102400000, 204800000,
+            409600000, 819200000, null]::bigint[]
   and (select array_agg(public.upgrade_cost_cents('study', l) order by l) from generate_series(0, 3) l)
     = array[800000, 2400000, 7200000, null]::bigint[]
   and (select array_agg(public.upgrade_cost_cents('overtime', l) order by l) from generate_series(0, 2) l)
@@ -166,13 +167,13 @@ select public.get_my_portfolio() -> 'vault' as uv \gset
 reset role;
 select tests.assert(
   (:'uv'::jsonb ->> 'rate_cents_per_hour')::bigint
-     = round(:inc0::numeric * 11000 / 10000)::bigint * (:'uv'::jsonb ->> 'factor_bps')::int / 10000
+     = round(:inc0::numeric * 12500 / 10000)::bigint * (:'uv'::jsonb ->> 'factor_bps')::int / 10000
   and (:'uv'::jsonb ->> 'cap_cents')::bigint = round((:'uv'::jsonb ->> 'rate_cents_per_hour')::bigint * (:cap0 + 12))
   and (:'uv'::jsonb ->> 'full_at')::timestamptz
       = (select v.accrual_started_at + make_interval(secs => (:cap0 + 12) * 3600) from public.vaults v where v.player_id = :u)
-  and public.player_basic_income_cents_per_hour(:u) = round(:inc0::numeric * 1.1)::bigint
+  and public.player_basic_income_cents_per_hour(:u) = round(:inc0::numeric * 1.25)::bigint
   and public.player_vault_cap_hours(:u) = :cap0 + 12,
-  'portfolio vault: rate = basic income +10 % (income 1) x treasury factor, cap = rate x (8 + 6 x 2) hours, full_at');
+  'portfolio vault: rate = basic income +25 % (income 1) x treasury factor, cap = rate x (8 + 6 x 2) hours, full_at');
 select tests.assert(
   ((public.vault_status(:u)) ->> 'accrued_seconds')::bigint between (:cap0 * 3600)::bigint and (:cap0 * 3600)::bigint + 300,
   'buy_upgrade(vault) on a full vault: it keeps what it held (8 h) and fills on from there, the full hours earn nothing');

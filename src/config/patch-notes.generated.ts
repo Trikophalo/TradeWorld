@@ -598,6 +598,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Fertigkeiten für Firmen",
         text: "Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-39278c07",
+        title: "Grundeinkommen stark ausbaubar",
+        text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +25 %, zusammen bis zum Vierfachen; die Preise…",
+      },
     ],
   },
   {
