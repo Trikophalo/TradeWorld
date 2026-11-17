@@ -304,12 +304,13 @@ export const NEXAMON_RULES = {
      * condition or grade included) they always buy, on the next run of the minute job, whatever the price: no
      * budget stops these buys, only the households' cash. Above the value they pay at most value x (1 + premium),
      * the premium by condition for a raw copy and by grade for a slab (order of `grading.grades`, the Black Label its
-     * own), never more than `maxPremiumBps` (+15 %). Up there the chance per minute is `buyChanceMinBps` for an
-     * unpopular card, rising with the card's popularity to `buyChanceBps`, and falls linearly to `atMaxChanceBps` of
+     * own), never more than `maxPremiumBps` (+15 %). Up there the chance per minute is `buyChanceBps` x
+     * (`buyChanceMinShareBps` + the rest x popularity: 4 % of it for an unpopular card, all of it for the most
+     * popular), and it falls linearly to `atMaxChanceBps` of
      * it at the maximum. Only these premium buys count against `dailyBudgetPacks`.
      */
     buyChanceBps: 100,
-    buyChanceMinBps: 4,
+    buyChanceMinShareBps: 400,
     atMaxChanceBps: 2_000,
     maxPremiumBps: 1_500,
     premiumBps: { poor: 0, good: 300, near_mint: 800, mint: 1_200 },

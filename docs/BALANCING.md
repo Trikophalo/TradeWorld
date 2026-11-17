@@ -1299,8 +1299,8 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   mit dem Faktor nach Beliebtheit) oder darunter im nächsten Minutenlauf, egal wie teuer, ohne Budget; nur das Geld der
   Haushalte begrenzt. Faire Angebote zuerst. Darüber zahlen sie einen Aufschlag, nie mehr als `maxPremiumBps` 15 %:
   roh Poor 0 %, Good 3 %, Near Mint 8 %, Mint 12 %; Slabs 8: 5 %, 8,5: 7 %, 9: 10 %, 9,5: 12 %, 10 und Black Label
-  15 %. Chance je Minute knapp über dem Wert 0,04 % (`buyChanceMinBps`) plus Beliebtheit × 0,96 % bis 1 %
-  (`buyChanceBps`), bis zum Höchstpreis linear fallend auf 20 % davon (Legendary bei + 10 %: rund 0,4 % je Minute,
+  15 %. Chance je Minute knapp über dem Wert 1 % (`buyChanceBps`) × (4 % + 96 % × Beliebtheit;
+  `buyChanceMinShareBps`, also 0,04 % bis 1 %), bis zum Höchstpreis linear fallend auf 20 % davon (Legendary bei + 10 %: rund 0,4 % je Minute,
   also im Mittel nach gut vier Stunden; Common: fast nie). Höchstens 100 Käufe je Lauf. Nur Käufe über dem Wert
   prüfen das Budget je Set und Tag von 300 Booster-Preisen (60.000 € / 300.000 € / 3 Mio. € …, gezählt werden alle
   KI-Käufe des Sets). Höchste KI-Ausgabe am Tag also: diese Budgets plus die Summe aller fair angebotenen Karten.

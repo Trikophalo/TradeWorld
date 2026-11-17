@@ -16,6 +16,9 @@ select value as nx_cfg from public.game_config where key = 'nexamon' \gset
 select tests.set_cfg('nexamon', '{ai,packsPerHour}', '{"mystic_energy": 0, "super_apex": 0, "prismatic_peak": 0, "cosmic_winds": 0, "titans_revenge": 0, "yin_yang": 0}');
 -- a budget far below the price: buys at the value must ignore it
 select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '1');
+-- earlier tests switch the chance above the value off; use the shipped one (balance.ts)
+select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '100');
+select tests.set_cfg('nexamon', '{ai,buyChanceMinShareBps}', '400');
 select public.nexamon_sync() is not null as ok \gset
 
 select card_key as hot from public.nexamon_cards
@@ -84,4 +87,5 @@ select tests.assert(
 
 select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', :'nx_cfg'::jsonb #> '{ai,dailyBudgetPacks}');
 select tests.set_cfg('nexamon', '{ai,packsPerHour}', :'nx_cfg'::jsonb #> '{ai,packsPerHour}');
+select tests.set_cfg('nexamon', '{ai,buyChanceBps}', :'nx_cfg'::jsonb #> '{ai,buyChanceBps}');
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant: ' || tests.money_invariant());

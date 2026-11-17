@@ -3110,7 +3110,7 @@ grant execute on function public.learn_company_skill(uuid, text) to authenticate
 --   * at or below the copy's value (with the card, as shown in the UI): bought on the next minute run, any price,
 --     no budget; fair listings come first in each run; only the households' cash stops it
 --   * above the value: at most value x (1 + min(premium by condition or grade, ai.maxPremiumBps = 15 %)); chance per
---     minute buyChanceMinBps + (buyChanceBps - buyChanceMinBps) x popularity, falling linearly to atMaxChanceBps of
+--     minute buyChanceBps x (buyChanceMinShareBps + rest x popularity), falling linearly to atMaxChanceBps of
 --     it at the maximum; only these buys check ai.dailyBudgetPacks (all AI buys of the set that day count)
 --   * unchanged: never the AI's own listings, never ai.excludedRarities, nexamon_sell() idempotent per listing
 -- Latest definitions copied: nexamon_ai_premium_bps / nexamon_ai_buy_chance_bps (6010 + 6510 patch),
@@ -3152,6 +3152,7 @@ as $$
 declare
   ai      jsonb := public.nexamon_cfg() -> 'ai';
   v_min   bigint;
+  v_pop   bigint;
   v_full  bigint;
   v_max   bigint;
   v_share bigint;
@@ -3169,9 +3170,9 @@ begin
   if p_price > v_max then
     return 0;
   end if;
-  v_min := coalesce((ai ->> 'buyChanceMinBps')::bigint, 0);
-  v_full := v_min + floor((coalesce((ai ->> 'buyChanceBps')::bigint, 0) - v_min)::numeric
-                          * public.nexamon_popularity_bps(p_rarity, p_population) / 10000)::bigint;
+  v_min := coalesce((ai ->> 'buyChanceMinShareBps')::bigint, 10000);
+  v_pop := floor((10000 - v_min)::numeric * public.nexamon_popularity_bps(p_rarity, p_population) / 10000)::bigint;
+  v_full := floor(coalesce((ai ->> 'buyChanceBps')::numeric, 0) * (v_min + v_pop) / 10000)::bigint;
   v_share := 10000 - floor((10000 - coalesce((ai ->> 'atMaxChanceBps')::numeric, 0)) * (p_price - p_value) / (v_max - p_value))::bigint;
   return floor(v_full::numeric * v_share / 10000)::integer;
 end;
@@ -3258,7 +3259,7 @@ begin
     v_chance := public.nexamon_ai_buy_chance_bps(r.price_cents, v_value, r.condition, r.grade, r.rarity, r.population);
     continue when v_chance <= 0;
     continue when v_chance < 10000 and random() * 10000 >= v_chance;
-    if v_chance < 10000 then
+    if r.price_cents > v_value then
       select coalesce(sum(s.price_cents), 0) into v_spent
         from public.nexamon_sales s join public.nexamon_cards k on k.card_key = s.card_key
        where s.kind = 'ai_buy' and s.at >= v_day and k.set_key = r.set_key;

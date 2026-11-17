@@ -4453,8 +4453,8 @@ Marktwert blieben liegen. Ursachen im Minutenjob `nexamon_run_due` (seit Migrati
   Minutenlauf, egal wie teuer. Diese Käufe zählen gegen kein Budget; Grenze ist nur das Geld der Haushalte. Faire
   Angebote kommen in jedem Lauf zuerst.
 - Über dem Wert höchstens + `ai.maxPremiumBps` (15 %), weiter begrenzt durch den Aufschlag nach Zustand oder Note.
-  Chance je Minute von `ai.buyChanceMinBps` (0,04 %, unbeliebte Karte) mit der Beliebtheit steigend bis
-  `ai.buyChanceBps` (1 %), linear fallend bis auf `atMaxChanceBps` (20 %) davon am Höchstpreis. Nur diese Käufe
+  Chance je Minute `ai.buyChanceBps` (1 %) × (`ai.buyChanceMinShareBps` 4 % + Rest × Beliebtheit), also 0,04 %
+  (unbeliebte Karte) bis 1 % (beliebteste), linear fallend bis auf `atMaxChanceBps` (20 %) davon am Höchstpreis. Nur diese Käufe
   prüfen das Tagesbudget je Set (die Summe aller KI-Käufe des Sets am Tag).
 - Unverändert: nie die eigenen Angebote der KI, nie `ai.excludedRarities` (One of One, Uran bleiben unter Spielern,
   ADR-174/182), Sperre noch nicht erschienener Sets und die Slab-Haltezeit der KI (ADR-185), `nexamon_sell` mit

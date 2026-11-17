@@ -521,7 +521,7 @@ select tests.assert(
   (select count(*) from public.nexamon_sales where card_key = 'me-055' and kind = 'ai_buy') = 4
   and (select count(*) from public.nexamon_listings where card_key = 'me-055' and seller_id = :a) = 0,
   'the AI buys every listing at the value, no cap per card and week');
--- no budget, no purchase
+-- no budget: a listing at the value still sells (ADR-195: only buys above the value check the budget)
 select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.nx_give(:a, 'me-058') as nobudget \gset
 select tests.nx_value('me-058') as p58 \gset
@@ -529,8 +529,8 @@ select tests.login_as('authenticated', :a);
 select public.list_nexamon_card(gen_random_uuid(), :'nobudget', :p58) is not null as ok \gset
 reset role;
 select public.nexamon_run_due() as run2 \gset
-select tests.assert((:'run2'::jsonb ->> 'ai_bought')::integer = 0 and tests.nx_listing(:'nobudget') is not null,
-  'the AI stops buying when the set''s daily budget is spent');
+select tests.assert((:'run2'::jsonb ->> 'ai_bought')::integer = 1 and tests.nx_listing(:'nobudget') is null,
+  'without a daily budget the AI still buys a listing at the value (ADR-195)');
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after AI purchases');
 
 -- =============================================================================

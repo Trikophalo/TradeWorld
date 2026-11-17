@@ -664,8 +664,8 @@ export function nexamonAiMaxPriceCents(
 
 /**
  * Chance per minute that an AI collector buys a player's listing, in basis points: certain (10 000) at or below the
- * copy's value, whatever the price (ADR-195); above it from `buyChanceMinBps` (unpopular) rising with the
- * popularity to `buyChanceBps`, falling linearly to `atMaxChanceBps` of that at the
+ * copy's value, whatever the price (ADR-195); above it `buyChanceBps` x (`buyChanceMinShareBps` + the
+ * rest x popularity), falling linearly to `atMaxChanceBps` of that at the
  * most the AI pays (nexamonAiMaxPriceCents); 0 above that or for a price of 0.
  */
 export function nexamonAiBuyChanceBps(
@@ -681,7 +681,8 @@ export function nexamonAiBuyChanceBps(
 ): number {
   if (!nexamonAiAllowed(i.rarity, cfg)) return 0;
   const pop = nexamonPopularityBps(i.rarity, i.population, cfg);
-  const full = cfg.ai.buyChanceMinBps + mulDivFloor(cfg.ai.buyChanceBps - cfg.ai.buyChanceMinBps, pop, 10_000);
+  const minShare = cfg.ai.buyChanceMinShareBps;
+  const full = mulDivFloor(cfg.ai.buyChanceBps, minShare + mulDivFloor(10_000 - minShare, pop, 10_000), 10_000);
   if (i.priceCents <= 0) return 0;
   if (i.priceCents <= i.copyValueCents) return 10_000;
   const max = nexamonAiMaxPriceCents(i.copyValueCents, i.condition, i.grade, cfg);
