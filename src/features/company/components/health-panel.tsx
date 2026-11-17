@@ -7,7 +7,8 @@ import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BALANCE } from "@/config/balance";
-import { formatMoney } from "@/lib/format";
+import type { CompanyStrengths } from "@/features/game/types";
+import { formatBps, formatMoney } from "@/lib/format";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
 import type { CompanyHealth, HealthFactor, HealthFactorKey, HealthStatus } from "@/lib/sim/company-health";
 import { cn } from "@/lib/utils";
@@ -52,11 +53,20 @@ export function HealthPanel({
   health,
   onAsk,
   late,
+  strengths,
+  goTo,
 }: {
   health: CompanyHealth;
   onAsk: AskMira;
   /** No closed hour although the company is hours old: the numbers are estimates and the close is overdue. */
   late?: boolean;
+  /**
+   * The slow strengths (ADR-176), shown in the same rows (ADR-187): one topic once, "now" and "long-term" clearly
+   * apart. Without them the rows only name the strength they feed.
+   */
+  strengths?: CompanyStrengths | null;
+  /** Where a factor is influenced (ADR-187): a link per row and for the weakest one. */
+  goTo?: { hint: (factor: HealthFactorKey) => string; go: (factor: HealthFactorKey) => void };
 }) {
   const t = useTranslations("companyHealth");
   const weakest = health.factors.find((f) => f.key === health.weakest)!;
@@ -68,7 +78,7 @@ export function HealthPanel({
   }));
   return (
     <Card padding="lg" className="space-y-5" data-testid="company-health" data-estimated={health.estimated}>
-      <Header health={health} />
+      <Header health={health} strengths={strengths ?? null} />
       {/* Estimates must not pass for the real hourly numbers: said first, not in a footnote. */}
       {health.estimated && (
         <p
@@ -96,7 +106,15 @@ export function HealthPanel({
         </div>
         <ol className="space-y-2" aria-label={t("listLabel")}>
           {rows.map((f, i) => (
-            <FactorRow key={f.key} factor={f} weakest={f.key === health.weakest} index={i} onAsk={onAsk} />
+            <FactorRow
+              key={f.key}
+              factor={f}
+              weakest={f.key === health.weakest}
+              index={i}
+              onAsk={onAsk}
+              strengths={strengths ?? null}
+              goTo={goTo}
+            />
           ))}
         </ol>
       </div>
@@ -155,8 +173,9 @@ export function HealthCompact({
   );
 }
 
-function Header({ health }: { health: CompanyHealth }) {
+function Header({ health, strengths }: { health: CompanyHealth; strengths: CompanyStrengths | null }) {
   const t = useTranslations("companyHealth");
+  const tm = useTranslations("companyHealth.merged");
   const score = health.score;
   const limits = BALANCE.companyHealth.status;
   const status: HealthStatus =
@@ -166,12 +185,13 @@ function Header({ health }: { health: CompanyHealth }) {
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 label-pixel text-fg-2">
           <PixelIcon {...UI_ICONS.star} scale={1} />
-          {t("title")}
+          {strengths ? tm("title") : t("title")}
           <InfoTip text={t("info")} label={t("title")} />
         </p>
-        <p className="mt-1 text-sm text-pretty text-fg-3">{t("intro")}</p>
+        <p className="mt-1 text-sm text-pretty text-fg-3">{strengths ? tm("intro") : t("intro")}</p>
       </div>
-      <div className="flex items-stretch gap-2">
+      <div className="flex flex-wrap items-stretch gap-2">
+        {strengths && <LongTermBox strengths={strengths} />}
         <div className="rounded-md bg-surface-2 px-3 py-2 text-right" data-testid="health-score">
           <p className="text-2xs text-fg-3">{t("scoreLabel")}</p>
           <p className={cn("nums text-lg font-semibold", TONE[status].text)}>
@@ -185,6 +205,32 @@ function Header({ health }: { health: CompanyHealth }) {
           <ProfitNow cents={health.profitPerHourCents} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The slow strengths in one box (ADR-187): average, bonus now and the next tier. */
+function LongTermBox({ strengths }: { strengths: CompanyStrengths }) {
+  const tm = useTranslations("companyHealth.merged");
+  const overall = Math.floor(strengths.overall);
+  const percent = (bps: number) => formatBps(bps).replace("+", "");
+  return (
+    <div className="rounded-md bg-surface-2 px-3 py-2 text-right" data-testid="strengths-overall-box">
+      <p className="text-2xs text-fg-3">{tm("overall")}</p>
+      <p className="nums text-lg font-semibold text-fg-1" data-testid="strengths-overall">
+        {overall}
+        <span className="text-xs font-normal text-fg-3"> / 100</span>
+      </p>
+      <p
+        className={cn("nums text-2xs", strengths.rewardBps > 0 ? "text-gain" : "text-fg-3")}
+        data-testid="strengths-reward"
+      >
+        {strengths.rewardBps > 0
+          ? tm("bonusNow", { percent: percent(strengths.rewardBps) })
+          : strengths.next
+            ? tm("bonusFrom", { at: strengths.next.at, percent: percent(strengths.next.bps) })
+            : tm("bonusNone")}
+      </p>
     </div>
   );
 }
@@ -251,13 +297,23 @@ function FactorRow({
   weakest,
   index,
   onAsk,
+  strengths,
+  goTo,
 }: {
   factor: HealthFactor;
   weakest: boolean;
   index: number;
   onAsk: AskMira;
+  strengths?: CompanyStrengths | null;
+  goTo?: { hint: (factor: HealthFactorKey) => string; go: (factor: HealthFactorKey) => void };
 }) {
   const t = useTranslations("companyHealth");
+  const tm = useTranslations("companyHealth.merged");
+  const strengthKey = STRENGTH_OF[factor.key];
+  const longTerm =
+    strengths && strengthKey in strengths.scores
+      ? Math.floor(strengths.scores[strengthKey as keyof CompanyStrengths["scores"]])
+      : null;
   const text = useHealthText();
   const tone = TONE[factor.status];
   const limits = BALANCE.companyHealth.status;
@@ -277,11 +333,14 @@ function FactorRow({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-fg-1">{text.factor(factor.key)}</span>
-          <span className="rounded-xs bg-surface-3 px-1.5 py-0.5 text-2xs text-fg-3">
-            {t(`link.${STRENGTH_OF[factor.key]}`)}
-          </span>
+          {(!strengths || longTerm === null) && (
+            <span className="rounded-xs bg-surface-3 px-1.5 py-0.5 text-2xs text-fg-3">
+              {t(`link.${STRENGTH_OF[factor.key]}`)}
+            </span>
+          )}
         </span>
         <span className="flex shrink-0 items-center gap-2">
+          {strengths && <span className="text-2xs text-fg-3">{tm("now")}</span>}
           <span className={cn("rounded-pill px-2 py-0.5 text-2xs font-medium", tone.soft, tone.text)}>
             {t(`status.${factor.status}`)}
           </span>
@@ -309,6 +368,18 @@ function FactorRow({
           <span key={at} aria-hidden className="absolute inset-y-0 w-px bg-bg/70" style={{ left: `${at}%` }} />
         ))}
       </div>
+      {strengths && longTerm !== null && (
+        <div className="flex items-center gap-2 text-2xs text-fg-3" data-testid="health-longterm">
+          <span className="shrink-0">{tm("longTerm", { score: longTerm })}</span>
+          <span className="relative h-1 min-w-8 flex-1 overflow-hidden rounded-pill bg-surface-3" aria-hidden>
+            <span
+              className="block h-full origin-left rounded-pill bg-fg-3"
+              style={{ transform: `scaleX(${Math.max(0, Math.min(1, longTerm / 100))})` }}
+            />
+          </span>
+          {strengths.next && <span className="shrink-0 nums">{tm("tierShort", { at: strengths.next.at })}</span>}
+        </div>
+      )}
       <p className="text-xs text-pretty text-fg-3">{t(`explain.${factor.key}`)}</p>
       <p className="text-sm text-pretty text-fg-2">{text.reason(factor)}</p>
       {factor.status !== "good" && (
@@ -320,17 +391,32 @@ function FactorRow({
         <span className={cn("nums text-xs", factor.impactCents > 0 ? "font-semibold text-gain" : "text-fg-3")}>
           {factor.impactCents > 0 ? t("impact", { amount: money(factor.impactCents) }) : t("noImpact")}
         </span>
-        <button
-          type="button"
-          onClick={() => onAsk(factor.key)}
-          className="group inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-xs font-medium text-accent focus-ring transition duration-fast hover:bg-accent-soft active:scale-[0.97]"
-          data-testid="health-ask"
-        >
-          {t("ask")}
-          <span aria-hidden className="transition-transform duration-fast group-hover:translate-x-0.5">
-            →
-          </span>
-        </button>
+        <span className="flex flex-wrap items-center gap-1">
+          {goTo && (
+            <button
+              type="button"
+              onClick={() => goTo.go(factor.key)}
+              className="group inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-xs font-medium text-accent focus-ring transition duration-fast hover:bg-accent-soft active:scale-[0.97]"
+              data-testid="health-go"
+            >
+              {goTo.hint(factor.key)}
+              <span aria-hidden className="transition-transform duration-fast group-hover:translate-x-0.5">
+                ›
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onAsk(factor.key)}
+            className="group inline-flex items-center gap-1 rounded-sm px-1.5 py-1 text-xs font-medium text-accent focus-ring transition duration-fast hover:bg-accent-soft active:scale-[0.97]"
+            data-testid="health-ask"
+          >
+            {t("ask")}
+            <span aria-hidden className="transition-transform duration-fast group-hover:translate-x-0.5">
+              →
+            </span>
+          </button>
+        </span>
       </div>
     </motion.li>
   );

@@ -4,10 +4,11 @@ import { motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { UI_ICONS } from "@/components/pixel/art";
+import { MIRA, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useServerClock } from "@/features/game/server-clock";
 import type { MyCompany } from "@/features/game/types";
@@ -19,14 +20,15 @@ import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { askMira, type MiraOpen } from "../assistant/mira-chat";
+import { askMira, MiraChat, type MiraOpen } from "../assistant/mira-chat";
 import { useCompanyHealth } from "../health";
 import { BoardView } from "../listed/board";
 import { useListedCompany } from "../listed/shared";
 import { companyTodos } from "../listed/view";
 import { companyHref, resolveCompanyTarget, type CompanyTab, type CompanyTarget } from "../tabs";
-import { useCompanyTasks } from "../tasks/task-board";
+import { useCompanyAutopilot } from "./autopilot-card";
 import { BannerEditor } from "./banner-editor";
+import { useCompanyTodoItems } from "./todo-center";
 import { HireSheet, type HireRequest } from "./employer";
 import { HeadquartersHero } from "./headquarters";
 import { SideJobNotice } from "./listing";
@@ -36,7 +38,7 @@ import { BooksTab } from "./tabs/books-tab";
 import { ControllingTab } from "./tabs/controlling-tab";
 import { DashboardTab, ListedTeaser } from "./tabs/dashboard-tab";
 import { StaffTab } from "./tabs/staff-tab";
-import { FirmSection } from "./firm-layout";
+import { announceFocus, FirmSection } from "./firm-layout";
 
 const money = (cents: number) => formatMoney(cents, { whole: true });
 
@@ -51,6 +53,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const th = useTranslations("hq.tabs");
   const tb = useTranslations("hq.board");
   const tl = useTranslations("logo");
+  const tm = useTranslations("hq.miraPanel");
   const router = useRouter();
   const params = useSearchParams();
   const rawTab = params.get("tab");
@@ -69,8 +72,18 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const teaser = useDisclosed("companyListed");
   const now = useServerClock();
 
-  /** Scrolls to the place (nothing folds any more, ADR-183), with a short highlight. */
+  const [miraOpen, setMiraOpen] = useState(false);
+
+  /**
+   * Scrolls to the place (nothing folds any more, ADR-183), with a short highlight. A merged card switches to the
+   * right pane first (ADR-187); Mira opens her panel.
+   */
   const focus = useCallback((target: CompanyTarget) => {
+    if (target.target === "mira") {
+      window.setTimeout(() => setMiraOpen(true), 0);
+      return;
+    }
+    announceFocus(target);
     const id = target.target ?? (target.section ? `section-${target.section}` : null);
     if (!id) return;
     let tries = 0;
@@ -89,6 +102,10 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
 
   const go = useCallback(
     (target: CompanyTarget) => {
+      if (target.target === "mira") {
+        setMiraOpen(true);
+        return;
+      }
       router.replace(companyHref(target), { scroll: false });
       if (target.section || target.target) focus(target);
     },
@@ -104,8 +121,8 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
     if (current.section || current.target) focus(current);
   }, [rawTab, rawSection, current, focus]);
 
-  const tasks = useCompanyTasks();
-  const openTasks = tasks.data?.tasks.filter((x) => x.status === "open").length ?? 0;
+  const autopilot = useCompanyAutopilot();
+  const todoItems = useCompanyTodoItems(company, listed, autopilot.data ?? null);
   const [hire, setHire] = useState<HireRequest | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [bannerOpen, setBannerOpen] = useState(false);
@@ -127,16 +144,26 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const askAbout = (factor: HealthFactorKey) => {
     haptic("tap");
     askMira(questions(factor));
-    go({ tab: "dashboard", target: "mira" });
+    setMiraOpen(true);
   };
-  const onMira: MiraOpen = (to, id) => go(resolveCompanyTarget(to, id));
+  // Mira opens a place: her panel closes, the page goes there.
+  const onMira: MiraOpen = (to, id) => {
+    const target = resolveCompanyTarget(to, id);
+    if (target.target !== "mira") setMiraOpen(false);
+    go(target);
+  };
 
   const todos = listed && now !== null ? companyTodos(listed, now) : [];
   const booksBadge = todos.filter((x) => x.key === "books" || x.key === "tax").length;
   const tabs: TabItem[] = [
     { value: "dashboard", label: th("dashboard"), icon: "home" },
     { value: "controlling", label: th("controlling"), icon: "markets" },
-    { value: "staff", label: th("staff"), icon: "profile", badge: company.pendingApplications + openTasks },
+    {
+      value: "staff",
+      label: th("staff"),
+      icon: "profile",
+      badge: todoItems.filter((x) => x.target.tab === "staff").length,
+    },
     ...(isListed || teaser
       ? ([
           { value: "books", label: th("books"), icon: "portfolio", badge: booksBadge, locked: !isListed },
@@ -185,7 +212,12 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         onShow={() => go({ tab: "controlling", section: "marketing", target: "campaign" })}
       />
 
-      <CompanyTabs value={tab} onChange={(next) => go({ tab: next })} tabs={tabs} label={t("title")} />
+      <div className="flex items-stretch gap-2">
+        <div className="min-w-0 flex-1">
+          <CompanyTabs value={tab} onChange={(next) => go({ tab: next })} tabs={tabs} label={t("title")} />
+        </div>
+        <MiraLauncher onOpen={() => setMiraOpen(true)} />
+      </div>
 
       <div role="tabpanel" aria-label={tabs.find((x) => x.value === tab)?.label} data-tab={tab}>
         {tab === "dashboard" && (
@@ -194,9 +226,9 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
             listed={listed}
             listedPending={listedPending}
             health={health}
-            miraHealth={miraHealth}
             onAsk={askAbout}
-            onMira={onMira}
+            todoCount={todoItems.length}
+            urgentCount={todoItems.filter((x) => x.tone === "urgent").length}
             go={go}
           />
         )}
@@ -212,7 +244,14 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
           />
         )}
         {tab === "staff" && (
-          <StaffTab company={company} listed={listed} listedPending={listedPending} onHire={setHire} />
+          <StaffTab
+            company={company}
+            listed={listed}
+            listedPending={listedPending}
+            onHire={setHire}
+            todos={todoItems}
+            go={go}
+          />
         )}
         {tab === "books" &&
           (listed ? <BooksTab listed={listed} /> : listedPending ? <ListedSkeleton /> : <ListedTeaser focus="books" />)}
@@ -227,7 +266,38 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       </div>
 
       <HireSheet company={company} request={hire} onClose={() => setHire(null)} />
+      {/* Mira on every tab (ADR-187): her own panel instead of a block on the dashboard. */}
+      <Sheet open={miraOpen} onOpenChange={setMiraOpen} title={tm("title")} description={tm("text")}>
+        <MiraChat
+          applications={company.pendingApplications}
+          health={miraHealth}
+          onOpen={onMira}
+          className="h-[min(68dvh,640px)]"
+        />
+      </Sheet>
     </div>
+  );
+}
+
+/** The button that opens Mira's panel, next to the tabs on every tab. */
+function MiraLauncher({ onOpen }: { onOpen: () => void }) {
+  const tm = useTranslations("hq.miraPanel");
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        haptic("tap");
+        void playSound("tap");
+        onOpen();
+      }}
+      aria-label={tm("open")}
+      data-testid="mira-open"
+      data-tour="assistant"
+      className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-lg bg-accent-soft px-3 text-2xs font-medium text-fg-1 ring-1 ring-accent/40 focus-ring transition duration-fast hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] sm:flex-row sm:gap-2 sm:text-sm"
+    >
+      <PixelIcon {...MIRA.idle} scale={2} />
+      <span>{tm("short")}</span>
+    </button>
   );
 }
 
