@@ -4713,3 +4713,18 @@ einmal.
 - `FoldBlock`: Kopf als Knopf mit `aria-expanded`, zugeklappt eine kurze Zusammenfassung (Anzahl), Zustand je
   Spieler in `localStorage` (nach der Hydration), Einblenden nur über `opacity`/`transform` mit Motion-Tokens. Ein
   Link auf die Stelle klappt sie für diesen Besuch auf. „Was jeder leistet“ startet ab sechs Personen zugeklappt.
+
+## ADR-197: Grundeinkommen stark verbesserbar — `Annahme`
+
+**Kontext.** Der Besitzer will das Grundeinkommen in den Verbesserungen stark und günstig ausbauen können; bisher drei
+Stufen mit je +10 % (höchstens +30 %).
+
+**Entscheidung.** `upgrades.income`: 12 Stufen, je +50 % (`perLevel` 5 000 bps, höchstens +600 %, also das
+Siebenfache, 700 € je Stunde), freigeschaltet ab Level 3 alle 2 Level (3, 5, …, 25; letzte Stufe bis Level 30 wie
+bei allen Verbesserungen), Preis 3.000 € · 1,5^Stufe (bis rund 259.500 €). Der Server liest alles aus `game_config`
+(`upgrade_cost_cents`, `upgrade_stage_level`, `player_basic_income_cents_per_hour`), daher keine Migration.
+
+**Folgen.** Bei zwei Tresor-Leerungen am Tag (16 Stunden) bringt jede Stufe +800 € am Tag: Stufe 1 lohnt sich nach
+4 Tagen, Stufe 12 nach etwa 11 Wochen. Das Geld bleibt geschlossen (ADR-041): Käufe fließen in die Staatskasse, die
+das Grundeinkommen zahlt; leert sie sich unter das Ziel (`basicIncome.treasuryTargetCents`, 250 Mio. €), sinkt der
+Faktor bis `minFactor` 0,25. Bei vier Spielern auf Stufe 12 sind das höchstens rund 45.000 € am Tag, weit unter dem Ziel.

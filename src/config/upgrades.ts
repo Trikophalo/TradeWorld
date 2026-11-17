@@ -135,8 +135,10 @@ export const UPGRADES: UpgradesConfig = {
   // 8 h → 24 h: 3.000 €, 6.000 €, 12.000 €, 24.000 €, 48.000 €, 96.000 €, 192.000 €, 384.000 €;
   // levels 1, 3, 5, 7, 9, 11, 13, 15 (ADR-134: two more stages)
   vault: { maxLevel: 8, minLevel: 1, levelStep: 2, baseCostCents: 300_000, costGrowth: 2, perLevel: 2 },
-  // Only a little (owner): +10 % per level, at most +30 %. 4.000 €, 12.000 €, 36.000 €; levels 3, 7, 11
-  income: { maxLevel: 3, minLevel: 3, levelStep: 4, baseCostCents: 400_000, costGrowth: 3, perLevel: 1_000 },
+  // Strong and cheap (owner, ADR-197): +50 % per level, at most +600 % (7x basic income). 3.000 € x 1.5 per
+  // stage up to about 259.500 €; levels 3, 5, 7, ..., 25 (last stage by level 30). Every stage pays back in days
+  // to a few weeks of vault claims.
+  income: { maxLevel: 12, minLevel: 3, levelStep: 2, baseCostCents: 300_000, costGrowth: 1.5, perLevel: 5_000 },
   // 6 → 3 work hours per branch point: 8.000 €, 24.000 €, 72.000 €; levels 2, 6, 10
   study: { maxLevel: 3, minLevel: 2, levelStep: 4, baseCostCents: 800_000, costGrowth: 3, perLevel: 1 },
   // +10 % XP from work per level: 6.000 €, 18.000 €, 54.000 €; levels 4, 8, 12

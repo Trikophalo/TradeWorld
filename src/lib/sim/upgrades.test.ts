@@ -82,23 +82,29 @@ describe("upgrade effects", () => {
   });
 
   it("add per level and clamp to the maximum", () => {
-    const e = upgradeEffects({ vault: 3, income: 9, study: 3, overtime: 2, rhetoric: 1 });
+    const e = upgradeEffects({ vault: 3, income: 15, study: 3, overtime: 2, rhetoric: 1 });
     expect(e.vaultCapHours).toBe(14);
-    expect(e.incomeBps).toBe(13_000);
+    expect(e.incomeBps).toBe(70_000);
     expect(e.workHoursPerBranchPoint).toBe(3);
     expect(e.paidHoursCap).toBe(10);
     expect(e.promotionBonusBps).toBe(500);
   });
 
-  it("raise the basic income only a little", () => {
+  it("raise the basic income strongly, up to seven times", () => {
     expect(basicIncomeCentsPerHour({})).toBe(10_000);
-    expect(basicIncomeCentsPerHour({ income: 1 })).toBe(11_000);
-    expect(basicIncomeCentsPerHour({ income: 3 })).toBe(13_000);
+    expect(basicIncomeCentsPerHour({ income: 1 })).toBe(15_000);
+    expect(basicIncomeCentsPerHour({ income: 3 })).toBe(25_000);
+    expect(basicIncomeCentsPerHour({ income: 12 })).toBe(70_000);
+    expect(upgradeCostCents("income", 0)).toBe(300_000);
+    expect(upgradeCostCents("income", 4)).toBe(1_518_800);
+    expect(upgradeCostCents("income", 11)).toBe(25_949_300);
+    expect(upgradeCostCents("income", 12)).toBeNull();
+    expect(upgradeStageLevel("income", 11)).toBe(25);
   });
 
   it("show one number per upgrade for the shop", () => {
     expect(upgradeValue("vault", 1)).toBe(10);
-    expect(upgradeValue("income", 2)).toBe(12_000);
+    expect(upgradeValue("income", 2)).toBe(20_000);
     expect(upgradeValue("study", 1)).toBe(5);
     expect(upgradeValue("overtime", 1)).toBe(9);
     expect(upgradeValue("rhetoric", 3)).toBe(1_500);

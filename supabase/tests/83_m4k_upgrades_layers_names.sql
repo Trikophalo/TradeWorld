@@ -74,7 +74,8 @@ grant execute on all functions in schema tests to public;
 -- =============================================================================
 select tests.assert(
   (select array_agg(public.upgrade_stage_level('vault', l) order by l) from generate_series(0, 8) l) = array[1, 3, 5, 7, 9, 11, 13, 15, null]
-  and (select array_agg(public.upgrade_stage_level('income', l) order by l) from generate_series(0, 3) l) = array[3, 7, 11, null]
+  and (select array_agg(public.upgrade_stage_level('income', l) order by l) from generate_series(0, 12) l)
+      = array[3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, null]
   and (select array_agg(public.upgrade_stage_level('study', l) order by l) from generate_series(0, 3) l) = array[2, 6, 10, null]
   and (select array_agg(public.upgrade_stage_level('mentor', l) order by l) from generate_series(0, 3) l) = array[4, 8, 12, null]
   and (select array_agg(public.upgrade_stage_level('overtime', l) order by l) from generate_series(0, 2) l) = array[5, 11, null]
