@@ -133,6 +133,11 @@ export interface CompanyFacts {
   order: { costCents: number; waitMinutes: number | null; affordable: boolean } | null;
   event: { polarity: "crisis" | "chance"; pitched: boolean } | null;
   interview: { expiresAt: string } | null;
+  /**
+   * Fertigkeiten (ADR-194): learned levels and the cheapest next level that can be learned now (skill held, not in
+   * training, affordable), or null.
+   */
+  skills: { levels: number; learnable: { key: string; costCents: number } | null } | null;
   listed: {
     satisfaction: number;
     zone: "green" | "yellow" | "red";
@@ -448,6 +453,22 @@ export function companyFacts(state: MiraState, cfg: BalanceConfig = BALANCE): Co
       state.interview && state.interview.status === "requested" && Date.parse(state.interview.expiresAt) > now
         ? { expiresAt: state.interview.expiresAt }
         : null,
+    skills: state.skills
+      ? {
+          levels: state.skills.skills.reduce((a, s) => a + s.level, 0),
+          learnable:
+            state.skills.skills
+              .filter(
+                (s) =>
+                  s.nextCostCents !== null &&
+                  s.missing === null &&
+                  s.trainingUntil === null &&
+                  s.nextCostCents <= state.skills!.freeCashCents,
+              )
+              .map((s) => ({ key: s.key, costCents: s.nextCostCents! }))
+              .sort((a, b) => a.costCents - b.costCents)[0] ?? null,
+        }
+      : null,
     listed: l
       ? {
           satisfaction: Math.round(l.satisfaction.value),
@@ -526,6 +547,8 @@ export function factsForClaude(f: CompanyFacts): Record<string, string | number 
     freier_auftrag_in_min: f.order?.waitMinutes ?? null,
     krise_oder_chance: f.event?.polarity ?? null,
     interview_wartet: f.interview !== null,
+    fertigkeiten_stufen: f.skills?.levels ?? null,
+    fertigkeit_lernbar: f.skills?.learnable?.key ?? null,
     zufriedenheit: f.listed?.satisfaction ?? null,
     steuer_faellig_eur: f.listed ? euro(f.listed.taxDueCents) : null,
     buecher_offen: f.listed?.booksOpen ?? null,

@@ -8211,7 +8211,7 @@
       }
     },
     "open": {
-      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} other {Hinschauen}}"
+      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} skills {Zu den Fertigkeiten} other {Hinschauen}}"
     },
     "advice": {
       "distress": "Alarm: Die Firma hat {unpaid} offene Rechnungen. Bleiben sie offen, droht die Insolvenz. Zahl Geld ein, bevor die Schonfrist abläuft.",
@@ -8244,7 +8244,8 @@
         "nextStage": "Die nächste Stufe hebt den Deckel der Bekanntheit.",
         "marketing": "Etwa +{gain} Punkte Bekanntheit je Stunde.",
         "expand": "Kostet {cost} aus der Firmenkasse."
-      }
+      },
+      "companySkills": "Fertigkeit bereit: „{skill}“ kannst du jetzt für {amount} lernen. Sie wirkt nach der Schulung jede Stunde auf den Gewinn."
     },
     "next": {
       "intro": "Das würde ich jetzt tun, das Wichtigste zuerst:",
@@ -10113,6 +10114,7 @@
         "capital": "Mit dem Börsengang verkaufst du Anteile gegen frisches Geld. Danach gelten die Regeln der Börse.",
         "dividends": "Schüttet Geld an alle Aktionäre aus. Hebt den Ruf und den Kurs, höchstens einmal am Tag.",
         "growth": "Produkte, Märkte, Maschinen, Zukäufe und Lizenzen: kosten einmal und laufend, wirken jede Stunde.",
+        "skills": "Was deine Firma selbst besser kann: freigeschaltet durch den Skilltree, wirkt jede Abschlussstunde.",
         "level": {
           "budget": "Günstig",
           "normal": "Normal",
@@ -10631,14 +10633,15 @@
         "group-team": "Team",
         "staff-team": "Team & Plätze",
         "staff-mood": "Stimmung",
-        "staff-value": "Wert des Teams"
+        "staff-value": "Wert des Teams",
+        "skills": "Fertigkeiten"
       }
     },
     "groupCards": {
       "group-offer": "Preis, Strategie und was du herstellst: Hier entsteht dein Umsatz.",
       "group-marketing": "Budget, Kampagnen und Geschäftszüge: So wirst du bekannter und gewinnst Ruf.",
       "group-money": "Kasse, deine Auszahlung, Kapital und Börse, Dividenden.",
-      "group-growth": "Ausbau und Rechtsform, Forschung, Produkte, Regionen und Maschinen.",
+      "group-growth": "Ausbau und Rechtsform, Fertigkeiten, Forschung, Produkte, Regionen und Maschinen.",
       "group-brand": "Banner, Logo und das Schließen der Firma.",
       "todo": "Alles, was auf dich wartet, nach Dringlichkeit. Ein Tipp führt direkt hin.",
       "situation": "Krisen, Chancen, Interviews und die Nachrichten deiner Firma.",
@@ -10917,5 +10920,77 @@
     },
     "emptyTitle": "Gerade keine Aktion",
     "emptyText": "Mr. Doodle Dangle kündigt ab und zu in der Show eine Aktion für alle an."
+  },
+  "companySkills": {
+    "title": "Fertigkeiten",
+    "intro": "Was deine Firma selbst besser kann. Jede Stufe braucht eine Fähigkeit aus dem Skilltree, die du oder jemand mit Job in deiner Firma gelernt hat, kostet Firmengeld und wirkt nach der Schulung in jeder Abschlussstunde: mehr Nachfrage, mehr Kapazität, weniger Kosten oder bessere Qualität. Mehr Gewinn hebt bei einer Börsenfirma auch den fairen Wert der Aktie.",
+    "summary": "{levels} von {max} Stufen",
+    "level": "Stufe {level} von {max}",
+    "none": "noch keine Wirkung",
+    "maxed": "Höchste Stufe erreicht",
+    "cost": "{amount} · {hours} Std. Schulung",
+    "learn": "Stufe {level} lernen",
+    "learned": "{name}: Stufe {level} gelernt",
+    "learnedText": "Die Schulung dauert {hours} Std. Danach wirkt die Stufe in jeder Abschlussstunde.",
+    "locked": "Braucht „{skill}“ aus dem Skilltree",
+    "lockedHint": "Du oder jemand mit Job in deiner Firma muss diese Fähigkeit gelernt haben.",
+    "toSkill": "Zum Skilltree",
+    "noCash": "Zu wenig freies Firmengeld",
+    "total": "Wirkt gerade",
+    "totalNone": "Noch keine Fertigkeit aktiv. Die erste Stufe kostet wenig und wirkt nach einer Stunde Schulung.",
+    "effects": {
+      "demand": "Nachfrage +{pct} %",
+      "capacity": "Kapazität +{pct} %",
+      "cogs": "Wareneinsatz −{pct} %",
+      "fixed": "Fixkosten −{pct} %",
+      "quality": "Qualität +{pct} Punkte"
+    },
+    "items": {
+      "data_analysis": {
+        "name": "Daten analysieren",
+        "desc": "Bessere Preis- und Nachfrageprognosen: Du triffst die Kunden genauer und verschwendest weniger Werbegeld."
+      },
+      "automation": {
+        "name": "Prozesse automatisieren",
+        "desc": "Software erledigt Routine: Das Team schafft mehr pro Stunde."
+      },
+      "cost_control": {
+        "name": "Kosten im Griff",
+        "desc": "Controlling und Budgets senken die laufenden Fixkosten."
+      },
+      "contracts": {
+        "name": "Verträge verhandeln",
+        "desc": "Rechtssichere Lieferverträge drücken den Wareneinsatz."
+      },
+      "craftsmanship": {
+        "name": "Handwerk & Fertigung",
+        "desc": "Saubere Technik und Fertigung heben die Qualität deiner Produkte."
+      },
+      "campaigns": {
+        "name": "Kampagnen schärfen",
+        "desc": "Marketing mit Plan: Jeder Werbe-Euro bringt mehr Nachfrage."
+      },
+      "leadership": {
+        "name": "Team führen",
+        "desc": "Gute Führung und klare Abläufe machen das Team produktiver."
+      },
+      "research": {
+        "name": "Forschen & Testen",
+        "desc": "Labor und Statistik: Produkte werden besser, bevor sie rausgehen."
+      },
+      "supply_chain": {
+        "name": "Lieferkette optimieren",
+        "desc": "Einkauf und Logistik senken den Wareneinsatz."
+      }
+    },
+    "mapTitle": "Fertigkeiten in deiner Firma",
+    "mapHint": "Diese Fähigkeit schaltet in einer eigenen Firma frei:",
+    "mapItem": "{name}, Stufe {level}",
+    "dashLink": "Auch Fertigkeiten heben diesen Wert",
+    "nowLabel": "Jetzt",
+    "nextLabel": "Nächste Stufe",
+    "trainingLabel": "In Schulung, wirkt in",
+    "capLabel": "max.",
+    "empty": "Gründe zuerst eine Firma, dann lernt sie hier Fertigkeiten."
   }
 }

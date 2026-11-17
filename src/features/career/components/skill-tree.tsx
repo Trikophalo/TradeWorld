@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { memo, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ import {
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { useVisitTour } from "@/features/tutorial/use-visit-tour";
+import { companySkillName } from "@/features/company/components/company-skills";
+import { unlockedBy } from "@/lib/sim/company-skills";
 import { useCareerRefresh, useSkills } from "../hooks";
 import { NextSkills } from "./skill-paths";
 
@@ -108,7 +111,11 @@ export function SkillTree() {
   const t = useTranslations("skillTree");
   const ts = useTranslations("skills");
   const skills = useSkills();
-  const [open, setOpen] = useState<string | null>(null);
+  // ?skill=<key> opens that skill (links from the company's Fertigkeiten, ADR-194)
+  const asked = useSearchParams().get("skill");
+  const [open, setOpen] = useState<string | null>(() =>
+    asked && SKILL_NODES.some((n) => n.key === asked) ? asked : null,
+  );
   const [focus, setFocus] = useState<SkillBranch | null>(null);
   const [goTo, setGoTo] = useState<{ branch: SkillBranch; n: number } | null>(null);
   const data = skills.data;
@@ -809,11 +816,32 @@ function LearnSheet({
             </ul>
           </div>
         )}
+        <CompanyUnlocks skillKey={node.key} />
         <p className={cn("text-xs text-fg-3")}>
           {t("score", { score: BALANCE.skills.scoreByTier[node.tier - 1] ?? 0 })} ·{" "}
           {node.branches.map((b) => branchName(ts, b)).join(" + ")}
         </p>
       </div>
     </Sheet>
+  );
+}
+
+/** Fertigkeiten a skill opens in an own company (ADR-194). */
+function CompanyUnlocks({ skillKey }: { skillKey: string }) {
+  const tc = useTranslations("companySkills");
+  const items = unlockedBy(skillKey);
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-md bg-surface-2 px-4 py-3" data-testid="skill-company-unlocks">
+      <p className="label-pixel text-fg-3">{tc("mapTitle")}</p>
+      <p className="mt-1 text-xs text-fg-3">{tc("mapHint")}</p>
+      <ul className="mt-1.5 flex flex-wrap gap-1.5">
+        {items.map((i) => (
+          <li key={i.key}>
+            <Badge tone="accent">{tc("mapItem", { name: companySkillName(tc, i.key), level: i.level })}</Badge>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

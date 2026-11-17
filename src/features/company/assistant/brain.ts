@@ -13,6 +13,7 @@ import type {
   CompanyMoveOption,
   CompanyMoves,
   CompanyPitch,
+  CompanySkillsState,
   CompanyTask,
   CompanyTasks,
   MyCompany,
@@ -92,6 +93,8 @@ export interface MiraNames {
   };
   /** Listed companies (ADR-167): names of the catalogue items. */
   listed?: { item: (key: string) => string };
+  /** Fertigkeiten of the company (ADR-194). */
+  companySkill?: (key: string) => string;
 }
 
 /** What Mira knows about the company's health (ADR-162), for the founder. */
@@ -122,6 +125,8 @@ export interface MiraState {
   autopilot?: CompanyAutopilot | null;
   /** The latest CEO interview (ADR-173). */
   interview?: CompanyInterview | null;
+  /** Fertigkeiten of the company (ADR-194). */
+  skills?: CompanySkillsState | null;
   now: number;
 }
 

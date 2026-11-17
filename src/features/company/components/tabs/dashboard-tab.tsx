@@ -23,6 +23,7 @@ import { hourlyCloseOverdue } from "../../routes";
 import type { CompanyTarget } from "../../tabs";
 import { useCompanyAutopilot } from "../autopilot-card";
 import { COMPANY_MOVES_KEY, moveText } from "../company-moves";
+import { COMPANY_SKILLS_KEY } from "../company-skills";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { ChartLink, DashLink, FirmSection, SectionNav, useWhere, type NavItem } from "../firm-layout";
 import { HealthPanel, type AskMira } from "../health-panel";
@@ -205,6 +206,26 @@ function KpiTile({
   );
 }
 
+/** Fertigkeiten (ADR-194): learned levels; they lift demand, capacity and quality and lower costs. */
+function SkillsTile({ go }: { go: Go }) {
+  const tc = useTranslations("companySkills");
+  const q = useQuery({ queryKey: COMPANY_SKILLS_KEY, queryFn: () => engine.companySkills(), refetchInterval: 60_000 });
+  const skills = q.data?.skills ?? [];
+  const levels = skills.reduce((a, s) => a + s.level, 0);
+  const max = skills.reduce((a, s) => a + s.maxLevel, 0);
+  return (
+    <KpiTile
+      go={go}
+      label={tc("title")}
+      testId="skills"
+      target={{ tab: "controlling", section: "skills" }}
+      hint={tc("dashLink")}
+    >
+      {q.data ? tc("summary", { levels, max }) : "–"}
+    </KpiTile>
+  );
+}
+
 /** The key numbers as tiles; each one leads to where it is influenced. */
 function KpiGrid({
   company,
@@ -304,6 +325,9 @@ function KpiGrid({
       >
         {pct(company.qualityBps)}
       </KpiTile>
+      <Reveal feature="companySkills">
+        <SkillsTile go={go} />
+      </Reveal>
       {reputation && (
         <KpiTile
           go={go}
