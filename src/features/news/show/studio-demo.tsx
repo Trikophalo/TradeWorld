@@ -5,6 +5,7 @@ import { ANCHOR_MOODS } from "@/components/pixel/news-art";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { BALANCE } from "@/config/balance";
+import { buildGagSegment } from "@/lib/sim/running-gag";
 import {
   NewsStudio,
   segmentMood,
@@ -56,6 +57,16 @@ const SEGMENTS: StudioSegment[] = [
     ],
   },
 ];
+
+function gagPreview(): StudioSegment {
+  const gag = BALANCE.newsShow.runningGags.vulcan;
+  const built = buildGagSegment(
+    gag,
+    { company: gag.demo.company, founder: gag.demo.founder, days: gag.demo.ageDays, episode: 3, lastLine: null },
+    () => 0.4,
+  );
+  return { kind: "gag", mood: built.mood, headline: built.headline, text: built.text, effects: [] };
+}
 
 /** Stories outside the loop: the longest text the show sends, and the kinds that came later. */
 const EXTRAS = {
@@ -109,6 +120,8 @@ const EXTRAS = {
     text: "Bei Dangle & Söhne haben heute 7 Leute hingeschmissen. Dax_Dieter nennt das eine natürliche Verschlankung. Sogar die Zimmerpflanze hat sich versetzen lassen.",
     effects: [],
   },
+  /** The running gag (ADR-179) with the made-up preview company of the config. */
+  gag: gagPreview(),
 } as const satisfies Record<string, StudioSegment>;
 
 type Extra = keyof typeof EXTRAS;
@@ -128,6 +141,7 @@ const BUTTONS: { phase: Phase; label: string }[] = [
   { phase: "cards", label: "Sammelkarten" },
   { phase: "tax", label: "Finanzamt" },
   { phase: "corp", label: "Börsenfirma" },
+  ...(BALANCE.newsShow.runningGags.vulcan.demo.preview ? [{ phase: "gag" as const, label: "Running Gag" }] : []),
   { phase: "outro", label: "Outro" },
   { phase: "off", label: "Aus" },
 ];

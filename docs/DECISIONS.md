@@ -3744,3 +3744,29 @@ der Deploy-Workflow, ohne dass die Datenbank aktualisiert wurde.
 **Offen.** Die konkrete Fehlermeldung der Live-Firma ist erst mit dem Deploy sichtbar (Dashboard oder
 `select * from job_runs where job_name = 'company_hours'`). Die Demo rechnet die Stärken aus ihren Stunden nach,
 zahlt den Bonus aber nicht.
+
+## ADR-179: Running Gags in den NEXA Nachrichten, zuerst „Vulcan Energy bohrt nie“ — `Annahme`
+
+**Kontext:** Der Owner wünscht ein wiederkehrendes Meme: Die Spielerfirma „Vulcan Energy“ kündigt in jeder Sendung
+an, mit den Bohrungen zu beginnen, und tut es nie. Der Chat ist genervt, ein paar Hardcore-Fans verteidigen sie.
+Das Meme lebt so lange wie die Firma. Eine echte börsennotierte Firma mit ähnlichem Namen existiert.
+
+**Entscheidung:**
+
+- Allgemeiner Mechanismus `newsShow.runningGags.<key>` (Texte und Werte in `src/config/running-gags.ts`):
+  `namePattern` (ILIKE, für Vulcan `vulcan energy%`), `chanceBps` (70 %), `ord` (75), Steigerung
+  `escalateStart`/`escalatePerEpisode`, Überschriften, Einleitungen, Zeitangaben („bald“, „nach dem nächsten
+  Gutachten“ …), 40 Moderationszeilen mit Stimmung (Augenrollen = confused, Seufzen = crying, gespielte Begeisterung
+  = shocked), Zusatzzeilen bei Börsengang und Notierung, Chatzeilen (28 genervt, 17 Fans) und drei feste Fan-Namen.
+- Server: `news_show_running_gags()` sucht die älteste aktive Spielerfirma (nicht KI, nicht aufgelöst/insolvent)
+  mit passendem Namen und baut ein Segment `gag` ohne Wirkung. Tabelle `news_running_gags` zählt je Gag und Firma die
+  gesendeten Folgen und merkt sich die letzte Zeile (keine direkte Wiederholung); gezählt wird in `news_show_start()`
+  einmal je Sendung. „Tag X ohne Bohrung“ zählt ab Gründung. Eine neu gegründete Firma mit dem Namen beginnt bei
+  Folge 1. `news_show_gag_chat()` (aus `news_show_after_start()`) lässt die erfundenen Zuschauer rund um das Segment
+  schreiben. Claudes Umschreiben (`store_news_show_script`) lässt Gag-Segmente unverändert.
+- Abgrenzung zur echten Firma: Jede Folge beginnt mit „die Spielerfirma … von {founder}“ bzw. „NEXA-Firma“. Keine
+  Orte, Personen, Genehmigungen, Finanzen oder Projekte einer echten Firma; ein Texttest prüft Platzhalter und eine
+  Liste verbotener Wörter.
+- Demo: Schalter `demo.preview` zeigt den Gag mit der erfundenen Firma „Vulcan Energy“ von „Bohr_Boris“, wenn die
+  Demo-Firma nicht so heißt; `/dev/ui` hat den Knopf „Running Gag“.
+- Bewusst nicht in Changelog und Patchnotes (Überraschung, Wunsch des Owners).

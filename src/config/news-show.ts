@@ -14,6 +14,7 @@
  * facts they are made.
  */
 import { NEWS_RAMBLE_EXTRA, NEWS_TOPICS } from "./news-topics.ts";
+import { NEWS_RUNNING_GAGS } from "./running-gags.ts";
 
 type Topics = typeof NEWS_TOPICS;
 const topicKeys = Object.keys(NEWS_TOPICS) as (keyof Topics)[];
@@ -157,6 +158,8 @@ export const NEWS_SHOW_RULES = {
       },
     },
   },
+  /** Running gags (ADR-179): stories that come back every show while their player company exists. */
+  runningGags: NEWS_RUNNING_GAGS,
   /** The loser of the day: biggest loss of net worth in this window, at least minLossBps. Gets a consolation. */
   loser: { windowHours: 24, minLossBps: 300, consolationCents: 50_000 },
   /** The winner of the day: biggest gain, at least minGainBps. */

@@ -19,6 +19,7 @@ import {
   type NewsShowSegment,
   type NewsShowState,
 } from "../types";
+import { buildGagSegment, gagChatLines, matchesNamePattern } from "@/lib/sim/running-gag";
 import { demoTopicCandidates } from "./news-topics";
 
 /*
@@ -49,6 +50,8 @@ export interface DemoNewsShowState {
   botUntil: number;
   /** Topics of the last show (ADR-169): they do not come twice in a row. Missing in older saved states. */
   lastTopics?: string[];
+  /** Running gags (ADR-179): aired episodes and the last host line per gag and company. Missing in older states. */
+  gags?: Record<string, { company: string; episodes: number; lastLine: number | null }>;
 }
 
 export interface NewsShowHost {
@@ -247,6 +250,38 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
     // a CEO interview (ADR-173): the questions, the answers and his reactions
     (host.interviewSegments?.() ?? []).forEach((segment, i) => segments.push(segment, BALANCE.interviews.ord + i));
 
+    // running gags (ADR-179): the player's company with the name, or (preview switch) a made-up one
+    const gagSegments: { key: string; segment: NewsShowSegment; values: Record<string, string | number> }[] = [];
+    for (const [key, gag] of Object.entries(cfg.runningGags)) {
+      if (!gag.enabled || host.random() * 10_000 >= gag.chanceBps) continue;
+      const own = company && matchesNamePattern(company.name, gag.namePattern) ? company.name : null;
+      if (!own && !gag.demo.preview) continue;
+      const name = own ?? gag.demo.company;
+      const before = s.gags?.[key]?.company === name ? s.gags[key] : undefined;
+      const episode = (before?.episodes ?? 0) + 1;
+      const built = buildGagSegment(
+        gag,
+        {
+          company: name,
+          founder: own ? host.nickname() : gag.demo.founder,
+          days: gag.demo.ageDays,
+          episode,
+          lastLine: before?.lastLine ?? null,
+        },
+        () => host.random(),
+      );
+      s.gags = { ...s.gags, [key]: { company: name, episodes: episode, lastLine: built.line } };
+      const segment: NewsShowSegment = {
+        kind: "gag",
+        mood: built.mood,
+        headline: built.headline,
+        text: built.text,
+        effects: [],
+      };
+      gagSegments.push({ key, segment, values: built.values });
+      segments.push(segment, gag.ord);
+    }
+
     // more topics (ADR-169): about fellow players, drawn like the server does; not the ones of the last show
     const friends = host.friendsOnline?.() ?? [];
     const candidates = demoTopicCandidates({
@@ -288,6 +323,24 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
         ...script(s, "tip", { stock: tipStock.name, move: tipUp ? cfg.tipWords.up : cfg.tipWords.down }),
         effects: [{ label: `${tipStock.ticker} ${tipUp ? "↑" : "↓"} Tipp`, tone: "neutral" }],
       });
+    }
+    // the viewers react around the gag: annoyed ones and the die-hard fans
+    for (const gag of gagSegments) {
+      const index = kept.indexOf(gag.segment);
+      if (index < 0) continue;
+      const rules = cfg.runningGags[gag.key as keyof typeof cfg.runningGags];
+      const startsAt = startedAt + (cfg.introSeconds + index * cfg.segmentSeconds) * 1000;
+      for (const line of gagChatLines(rules, gag.values, bots.names, cfg.segmentSeconds, () => host.random())) {
+        s.seq += 1;
+        s.chat.push({
+          id: s.seq,
+          nickname: line.name,
+          body: line.body,
+          at: startsAt + line.atSeconds * 1000,
+          mine: false,
+          bot: true,
+        });
+      }
     }
     return { slot, startedAt, segments: kept };
   }
@@ -349,6 +402,7 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
   const chatOf = (s: DemoNewsShowState): NewsShowChatMessage[] =>
     s.chat
       .filter((m) => m.at <= host.now())
+      .sort((a, b) => a.at - b.at)
       .map((m) => ({ ...m, at: new Date(m.at).toISOString(), bot: m.bot ?? !m.mine }));
 
   /** The player's current look; in the demo every story about a person is about the player. */

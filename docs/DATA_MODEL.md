@@ -7957,3 +7957,14 @@ bonus_kind, bonus_bps, completed_at}], server_time}`. Jede Karte in Antworten (`
 
 **Benachrichtigungen:** `nexamon_bonus`, `nexamon_set`, `nexamon_hype`. **Feed:** `nexamon_master_set`, `nexamon_hype`
 (beide auch Klatsch der NEXA Nachrichten).
+
+## Nachtrag: Running Gags in den NEXA Nachrichten (ADR-179)
+
+Migration `20261204006800_news_running_gags.sql`.
+
+- `news_running_gags` (RLS an, kein Clientzugriff): `gag_key`, `company_id` (Primärschlüssel zusammen; löscht mit
+  der Firma), `episodes` (gesendete Folgen), `last_line`, `last_show_id`, `first_at`, `last_at`.
+- Intern: `news_running_gag_company(pattern)`, `news_show_running_gags(p_now)` (Segment `gag`, aufgerufen aus
+  `news_show_build()`), `news_show_gag_chat(show, now)` (aus `news_show_after_start()`); Apply-Typ `gag` in
+  `news_show_start()` (zählt die Folge einmal je Sendung, Feed unter Firmen). `store_news_show_script()` behält
+  Gag-Segmente. Konfiguration `game_config.newsShow.runningGags`.
