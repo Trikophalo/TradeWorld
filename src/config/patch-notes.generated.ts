@@ -488,6 +488,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Stärken der Firma",
         text: "Ganz oben im Firmen-Dashboard zeigt ein Netz sechs Stärken.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-24a8f8c7",
+        title: "Kritiker für NFTs",
+        text: "Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit Stärke und Schwäche, der Markt als kleines Abzeichen).",
+      },
     ],
   },
   {

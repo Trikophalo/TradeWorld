@@ -7968,3 +7968,24 @@ Migration `20261204006800_news_running_gags.sql`.
   `news_show_build()`), `news_show_gag_chat(show, now)` (aus `news_show_after_start()`); Apply-Typ `gag` in
   `news_show_start()` (zählt die Folge einmal je Sendung, Feed unter Firmen). `store_news_show_script()` behält
   Gag-Segmente. Konfiguration `game_config.newsShow.runningGags`.
+
+## Nachtrag: Kritiker-Urteil und Sammler-Chat (ADR-181)
+
+Migrationen `20261204007000_nft_quality.sql`, `…7010_nft_quality_value.sql`, `…7020_nft_talk.sql`,
+`…7030_nft_quality_json.sql`.
+
+- `artworks`: neue Spalten `quality smallint` (0..100, null = noch nicht bewertet), `quality_detail jsonb`
+  (`sub` mit coverage, colours, harmony, contrast, structure, outline, composition, detail, shapes; `best`, `worst`,
+  `copy` = exact | near | null), `quality_sig text` (Kopie-Signatur, Index auf `md5(quality_sig)`). Gesetzt nur vom
+  Trigger `artworks_quality_ins` (nach Insert) bzw. `artworks_quality_upd` (Pixel geändert) über
+  `artwork_rate_quality(id)`; Nachbewertung in `nfts_run_due`.
+- Intern (service_role): `art_signature(pixels)`, `art_copy_kind(sig, self)`, `art_quality(pixels, copy)` (Port von
+  `artQuality`), `artwork_rate_quality(id)`, `nft_quality_factor_bps`, `nft_quality_chance_bps`,
+  `nft_quality_base_cents`, `nft_lowball_cents(value, u, quality)`, `nft_intent(text)`, `nft_line(artwork, lines, u)`,
+  `nft_say(artwork, name, path, u)`, `nft_offer_path(...)`, `nft_offer_text(artwork, name)`,
+  `nft_counter_cents(previous, value)`. Neu definiert: `nft_fair_cents`, `nft_ai_value_excluding` (Anker mit
+  Qualitätsfaktor), `nfts_run_due` (Chancen nach Qualität, Schritte 3b Antworten/Gegenangebote, 3c Erinnerungen;
+  Antwort zusätzlich `replies`, `followups`).
+- `artwork_json` (alle NFT-RPCs): neues Feld `quality` = `{score, best, worst, copy}` oder null.
+- `artwork_messages`: unverändert; Antworten der Sammler sind `kind = 'chat'` mit `ai_name`, Gegenangebote `kind =
+'offer'` (das vorige Angebot desselben Sammlers wird `closed`).
