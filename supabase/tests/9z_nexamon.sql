@@ -29,7 +29,7 @@ create or replace function tests.nx_give(p_player uuid, p_card text, p_condition
   select public.nexamon_mint_copy(p_card, p_player, null, p_condition, 'pack', null, public.game_now()) $$;
 create or replace function tests.nx_value(p_card text, p_condition text default 'mint', p_grade integer default null)
 returns bigint language sql security definer as $$
-  select public.nexamon_copy_value_cents((tests.nx(p_card)).value_e4, p_condition, p_grade) $$;
+  select public.nexamon_copy_value_cents((tests.nx(p_card)).value_e4, p_condition, p_grade::double precision, p_card) $$;
 create or replace function tests.nx_ask(p_card text, p_condition text default 'mint') returns bigint language sql security definer as $$
   select public.nexamon_ai_ask_cents(tests.nx_value(p_card, p_condition)) $$;
 create or replace function tests.nx_copy(p_copy uuid) returns public.nexamon_copies language sql security definer as $$
@@ -667,9 +667,10 @@ select tests.assert(
   :early = 0 and :done = 1
   and (tests.nx_copy(:'g1')).grade = 10 and (tests.nx_copy(:'g1')).grading_until is null
   and (tests.nx_copy(:'g1')).graded_at is not null and (tests.nx_copy(:'g1')).condition = 'mint'
-  and tests.nx_value('me-062', 'mint', 10) = :gv::bigint * 4
+  and tests.nx_value('me-062', 'mint', 10) = public.div_round_half_even((tests.nx('me-062')).value_e4::numeric * public.nexamon_grade_factor_bps(10, 'me-062'), 1000000)
+  and public.nexamon_grade_factor_bps(10, 'me-062') between 25000 and 40000
   and tests.nx_notes(:a, 'nexamon_graded') = 1,
-  'ASP needs the full hour; a mint card gets its 10 and is then worth four times the card');
+  'ASP needs the full hour; a mint card gets its 10 and is then worth 2.5 to 4 times the card (by popularity)');
 -- the player's own reads finish due gradings too (no cron needed); a poor card gets a low grade
 select tests.cash(:a) as cash_a \gset
 select tests.login_as('authenticated', :a);

@@ -30,7 +30,7 @@ begin
 end $$;
 create or replace function tests.np_value(p_card text, p_condition text default 'mint', p_grade integer default null)
 returns bigint language sql security definer as $$
-  select public.nexamon_copy_value_cents(k.value_e4, p_condition, p_grade) from public.nexamon_cards k where k.card_key = p_card $$;
+  select public.nexamon_copy_value_cents(k.value_e4, p_condition, p_grade::double precision, k.card_key) from public.nexamon_cards k where k.card_key = p_card $$;
 grant execute on all functions in schema tests to public;
 
 select card_key as common1 from public.nexamon_cards where set_key = 'mystic_energy' and rarity = 'common' order by number limit 1 \gset

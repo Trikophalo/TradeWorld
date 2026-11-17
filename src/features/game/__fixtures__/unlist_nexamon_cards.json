@@ -1,0 +1,17 @@
+{
+  "copies": [
+    {
+      "id": "2abbc5cc-e985-45ff-9d45-d204b485cfe4",
+      "grade": null,
+      "state": "raw",
+      "serial": 9,
+      "listing": null,
+      "card_key": "me-028",
+      "condition": "mint",
+      "graded_at": null,
+      "acquired_at": "2026-11-17T09:57:03.360928+00:00",
+      "value_cents": 700,
+      "grading_until": null
+    }
+  ]
+}
