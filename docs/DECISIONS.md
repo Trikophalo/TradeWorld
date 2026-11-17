@@ -3460,3 +3460,72 @@ Verlierer, Gewinner, Klatsch aus dem Feed, Firmen, NFTs, Börse, Welt und Abschw
 **Folgen:** Mehr Abwechslung pro Sendung, Sammelkarten und Steuern kommen in der Sendung vor. Die Abfrage liest
 nur und läuft einmal pro Stunde. Neue Themen brauchen nur einen Eintrag in `news-topics.ts` und, falls sie Daten
 brauchen, einen Zweig in `news_show_topics()`.
+
+## ADR-170: Kein Geld aus der eigenen Aktie, NFT-Sammler den ganzen Tag aktiv — `Annahme`
+
+Vorgaben: „Man kann Geld aus seinem Unternehmen auszahlen und dann seine eigene Aktie kaufen, um so die Aktie unendlich
+nach oben zu treiben und Geld zu machen.“ und „Die NFTs sollen mehr verkauft werden, die Bots sollen immer wieder was
+machen und nicht nur einmal am Tag.“
+
+**Wie der Trick funktionierte (nachgestellt auf der lokalen Datenbank):** Eine frisch gelistete Garagenfirma
+(Gründerin 60 %, KI-Anleger 40 % zum Mindestpreis 1 €, Kurs danach 0,40 €). Ein reines Hin und Her lohnt sich nicht:
+Entnahme von 300.000 €, Kauf von 30.000 € eigener Aktien (Kurs +10 %, nach einer Stunde +21 %), Verkauf kostet
+10.000 bis 12.000 € (ADR-126 wirkt). Das Geld kam aus der **Kapitalerhöhung**: KI-Anleger zeichneten 60 % + 40 % ×
+Qualität der neuen Aktien zu 90 % des (hochgetriebenen) Börsenkurses, mindestens 1 €, ganz gleich, was die Firma wert
+war. Eine Kapitalerhöhung um 25 % brachte so 250.000 € vom Finanzmarkt in die (leer entnommene) Firmenkasse, für
+Aktien, die an der Börse 0,45 € und nach der Erhöhung fair rund 0,20 € wert waren; die Gründerin entnahm das Geld und
+konnte von vorn beginnen. Je höher der Kurs
+getrieben war, desto mehr zahlte die KI. Dazu hob der eigene Bestand der Gründerin den Anker des Value-Fonds um bis
+zu 15 % (Halteprämie), und der Börsengang selbst (KI zahlt den Mindestpreis 1 € für eine Firma, die fast nichts wert
+ist) ließ sich sofort entnehmen.
+
+**Entscheidung (Ursache statt Symptom):**
+
+- **KI-Anleger zahlen höchstens den fairen Wert.** Bei einer Kapitalerhöhung zeichnen sie ihren üblichen Anteil nur,
+  wenn der Ausgabepreis höchstens `startups.ipo.aiMaxPremiumBps` (100 %) des fairen Werts nach der Erhöhung beträgt:
+  (Firmenwert × Reputationsfaktor + neues Geld) / Aktien danach. Darüber zeichnen sie nichts
+  (`company_share_offers.ai_factor` 1 oder 0, `issueAiFactor`, `postIssueFairCents`). Ein getriebener Kurs bringt
+  damit kein Geld mehr; Mitspieler dürfen weiter zu jedem Preis zeichnen (ihr eigenes Risiko).
+- **Eine Kapitalerhöhung höchstens alle 24 Stunden** (`capitalIncreaseCooldownHours`, Fehler
+  `capital_increase_cooldown`, NX221).
+- **Geld aus Börsengang und Kapitalerhöhung bleibt 72 Stunden in der Firma** (`issueProceedsLockHours`, Fehler
+  `issue_proceeds_locked`, NX222). Die Firma darf es ausgeben, der Gründer nicht entnehmen.
+- **Insiderregel:** Floss in den letzten 24 Stunden Geld aus der Firma an den Gründer (Entnahme, automatische
+  Auszahlung, Dividende), kann er ihre Aktie nicht kaufen (`trading.playerStocks.insiderCooldownHours`, Fehler
+  `insider_cooldown`, NX220). Verkaufen geht immer, andere Spieler kaufen wie bisher.
+- **Tagesband für Spieleraktien:** Der Kurs einer Spielerfirma bleibt je Tag höchstens 30 % über und 23 % unter dem
+  Vortagesschluss (`trading.playerStocks.dailyBandBps`, `playerStockBandE4`). Wer weiter kauft, zahlt beim Kauf den
+  vollen Aufschlag, ohne dass der Kurs folgt.
+- **Keine Halteprämie aus dem eigenen Bestand:** Die Aktien des Gründers zählen nicht mehr zur Halteprämie des
+  Value-Fonds (ADR-056), nur, was Mitspieler halten.
+- Verworfen: ein fester Spread oder asymmetrischer Impact (ADR-126 macht das Hin und Her schon teuer, das Geld kam
+  nicht von dort) und ein Kaufverbot für Gründer (eigene Aktien kaufen soll mit eigenem Geld möglich bleiben).
+
+**Ergebnis** (`supabase/tests/a9_stock_pump.sql`): Entnahme, Kauf, Kapitalerhöhung, Verkauf kostet die Gründerin
+rund 12.000 €, die KI zeichnet bei getriebenem Kurs nichts; 100.000 € Käufe in einer Stunde heben den Kurs nur bis
+zum Band (+30 %), der Rückverkauf kostet über 60.000 €; zwei Freunde, die viermal hin und her handeln, verlieren
+zusammen rund 3.000 €. Eine faire Kapitalerhöhung (Preis unter dem fairen Wert) findet weiter KI-Anleger.
+
+**NFT-Sammler (ergänzt ADR-163):** Warum sie wie „einmal am Tag“ wirkten: Ihre Angebote galten 24 Stunden, und
+höchstens drei Sammler bieten gleichzeitig auf ein NFT. Ein NFT bekam also in den ersten Minuten seine drei Angebote
+und danach bis zum nächsten Tag keines mehr. Handel unter Sammlern lief gegen die Tagesgrenze (300) und wurde mit
+der Beliebtheit immer schneller (15 → 44 je Stunde mit zwölf Sammler-NFTs, Grenze gegen Nachmittag erreicht);
+Auktionen von Spielern bekamen von der KI gar keine Gebote. Jetzt:
+
+- Ein Angebot eines Sammlers gilt `nfts.ai.offerHours` (2) Stunden, danach kommt ein neues (Angebote von Spielern
+  weiter 24 Stunden).
+- Stundengrenzen: höchstens `maxBuysPerHour` (6) Käufe von Spielern und `trade.perHour` (24) Käufe unter Sammlern je
+  Stunde, je Tag 100 und 480. Ein Festpreis bis zum Wert wird weiter mit 25 % je Minute gekauft, also binnen Minuten.
+- Sammler bieten in Auktionen (`artwork_auctions.leader_ai`, `artwork_bids.bidder_ai`): je Minute und Auktion mit
+  10 % das Mindestgebot, nur solange es höchstens ihre Bewertung ist, höchstens drei Gebote je Minute. Das Geld liegt
+  wie bei Spielern im Treuhandkonto und kommt von den Haushalten; wird ein Sammler überboten, geht es zurück. Gewinnt
+  er, gehört ihm das NFT und er bietet es mit seinem Aufschlag wieder an.
+- **Geld bleibt vernünftig:** Sammler zahlen nie mehr als ihre Bewertung (Prägekosten oder letzter Preis plus Boni),
+  und Käufe von Spielern plus ihre Führungen in Spielerauktionen bleiben unter `ai.budgetCentsPerDay` (300.000 €) je
+  Berliner Tag (`nft_ai_spent_today`).
+- Ergebnis über sechs simulierte Stunden (`supabase/tests/a9b_nft_activity.sql`): der faire Festpreis ist nach
+  Minuten verkauft, 24 Käufe unter Sammlern in jeder Stunde, 14 Angebote auf ein zu teures und ein behaltenes NFT
+  (vorher 6, alle in der ersten Stunde), Gebote in jeder Stunde; vorher 0.
+- Demo: Kapitalerhöhungen rechnen mit demselben KI-Faktor und derselben Sperre; Sammler-Angebote laufen nach zwei
+  Stunden aus, der Handel unter Sammlern hat dieselbe Stundengrenze. Insiderregel, Tagesband und Auktionsgebote der
+  Sammler gibt es nur auf dem Server (die Demo handelt die eigene Aktie nicht, ihre Auktionen haben eigene Bieter).

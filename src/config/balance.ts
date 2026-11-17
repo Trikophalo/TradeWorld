@@ -159,6 +159,13 @@ export interface TradingConfig {
     readonly maxHoldingsPremium: number;
     readonly premiumScaleDepths: number;
   };
+  /** Stocks of player companies (ADR-170). */
+  readonly playerStocks: {
+    /** The founder may not buy his own stock for this many hours after taking money out of the company. */
+    readonly insiderCooldownHours: number;
+    /** The price stays within this band around the previous close (bps up; down by the same factor). */
+    readonly dailyBandBps: number;
+  };
 }
 
 export interface CentralBankConfig {
@@ -1425,6 +1432,15 @@ export interface StartupsConfig {
     /** Capital increase: new shares at this share of the market price, at most this many % per round. */
     readonly capitalIncreaseDiscount: number;
     readonly capitalIncreaseMaxPercent: number;
+    /**
+     * AI investors pay at most the fair value (ADR-170): in a capital increase they subscribe their share only while the
+     * price is at most aiMaxPremiumBps of the fair value after the increase, (company value + new money) / shares after.
+     */
+    readonly aiMaxPremiumBps: number;
+    /** A capital increase at most once in this many hours (ADR-170). */
+    readonly capitalIncreaseCooldownHours: number;
+    /** Money raised by an IPO or capital increase cannot be withdrawn for this many hours (ADR-170). */
+    readonly issueProceedsLockHours: number;
   };
   /**
    * Founder with a job elsewhere (ADR-066): the founder's productivity in the own company counts
@@ -1744,6 +1760,8 @@ export const BALANCE = {
       maxHoldingsPremium: 0.15,
       premiumScaleDepths: 20,
     },
+    // ADR-170: no pump with money from the own company, at most +30 % / -23 % a day
+    playerStocks: { insiderCooldownHours: 24, dailyBandBps: 3_000 },
   },
 
   // ----------------------------------------------------------- centralBank (spec 5.1)
@@ -2520,6 +2538,10 @@ export const BALANCE = {
       aiPace: 3,
       capitalIncreaseDiscount: 0.9,
       capitalIncreaseMaxPercent: 25,
+      // ADR-170: no money from a pushed price; AI investors never pay more than the fair value
+      aiMaxPremiumBps: 10_000,
+      capitalIncreaseCooldownHours: 24,
+      issueProceedsLockHours: 72,
     },
     sideJobFounderFactor: 0.5,
     aiQualityPenalty: 0.3,

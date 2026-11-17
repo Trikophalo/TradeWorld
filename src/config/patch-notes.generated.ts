@@ -434,6 +434,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-1429a90b",
+        title: "Lebendigere NFT-Sammler",
+        text: "Sammler bieten alle paar Stunden neu, handeln den ganzen Tag unter sich und bieten in deinen Auktionen mit, nie über ihrer Bewertung.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-6cc34ad1",
+        title: "Kein Geld mehr aus der eigenen Aktie",
+        text: "KI-Anleger zeichnen Kapitalerhöhungen nur noch bis zum fairen Wert, Ausgabeerlöse bleiben drei Tage in der Firma, nach einer Entnahme gibt es 24…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-2257128a",
         title: "Karten umdrehen",
         text: "Beim Booster-Öffnen dreht ein Klick oder Tipp eine Karte um, Taste F oder Enter ebenso.",

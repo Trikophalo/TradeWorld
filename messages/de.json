@@ -887,7 +887,10 @@
     "board_not_shareholder": "Dafür brauchst du Aktien dieser Firma.",
     "interview_not_found": "Dieses Interview gibt es nicht.",
     "interview_text_invalid": "Die Antwort ist zu lang oder enthält Wörter, die hier nicht gehen.",
-    "interview_closed": "Das Interview ist schon vorbei."
+    "interview_closed": "Das Interview ist schon vorbei.",
+    "insider_cooldown": "Insiderregel: Nach einer Entnahme aus deiner Firma kannst du ihre Aktie 24 Stunden lang nicht kaufen.",
+    "capital_increase_cooldown": "Eine Kapitalerhöhung geht höchstens einmal am Tag.",
+    "issue_proceeds_locked": "Das Geld aus dem Börsengang oder der Kapitalerhöhung gehört drei Tage lang der Firma und kann noch nicht entnommen werden."
   },
   "locks": {
     "level": "Level {level}",

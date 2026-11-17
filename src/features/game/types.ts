@@ -2187,6 +2187,9 @@ export const GAME_ERROR_KEYS = [
   "interview_not_found",
   "interview_text_invalid",
   "interview_closed",
+  "insider_cooldown",
+  "capital_increase_cooldown",
+  "issue_proceeds_locked",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
