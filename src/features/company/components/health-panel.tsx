@@ -388,7 +388,14 @@ export function HealthRadar({
       ))}
       {!compact &&
         [0.5, 1].map((ring) => (
-          <text key={ring} x={CX + 3} y={CY - R * ring + 9} className="fill-fg-3 text-2xs" aria-hidden>
+          <text
+            key={ring}
+            x={CX - 4}
+            y={CY - R * ring + 10}
+            textAnchor="end"
+            className="fill-fg-3 text-2xs"
+            aria-hidden
+          >
             {ring * 100}
           </text>
         ))}
