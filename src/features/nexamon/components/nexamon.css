@@ -87,6 +87,51 @@
   );
 }
 
+/* Titans Revenge (ADR-182): sparks on iron, brushed titanium, diamond facets and the pulsing uranium glow. */
+.nexamon-foil-sparks {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' shape-rendering='crispEdges'%3E%3Cg fill='%23ffb347'%3E%3Crect x='4' y='6' width='1' height='1'/%3E%3Crect x='21' y='3' width='1' height='1'/%3E%3Crect x='12' y='17' width='1' height='1'/%3E%3Crect x='26' y='24' width='1' height='1'/%3E%3Crect x='7' y='26' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: calc(var(--u, 3px) * 30) calc(var(--u, 3px) * 30);
+  image-rendering: pixelated;
+}
+.nexamon-foil-brushed {
+  background-image: repeating-linear-gradient(
+    100deg,
+    rgb(60 90 130) 0%,
+    rgb(200 220 240) 1.5%,
+    rgb(110 140 175) 3%,
+    rgb(235 245 255) 4%,
+    rgb(80 110 150) 6%
+  );
+}
+.nexamon-foil-facets {
+  background-image:
+    conic-gradient(
+      from 30deg at 30% 35%,
+      rgb(255 255 255),
+      rgb(140 220 255),
+      rgb(200 160 255),
+      rgb(255 255 255),
+      rgb(140 255 230),
+      rgb(255 200 240),
+      rgb(255 255 255)
+    ),
+    conic-gradient(from 200deg at 70% 70%, rgb(140 220 255), rgb(255 255 255), rgb(200 160 255), rgb(140 220 255));
+  background-blend-mode: difference;
+}
+.nexamon-foil-uranium {
+  background-image: radial-gradient(
+    ellipse at 50% 50%,
+    rgb(125 255 58 / 0) 45%,
+    rgb(125 255 58 / 0.55) 80%,
+    rgb(210 255 160 / 0.9) 100%
+  );
+}
+.nexamon-foil-pulse {
+  position: absolute;
+  inset: 0;
+  animation: nexamon-glow-pulse 1.6s var(--ease-in-out) infinite alternate;
+}
+
 .nexamon-foil-gold {
   background-image: repeating-linear-gradient(
     112deg,

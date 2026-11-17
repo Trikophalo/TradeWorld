@@ -1,7 +1,7 @@
 /*
  * Nexamon collectible cards (ADR-165): booster packs, pull rates, card conditions, grading by "ASP", the card
  * market with AI sellers and the supply and demand model behind every card's market value.
- * The catalogue (321 cards in four sets) lives in src/config/nexamon; `pnpm db:config` writes key, set, number,
+ * The catalogue (461 cards in six sets) lives in src/config/nexamon; `pnpm db:config` writes key, set, number,
  * rarity and start price of every card to game_config.nexamon_cards, the rules below to game_config.nexamon.
  * The formulas are in src/lib/sim/nexamon.ts and, as the same rule in PL/pgSQL, in
  * supabase/migrations/20261204005200_nexamon.sql.
@@ -17,6 +17,8 @@ export const NEXAMON_RULES = {
     super_apex: { name: "Nexamon: Super Apex", packPriceCents: 100_000 },
     prismatic_peak: { name: "Nexamon: Prismatic Peak", packPriceCents: 1_000_000 },
     cosmic_winds: { name: "Nexamon: Cosmic Winds", packPriceCents: 500_000 },
+    titans_revenge: { name: "Nexamon: Titans Revenge", packPriceCents: 10_000_000 },
+    yin_yang: { name: "Nexamon: Yin Yang", packPriceCents: 200_000 },
   },
   packs: {
     /** At most this many packs per player and minute. */
@@ -44,13 +46,37 @@ export const NEXAMON_RULES = {
    */
   oneOfOne: { slot: 5, packs: 5_000 },
   /**
+   * A set's own slot table (ADR-182), same shape as `odds`, used instead of it. Yin Yang: every chance from ultra
+   * upwards x 0.9 (YINYANG_CHASE_PULL_FACTOR), in parts of 36 000 so it stays exact; what is freed goes to the rare
+   * (slot 4: ultra 1 350 instead of 1 500, rare 9 150; slot 5: legendary 36, prisma 405, ultra 1 350, rare 9 199).
+   * The commons stay as they are.
+   */
+  setOdds: {
+    yin_yang: {
+      denominator: 36_000,
+      slot4: { legendary: 0, prisma: 0, ultra: 1_350, rare: 9_150 },
+      slot5: { legendary: 36, prisma: 405, ultra: 1_350, rare: 9_199 },
+    },
+  } as Readonly<Record<string, NexamonOddsTable>>,
+  /**
    * Pack composition per set (ADR-174). A set without an entry uses `odds` (slots 1-3 common, slots 4 and 5 roll)
    * and `oneOfOne`. A set with an entry of kind "tiers" fills its pack like this: every tier, best first, appears in
    * a pack with the chance 1 / `packs`; then it holds `min` to `max` cards (uniform), filled from the last slot
    * backwards into the slots still free. Every slot left holds the `base` rarity (never twice the same card).
-   * Example (Titans Revenge, ADR-175): base "iron", tiers uranium 1/500 (1), diamond 1/50 (1), titanium 1/5 (1-2).
+   * Titans Revenge (ADR-182): base "iron", tiers uranium 1/500 (1), diamond 1/50 (1), titanium 1/5 (1-2), so every
+   * pack holds 3 to 5 iron cards. Expected value about 90 % of the pack price (docs/BALANCING.md).
    */
-  packRules: {} as Readonly<Record<string, NexamonTierPackRule>>,
+  packRules: {
+    titans_revenge: {
+      kind: "tiers",
+      base: "iron",
+      tiers: [
+        { rarity: "uranium", packs: 500, min: 1, max: 1 },
+        { rarity: "diamond", packs: 50, min: 1, max: 1 },
+        { rarity: "titanium", packs: 5, min: 1, max: 2 },
+      ],
+    },
+  } as Readonly<Record<string, NexamonTierPackRule>>,
   /**
    * Condition of a pulled card, worst first. Cards worse than "good" are very rare. A raw copy is worth its card's
    * market value x `valueBps` of its condition: poor 70 %, good 90 %, near mint and mint 100 %.
@@ -157,9 +183,31 @@ export const NEXAMON_RULES = {
      * rarityBps + scarceBonusBps x popRef / (popRef + population), at most 10 000.
      */
     popularity: {
-      rarityBps: { common: 500, rare: 1_500, ultra: 4_000, prisma: 7_000, legendary: 9_000, one_of_one: 10_000 },
+      rarityBps: {
+        common: 500,
+        rare: 1_500,
+        ultra: 4_000,
+        prisma: 7_000,
+        legendary: 9_000,
+        one_of_one: 10_000,
+        iron: 800,
+        titanium: 4_000,
+        diamond: 7_000,
+        uranium: 9_500,
+      },
       scarceBonusBps: 3_000,
-      popRef: { common: 2_000, rare: 800, ultra: 150, prisma: 30, legendary: 4, one_of_one: 1 },
+      popRef: {
+        common: 2_000,
+        rare: 800,
+        ultra: 150,
+        prisma: 30,
+        legendary: 4,
+        one_of_one: 1,
+        iron: 1_500,
+        titanium: 150,
+        diamond: 30,
+        uranium: 4,
+      },
     },
     /**
      * Supply against demand, once per `everyMinutes` and card.
@@ -174,7 +222,18 @@ export const NEXAMON_RULES = {
       everyMinutes: 60,
       upStepBps: 30,
       downStepBps: 30,
-      want: { common: 4, rare: 3, ultra: 2, prisma: 1, legendary: 1, one_of_one: 1 },
+      want: {
+        common: 4,
+        rare: 3,
+        ultra: 2,
+        prisma: 1,
+        legendary: 1,
+        one_of_one: 1,
+        iron: 4,
+        titanium: 2,
+        diamond: 1,
+        uranium: 1,
+      },
       buyWeightMilli: 500,
       buyDays: 7,
       maxBuys: 10,
@@ -192,15 +251,48 @@ export const NEXAMON_RULES = {
     sellers: ["Karten-Kalle", "Booster-Berta", "Holo-Hanna", "Sammel-Sven"],
     /** The AI always offers a copy 10 % above what it is worth. */
     askBps: 11_000,
-    /** Copies of every card the AI owns at the start; of the prismas only the `seedPrismaCards` cheapest per set. */
-    seedCopies: { common: 6, rare: 4, ultra: 2, prisma: 1, legendary: 0, one_of_one: 0 },
+    /**
+     * Copies of every card the AI owns at the start; of the prismas only the `seedPrismaCards` cheapest per set.
+     * Titans Revenge (ADR-182): iron and titanium like common and ultra, no diamond (the AI gets one only from its own
+     * packs, about 1 in 50, and offers it once), never uranium (`excludedRarities`).
+     */
+    seedCopies: {
+      common: 6,
+      rare: 4,
+      ultra: 2,
+      prisma: 1,
+      legendary: 0,
+      one_of_one: 0,
+      iron: 6,
+      titanium: 2,
+      diamond: 0,
+      uranium: 0,
+    },
     seedPrismaCards: 2,
     /** Copies of a card the AI offers at once; the rest of its stock waits. */
-    listedPerCard: { common: 4, rare: 3, ultra: 2, prisma: 1, legendary: 0, one_of_one: 0 },
+    listedPerCard: {
+      common: 4,
+      rare: 3,
+      ultra: 2,
+      prisma: 1,
+      legendary: 0,
+      one_of_one: 0,
+      iron: 4,
+      titanium: 2,
+      diamond: 1,
+      uranium: 0,
+    },
     /** Per value run (hour) and legendary card the AI holds: chance that one copy goes on sale. */
     legendaryListChanceBps: 20,
     /** The AI opens packs too, so populations level out; its pulls go into its stock. */
-    packsPerHour: { mystic_energy: 4, super_apex: 2, prismatic_peak: 1, cosmic_winds: 1 },
+    packsPerHour: {
+      mystic_energy: 4,
+      super_apex: 2,
+      prismatic_peak: 1,
+      cosmic_winds: 1,
+      titans_revenge: 1,
+      yin_yang: 2,
+    },
     maxPacksPerRun: 5,
     /**
      * AI collectors buy players' listings (ADR-165). At or below the copy's value they always buy, on the next run of
@@ -219,22 +311,45 @@ export const NEXAMON_RULES = {
      * of the value and the card had fewer than this many such counted AI buys in `buyWindowDays`; else it still
      * sells, without moving the value.
      */
-    buysPerCardWindow: { common: 6, rare: 6, ultra: 4, prisma: 3, legendary: 2, one_of_one: 0 },
+    buysPerCardWindow: {
+      common: 6,
+      rare: 6,
+      ultra: 4,
+      prisma: 3,
+      legendary: 2,
+      one_of_one: 0,
+      iron: 6,
+      titanium: 4,
+      diamond: 2,
+      uranium: 0,
+    },
     buyWindowDays: 1,
     maxBuysPerRun: 100,
     /** Budget per set and Berlin day: this many pack prices. */
     dailyBudgetPacks: 300,
     /**
-     * Rarities the AI never pulls, holds or buys (ADR-174): One of Ones change hands only between players.
+     * Rarities the AI never pulls, holds or buys (ADR-174): One of Ones change hands only between players, and so do
+     * the uranium cards of Titans Revenge (ADR-182; an AI pack that rolls uranium gets iron in that slot).
      */
-    excludedRarities: ["one_of_one"],
+    excludedRarities: ["one_of_one", "uranium"],
     /**
      * The AI's offers do not pile up (ADR-174): every `listingResetHours` all AI listings go, the AI's stock of a card
      * above `stockCap` is retired (newest first; the population still counts it) and it lists its normal amounts
      * again at the current value.
      */
     listingResetHours: 6,
-    stockCap: { common: 12, rare: 8, ultra: 4, prisma: 2, legendary: 1, one_of_one: 0 },
+    stockCap: {
+      common: 12,
+      rare: 8,
+      ultra: 4,
+      prisma: 2,
+      legendary: 1,
+      one_of_one: 0,
+      iron: 12,
+      titanium: 4,
+      diamond: 1,
+      uranium: 0,
+    },
   },
   /**
    * Bulk (ADR-174): raw copies of the bulk rarities (`rarities`, or per set `setRarities[set]`, e.g. Titans Revenge's
@@ -244,7 +359,7 @@ export const NEXAMON_RULES = {
    */
   quickSell: {
     rarities: ["common", "rare"],
-    setRarities: {} as Readonly<Record<string, readonly string[]>>,
+    setRarities: { titans_revenge: ["iron"] } as Readonly<Record<string, readonly string[]>>,
     bps: 6_500,
     maxPerCall: 500,
     callsPerMinute: 10,
@@ -254,7 +369,7 @@ export const NEXAMON_RULES = {
    * Pulling a card of these rarities is news for the friends (feed kind nexamon_pull). A Black Label always is
    * (feed kind nexamon_black_label).
    */
-  feedRarities: ["legendary"],
+  feedRarities: ["legendary", "uranium"],
   /**
    * Who is on the Collectibles tab (ADR-172): the page asks every `pingSeconds`; a player counts as there for
    * `presenceSeconds` after the last ask. At most `maxPlayers` figures are shown.
@@ -319,10 +434,29 @@ export const NEXAMON_RULES = {
       // stars and void: knowledge from far away, so plain XP (ADR-174)
       cosmic: "xp",
     },
-    rarities: ["ultra", "prisma", "legendary", "one_of_one"],
+    /** Titans Revenge (ADR-182): titanium like an ultra, diamond like a prisma, uranium like a legendary. */
+    rarities: ["ultra", "prisma", "legendary", "one_of_one", "titanium", "diamond", "uranium"],
     extraNumbers: [60],
-    rarityBps: { common: 25, rare: 50, ultra: 50, prisma: 100, legendary: 250, one_of_one: 500 },
-    setBps: { mystic_energy: 10_000, super_apex: 12_500, prismatic_peak: 15_000, cosmic_winds: 15_000 },
+    rarityBps: {
+      common: 25,
+      rare: 50,
+      ultra: 50,
+      prisma: 100,
+      legendary: 250,
+      one_of_one: 500,
+      iron: 25,
+      titanium: 50,
+      diamond: 100,
+      uranium: 250,
+    },
+    setBps: {
+      mystic_energy: 10_000,
+      super_apex: 12_500,
+      prismatic_peak: 15_000,
+      cosmic_winds: 15_000,
+      titans_revenge: 17_500,
+      yin_yang: 15_000,
+    },
     slab: { minGrade: 9, gradeBps: 15_000, blackLabelBps: 20_000 },
     /** Hard cap per kind in bps (xp 10 %, mission and trade XP 15 %, wage 10 %, vault 15 %, daily 20 %, company 10 %). */
     caps: { xp: 1_000, mission_xp: 1_500, trade_xp: 1_500, wage: 1_000, vault: 1_500, daily: 2_000, company: 1_000 },
@@ -340,7 +474,8 @@ export const NEXAMON_RULES = {
       complete: { kind: "xp", bps: 200, rewardPacks: 20, rewardXp: 2_500 },
       master: { bps: 100, rewardPacks: 75, rewardXp: 10_000 },
       masterMinGrade: 9,
-      masterRarities: ["prisma", "legendary"],
+      /** Titans Revenge (ADR-182): its diamonds and uranium cards as slabs. */
+      masterRarities: ["prisma", "legendary", "diamond", "uranium"],
       /** Cards of these rarities count for no collection (ADR-174): nobody can be asked to own a One of One. */
       excludeRarities: ["one_of_one"],
     },
@@ -353,7 +488,18 @@ export const NEXAMON_RULES = {
    * decayBps of what it lies above the base (half-life about 69 hours). A jump of bigJumpBps or more is news.
    */
   blackLabelHype: {
-    rarityChanceBps: { common: 5, rare: 10, ultra: 25, prisma: 60, legendary: 120, one_of_one: 200 },
+    rarityChanceBps: {
+      common: 5,
+      rare: 10,
+      ultra: 25,
+      prisma: 60,
+      legendary: 120,
+      one_of_one: 200,
+      iron: 5,
+      titanium: 25,
+      diamond: 60,
+      uranium: 150,
+    },
     blRef: 3,
     minJumpBps: 1_000,
     maxJumpBps: 6_000,
@@ -366,6 +512,12 @@ export const NEXAMON_RULES = {
 } as const;
 
 export type NexamonRules = typeof NEXAMON_RULES;
+/** A slot table (see `odds` and `setOdds`). */
+export interface NexamonOddsTable {
+  denominator: number;
+  slot4: { legendary: number; prisma: number; ultra: number; rare: number };
+  slot5: { legendary: number; prisma: number; ultra: number; rare: number };
+}
 /** A set's own pack composition (see `packRules`). Rarity names are those of src/config/nexamon/types.ts. */
 export interface NexamonTierPackRule {
   kind: "tiers";

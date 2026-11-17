@@ -18,14 +18,20 @@ import {
   type Raster,
 } from "./nexamon-raster";
 import {
+  DIAMOND_INK,
   GOLD_INK,
+  IRON_INK,
   ONE_OF_ONE_INK,
   PRISM_INKS,
   rarityMark,
   setSymbol,
+  TITANIUM_INK,
   TYPE_INK,
   TYPE_SYMBOL,
   typeGlyph,
+  URANIUM_INK,
+  YIN_YANG_INK,
+  type TypeInk,
 } from "./nexamon-symbols";
 
 /*
@@ -121,7 +127,50 @@ export const FACE_LAYOUT: Record<NexamonRarity, FaceLayout> = {
   prisma: FULL,
   legendary: FULL,
   one_of_one: FULL,
+  iron: CLASSIC,
+  titanium: BREAKOUT,
+  diamond: FULL,
+  uranium: FULL,
 };
+
+/** The plate of a warrior card (ADR-182) where the component writes "KRIEGER", by layout. */
+export const WARRIOR_LABEL: Record<FaceLayoutKind, Box> = {
+  classic: { x: 7, y: 15, w: 23, h: 5 },
+  breakout: { x: 4, y: 50, w: 23, h: 5 },
+  full: { x: 5, y: 15, w: 23, h: 5 },
+};
+
+/** Yin (black) or Yang (white): the two legendaries of Yin Yang share a frame in opposite inks (ADR-182). */
+export function yinYangSide(card: { set: string; rarity: string; number?: number }): "yin" | "yang" | null {
+  if (card.set !== "yin_yang" || card.rarity !== "legendary") return null;
+  return card.number === 110 ? "yang" : "yin";
+}
+
+const IRON_FRAME: TypeInk = {
+  deep: IRON_INK.deep,
+  dark: IRON_INK.dark,
+  base: IRON_INK.base,
+  light: IRON_INK.light,
+  pale: IRON_INK.rivet,
+  paper: IRON_INK.paper,
+  paperShade: IRON_INK.paperShade,
+};
+const TITANIUM_FRAME: TypeInk = {
+  deep: TITANIUM_INK.deep,
+  dark: TITANIUM_INK.dark,
+  base: TITANIUM_INK.base,
+  light: TITANIUM_INK.light,
+  pale: TITANIUM_INK.pale,
+  paper: TITANIUM_INK.paper,
+  paperShade: TITANIUM_INK.paperShade,
+};
+
+/** The inks of a framed card: the type's, or the metal of an iron or titanium card (ADR-182). */
+export function frameInk(card: Pick<NexamonCard, "type" | "rarity">): TypeInk {
+  if (card.rarity === "iron") return IRON_FRAME;
+  if (card.rarity === "titanium") return TITANIUM_FRAME;
+  return TYPE_INK[card.type];
+}
 
 /** The "ONE OF ONE" band across the middle of a One of One (ADR-174), and the serial "1/1" in it. */
 export const ONE_OF_ONE_BAND: Box = { x: 0, y: 38, w: 72, h: 19 };
@@ -190,7 +239,7 @@ function drawFooterMarks(r: Raster, layout: FaceLayout, card: Pick<NexamonCard, 
   blitGrid(r, mark.grid, mark.palette, layout.rarity.x, layout.rarity.y);
 }
 
-type FaceCard = Pick<NexamonCard, "type" | "rarity" | "set" | "kind">;
+type FaceCard = Pick<NexamonCard, "type" | "rarity" | "set" | "kind"> & { number?: number };
 
 /** A sprinkle of stars over a box (event frames), always the same. */
 function starDust(r: Raster, box: Box, hex: string, every: number): void {
@@ -198,10 +247,38 @@ function starDust(r: Raster, box: Box, hex: string, every: number): void {
     for (let x = box.x; x < box.x + box.w; x++) if ((x * 17 + y * 31 + x * y) % every === 0) setPixel(r, x, y, hex);
 }
 
+/** Iron (ADR-182): rust eats into the plate, rivets run down both sides, a few sparks fly off the corners. */
+function drawIronWear(r: Raster): void {
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const n = Math.sin(x * 0.7 + y * 0.31) + Math.sin(x * 0.23 - y * 0.9) + Math.sin((x + y) * 0.17);
+      if (n > 1.5) setPixel(r, x, y, n > 2.1 ? IRON_INK.rustLight : IRON_INK.rust, bayer(x, y) < 0.6 ? 1 : 0.6);
+    }
+}
+
+function drawIronRivets(r: Raster): void {
+  for (let y = 16; y < 92; y += 8)
+    for (const x of [1, W - 3]) {
+      setPixel(r, x, y, IRON_INK.rivet);
+      setPixel(r, x + 1, y, IRON_INK.light);
+      setPixel(r, x, y + 1, IRON_INK.light);
+      setPixel(r, x + 1, y + 1, IRON_INK.deep);
+    }
+  for (const [x, y] of [
+    [4, 13],
+    [3, 11],
+    [67, 55],
+    [69, 57],
+    [66, 13],
+  ] as const)
+    setPixel(r, x, y, IRON_INK.spark);
+}
+
 function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout): Raster {
   const r = createRaster(W, H);
-  const ink = TYPE_INK[card.type];
-  const ultra = card.rarity === "ultra";
+  const ink = frameInk(card);
+  const iron = card.rarity === "iron";
+  const ultra = card.rarity === "ultra" || card.rarity === "titanium";
   const event = card.kind === "event";
 
   // Frame: a dithered run from light to shadow; the ultra frame is brushed metal with diagonal bands.
@@ -220,8 +297,10 @@ function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: Face
     starDust(r, { x: 0, y: 0, w: W, h: H }, ink.pale, 23);
   } else {
     ditherRect(r, 0, 0, W, H, [mixHex(ink.base, ink.light, 0.45), ink.base, ink.base, mixHex(ink.base, ink.dark, 0.6)]);
+    if (iron) drawIronWear(r);
   }
   bevelRect(r, 1, 1, W - 2, H - 2, ultra ? "#ffffff" : event ? ink.light : ink.light, ink.dark);
+  if (card.rarity === "titanium") strokeRect(r, 2, 2, W - 4, H - 4, TITANIUM_INK.blue, 0.7);
 
   // Name bar.
   const headTop = 2;
@@ -232,8 +311,17 @@ function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: Face
   // Art window: ink line, a bright line, then the picture.
   const win = CLASSIC.window;
   strokeRect(r, win.x - 2, win.y - 2, win.w + 4, win.h + 4, ink.deep);
-  const ring = card.rarity === "common" ? ink.pale : GOLD_INK.light;
-  bevelRect(r, win.x - 1, win.y - 1, win.w + 2, win.h + 2, ring, card.rarity === "common" ? ink.light : GOLD_INK.base);
+  const plain = card.rarity === "common" || iron;
+  const ring = iron ? IRON_INK.rustLight : plain ? ink.pale : GOLD_INK.light;
+  bevelRect(
+    r,
+    win.x - 1,
+    win.y - 1,
+    win.w + 2,
+    win.h + 2,
+    ring,
+    iron ? IRON_INK.rust : plain ? ink.light : GOLD_INK.base,
+  );
   ditherRect(r, win.x, win.y, win.w, win.h, [ink.pale, ink.light, ink.base, ink.dark]);
 
   // The line under the art, then the paper with the attack, the flavour box and the footer.
@@ -255,6 +343,8 @@ function composeFramed(card: FaceCard, art: NexamonArt | undefined, layout: Face
   }
 
   if (event) drawEventMarks(r, layout, ink.deep, ink.pale);
+  if (card.kind === "warrior") drawWarriorPlate(r, WARRIOR_LABEL[layout.kind], ink.deep, ink.pale);
+  if (iron) drawIronRivets(r);
   const symbol = TYPE_SYMBOL[card.type];
   blitGrid(r, symbol.grid, symbol.palette, layout.type.x, layout.type.y);
   blitGrid(r, symbol.grid, symbol.palette, layout.attackSymbol.x, layout.attackSymbol.y);
@@ -277,13 +367,164 @@ function drawEventMarks(r: Raster, layout: FaceLayout, deep: string, pale: strin
     setPixel(r, x, Math.round(layout.attackName.y + layout.attackName.h), deep, 0.5);
 }
 
+/** The "KRIEGER" plate of a warrior card (ADR-182): dark with a light rim and a red seal dot. */
+function drawWarriorPlate(r: Raster, box: Box, deep: string, pale: string): void {
+  fillRect(r, box.x, box.y, box.w, box.h, deep, 0.9);
+  strokeRect(r, box.x, box.y, box.w, box.h, pale, 0.8);
+  fillRect(r, box.x + box.w - 3, box.y + 1, 2, box.h - 2, YIN_YANG_INK.seal);
+}
+
 /** Corner ornament of the legendary frame, drawn for the top left corner and mirrored for the others. */
 const GOLD_CORNER = ["lllllll", "lbbbbd.", "lbldd..", "lbdl...", "lbd.l..", "ld.....", "l......"] as const;
+
+/**
+ * Diamond (ADR-182): full art in a crystal frame. The border is cut into facets in ice white and blue with a
+ * prismatic pixel on every few, the plates are a clear deep blue, and four-point sparkles sit in the corners.
+ */
+function composeDiamond(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout): Raster {
+  const r = createRaster(W, H);
+  const d = DIAMOND_INK;
+  drawArt(r, layout, card, art);
+  for (const plate of FULL_PLATES) {
+    fillRect(r, plate.x, plate.y, plate.w, plate.h, d.plate, 0.66);
+    fillRect(r, plate.x, plate.y, plate.w, 1, d.light);
+    fillRect(r, plate.x, plate.y + plate.h - 1, plate.w, 1, d.base, 0.6);
+  }
+  const facets = [d.pale, d.light, d.base, d.light, d.dark, d.light];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const edge = Math.min(x, y, W - 1 - x, H - 1 - y);
+      if (edge > 3) continue;
+      const cell = Math.floor((x + y) / 5) + Math.floor((x - y + 200) / 5);
+      const hex = (x * 3 + y * 5) % 23 === 0 ? PRISM_INKS[cell % PRISM_INKS.length]! : facets[cell % facets.length]!;
+      setPixel(r, x, y, edge === 0 ? d.deep : hex);
+    }
+  strokeRect(r, 4, 4, W - 8, H - 8, d.pale, 0.7);
+  for (const [cx, cy] of [
+    [6, 6],
+    [W - 7, 6],
+    [6, H - 7],
+    [W - 7, H - 7],
+  ] as const) {
+    setPixel(r, cx, cy, "#ffffff");
+    for (const k of [1, 2])
+      for (const [dx, dy] of [
+        [k, 0],
+        [-k, 0],
+        [0, k],
+        [0, -k],
+      ] as const)
+        setPixel(r, cx + dx, cy + dy, k === 1 ? d.pale : d.light, k === 1 ? 1 : 0.7);
+  }
+  if (card.kind === "warrior") drawWarriorPlate(r, WARRIOR_LABEL.full, d.plate, d.light);
+  const symbol = TYPE_SYMBOL[card.type];
+  blitGrid(r, symbol.grid, symbol.palette, layout.type.x, layout.type.y);
+  blitGrid(r, symbol.grid, symbol.palette, layout.attackSymbol.x, layout.attackSymbol.y);
+  drawFooterMarks(r, layout, card, d.pale);
+  roundCorners(r, 3);
+  outlineEdge(r, d.deep);
+  return r;
+}
+
+/**
+ * Uranium (ADR-182): the artwork is a giant glowing eye, so the frame steps back. A thin black edge, then a
+ * radioactive green glow that bleeds a few pixels into the picture; only the name and footer get a solid plate,
+ * attack and flavour float on a light veil so the eye stays the centre.
+ */
+function composeUranium(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout): Raster {
+  const r = createRaster(W, H);
+  const u = URANIUM_INK;
+  drawArt(r, layout, card, art);
+  for (const [i, plate] of FULL_PLATES.entries()) {
+    const solid = i === 0 || i === 3;
+    fillRect(r, plate.x, plate.y, plate.w, plate.h, u.black, solid ? 0.78 : 0.42);
+    fillRect(r, plate.x, plate.y, plate.w, 1, u.glow, solid ? 0.9 : 0.5);
+  }
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const edge = Math.min(x, y, W - 1 - x, H - 1 - y);
+      if (edge < 2) setPixel(r, x, y, u.black);
+      else if (edge === 2) setPixel(r, x, y, u.pale);
+      else if (edge === 3) setPixel(r, x, y, u.glow);
+      else if (edge < 8 && bayer(x, y) < (8 - edge) / 6) setPixel(r, x, y, u.base, 0.55 - (edge - 4) * 0.1);
+    }
+  // hazard marks in the corners: a black square with a glowing dot
+  for (const [cx, cy] of [
+    [4, 4],
+    [W - 7, 4],
+    [4, H - 7],
+    [W - 7, H - 7],
+  ] as const) {
+    fillRect(r, cx, cy, 3, 3, u.black);
+    setPixel(r, cx + 1, cy + 1, u.glow);
+  }
+  const symbol = TYPE_SYMBOL[card.type];
+  blitGrid(r, symbol.grid, symbol.palette, layout.type.x, layout.type.y);
+  blitGrid(r, symbol.grid, symbol.palette, layout.attackSymbol.x, layout.attackSymbol.y);
+  drawFooterMarks(r, layout, card, u.glow);
+  roundCorners(r, 3);
+  outlineEdge(r, u.black);
+  return r;
+}
+
+/**
+ * Yin and Yang (ADR-182): the two legendaries of Yin Yang wear the legendary frame in ink instead of gold. Yin is
+ * black with silver lines and white corner dots, Yang its negative: white with grey lines and black dots. Side by
+ * side the corners mirror each other; both carry the red seal of the pack in the upper right.
+ */
+function composeYinYang(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout, side: "yin" | "yang"): Raster {
+  const r = createRaster(W, H);
+  const y = YIN_YANG_INK;
+  const yin = side === "yin";
+  const main = yin ? y.black : y.paper;
+  const line = yin ? y.silver : y.grey;
+  const dot = yin ? y.white : y.black;
+  drawArt(r, layout, card, art);
+  for (const plate of FULL_PLATES) {
+    fillRect(r, plate.x, plate.y, plate.w, plate.h, main, 0.8);
+    strokeRect(r, plate.x, plate.y, plate.w, plate.h, line);
+    for (const [cx, cy] of [
+      [plate.x, plate.y],
+      [plate.x + plate.w - 1, plate.y],
+      [plate.x, plate.y + plate.h - 1],
+      [plate.x + plate.w - 1, plate.y + plate.h - 1],
+    ] as const)
+      setPixel(r, cx, cy, dot);
+  }
+  strokeRect(r, 0, 0, W, H, y.black);
+  for (let i = 1; i <= 2; i++) strokeRect(r, i, i, W - 2 * i, H - 2 * i, main);
+  strokeRect(r, 3, 3, W - 6, H - 6, line, 0.9);
+  // a yin-yang dot pair in every corner: the own colour's dot holds the other colour's eye
+  for (const [cx, cy] of [
+    [4, 4],
+    [W - 8, 4],
+    [4, H - 8],
+    [W - 8, H - 8],
+  ] as const) {
+    fillRect(r, cx + 1, cy, 2, 4, dot);
+    fillRect(r, cx, cy + 1, 4, 2, dot);
+    setPixel(r, cx + 1, cy + 1, main);
+  }
+  fillRect(r, W - 13, 1, 4, 3, y.seal);
+  setPixel(r, W - 12, 2, y.paper);
+  if (card.kind === "warrior") drawWarriorPlate(r, WARRIOR_LABEL.full, main, line);
+  const symbol = TYPE_SYMBOL[card.type];
+  blitGrid(r, symbol.grid, symbol.palette, layout.type.x, layout.type.y);
+  blitGrid(r, symbol.grid, symbol.palette, layout.attackSymbol.x, layout.attackSymbol.y);
+  drawFooterMarks(r, layout, card, yin ? y.silver : y.black);
+  roundCorners(r, 3);
+  outlineEdge(r, y.black);
+  return r;
+}
 
 function composeFull(card: FaceCard, art: NexamonArt | undefined, layout: FaceLayout): Raster {
   const r = createRaster(W, H);
   const ink = TYPE_INK[card.type];
   if (card.rarity === "one_of_one") return composeOneOfOne(card, art, layout);
+  if (card.rarity === "diamond") return composeDiamond(card, art, layout);
+  if (card.rarity === "uranium") return composeUranium(card, art, layout);
+  const side = yinYangSide(card);
+  if (side) return composeYinYang(card, art, layout, side);
   const gold = card.rarity === "legendary";
   drawArt(r, layout, card, art);
 
@@ -336,6 +577,7 @@ function composeFull(card: FaceCard, art: NexamonArt | undefined, layout: FaceLa
     strokeRect(r, 2, 2, W - 4, H - 4, "#ffffff", 0.55);
   }
 
+  if (card.kind === "warrior") drawWarriorPlate(r, WARRIOR_LABEL.full, gold ? GOLD_INK.plate : ink.deep, "#ffffff");
   const symbol = TYPE_SYMBOL[card.type];
   blitGrid(r, symbol.grid, symbol.palette, layout.type.x, layout.type.y);
   blitGrid(r, symbol.grid, symbol.palette, layout.attackSymbol.x, layout.attackSymbol.y);

@@ -8780,7 +8780,11 @@
       "ultra": "Ultra Rare",
       "prisma": "Prisma Illustration Rare",
       "legendary": "Legendary Illustration Rare",
-      "one_of_one": "One of One"
+      "one_of_one": "One of One",
+      "iron": "Iron",
+      "titanium": "Titanium",
+      "diamond": "Diamond",
+      "uranium": "Uranium"
     },
     "rarityShort": {
       "common": "Common",
@@ -8788,7 +8792,11 @@
       "ultra": "Ultra",
       "prisma": "Prisma",
       "legendary": "Legendary",
-      "one_of_one": "1 of 1"
+      "one_of_one": "1 of 1",
+      "iron": "Iron",
+      "titanium": "Titanium",
+      "diamond": "Diamond",
+      "uranium": "Uranium"
     },
     "condition": {
       "poor": "Poor",
@@ -8800,7 +8808,9 @@
       "mystic_energy": "Mystic Energy",
       "super_apex": "Super Apex",
       "prismatic_peak": "Prismatic Peak",
-      "cosmic_winds": "Cosmic Winds"
+      "cosmic_winds": "Cosmic Winds",
+      "titans_revenge": "Titans Revenge",
+      "yin_yang": "Yin Yang"
     },
     "grade": {
       "blackLabel": "Black Label",
@@ -8840,7 +8850,9 @@
     "eventLabel": "{name}, Ereigniskarte, {rarity}",
     "oneOfOne": "One of One",
     "oneOfOneSerial": "1/1",
-    "eventLine": "Ereignis · {type}"
+    "eventLine": "Ereignis · {type}",
+    "warrior": "Krieger",
+    "warriorLabel": "{name}, Krieger, {type}, {hp} KP, {rarity}"
   },
   "nexamon": {
     "title": "Collectibles",
@@ -8917,7 +8929,7 @@
     },
     "odds": {
       "title": "Ziehungsraten",
-      "intro": "Jedes Booster hat {count} Karten. Die ersten {sure} sind immer Commons, die letzten beiden werden gewürfelt. Die Raten gelten für alle Sets.",
+      "intro": "Jedes Booster hat {count} Karten. Die ersten {sure} sind immer Commons, die letzten beiden werden gewürfelt. Die Raten gelten für die klassischen Sets; Titans Revenge und Yin Yang haben eigene (unten).",
       "rarity": "Seltenheit",
       "slot": "Platz {slot}",
       "average": "Im Schnitt",
@@ -8928,6 +8940,8 @@
       "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld.",
       "cardsInSets": "{count} je Set, {cosmic} in Cosmic Winds",
       "oneOfOne": "1 in {count} Packs, jede Karte nur einmal",
+      "titansNote": "Titans Revenge füllt seine Booster anders: Jedes hat Iron-Karten. Titanium kommt in 1 von {titanium} Boostern (1 bis 2 Karten), Diamond in 1 von {diamond}, Uranium in 1 von {uranium}. Uranium zieht die KI nie und bietet sie nie an.",
+      "yinYangNote": "Yin Yang ist härter: Ab Ultra Rare ist jede Chance 10 % kleiner (Ultra auf Platz 5 {ultra}, Prisma {prisma}, Legendary {legendary}). Was frei wird, geht an die Rares.",
       "oneOfOneNote": "Nur in Cosmic Winds: Platz 5 würfelt zuerst 1 zu {count} auf eine der drei One of Ones. Jede gibt es im ganzen Spiel nur ein einziges Mal; ist sie gezogen, ist sie weg. Die KI zieht und kauft sie nie."
     },
     "contents": {
@@ -8943,6 +8957,9 @@
       "oneOfOneOpen": "noch nicht gezogen",
       "oneOfOneTaken": "gezogen von {name}",
       "oneOfOneTakenAnon": "schon gezogen",
+      "base": "In jedem Booster, im Schnitt {count}",
+      "tierOne": "1 Karte, wenn sie kommt",
+      "tierRange": "{min} bis {max} Karten, wenn sie kommen",
       "oneOfOneLeft": "{count, plural, =0 {Alle gezogen: Platz 5 würfelt wieder normal} one {Noch # im Spiel} other {Noch # im Spiel}}"
     },
     "binder": {
@@ -9902,7 +9919,9 @@
       "mystic_energy": "Mystic Energy",
       "super_apex": "Super Apex",
       "prismatic_peak": "Prismatic Peak",
-      "cosmic_winds": "Cosmic Winds"
+      "cosmic_winds": "Cosmic Winds",
+      "titans_revenge": "Titans Revenge",
+      "yin_yang": "Yin Yang"
     },
     "battle": {
       "title": "Pack Battle",

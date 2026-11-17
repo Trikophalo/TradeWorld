@@ -10,9 +10,25 @@ import {
   type NexamonArt,
   type NexamonCard,
 } from "@/config/nexamon";
-import { composeCardBack, composeCardFace, EVENT_LABEL, FACE_LAYOUT, type Box } from "@/components/pixel/nexamon-face";
+import {
+  composeCardBack,
+  composeCardFace,
+  EVENT_LABEL,
+  FACE_LAYOUT,
+  frameInk,
+  WARRIOR_LABEL,
+  yinYangSide,
+  type Box,
+} from "@/components/pixel/nexamon-face";
 import type { Raster } from "@/components/pixel/nexamon-raster";
-import { GOLD_INK, ONE_OF_ONE_INK, TYPE_INK } from "@/components/pixel/nexamon-symbols";
+import {
+  DIAMOND_INK,
+  GOLD_INK,
+  ONE_OF_ONE_INK,
+  TYPE_INK,
+  URANIUM_INK,
+  YIN_YANG_INK,
+} from "@/components/pixel/nexamon-symbols";
 import { cn } from "@/lib/utils";
 import {
   estimateNumberWidth,
@@ -41,7 +57,34 @@ function faceRaster(card: NexamonCard, art: NexamonArt | undefined): Raster {
 
 /** Inks of the text by rarity: dark on paper for framed cards, light on the plates of full-art cards. */
 function textInks(card: NexamonCard) {
-  const ink = TYPE_INK[card.type];
+  const ink = frameInk(card);
+  const side = yinYangSide(card);
+  if (side === "yin")
+    return {
+      main: YIN_YANG_INK.white,
+      soft: YIN_YANG_INK.silver,
+      strip: YIN_YANG_INK.white,
+      halo: YIN_YANG_INK.black,
+      number: YIN_YANG_INK.silver,
+    };
+  if (side === "yang")
+    return {
+      main: YIN_YANG_INK.black,
+      soft: YIN_YANG_INK.ink,
+      strip: YIN_YANG_INK.black,
+      halo: YIN_YANG_INK.paper,
+      number: YIN_YANG_INK.ink,
+    };
+  if (card.rarity === "diamond")
+    return { main: "#ffffff", soft: DIAMOND_INK.light, strip: "#ffffff", halo: DIAMOND_INK.plate, number: "#ffffff" };
+  if (card.rarity === "uranium")
+    return {
+      main: URANIUM_INK.pale,
+      soft: URANIUM_INK.glow,
+      strip: "#ffffff",
+      halo: URANIUM_INK.black,
+      number: URANIUM_INK.glow,
+    };
   if (card.rarity === "legendary")
     return {
       main: GOLD_INK.pale,
@@ -100,6 +143,7 @@ export const NexamonCardFace = memo(function NexamonCardFace({
   const type = t(`types.${card.type}`);
   const full = u >= 3;
   const event = nexamonCardKind(card) === "event";
+  const warrior = nexamonCardKind(card) === "warrior";
 
   const at = (box: Box): CSSProperties => ({
     position: "absolute",
@@ -146,9 +190,11 @@ export const NexamonCardFace = memo(function NexamonCardFace({
       aria-label={
         event
           ? t("eventLabel", { name: card.name, rarity: t(`rarity.${card.rarity}`) })
-          : t("cardLabel", { name: card.name, type, hp: card.hp, rarity: t(`rarity.${card.rarity}`) })
+          : warrior
+            ? t("warriorLabel", { name: card.name, type, hp: card.hp, rarity: t(`rarity.${card.rarity}`) })
+            : t("cardLabel", { name: card.name, type, hp: card.hp, rarity: t(`rarity.${card.rarity}`) })
       }
-      data-kind={event ? "event" : "monster"}
+      data-kind={nexamonCardKind(card)}
       data-rarity={card.rarity}
       data-card={card.key}
       className={cn("relative isolate shrink-0 select-none", className)}
@@ -220,6 +266,20 @@ export const NexamonCardFace = memo(function NexamonCardFace({
                 </span>
               )}
               <span className="nums">{card.hp}</span>
+            </p>
+          )}
+          {warrior && (
+            <p
+              data-part="warrior"
+              className="overflow-hidden pr-[0.6em] text-center font-pixel whitespace-nowrap uppercase"
+              style={{
+                ...at(WARRIOR_LABEL[layout.kind]),
+                fontSize: u * 2.4,
+                lineHeight: `${u * WARRIOR_LABEL[layout.kind].h}px`,
+                color: yinYangSide(card) === "yang" ? YIN_YANG_INK.black : "#ffffff",
+              }}
+            >
+              {t("warrior")}
             </p>
           )}
           {full && layout.strip && (

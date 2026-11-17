@@ -2,22 +2,28 @@ import { COSMIC_WINDS_ART, COSMIC_WINDS_CARDS } from "./cards-cosmic-winds";
 import { MYSTIC_ENERGY_ART, MYSTIC_ENERGY_CARDS } from "./cards-mystic-energy";
 import { PRISMATIC_PEAK_ART, PRISMATIC_PEAK_CARDS } from "./cards-prismatic-peak";
 import { SUPER_APEX_ART, SUPER_APEX_CARDS } from "./cards-super-apex";
+import { TITANS_REVENGE_ART, TITANS_REVENGE_CARDS } from "./cards-titans-revenge";
+import { YIN_YANG_ART, YIN_YANG_CARDS } from "./cards-yin-yang";
 import type { NexamonArt, NexamonCard } from "./types";
 
 export * from "./types";
 
-/** All 321 cards, set by set, in card-number order. */
+/** All 461 cards, set by set, in card-number order. */
 export const NEXAMON_CARDS: readonly NexamonCard[] = [
   ...MYSTIC_ENERGY_CARDS,
   ...SUPER_APEX_CARDS,
   ...PRISMATIC_PEAK_CARDS,
   ...COSMIC_WINDS_CARDS,
+  ...TITANS_REVENGE_CARDS,
+  ...YIN_YANG_CARDS,
 ];
 export const NEXAMON_ART: Readonly<Record<string, NexamonArt>> = {
   ...MYSTIC_ENERGY_ART,
   ...SUPER_APEX_ART,
   ...PRISMATIC_PEAK_ART,
   ...COSMIC_WINDS_ART,
+  ...TITANS_REVENGE_ART,
+  ...YIN_YANG_ART,
 };
 const BY_KEY = new Map(NEXAMON_CARDS.map((card) => [card.key, card]));
 export const nexamonCard = (key: string): NexamonCard | undefined => BY_KEY.get(key);

@@ -26,6 +26,10 @@ const SOUND: Record<NexamonRarity, SoundName> = {
   prisma: "pullPrisma",
   legendary: "pullLegendary",
   one_of_one: "pullOneOfOne",
+  iron: "cardShow",
+  titanium: "pullUltra",
+  diamond: "pullLegendary",
+  uranium: "pullUranium",
 };
 
 /**

@@ -160,6 +160,10 @@ describe("Nexamon packs (ADR-165)", () => {
       prisma: 0,
       legendary: 0,
       one_of_one: 0,
+      iron: 0,
+      titanium: 0,
+      diamond: 0,
+      uranium: 0,
     };
     const perCard = new Map<string, number>();
     const conditions: Record<string, number> = {};

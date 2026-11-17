@@ -256,25 +256,31 @@ function SetContents({
                 ? t("contents.oneOfOne", { count: formatInteger(group.odds.denominator) })
                 : group.odds.kind === "tier"
                   ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks ?? 0) })
-                  : group.odds.oneInPacks !== null
-                    ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks) })
-                    : t("odds.perPack", { count: formatDecimal(group.odds.perPack) })}
+                  : group.odds.kind === "base"
+                    ? t("contents.base", { count: formatDecimal(group.odds.perPack) })
+                    : group.odds.oneInPacks !== null
+                      ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks) })
+                      : t("odds.perPack", { count: formatDecimal(group.odds.perPack) })}
             </span>
             <span className="nums text-xs text-fg-3">
               {group.odds.kind === "one_of_one"
                 ? t("contents.oneOfOneLeft", {
                     count: group.cards.filter(({ card }) => !status.get(card.key)?.pulled).length,
                   })
-                : group.odds.kind !== "slots"
-                  ? null
-                  : group.odds.slot4 > 0
-                    ? t("contents.slots", {
-                        slot4: formatChance(chanceBps(group.odds.slot4, group.odds.denominator)),
-                        slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
-                      })
-                    : t("contents.lastSlot", {
-                        slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
-                      })}
+                : group.odds.kind === "tier"
+                  ? group.odds.max === 1
+                    ? t("contents.tierOne")
+                    : t("contents.tierRange", { min: group.odds.min ?? 1, max: group.odds.max ?? 1 })
+                  : group.odds.kind !== "slots"
+                    ? null
+                    : group.odds.slot4 > 0
+                      ? t("contents.slots", {
+                          slot4: formatChance(chanceBps(group.odds.slot4, group.odds.denominator)),
+                          slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                        })
+                      : t("contents.lastSlot", {
+                          slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                        })}
             </span>
             <span className="ml-auto nums text-xs text-fg-2" data-testid="contents-owned">
               {collection ? (

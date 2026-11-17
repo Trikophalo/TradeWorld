@@ -30,6 +30,8 @@ export const SET_TITLE: Record<NexamonSetKey, string> = {
   super_apex: "SUPER APEX",
   prismatic_peak: "PRISMATIC PEAK",
   cosmic_winds: "COSMIC WINDS",
+  titans_revenge: "TITANS REVENGE",
+  yin_yang: "YIN YANG",
 };
 
 function rng(seed: number): () => number {
@@ -204,6 +206,141 @@ function drawCosmic(r: Raster): void {
   fillRect(r, 65, 26, 2, 2, "#ffffff");
 }
 
+/**
+ * Titans Revenge (ADR-182): a slab of dark riveted armour plate. A titan's head and shoulders rise from the bottom
+ * as a black silhouette against a furnace glow, one huge ember eye burning in its face; molten cracks run through
+ * the plates and sparks drift up.
+ */
+function drawTitans(r: Raster): void {
+  const ink = SET_INK.titans_revenge;
+  ditherRect(r, 0, 0, PW, PH, [ink.dark, ink.base, ink.dark, ink.deep]);
+  // Armour plates: horizontal seams with a light lip, rivets along every seam and down both sides.
+  for (const y of [30, 52, 74, 96]) {
+    fillRect(r, 0, y, PW, 1, ink.deep);
+    fillRect(r, 0, y + 1, PW, 1, "#6a7079", 0.6);
+    for (let x = 4; x < PW - 2; x += 9) {
+      setPixel(r, x, y - 2, "#9aa1aa");
+      setPixel(r, x + 1, y - 2, "#5c626b");
+      setPixel(r, x, y - 1, "#5c626b");
+      setPixel(r, x + 1, y - 1, ink.deep);
+    }
+  }
+  // Furnace glow behind the titan, strongest low in the middle.
+  for (let y = 40; y < PH - CRIMP; y++)
+    for (let x = 0; x < PW; x++) {
+      const g = 1 - Math.hypot((x - 38) / 40, (y - 104) / 46);
+      if (g > bayer(x, y) * 0.9) setPixel(r, x, y, g > 0.55 ? "#ff8a2a" : g > 0.3 ? "#c2410c" : "#5a1a08", 0.75);
+    }
+  // The silhouette: a heavy head on a neck between massive shoulders.
+  const cx = 38;
+  for (let y = 44; y < PH - CRIMP; y++)
+    for (let x = 0; x < PW; x++) {
+      const head = Math.hypot((x - cx) / 13, (y - 60) / 15) < 1 && y > 46;
+      const jaw = y >= 60 && y < 78 && Math.abs(x - cx) < 12 - (y - 60) * 0.25;
+      const shoulders = y > 76 && Math.abs(x - cx) < 18 + (y - 76) * 2.2;
+      const horns = y > 40 && y < 54 && Math.abs(Math.abs(x - cx) - (14 - (y - 40) * 0.25)) < 1.6 - (54 - y) * 0.08;
+      if (head || jaw || shoulders || horns) setPixel(r, x, y, "#050506");
+    }
+  // Rim light on the shoulders.
+  for (let x = 0; x < PW; x++)
+    for (let y = 76; y < PH - CRIMP; y++) {
+      if (Math.abs(Math.abs(x - cx) - (18 + (y - 76) * 2.2)) < 0.8) setPixel(r, x, y, "#ff8a2a", 0.8);
+    }
+  // The eye: a burning ember with a slit pupil and a halo.
+  const ey = 60;
+  for (let y = -9; y <= 9; y++)
+    for (let x = -12; x <= 12; x++) {
+      const d = Math.hypot(x / 10, y / 4.2);
+      const halo = Math.hypot(x / 13, y / 8);
+      if (d < 1) {
+        const hex = d < 0.35 ? "#fff3c4" : d < 0.65 ? "#ffb347" : "#ff5a1f";
+        setPixel(r, cx + x, ey + y, Math.abs(x) < 1 && Math.abs(y) < 4 ? "#050506" : hex);
+      } else if (halo < 1 && bayer(cx + x, ey + y) < 1 - halo) setPixel(r, cx + x, ey + y, "#ff5a1f", 0.5);
+    }
+  // Molten cracks and sparks.
+  const rand = rng(77);
+  for (const [x0, y0, dir] of [
+    [6, 34, 1],
+    [70, 56, -1],
+    [10, 78, 1],
+  ] as const) {
+    let x = x0;
+    for (let y = y0; y < y0 + 14; y++) {
+      x += rand() > 0.5 ? dir : 0;
+      setPixel(r, x, y, "#ffb347");
+      setPixel(r, x + 1, y, "#c2410c", 0.6);
+    }
+  }
+  for (let i = 0; i < 26; i++) {
+    const x = 3 + Math.floor(rand() * (PW - 6));
+    const y = 28 + Math.floor(rand() * 40);
+    setPixel(r, x, y, rand() > 0.6 ? "#ffd27a" : "#ff8a2a", 0.9);
+  }
+}
+
+/**
+ * Yin Yang (ADR-182): black and white ink on rice paper. Grey washes of mountains in the back, one big ensō drawn
+ * in a single brush stroke with a yin-yang inside, and a red seal stamp as the only colour on the pack.
+ */
+function drawYinYang(r: Raster): void {
+  const ink = SET_INK.yin_yang;
+  ditherRect(r, 0, 0, PW, PH, [ink.pale, ink.pale, "#e9e5dc", ink.pale]);
+  // Paper fibres.
+  for (let y = 0; y < PH; y++)
+    for (let x = 0; x < PW; x++) if ((x * 13 + y * 7 + x * y) % 37 === 0) setPixel(r, x, y, "#d8d3c8");
+  // Ink-wash mountains: two ridges in pale and mid grey, fading into the paper.
+  for (let x = 0; x < PW; x++) {
+    const far = 74 + Math.sin(x * 0.11) * 8 + Math.sin(x * 0.31) * 3;
+    const near = 88 + Math.sin(x * 0.07 + 2) * 7 + Math.sin(x * 0.23) * 2;
+    for (let y = Math.round(far); y < PH - CRIMP; y++)
+      if (bayer(x, y) < 0.75 - (y - far) / 40) setPixel(r, x, y, "#a9a59d");
+    for (let y = Math.round(near); y < PH - CRIMP; y++)
+      setPixel(r, x, y, bayer(x, y) < 0.6 + (y - near) / 30 ? "#4a4a4a" : "#8a8a8a");
+  }
+  // The ensō: a ring of uneven width, opening at the upper right, dry brush at its tail.
+  const cx = 38;
+  const cy = 56;
+  for (let y = 22; y < 92; y++)
+    for (let x = 0; x < PW; x++) {
+      const a = Math.atan2(y - cy, x - cx);
+      const t = ((a + Math.PI * 0.32 + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2);
+      if (t > 0.94) continue;
+      const width = 2.2 + 3.2 * Math.sin(t * Math.PI) + Math.sin(t * 40) * 0.4;
+      const d = Math.hypot(x - cx, y - cy);
+      if (Math.abs(d - 28) < width / 2) {
+        if (t > 0.8 && bayer(x, y) < (t - 0.8) * 5) continue;
+        setPixel(r, x, y, "#0a0a0a");
+      }
+    }
+  // Yin-yang inside the ring.
+  const R = 15;
+  for (let y = -R; y <= R; y++)
+    for (let x = -R; x <= R; x++) {
+      const d = Math.hypot(x, y);
+      if (d > R + 0.3) continue;
+      let dark = x > 0;
+      if (Math.hypot(x, y + R / 2) < R / 2) dark = true;
+      if (Math.hypot(x, y - R / 2) < R / 2) dark = false;
+      if (Math.hypot(x, y + R / 2) < 2.2) dark = false;
+      if (Math.hypot(x, y - R / 2) < 2.2) dark = true;
+      setPixel(r, cx + x, cy + y, d > R - 0.8 ? "#0a0a0a" : dark ? "#0a0a0a" : "#fbfaf6");
+    }
+  // The seal: a red square stamp with a white mark, slightly uneven like a real stamp.
+  const sx = 56;
+  const sy = 80;
+  fillRect(r, sx, sy, 12, 12, ink.light);
+  for (let i = 0; i < 12; i++) if (i % 5 === 2) setPixel(r, sx + i, sy, ink.pale);
+  strokeRect(r, sx + 2, sy + 2, 8, 8, ink.pale);
+  fillRect(r, sx + 4, sy + 4, 1, 4, ink.pale);
+  fillRect(r, sx + 4, sy + 4, 4, 1, ink.pale);
+  fillRect(r, sx + 7, sy + 4, 1, 4, ink.pale);
+  fillRect(r, sx + 5, sy + 6, 2, 1, ink.pale);
+  // Ink splatter.
+  const rand = rng(108);
+  for (let i = 0; i < 14; i++)
+    setPixel(r, 3 + Math.floor(rand() * (PW - 6)), 24 + Math.floor(rand() * 20), "#1a1a1a", 0.8);
+}
+
 export interface PackRasters {
   /** The sealed pack. */
   full: Raster;
@@ -227,6 +364,8 @@ export function composePack(set: NexamonSetKey): PackRasters {
   if (set === "mystic_energy") drawMystic(full);
   else if (set === "super_apex") drawApex(full);
   else if (set === "cosmic_winds") drawCosmic(full);
+  else if (set === "titans_revenge") drawTitans(full);
+  else if (set === "yin_yang") drawYinYang(full);
   else drawPeak(full);
 
   // Title band and set name.
@@ -239,7 +378,11 @@ export function composePack(set: NexamonSetKey): PackRasters {
     "NEXAMON",
     PW / 2,
     CRIMP + 6,
-    set === "prismatic_peak" || set === "cosmic_winds" ? "#ffffff" : "#ffe25c",
+    set === "prismatic_peak" || set === "cosmic_winds" || set === "yin_yang"
+      ? "#ffffff"
+      : set === "titans_revenge"
+        ? "#ffb347"
+        : "#ffe25c",
     2,
   );
   fillRect(full, 0, PH - CRIMP - 13, PW, 9, ink.deep, 0.7);
@@ -257,7 +400,8 @@ export function composePack(set: NexamonSetKey): PackRasters {
     [...title].forEach((ch, i) => {
       x = drawMicroText(full, ch, x, PH - CRIMP - 11, ONE_OF_ONE_INK.iris[i % ONE_OF_ONE_INK.iris.length]!);
     });
-  } else drawMicroTextCentered(full, title, PW / 2, PH - CRIMP - 11, ink.pale);
+  } else if (set === "titans_revenge") drawMicroTextCentered(full, title, PW / 2, PH - CRIMP - 11, ink.light);
+  else drawMicroTextCentered(full, title, PW / 2, PH - CRIMP - 11, ink.pale);
 
   // Crimped seals: ridges of foil, a shadow line where the body begins, teeth on the outer edge.
   for (const y0 of [0, PH - CRIMP]) {

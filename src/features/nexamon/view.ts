@@ -27,6 +27,7 @@ import {
   nexamonQuickSellCents,
   nexamonIsBulk,
   nexamonPackRule,
+  nexamonOddsTable,
   nexamonSlotOdds,
 } from "@/lib/sim/nexamon";
 
@@ -66,9 +67,15 @@ export function packOdds(set: NexamonSetKey = "mystic_energy"): OddsRow[] {
   const rarities = nexamonSetRarities(set).sort((a, b) => NEXAMON_RARITY_RANK[b] - NEXAMON_RARITY_RANK[a]);
   const rule = nexamonPackRule(set);
   if (rule) {
+    // the base rarity fills every slot the tiers leave (ADR-182: about 4.6 iron cards in a Titans pack)
+    const basePerPack = rule.tiers.reduce<number>(
+      (n, t) => n - (t.min + t.max) / 2 / Math.max(1, t.packs),
+      cfg.packSize,
+    );
     return rarities.map((rarity) => {
       const tier = rule.tiers.find((x) => x.rarity === rarity);
-      if (!tier) return { rarity, slot4: 0, slot5: 0, denominator: 1, perPack: 0, oneInPacks: null, kind: "base" };
+      if (!tier)
+        return { rarity, slot4: 0, slot5: 0, denominator: 1, perPack: basePerPack, oneInPacks: null, kind: "base" };
       return {
         rarity,
         slot4: 0,
@@ -82,9 +89,9 @@ export function packOdds(set: NexamonSetKey = "mystic_energy"): OddsRow[] {
       };
     });
   }
-  const slot4 = nexamonSlotOdds(4);
-  const slot5 = nexamonSlotOdds(5);
-  const expected = nexamonExpectedPerPack();
+  const slot4 = nexamonSlotOdds(4, cfg, set);
+  const slot5 = nexamonSlotOdds(5, cfg, set);
+  const expected = nexamonExpectedPerPack(cfg, set);
   return rarities.map((rarity): OddsRow => {
     if (rarity === "one_of_one")
       return {
@@ -100,7 +107,7 @@ export function packOdds(set: NexamonSetKey = "mystic_energy"): OddsRow[] {
       rarity,
       slot4: slot4[rarity],
       slot5: slot5[rarity],
-      denominator: cfg.odds.denominator,
+      denominator: nexamonOddsTable(set, cfg).denominator,
       perPack: expected[rarity],
       oneInPacks: rarity === "common" || expected[rarity] <= 0 ? null : Math.round(1 / expected[rarity]),
       kind: "slots",

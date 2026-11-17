@@ -451,7 +451,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     const freeOneOfOnes = cards
       .filter((c) => c.rarity === "one_of_one" && s.oneOfOnes?.[c.key] === undefined)
       .map((c) => c.key);
-    return nexamonOpenPack(cards, host.random, cfg, { freeOneOfOnes, rule: nexamonPackRule(set) });
+    return nexamonOpenPack(cards, host.random, cfg, { freeOneOfOnes, rule: nexamonPackRule(set), set });
   }
 
   function record(s: DemoNexamonState, sale: DemoSale) {
@@ -509,7 +509,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
       due = Math.min(due, MAX_AI_PACKS - opened);
       const cards = NEXAMON_CARDS.filter((c) => c.set === set);
       for (let i = 0; i < due; i++) {
-        for (const pull of nexamonOpenPack(cards, host.random)) {
+        const opts = { rule: nexamonPackRule(set), set, skipRarities: cfg.ai.excludedRarities };
+        for (const pull of nexamonOpenPack(cards, host.random, cfg, opts)) {
           const serial = mint(s, pull.key, now);
           const stock = s.cards[pull.key]!.ai;
           if (stock.length < AI_STOCK_CAP) stock.push({ serial, condition: pull.condition });
@@ -1265,6 +1266,11 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         const cards = nexamonOpenPack(
           NEXAMON_CARDS.filter((c) => c.set === set),
           host.random,
+          cfg,
+          {
+            rule: nexamonPackRule(set as NexamonSetKey),
+            set,
+          },
         ).map((pull): NexamonPull => {
           const isNew = !s.copies.some((c) => c.cardKey === pull.key);
           const serial = mint(s, pull.key, now);

@@ -232,11 +232,15 @@ export const NEWS_SHOW_RULES = {
       prisma: "Prisma",
       legendary: "Legendär",
       one_of_one: "One of One",
+      iron: "Eisen",
+      titanium: "Titan",
+      diamond: "Diamant",
+      uranium: "Uran",
     },
     cards: {
       /** A pull of these rarities is a story; a spree of at least dudMinPacks packs without any of hitRarities too. */
-      pullRarities: ["prisma", "legendary"],
-      hitRarities: ["ultra", "prisma", "legendary"],
+      pullRarities: ["prisma", "legendary", "diamond", "uranium"],
+      hitRarities: ["ultra", "prisma", "legendary", "titanium", "diamond", "uranium"],
       dudMinPacks: 5,
       /** A sale from this price on; a card whose value left the day's first value by at least minMoveBps. */
       minSaleCents: 100_000,

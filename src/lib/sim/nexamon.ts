@@ -7,8 +7,8 @@
  * rounded half to even (ADR-003). Randomness is passed in (`u` uniform in [0, 1), or `rng` returning such numbers).
  */
 import { BALANCE } from "../../config/balance.ts";
-import type { NexamonCondition, NexamonTierPackRule } from "../../config/nexamon-rules.ts";
-import type { NexamonRarity } from "../../config/nexamon/types.ts";
+import type { NexamonCondition, NexamonOddsTable, NexamonTierPackRule } from "../../config/nexamon-rules.ts";
+import { NEXAMON_RARITIES, type NexamonRarity } from "../../config/nexamon/types.ts";
 import { divRoundHalfEven } from "./money.ts";
 
 type Config = typeof BALANCE.nexamon;
@@ -29,19 +29,42 @@ export const nexamonCentsFromE4 = (e4: number) => mulDivRound(e4, 1, NEXAMON_E4_
 
 // ---------------------------------------------------------------------------------------------- packs
 
-/** Chance of every rarity in a slot, in parts of `odds.denominator`. Slots 1 to 3 are always common. */
-export function nexamonSlotOdds(slot: number, cfg: Config = BALANCE.nexamon): Record<NexamonRarity, number> {
-  const den = cfg.odds.denominator;
-  const table = slot === 5 ? cfg.odds.slot5 : slot === 4 ? cfg.odds.slot4 : null;
-  if (!table) return { common: den, rare: 0, ultra: 0, prisma: 0, legendary: 0, one_of_one: 0 };
+/** Every rarity at 0. */
+const noRarities = (): Record<NexamonRarity, number> =>
+  Object.fromEntries(NEXAMON_RARITIES.map((r) => [r, 0])) as Record<NexamonRarity, number>;
+
+/** The slot table of a set: its entry in `setOdds` (ADR-182, Yin Yang), else `odds`. */
+export function nexamonOddsTable(set: string | null = null, cfg: Config = BALANCE.nexamon): NexamonOddsTable {
+  const own = set ? (cfg.setOdds as Readonly<Record<string, NexamonOddsTable>>)[set] : undefined;
+  return own ?? cfg.odds;
+}
+
+/**
+ * Chance of every rarity in a slot, in parts of the set's denominator (`nexamonOddsTable(set).denominator`). Slots
+ * 1 to 3 are always common.
+ */
+export function nexamonSlotOdds(
+  slot: number,
+  cfg: Config = BALANCE.nexamon,
+  set: string | null = null,
+): Record<NexamonRarity, number> {
+  const odds = nexamonOddsTable(set, cfg);
+  const den = odds.denominator;
+  const table = slot === 5 ? odds.slot5 : slot === 4 ? odds.slot4 : null;
+  if (!table) return { ...noRarities(), common: den };
   const better = table.legendary + table.prisma + table.ultra + table.rare;
-  return { ...table, common: den - better, one_of_one: 0 };
+  return { ...noRarities(), ...table, common: den - better };
 }
 
 /** The rarity a slot holds for the roll `u`: the best rarities take the lowest numbers. */
-export function nexamonSlotRarity(slot: number, u: number, cfg: Config = BALANCE.nexamon): NexamonRarity {
-  const odds = nexamonSlotOdds(slot, cfg);
-  const n = Math.floor(clampUnit(u) * cfg.odds.denominator);
+export function nexamonSlotRarity(
+  slot: number,
+  u: number,
+  cfg: Config = BALANCE.nexamon,
+  set: string | null = null,
+): NexamonRarity {
+  const odds = nexamonSlotOdds(slot, cfg, set);
+  const n = Math.floor(clampUnit(u) * nexamonOddsTable(set, cfg).denominator);
   let edge = 0;
   for (const rarity of RARITIES_BEST_FIRST) {
     edge += odds[rarity];
@@ -50,12 +73,16 @@ export function nexamonSlotRarity(slot: number, u: number, cfg: Config = BALANCE
   return "common";
 }
 
-/** Expected number of cards of every rarity in one pack (exact fractions of `odds.denominator`). */
-export function nexamonExpectedPerPack(cfg: Config = BALANCE.nexamon): Record<NexamonRarity, number> {
-  const total: Record<NexamonRarity, number> = { common: 0, rare: 0, ultra: 0, prisma: 0, legendary: 0, one_of_one: 0 };
+/** Expected number of cards of every rarity in one pack of a slot-table set (exact fractions of its denominator). */
+export function nexamonExpectedPerPack(
+  cfg: Config = BALANCE.nexamon,
+  set: string | null = null,
+): Record<NexamonRarity, number> {
+  const total = noRarities();
+  const den = nexamonOddsTable(set, cfg).denominator;
   for (let slot = 1; slot <= cfg.packSize; slot++) {
-    const odds = nexamonSlotOdds(slot, cfg);
-    for (const rarity of Object.keys(total) as NexamonRarity[]) total[rarity] += odds[rarity] / cfg.odds.denominator;
+    const odds = nexamonSlotOdds(slot, cfg, set);
+    for (const rarity of NEXAMON_RARITIES) total[rarity] += odds[rarity] / den;
   }
   return total;
 }
@@ -106,6 +133,13 @@ export interface NexamonPackOptions {
   readonly freeOneOfOnes?: readonly string[];
   /** The set's own pack composition (`packRules[set]`); missing: the slot table `odds`. */
   readonly rule?: NexamonTierPackRule | null;
+  /** The set, for its own slot table (`setOdds`, ADR-182). */
+  readonly set?: string | null;
+  /**
+   * Rarities this pack must not hold (ADR-182: an AI pack never holds an `ai.excludedRarities` card). A tier of such
+   * a rarity that hits leaves its slots to the base rarity.
+   */
+  readonly skipRarities?: readonly string[];
 }
 
 /** The pack rule of a set: its entry in `packRules`, or null for the slot table. */
@@ -121,6 +155,7 @@ export function nexamonTierRarities(
   rule: NexamonTierPackRule,
   rng: () => number,
   cfg: Config = BALANCE.nexamon,
+  skipRarities: readonly string[] = [],
 ): string[] {
   const slots: string[] = Array.from({ length: cfg.packSize }, () => rule.base);
   let free = cfg.packSize;
@@ -128,7 +163,7 @@ export function nexamonTierRarities(
     const hit = Math.floor(clampUnit(rng()) * Math.max(1, tier.packs)) === 0;
     const span = Math.max(0, tier.max - tier.min);
     const count = tier.min + Math.floor(clampUnit(rng()) * (span + 1));
-    if (!hit) continue;
+    if (!hit || skipRarities.includes(tier.rarity)) continue;
     for (let i = 0; i < count && free > 0; i++) slots[--free] = tier.rarity;
   }
   return slots;
@@ -155,7 +190,7 @@ export function nexamonOpenPack(
   const used = new Set<string>();
   const pulls: NexamonPull[] = [];
   const free = opts.freeOneOfOnes ?? [];
-  const tiers = opts.rule ? nexamonTierRarities(opts.rule, rng, cfg) : null;
+  const tiers = opts.rule ? nexamonTierRarities(opts.rule, rng, cfg, opts.skipRarities ?? []) : null;
   const base = opts.rule?.base ?? "common";
   for (let slot = 1; slot <= cfg.packSize; slot++) {
     if (slot === cfg.oneOfOne.slot && free.length > 0 && nexamonOneOfOneHit(rng(), cfg)) {
@@ -167,7 +202,7 @@ export function nexamonOpenPack(
     const rarity = tiers
       ? (tiers[slot - 1] as NexamonRarity)
       : slot >= 4
-        ? nexamonSlotRarity(slot, rng(), cfg)
+        ? nexamonSlotRarity(slot, rng(), cfg, opts.set ?? null)
         : "common";
     const pool = cards.filter((c) => c.rarity === rarity && !(rarity === base && used.has(c.key)));
     if (pool.length === 0) throw new RangeError(`nexamonOpenPack: no ${rarity} card in the set`);

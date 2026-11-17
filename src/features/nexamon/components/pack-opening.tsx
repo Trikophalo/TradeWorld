@@ -74,6 +74,10 @@ const REVEAL_SOUND: Record<NexamonRarity, SoundName> = {
   prisma: "pullPrisma",
   legendary: "pullLegendary",
   one_of_one: "pullOneOfOne",
+  iron: "cardShow",
+  titanium: "pullUltra",
+  diamond: "pullLegendary",
+  uranium: "pullUranium",
 };
 /** Upper part of the pack (share of its height) where a tear can start. */
 const TEAR_ZONE = 0.45;

@@ -179,6 +179,13 @@ function OddsCard({ packSize }: { packSize: number }) {
   const rows = packOdds();
   // ADR-174: the One of One row of the set that has them
   const oneOfOne = packOdds("cosmic_winds").find((row) => row.kind === "one_of_one");
+  // ADR-182: the two sets with their own rules
+  const titans = packOdds("titans_revenge");
+  const yinYang = packOdds("yin_yang");
+  const yinYangChance = (rarity: string) => {
+    const row = yinYang.find((r) => r.rarity === rarity);
+    return row ? formatChance(chanceBps(row.slot5, row.denominator)) : "–";
+  };
   const weights = BALANCE.nexamon.conditions.weightBps;
   return (
     <Card padding="lg" data-testid="nexamon-odds">
@@ -248,6 +255,20 @@ function OddsCard({ packSize }: { packSize: number }) {
           {t("odds.oneOfOneNote", { count: formatInteger(oneOfOne.denominator) })}
         </p>
       )}
+      <p className="mt-3 text-sm text-pretty text-fg-2" data-testid="odds-titans">
+        {t("odds.titansNote", {
+          titanium: formatInteger(titans.find((row) => row.rarity === "titanium")?.oneInPacks ?? 0),
+          diamond: formatInteger(titans.find((row) => row.rarity === "diamond")?.oneInPacks ?? 0),
+          uranium: formatInteger(titans.find((row) => row.rarity === "uranium")?.oneInPacks ?? 0),
+        })}
+      </p>
+      <p className="mt-3 text-sm text-pretty text-fg-2" data-testid="odds-yin-yang">
+        {t("odds.yinYangNote", {
+          ultra: yinYangChance("ultra"),
+          prisma: yinYangChance("prisma"),
+          legendary: yinYangChance("legendary"),
+        })}
+      </p>
       <p className="mt-3 text-sm text-pretty text-fg-2">{t("odds.conditionIntro")}</p>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
         {[...NEXAMON_CONDITIONS].reverse().map((condition) => (

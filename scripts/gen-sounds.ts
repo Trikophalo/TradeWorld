@@ -1719,6 +1719,7 @@ const RENDER: Record<string, () => Float64Array> = {
   "pull-prisma": pullPrisma,
   "pull-legendary": pullLegendary,
   "pull-one-of-one": pullOneOfOne,
+  "pull-uranium": pullUranium,
   "grade-drum": gradeDrum,
   "grade-tick": gradeTick,
   "grade-low": gradeLow,
@@ -1907,6 +1908,36 @@ function pullOneOfOne(): Float64Array {
   stars.forEach((note, i) => bell(m, 2.5 + i * 0.13, note, { gain: 0.1 }));
   noise(m, 2.35, 1.6, { type: "hp", cutoff: 7000 }, 0.05, { a: 0.3, d: 1.2, r: 0.4 });
   return master(m.buf, { room: { mix: 0.32, size: 1.4 } });
+}
+
+/**
+ * A uranium card of Titans Revenge (ADR-182): a Geiger counter that ticks faster and faster over a low hum, a
+ * crackling surge, then a heavy detuned power chord that glows on with a slow wobble.
+ */
+function pullUranium(): Float64Array {
+  const m = new Mix(4.2, 182);
+  m.tone({ at: 0, note: "E1", gate: 1.7, wave: "sine", gain: 0.5, env: { a: 0.5, d: 0.6, s: 0.7, r: 0.2 } });
+  m.tone({ at: 0, note: "F1", gate: 1.7, wave: "sine", gain: 0.3, env: { a: 0.8, d: 0.6, s: 0.7, r: 0.2 } });
+  let at = 0.05;
+  let gap = 0.24;
+  while (at < 1.6) {
+    noise(m, at, 0.006, { type: "hp", cutoff: 3500 }, 0.6, { a: 0.0005, d: 0.006, r: 0.004 });
+    at += gap * (0.6 + ((at * 977) % 1) * 0.8);
+    gap = Math.max(0.018, gap * 0.9);
+  }
+  noise(m, 1.5, 0.3, { type: "bp", cutoff: 2200, q: 0.8 }, 0.35, { a: 0.1, d: 0.2, r: 0.05 });
+  const glow = { a: 0.05, d: 0.5, s: 0.75, r: 1.1 };
+  const wobble = { rate: 3.2, cents: 22, delay: 0.3 };
+  m.tone({ at: 1.75, note: "E2", gate: 1.7, wave: "pulse", gain: 0.32, env: glow });
+  m.tone({ at: 1.75, note: "B2", gate: 1.7, wave: "pulse", gain: 0.22, env: glow });
+  chip(m, 1.75, "E4", 1.7, { env: glow, vibrato: wobble, gain: 0.6, sparkle: 0.2 });
+  chip(m, 1.75, "B4", 1.7, { env: glow, vibrato: wobble, gain: 0.45, bright: 0.6 });
+  chip(m, 1.75, "E5", 1.7, { env: glow, vibrato: wobble, gain: 0.35, bright: 0.8 });
+  chip(m, 1.75, "A#4", 0.25, { env: { a: 0.01, d: 0.2, s: 0, r: 0.05 }, gain: 0.3 });
+  for (let i = 0; i < 10; i++)
+    bell(m, 1.9 + i * 0.16, ["E7", "B6", "E7", "G#6", "B6", "E6", "B6", "E7", "B7", "E7"][i]!, { gain: 0.08 });
+  noise(m, 1.75, 1.7, { type: "hp", cutoff: 6000 }, 0.06, { a: 0.2, d: 1.2, r: 0.4 });
+  return master(m.buf, { room: { mix: 0.3, size: 1.3 } });
 }
 
 /** The ASP package is open: a snare roll that gets denser and louder while the slab rises (ADR-165). */

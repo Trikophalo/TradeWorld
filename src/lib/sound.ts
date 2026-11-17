@@ -139,6 +139,8 @@ export const SOUNDS = {
   pullLegendary: { src: ["/sounds/pull-legendary.wav"], volume: 0.5, minIntervalMs: 800 },
   /** A One of One (ADR-174): the biggest reveal of the game. */
   pullOneOfOne: { src: ["/sounds/pull-one-of-one.wav"], volume: 0.6, minIntervalMs: 3000 },
+  /** A uranium card of Titans Revenge (ADR-182): Geiger clicks, then a glowing power chord. */
+  pullUranium: { src: ["/sounds/pull-uranium.wav"], volume: 0.6, minIntervalMs: 3000 },
   /** The ASP package (ADR-165): the drum roll while the slab rises, the grade counting up, and the result by tier. */
   gradeDrum: { src: ["/sounds/grade-drum.wav"], volume: 0.34, minIntervalMs: 800 },
   gradeTick: { src: ["/sounds/grade-tick.wav"], volume: 0.3, minIntervalMs: 60 },
