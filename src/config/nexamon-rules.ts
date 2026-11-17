@@ -1,7 +1,7 @@
 /*
  * Nexamon collectible cards (ADR-165): booster packs, pull rates, card conditions, grading by "ASP", the card
  * market with AI sellers and the supply and demand model behind every card's market value.
- * The catalogue (231 cards in three sets) lives in src/config/nexamon; `pnpm db:config` writes key, set, number,
+ * The catalogue (321 cards in four sets) lives in src/config/nexamon; `pnpm db:config` writes key, set, number,
  * rarity and start price of every card to game_config.nexamon_cards, the rules below to game_config.nexamon.
  * The formulas are in src/lib/sim/nexamon.ts and, as the same rule in PL/pgSQL, in
  * supabase/migrations/20261204005200_nexamon.sql.
@@ -16,6 +16,7 @@ export const NEXAMON_RULES = {
     mystic_energy: { name: "Nexamon: Mystic Energy", packPriceCents: 20_000 },
     super_apex: { name: "Nexamon: Super Apex", packPriceCents: 100_000 },
     prismatic_peak: { name: "Nexamon: Prismatic Peak", packPriceCents: 1_000_000 },
+    cosmic_winds: { name: "Nexamon: Cosmic Winds", packPriceCents: 500_000 },
   },
   packs: {
     /** At most this many packs per player and minute. */
@@ -36,6 +37,12 @@ export const NEXAMON_RULES = {
     slot4: { legendary: 0, prisma: 0, ultra: 150, rare: 900 },
     slot5: { legendary: 4, prisma: 45, ultra: 150, rare: 900 },
   },
+  /**
+   * One of One (ADR-174): in a set with One of One cards, slot `slot` of a player's pack first rolls 1 in `packs`.
+   * On a hit it holds one of the set's One of Ones nobody has pulled yet (each exists exactly once in the game,
+   * enforced by the database); if none is left, the slot rolls the normal table. AI packs never roll it.
+   */
+  oneOfOne: { slot: 5, packs: 5_000 },
   /**
    * Condition of a pulled card, worst first. Cards worse than "good" are very rare. A raw copy is worth its card's
    * market value x `valueBps` of its condition: poor 70 %, good 90 %, near mint and mint 100 %.
@@ -135,9 +142,9 @@ export const NEXAMON_RULES = {
      * rarityBps + scarceBonusBps x popRef / (popRef + population), at most 10 000.
      */
     popularity: {
-      rarityBps: { common: 500, rare: 1_500, ultra: 4_000, prisma: 7_000, legendary: 9_000 },
+      rarityBps: { common: 500, rare: 1_500, ultra: 4_000, prisma: 7_000, legendary: 9_000, one_of_one: 10_000 },
       scarceBonusBps: 3_000,
-      popRef: { common: 2_000, rare: 800, ultra: 150, prisma: 30, legendary: 4 },
+      popRef: { common: 2_000, rare: 800, ultra: 150, prisma: 30, legendary: 4, one_of_one: 1 },
     },
     /**
      * Supply against demand, once per `everyMinutes` and card.
@@ -152,13 +159,18 @@ export const NEXAMON_RULES = {
       everyMinutes: 60,
       upStepBps: 30,
       downStepBps: 30,
-      want: { common: 4, rare: 3, ultra: 2, prisma: 1, legendary: 1 },
+      want: { common: 4, rare: 3, ultra: 2, prisma: 1, legendary: 1, one_of_one: 1 },
       buyWeightMilli: 500,
       buyDays: 7,
       maxBuys: 10,
       /** Cards handled per run of the job. */
       perRun: 80,
     },
+    /**
+     * Rarities whose value moves only by trades between players (ADR-174): no supply-and-demand step, no AI
+     * purchases. The band, the steps and the anti-manipulation rules of `trade` still apply.
+     */
+    tradeOnlyRarities: ["one_of_one"],
   },
   /** AI sellers and collectors (households money, like the NFT collectors). */
   ai: {
@@ -166,14 +178,14 @@ export const NEXAMON_RULES = {
     /** The AI always offers a copy 10 % above what it is worth. */
     askBps: 11_000,
     /** Copies of every card the AI owns at the start; of the prismas only the `seedPrismaCards` cheapest per set. */
-    seedCopies: { common: 6, rare: 4, ultra: 2, prisma: 1, legendary: 0 },
+    seedCopies: { common: 6, rare: 4, ultra: 2, prisma: 1, legendary: 0, one_of_one: 0 },
     seedPrismaCards: 2,
     /** Copies of a card the AI offers at once; the rest of its stock waits. */
-    listedPerCard: { common: 4, rare: 3, ultra: 2, prisma: 1, legendary: 0 },
+    listedPerCard: { common: 4, rare: 3, ultra: 2, prisma: 1, legendary: 0, one_of_one: 0 },
     /** Per value run (hour) and legendary card the AI holds: chance that one copy goes on sale. */
     legendaryListChanceBps: 20,
     /** The AI opens packs too, so populations level out; its pulls go into its stock. */
-    packsPerHour: { mystic_energy: 4, super_apex: 2, prismatic_peak: 1 },
+    packsPerHour: { mystic_energy: 4, super_apex: 2, prismatic_peak: 1, cosmic_winds: 1 },
     maxPacksPerRun: 5,
     /**
      * AI collectors buy players' listings (ADR-165). At or below the copy's value they always buy, on the next run of
@@ -192,11 +204,15 @@ export const NEXAMON_RULES = {
      * of the value and the card had fewer than this many such counted AI buys in `buyWindowDays`; else it still
      * sells, without moving the value.
      */
-    buysPerCardWindow: { common: 6, rare: 6, ultra: 4, prisma: 3, legendary: 2 },
+    buysPerCardWindow: { common: 6, rare: 6, ultra: 4, prisma: 3, legendary: 2, one_of_one: 0 },
     buyWindowDays: 1,
     maxBuysPerRun: 100,
     /** Budget per set and Berlin day: this many pack prices. */
     dailyBudgetPacks: 300,
+    /**
+     * Rarities the AI never pulls, holds or buys (ADR-174): One of Ones change hands only between players.
+     */
+    excludedRarities: ["one_of_one"],
   },
   /** Instant sale of raw bulk cards to the AI, below value; every copy sold this way lowers the value a little. */
   quickSell: {
@@ -209,7 +225,7 @@ export const NEXAMON_RULES = {
    * Pulling a card of these rarities is news for the friends (feed kind nexamon_pull). A Black Label always is
    * (feed kind nexamon_black_label).
    */
-  feedRarities: ["legendary"],
+  feedRarities: ["legendary", "one_of_one"],
   /**
    * Who is on the Collectibles tab (ADR-172): the page asks every `pingSeconds`; a player counts as there for
    * `presenceSeconds` after the last ask. At most `maxPlayers` figures are shown.
@@ -271,18 +287,20 @@ export const NEXAMON_RULES = {
       rock: "wage",
       steel: "wage",
       dark: "xp",
+      // stars and void: knowledge from far away, so plain XP (ADR-174)
+      cosmic: "xp",
     },
-    rarities: ["ultra", "prisma", "legendary"],
+    rarities: ["ultra", "prisma", "legendary", "one_of_one"],
     extraNumbers: [60],
-    rarityBps: { common: 25, rare: 50, ultra: 50, prisma: 100, legendary: 250 },
-    setBps: { mystic_energy: 10_000, super_apex: 12_500, prismatic_peak: 15_000 },
+    rarityBps: { common: 25, rare: 50, ultra: 50, prisma: 100, legendary: 250, one_of_one: 500 },
+    setBps: { mystic_energy: 10_000, super_apex: 12_500, prismatic_peak: 15_000, cosmic_winds: 15_000 },
     slab: { minGrade: 9, gradeBps: 15_000, blackLabelBps: 20_000 },
     /** Hard cap per kind in bps (xp 10 %, mission and trade XP 15 %, wage 10 %, vault 15 %, daily 20 %, company 10 %). */
     caps: { xp: 1_000, mission_xp: 1_500, trade_xp: 1_500, wage: 1_000, vault: 1_500, daily: 2_000, company: 1_000 },
     kneeShareBps: 5_000,
     tailBps: 5_000,
     /**
-     * Collections. "type": every card of one type in a set; "complete": all 77 cards of a set; "master": all 77 and
+     * Collections. "type": every card of one type in a set; "complete": all cards of a set; "master": all of them and
      * every prisma and legendary of the set as an own slab of grade `masterMinGrade` or better. Owned means not
      * listed, like the cards. While a collection stays complete it adds `bps` (times the set's setBps) to the type's
      * kind ("type"), to `kind` ("complete") or to every kind ("master"); the first completion pays `rewardPacks`
@@ -294,6 +312,8 @@ export const NEXAMON_RULES = {
       master: { bps: 100, rewardPacks: 75, rewardXp: 10_000 },
       masterMinGrade: 9,
       masterRarities: ["prisma", "legendary"],
+      /** Cards of these rarities count for no collection (ADR-174): nobody can be asked to own a One of One. */
+      excludeRarities: ["one_of_one"],
     },
   },
   /**
@@ -304,7 +324,7 @@ export const NEXAMON_RULES = {
    * decayBps of what it lies above the base (half-life about 69 hours). A jump of bigJumpBps or more is news.
    */
   blackLabelHype: {
-    rarityChanceBps: { common: 5, rare: 10, ultra: 25, prisma: 60, legendary: 120 },
+    rarityChanceBps: { common: 5, rare: 10, ultra: 25, prisma: 60, legendary: 120, one_of_one: 200 },
     blRef: 3,
     minJumpBps: 1_000,
     maxJumpBps: 6_000,

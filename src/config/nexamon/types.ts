@@ -1,27 +1,50 @@
 /*
  * Nexamon collectible cards (ADR-165): the shared contract between the catalogue, the artwork, the renderer and
- * the market. Three sets of 77 cards each. Pure data, no imports.
+ * the market. Three sets of 77 cards and Cosmic Winds with 90 (ADR-174). Every set has its own rarity layout
+ * (`NEXAMON_SET_LAYOUT`): how many cards of each rarity, numbered by rarity. Pure data, no imports.
  */
-export const NEXAMON_SETS = ["mystic_energy", "super_apex", "prismatic_peak"] as const;
+export const NEXAMON_SETS = ["mystic_energy", "super_apex", "prismatic_peak", "cosmic_winds"] as const;
 export type NexamonSetKey = (typeof NEXAMON_SETS)[number];
 /** Prefix of the card keys of a set ("me-001"). */
 export const NEXAMON_SET_PREFIX: Record<NexamonSetKey, string> = {
   mystic_energy: "me",
   super_apex: "sa",
   prismatic_peak: "pp",
+  cosmic_winds: "cw",
 };
 
-export const NEXAMON_RARITIES = ["common", "rare", "ultra", "prisma", "legendary"] as const;
+/** Rarities, worst first. "one_of_one" (ADR-174): a card that exists exactly once in the whole game. */
+export const NEXAMON_RARITIES = ["common", "rare", "ultra", "prisma", "legendary", "one_of_one"] as const;
 export type NexamonRarity = (typeof NEXAMON_RARITIES)[number];
-/** Cards per rarity in every set, in card-number order: 1-50, 51-60, 61-70, 71-75, 76-77. */
-export const NEXAMON_RARITY_COUNTS: Record<NexamonRarity, number> = {
-  common: 50,
-  rare: 10,
-  ultra: 10,
-  prisma: 5,
-  legendary: 2,
+/** Cards per rarity of a set, in card-number order (common first, numbered by rarity). */
+export type NexamonRarityLayout = Readonly<Record<NexamonRarity, number>>;
+const CLASSIC_LAYOUT: NexamonRarityLayout = { common: 50, rare: 10, ultra: 10, prisma: 5, legendary: 2, one_of_one: 0 };
+/**
+ * The rarity layout of every set: the first three sets 1-50, 51-60, 61-70, 71-75, 76-77; Cosmic Winds 1-50, 51-65,
+ * 66-80, 81-85, 86-87 and the One of Ones 88-90.
+ */
+export const NEXAMON_SET_LAYOUT: Record<NexamonSetKey, NexamonRarityLayout> = {
+  mystic_energy: CLASSIC_LAYOUT,
+  super_apex: CLASSIC_LAYOUT,
+  prismatic_peak: CLASSIC_LAYOUT,
+  cosmic_winds: { common: 50, rare: 15, ultra: 15, prisma: 5, legendary: 2, one_of_one: 3 },
 };
-export const NEXAMON_SET_SIZE = 77;
+/** Cards of a set. */
+export const nexamonSetSize = (set: NexamonSetKey): number =>
+  NEXAMON_RARITIES.reduce((sum, r) => sum + NEXAMON_SET_LAYOUT[set][r], 0);
+/** First and last card number of a rarity in a set; null if the set has none. */
+export function nexamonRarityRange(set: NexamonSetKey, rarity: NexamonRarity): readonly [number, number] | null {
+  let first = 1;
+  for (const r of NEXAMON_RARITIES) {
+    const n = NEXAMON_SET_LAYOUT[set][r];
+    if (r === rarity) return n > 0 ? [first, first + n - 1] : null;
+    first += n;
+  }
+  return null;
+}
+/** Rarities a set has, worst first. */
+export const nexamonSetRarities = (set: NexamonSetKey): NexamonRarity[] =>
+  NEXAMON_RARITIES.filter((r) => NEXAMON_SET_LAYOUT[set][r] > 0);
 
 export const NEXAMON_TYPES = [
   "fire",
@@ -34,18 +57,25 @@ export const NEXAMON_TYPES = [
   "steel",
   "fairy",
   "dragon",
+  "cosmic",
 ] as const;
 export type NexamonType = (typeof NEXAMON_TYPES)[number];
+
+export type NexamonCardKind = "monster" | "event";
+export const nexamonCardKind = (card: { kind?: NexamonCardKind }): NexamonCardKind => card.kind ?? "monster";
 
 export interface NexamonCard {
   /** "<prefix>-<number 3 digits>", e.g. "me-001". Never changes once shipped. */
   key: string;
   set: NexamonSetKey;
-  /** 1..77 within the set. */
+  /** 1..size of the set (77, Cosmic Winds 90). */
   number: number;
   rarity: NexamonRarity;
   name: string;
+  /** "monster" (default) or "event": an object or happening (a galaxy, a comet) without HP (ADR-174). */
+  kind?: NexamonCardKind;
   type: NexamonType;
+  /** 0 for event cards. */
   hp: number;
   /** Evolution stage 0 (basic), 1 or 2, and the card (same set) it evolves from. */
   stage: 0 | 1 | 2;
@@ -62,7 +92,7 @@ export interface NexamonCard {
  * The card itself is a 72 x 100 pixel canvas. Sizes by rarity:
  *   common, rare: 60 x 40 (the art window inside the frame, at x 6, y 14)
  *   ultra:        68 x 48 (drawn at x 2, y 8: it breaks out of the frame at the top and the sides)
- *   prisma, legendary: 72 x 100 (full art; the renderer overlays name, HP and attack)
+ *   prisma, legendary, one_of_one: 72 x 100 (full art; the renderer overlays name, HP and attack)
  */
 export interface NexamonArt {
   width: number;
@@ -77,37 +107,57 @@ export const NEXAMON_ART_SIZE: Record<NexamonRarity, { width: number; height: nu
   ultra: { width: 68, height: 48 },
   prisma: { width: 72, height: 100 },
   legendary: { width: 72, height: 100 },
+  one_of_one: { width: 72, height: 100 },
 };
 
-/** Start price ranges of the first set in cents; super_apex x5, prismatic_peak x37.5. */
+/**
+ * Start price ranges of the first set in cents; super_apex x5, prismatic_peak x37.5, cosmic_winds x22.5. A One of One
+ * has its own absolute range (`NEXAMON_ONE_OF_ONE_PRICE_RANGE`), the entry here is unused.
+ */
 export const NEXAMON_BASE_PRICE_RANGE: Record<NexamonRarity, readonly [number, number]> = {
   common: [100, 1_000],
   rare: [700, 8_000],
   ultra: [16_000, 250_000],
   prisma: [500_000, 2_500_000],
   legendary: [9_000_000, 18_000_000],
+  one_of_one: [0, 0],
 };
+/** A One of One is worth 16 to 33 million euros at the start, whatever its set (ADR-174). */
+export const NEXAMON_ONE_OF_ONE_PRICE_RANGE = [1_600_000_000, 3_300_000_000] as const;
 export const NEXAMON_SET_PRICE_FACTOR: Record<NexamonSetKey, number> = {
   mystic_energy: 1,
   super_apex: 5,
   prismatic_peak: 37.5,
+  cosmic_winds: 22.5,
 };
+/** Start price range of a rarity in a set, in cents. */
+export function nexamonPriceRange(set: NexamonSetKey, rarity: NexamonRarity): readonly [number, number] {
+  if (rarity === "one_of_one") return NEXAMON_ONE_OF_ONE_PRICE_RANGE;
+  const [lo, hi] = NEXAMON_BASE_PRICE_RANGE[rarity];
+  return [lo * NEXAMON_SET_PRICE_FACTOR[set], hi * NEXAMON_SET_PRICE_FACTOR[set]];
+}
 
-export function nexamonRarityOfNumber(n: number): NexamonRarity {
-  return n <= 50 ? "common" : n <= 60 ? "rare" : n <= 70 ? "ultra" : n <= 75 ? "prisma" : "legendary";
+/** The rarity of card number `n` in a set (default: the layout of the first three sets). */
+export function nexamonRarityOfNumber(n: number, set: NexamonSetKey = "mystic_energy"): NexamonRarity {
+  let last = 0;
+  for (const r of NEXAMON_RARITIES) {
+    last += NEXAMON_SET_LAYOUT[set][r];
+    if (n <= last && NEXAMON_SET_LAYOUT[set][r] > 0) return r;
+  }
+  return nexamonSetRarities(set).at(-1)!;
 }
 export const nexamonKey = (set: NexamonSetKey, n: number) => `${NEXAMON_SET_PREFIX[set]}-${String(n).padStart(3, "0")}`;
 
 /** Placeholder cards for a set until its real catalogue is written: valid shape, prices spread over the range. */
 export function placeholderSet(set: NexamonSetKey): NexamonCard[] {
   const seen: Partial<Record<NexamonRarity, number>> = {};
-  return Array.from({ length: NEXAMON_SET_SIZE }, (_, i) => {
+  return Array.from({ length: nexamonSetSize(set) }, (_, i) => {
     const number = i + 1;
-    const rarity = nexamonRarityOfNumber(number);
+    const rarity = nexamonRarityOfNumber(number, set);
     const index = (seen[rarity] = (seen[rarity] ?? 0) + 1) - 1;
-    const [lo, hi] = NEXAMON_BASE_PRICE_RANGE[rarity];
-    const steps = Math.max(1, NEXAMON_RARITY_COUNTS[rarity] - 1);
-    const base = Math.round((lo + ((hi - lo) * index) / steps) / 100) * 100;
+    const [lo, hi] = nexamonPriceRange(set, rarity);
+    const steps = Math.max(1, NEXAMON_SET_LAYOUT[set][rarity] - 1);
+    const startPriceCents = Math.round(lo + ((hi - lo) * index) / steps);
     return {
       key: nexamonKey(set, number),
       set,
@@ -120,7 +170,7 @@ export function placeholderSet(set: NexamonSetKey): NexamonCard[] {
       evolvesFrom: null,
       attack: { name: "Rempler", damage: 10 + (i % 6) * 10, text: "" },
       flavor: "",
-      startPriceCents: base * NEXAMON_SET_PRICE_FACTOR[set],
+      startPriceCents,
     };
   });
 }

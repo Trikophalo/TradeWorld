@@ -3,7 +3,11 @@ import { BALANCE } from "../../config/balance.ts";
 import { NEXAMON_CONDITIONS, type NexamonCondition } from "../../config/nexamon-rules.ts";
 import { NEXAMON_RARITIES, placeholderSet, type NexamonRarity } from "../../config/nexamon/types.ts";
 import {
+  nexamonAiAllowed,
   nexamonAiAskCents,
+  nexamonOneOfOneChance,
+  nexamonOneOfOneHit,
+  nexamonTradeOnly,
   nexamonAiBuyChanceBps,
   nexamonAiBuyCounts,
   nexamonAiExpectedMinutes,
@@ -54,9 +58,23 @@ describe("Nexamon packs (ADR-165)", () => {
   it("has the exact slot odds: slots 1-3 common, slot 4 ultra/rare, slot 5 legendary/prisma/ultra/rare", () => {
     expect(DEN).toBe(3600);
     for (const slot of [1, 2, 3])
-      expect(nexamonSlotOdds(slot)).toEqual({ common: 3600, rare: 0, ultra: 0, prisma: 0, legendary: 0 });
-    expect(nexamonSlotOdds(4)).toEqual({ common: 2550, rare: 900, ultra: 150, prisma: 0, legendary: 0 });
-    expect(nexamonSlotOdds(5)).toEqual({ common: 2501, rare: 900, ultra: 150, prisma: 45, legendary: 4 });
+      expect(nexamonSlotOdds(slot)).toEqual({
+        common: 3600,
+        rare: 0,
+        ultra: 0,
+        prisma: 0,
+        legendary: 0,
+        one_of_one: 0,
+      });
+    expect(nexamonSlotOdds(4)).toEqual({ common: 2550, rare: 900, ultra: 150, prisma: 0, legendary: 0, one_of_one: 0 });
+    expect(nexamonSlotOdds(5)).toEqual({
+      common: 2501,
+      rare: 900,
+      ultra: 150,
+      prisma: 45,
+      legendary: 4,
+      one_of_one: 0,
+    });
     for (const slot of [1, 2, 3, 4, 5])
       expect(Object.values(nexamonSlotOdds(slot)).reduce((a, b) => a + b, 0)).toBe(DEN);
   });
@@ -128,7 +146,14 @@ describe("Nexamon packs (ADR-165)", () => {
   it("pulls at the stated rates over many packs (statistical, seeded)", () => {
     const rng = createRng(20261204);
     const packs = 360_000;
-    const count: Record<NexamonRarity, number> = { common: 0, rare: 0, ultra: 0, prisma: 0, legendary: 0 };
+    const count: Record<NexamonRarity, number> = {
+      common: 0,
+      rare: 0,
+      ultra: 0,
+      prisma: 0,
+      legendary: 0,
+      one_of_one: 0,
+    };
     const perCard = new Map<string, number>();
     const conditions: Record<string, number> = {};
     for (let i = 0; i < packs; i++) {
@@ -162,6 +187,48 @@ describe("Nexamon packs (ADR-165)", () => {
     for (const condition of NEXAMON_CONDITIONS)
       near(conditions[condition] ?? 0, cfg.conditions.weightBps[condition] / 10_000, total);
   }, 60_000);
+
+  it("rolls a One of One in slot 5 at 1 in 5 000 only while one is free (ADR-174)", () => {
+    expect(nexamonOneOfOneChance()).toBe(1 / 5_000);
+    expect(nexamonOneOfOneHit(0)).toBe(true);
+    expect(nexamonOneOfOneHit(1 / 5_000)).toBe(false);
+    const cosmic = placeholderSet("cosmic_winds");
+    const free = cosmic.filter((c) => c.rarity === "one_of_one").map((c) => c.key);
+    expect(free).toEqual(["cw-088", "cw-089", "cw-090"]);
+    // forced hit: the first roll of slot 5 is 0
+    const rolls = [...Array<number>(9).fill(0.5), 0, 0.7, 0.5];
+    const pack = nexamonOpenPack(cosmic, () => rolls.shift() ?? 0.5, cfg, { freeOneOfOnes: free });
+    expect(pack[4]).toMatchObject({ slot: 5, rarity: "one_of_one", key: "cw-090" });
+    // without free One of Ones the rarity table never yields one
+    const rng = createRng(5);
+    for (let i = 0; i < 2_000; i++)
+      for (const pull of nexamonOpenPack(cosmic, rng.next)) expect(pull.rarity).not.toBe("one_of_one");
+    // statistical: about 1 in 5 000 with free cards
+    const rng2 = createRng(174);
+    let hits = 0;
+    for (let i = 0; i < 100_000; i++)
+      if (nexamonOpenPack(cosmic, rng2.next, cfg, { freeOneOfOnes: free })[4]!.rarity === "one_of_one") hits++;
+    expect(hits).toBeGreaterThanOrEqual(8);
+    expect(hits).toBeLessThanOrEqual(35);
+  }, 60_000);
+
+  it("keeps the AI away from One of Ones and their value trade-only", () => {
+    expect(nexamonAiAllowed("one_of_one")).toBe(false);
+    expect(nexamonAiAllowed("legendary")).toBe(true);
+    expect(nexamonSeedCopies("one_of_one", 0)).toBe(0);
+    expect(nexamonTradeOnly("one_of_one")).toBe(true);
+    expect(nexamonPressureBps({ rarity: "one_of_one", population: 1, supply: 0, recentBuys: 5 })).toBe(0);
+    expect(
+      nexamonAiBuyChanceBps({
+        priceCents: 1,
+        copyValueCents: 100,
+        condition: "mint",
+        grade: null,
+        rarity: "one_of_one",
+        population: 1,
+      }),
+    ).toBe(0);
+  });
 
   it("refuses a set without the needed rarity", () => {
     expect(() =>
