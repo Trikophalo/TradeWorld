@@ -196,5 +196,19 @@ select tests.assert(
                    where m in ('cw-088', 'cw-089', 'cw-090')),
   'Set komplett needs the 87 cards without the One of Ones, the master set also the 5 prismas and 2 legendaries as slabs');
 
+-- =============================================================================
+-- G. A set's own pack rule (kind "tiers", the shape Titans Revenge uses)
+-- =============================================================================
+select tests.set_cfg('nexamon', '{packRules}',
+  '{"mystic_energy": {"kind": "tiers", "base": "common", "tiers": [{"rarity": "legendary", "packs": 1, "min": 2, "max": 2}, {"rarity": "rare", "packs": 1000000000, "min": 1, "max": 1}]}}');
+select tests.login_as('authenticated', :a);
+select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') as tp \gset
+reset role;
+select tests.assert(
+  (select string_agg(x ->> 'rarity', ',' order by (x ->> 'slot')::integer) from jsonb_array_elements(:'tp'::jsonb -> 'cards') x)
+    = 'common,common,common,legendary,legendary'
+  and (select count(distinct x ->> 'card_key') from jsonb_array_elements(:'tp'::jsonb -> 'cards') x where x ->> 'rarity' = 'common') = 3,
+  'tier rule: a sure tier fills the last slots, the base rarity the rest, never the same base card twice');
+
 update public.game_config set value = :'nx_cfg'::jsonb where key = 'nexamon';
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds after Cosmic Winds');

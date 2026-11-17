@@ -9,6 +9,7 @@ import {
   nexamonCardKind,
   nexamonKey,
   nexamonPriceRange,
+  nexamonRarityCount,
   nexamonRarityOfNumber,
   nexamonRarityRange,
   nexamonSetSize,
@@ -17,7 +18,7 @@ import {
 describe("Nexamon catalogue (ADR-165, ADR-174)", () => {
   it("has a rarity layout per set: 77 cards in the first three, 90 in Cosmic Winds", () => {
     expect(NEXAMON_SETS.map(nexamonSetSize)).toEqual([77, 77, 77, 90]);
-    expect(NEXAMON_SET_LAYOUT.cosmic_winds).toEqual({
+    expect(Object.fromEntries(NEXAMON_SET_LAYOUT.cosmic_winds)).toEqual({
       common: 50,
       rare: 15,
       ultra: 15,
@@ -67,7 +68,7 @@ describe("Nexamon catalogue (ADR-165, ADR-174)", () => {
         } else expect(card.hp, card.key).toBeGreaterThan(0);
       }
       for (const rarity of NEXAMON_RARITIES)
-        expect(cards.filter((c) => c.rarity === rarity)).toHaveLength(NEXAMON_SET_LAYOUT[set][rarity]);
+        expect(cards.filter((c) => c.rarity === rarity)).toHaveLength(nexamonRarityCount(set, rarity));
     }
     expect(NEXAMON_CARDS.some((c) => c.set === "cosmic_winds" && nexamonCardKind(c) === "event")).toBe(true);
   });

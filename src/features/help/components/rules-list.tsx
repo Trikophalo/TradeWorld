@@ -326,6 +326,7 @@ export function RulesList() {
             ultra: slot5("ultra"),
             prisma: slot5("prisma"),
             legendary: slot5("legendary"),
+            oneOfOne: formatInteger(nexamon.oneOfOne.packs),
           })}
           example={t("nexamonPacks.example", {
             price: whole(nexamon.sets.mystic_energy.packPriceCents),

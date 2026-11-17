@@ -13,6 +13,7 @@ import {
   nexamonGradingFeeCents,
   nexamonMarketFeeCents,
   nexamonOpenPack,
+  nexamonPackRule,
   nexamonPopularityBps,
   nexamonPriceIsPlausible,
   nexamonPricePerCardE4,
@@ -127,6 +128,8 @@ export interface DemoNexamonState {
   completions?: Record<string, number>;
   /** ADR-171: Black Label hype per card: factor, last hour handled, last jump, history [time, factor, jump]. */
   hype?: Record<string, { bps: number; at: number; jumpAt: number | null; points: [number, number, number][] }>;
+  /** ADR-174: the One of Ones pulled in this demo (card key -> time); each exists once. */
+  oneOfOnes?: Record<string, number>;
 }
 
 /** The effective card bonus of a kind in the demo (ADR-171), for the XP and money paths of the demo engine. */
@@ -435,6 +438,15 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     return c.population;
   }
 
+  /** A player's pack (ADR-174): the set's own pack rule and the One of Ones nobody has pulled yet. */
+  function openPlayerPack(s: DemoNexamonState, set: NexamonSetKey) {
+    const cards = NEXAMON_CARDS.filter((c) => c.set === set);
+    const freeOneOfOnes = cards
+      .filter((c) => c.rarity === "one_of_one" && s.oneOfOnes?.[c.key] === undefined)
+      .map((c) => c.key);
+    return nexamonOpenPack(cards, host.random, cfg, { freeOneOfOnes, rule: nexamonPackRule(set) });
+  }
+
   function record(s: DemoNexamonState, sale: DemoSale) {
     s.sales.push(sale);
     if (s.sales.length > MAX_SALES) s.sales.splice(0, s.sales.length - MAX_SALES);
@@ -737,6 +749,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           population: cards.reduce((sum, c) => sum + s.cards[c.key]!.population, 0),
         };
       });
+      // cheapest pack first, like the server
+      sets.sort((a, b) => a.packPriceCents - b.packPriceCents);
       return {
         unlocked: host.level() >= unlockAt,
         unlockLevel: unlockAt,
@@ -756,6 +770,16 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           packsPerMinute: cfg.packs.perMinute,
         },
         serverTime: iso(host.now()),
+        oneOfOnes: NEXAMON_CARDS.filter((c) => c.rarity === "one_of_one").map((c) => {
+          const at = s.oneOfOnes?.[c.key];
+          return {
+            cardKey: c.key,
+            set: c.set,
+            pulled: at !== undefined,
+            pulledBy: at !== undefined ? host.nickname() : null,
+            pulledAt: at !== undefined ? iso(at) : null,
+          };
+        }),
       };
     },
 
@@ -769,10 +793,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         host.pay(price);
         s.packTimes.push(now);
         const packId = `pack-${s.nextId++}`;
-        const pulls = nexamonOpenPack(
-          NEXAMON_CARDS.filter((c) => c.set === set),
-          host.random,
-        );
+        const pulls = openPlayerPack(s, set);
         const cards = pulls.map((pull) => {
           const isNew = !s.copies.some((c) => c.cardKey === pull.key);
           const serial = mint(s, pull.key, now);
@@ -788,6 +809,16 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
             listing: null,
           };
           s.copies.push(copy);
+          if (pull.rarity === "one_of_one") {
+            (s.oneOfOnes ??= {})[pull.key] = now;
+            host.feed("nexamon_one_of_one", {
+              card_key: pull.key,
+              set,
+              rarity: pull.rarity,
+              serial,
+              name: info(pull.key).name,
+            });
+          }
           if ((cfg.feedRarities as readonly string[]).includes(pull.rarity))
             host.feed("nexamon_pull", {
               card_key: pull.key,
@@ -976,12 +1007,14 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           tens: copies.filter((c) => (c.grade ?? 0) >= 10).length,
           blackLabels: copies.filter((c) => nexamonIsBlackLabel(c.grade)).length,
         },
-        sets: NEXAMON_SETS.map((set) => ({
-          key: set,
-          cards: NEXAMON_CARDS.filter((c) => c.set === set).length,
-          distinct: cards.filter((c) => c.set === set).length,
-          copies: cards.filter((c) => c.set === set).reduce((sum, c) => sum + c.copies, 0),
-        })),
+        sets: [...NEXAMON_SETS]
+          .sort((a, b) => cfg.sets[a].packPriceCents - cfg.sets[b].packPriceCents)
+          .map((set) => ({
+            key: set,
+            cards: NEXAMON_CARDS.filter((c) => c.set === set).length,
+            distinct: cards.filter((c) => c.set === set).length,
+            copies: cards.filter((c) => c.set === set).reduce((sum, c) => sum + c.copies, 0),
+          })),
         cards: cards.slice(0, cap),
         slabs: copies
           .filter((c): c is typeof c & { grade: number } => c.grade !== null)
@@ -1171,10 +1204,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
       const now = host.now();
       const roll = (mine: boolean) => {
         const copies: DemoCopy[] = [];
-        const pulls = nexamonOpenPack(
-          NEXAMON_CARDS.filter((c) => c.set === set),
-          host.random,
-        ).map((pull): NexamonPull => {
+        const pulls = openPlayerPack(s, set).map((pull): NexamonPull => {
+          if (pull.rarity === "one_of_one") (s.oneOfOnes ??= {})[pull.key] = now;
           const serial = mint(s, pull.key, now);
           const copy: DemoCopy = {
             id: `nx-${s.nextId++}`,

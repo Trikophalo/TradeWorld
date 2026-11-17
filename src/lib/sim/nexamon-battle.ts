@@ -4,7 +4,7 @@
  * and the battle view use these. Time is passed in as milliseconds since the epoch, randomness as a stored seed.
  */
 import { BALANCE } from "../../config/balance.ts";
-import { NEXAMON_RARITIES, type NexamonRarity } from "../../config/nexamon/types.ts";
+import { NEXAMON_RARITY_RANK, type NexamonRarity } from "../../config/nexamon/types.ts";
 
 type Config = typeof BALANCE.nexamon;
 
@@ -24,7 +24,7 @@ export interface BattleDecision {
 }
 
 /** 0 = common … 4 = legendary. */
-export const rarityRank = (rarity: NexamonRarity): number => NEXAMON_RARITIES.indexOf(rarity);
+export const rarityRank = (rarity: NexamonRarity): number => NEXAMON_RARITY_RANK[rarity];
 
 export const battleTotalCents = (pulls: readonly BattlePull[]): number =>
   pulls.reduce((sum, p) => sum + p.valueCents, 0);

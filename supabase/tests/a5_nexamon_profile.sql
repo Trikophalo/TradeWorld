@@ -59,17 +59,18 @@ reset role;
 select tests.assert(
   :'own'::jsonb ->> 'nickname' = 'Np_Anna' and (:'own'::jsonb ->> 'is_me')::boolean and (:'own'::jsonb ->> 'unlocked')::boolean
   and (:'own'::jsonb #>> '{summary,copies}')::integer = 6 and (:'own'::jsonb #>> '{summary,distinct}')::integer = 4
-  and (:'own'::jsonb #>> '{summary,total}')::integer = 231
+  and (:'own'::jsonb #>> '{summary,total}')::integer = 321
   and (:'own'::jsonb #>> '{summary,value_cents}')::bigint = :anna_total
   and (:'own'::jsonb #>> '{summary,graded}')::integer = 2 and (:'own'::jsonb #>> '{summary,tens}')::integer = 1,
-  'get_player_nexamon(): the own collection in numbers (6 copies, 4 of 231 cards, value, 2 slabs, one 10)');
+  'get_player_nexamon(): the own collection in numbers (6 copies, 4 of 321 cards, value, 2 slabs, one 10)');
 select tests.assert(
-  jsonb_array_length(:'own'::jsonb -> 'sets') = 3
+  jsonb_array_length(:'own'::jsonb -> 'sets') = 4
   and :'own'::jsonb #>> '{sets,0,key}' = 'mystic_energy' and (:'own'::jsonb #>> '{sets,0,cards}')::integer = 77
   and (:'own'::jsonb #>> '{sets,0,distinct}')::integer = 3 and (:'own'::jsonb #>> '{sets,0,copies}')::integer = 5
   and :'own'::jsonb #>> '{sets,1,key}' = 'super_apex' and (:'own'::jsonb #>> '{sets,1,distinct}')::integer = 1
   and (:'own'::jsonb #>> '{sets,1,copies}')::integer = 1
-  and :'own'::jsonb #>> '{sets,2,key}' = 'prismatic_peak' and (:'own'::jsonb #>> '{sets,2,distinct}')::integer = 0,
+  and :'own'::jsonb #>> '{sets,2,key}' = 'cosmic_winds' and (:'own'::jsonb #>> '{sets,2,cards}')::integer = 90
+  and :'own'::jsonb #>> '{sets,3,key}' = 'prismatic_peak' and (:'own'::jsonb #>> '{sets,3,distinct}')::integer = 0,
   'the progress per set, cheapest pack first: 3 of 77, 1 of 77, 0 of 77');
 select tests.assert(
   jsonb_array_length(:'own'::jsonb -> 'cards') = 4

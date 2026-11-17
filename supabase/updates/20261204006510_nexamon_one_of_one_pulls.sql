@@ -9,7 +9,10 @@
 --   nexamon_one_of_ones yet (uniformly), mints the one copy and registers it; if none is left the slot rolls the
 --   normal table. A One of One pull posts the feed item nexamon_one_of_one and tells every active player
 --   (notification nexamon_one_of_one). Port of nexamonOpenPack (src/lib/sim/nexamon.ts).
--- * nexamon_rarity_rank(): one_of_one ranks above legendary (Pack Battle tie-break).
+-- * nexamon_rarity_rank(): from game_config.nexamon_rarities.rank (src/config/nexamon/types.ts), so a set's own
+--   rarities rank too; one_of_one above legendary (Pack Battle tie-break).
+-- * A set with an entry in packRules of kind 'tiers' fills its pack by that rule (nexamonTierRarities): every tier,
+--   best first, with 1 / packs and min..max cards from the last slot backwards, the rest the base rarity.
 -- * nexamon_pressure_bps(): 0 for value.tradeOnlyRarities (the value moves only through player trades).
 -- * nexamon_ai_buy_chance_bps(): 0 for ai.excludedRarities (the AI never buys a One of One).
 -- * nexamon_battle_pull(): a One of One counts for the "ultra or better" mission like a legendary.
@@ -18,10 +21,12 @@
 create or replace function public.nexamon_rarity_rank(p_rarity text)
 returns integer
 language sql
-immutable
+stable
+security definer
 set search_path = ''
 as $$
-  select coalesce(array_position(array['common', 'rare', 'ultra', 'prisma', 'legendary', 'one_of_one'], p_rarity), 0) - 1;
+  select coalesce((select (g.value #>> array['rank', p_rarity])::integer from public.game_config g where g.key = 'nexamon_rarities'),
+                  array_position(array['common', 'rare', 'ultra', 'prisma', 'legendary', 'one_of_one'], p_rarity) - 1, -1);
 $$;
 
 -- nexamonPressureBps: (demand - supply) / want, -10 000 .. +10 000; a card nobody pulled yet stands still, a
@@ -122,19 +127,46 @@ declare
   v_copy   uuid;
   v_nick   text;
   v_name   text;
+  v_rule   jsonb := public.nexamon_cfg() #> array['packRules', p_set];
+  v_slots  text[];
+  v_base   text := 'common';
+  v_free   integer;
+  v_cnt    integer;
+  v_hit    boolean;
   k        public.nexamon_cards;
   s        integer;
+  i        integer;
   r        record;
+  t        record;
 begin
+  -- a set's own tier rule: the rarity of every slot first (nexamonTierRarities)
+  if v_rule is not null and v_rule ->> 'kind' = 'tiers' then
+    v_base := coalesce(v_rule ->> 'base', 'common');
+    v_slots := array_fill(v_base, array[v_size]);
+    v_free := v_size;
+    for t in select x from jsonb_array_elements(coalesce(v_rule -> 'tiers', '[]'::jsonb)) x loop
+      v_hit := floor(random() * greatest(1, coalesce((t.x ->> 'packs')::integer, 1))) = 0;
+      v_cnt := coalesce((t.x ->> 'min')::integer, 1)
+               + floor(random() * (greatest(0, coalesce((t.x ->> 'max')::integer, 1) - coalesce((t.x ->> 'min')::integer, 1)) + 1))::integer;
+      if v_hit then
+        for i in 1 .. v_cnt loop
+          exit when v_free < 1;
+          v_slots[v_free] := t.x ->> 'rarity';
+          v_free := v_free - 1;
+        end loop;
+      end if;
+    end loop;
+  end if;
   for s in 1 .. v_size loop
     v_key := public.nexamon_roll_one_of_one(p_set, p_owner, s);
     if v_key is not null then
       v_rarity := 'one_of_one';
     else
-      v_rarity := case when s >= 4 then public.nexamon_slot_rarity(s, random()) else 'common' end;
+      v_rarity := case when v_slots is not null then v_slots[s]
+                       when s >= 4 then public.nexamon_slot_rarity(s, random()) else 'common' end;
       select c.card_key into v_key from public.nexamon_cards c
        where c.set_key = p_set and c.rarity = v_rarity and c.in_catalogue
-         and (v_rarity <> 'common' or c.card_key <> all (v_used))
+         and (v_rarity <> v_base or c.card_key <> all (v_used))
        order by random() limit 1;
     end if;
     if v_key is null then

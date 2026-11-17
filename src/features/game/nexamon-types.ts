@@ -122,7 +122,7 @@ export interface NexamonSetSummary {
   key: NexamonSetKey;
   name: string;
   packPriceCents: number;
-  /** Cards in the set (77). */
+  /** Cards in the set (77, Cosmic Winds 90). */
   cards: number;
   ownedDistinct: number;
   ownedCopies: number;
@@ -147,6 +147,17 @@ export interface NexamonOverview {
   };
   limits: { maxListings: number; maxGrading: number; packsPerMinute: number };
   serverTime: string;
+  /** ADR-174: every One of One of the catalogue and who pulled it (null: still out there). */
+  oneOfOnes: NexamonOneOfOneStatus[];
+}
+
+export interface NexamonOneOfOneStatus {
+  cardKey: string;
+  set: NexamonSetKey;
+  pulled: boolean;
+  /** Nickname of the player who pulled it; null while it is still out there (or the player is gone). */
+  pulledBy: string | null;
+  pulledAt: string | null;
 }
 
 /** One card pulled from a pack, in slot order (1..5). */

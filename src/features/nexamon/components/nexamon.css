@@ -69,6 +69,24 @@
   );
 }
 
+/* One of One (ADR-174): an iridescent sheen from teal over violet to rose, in wide soft bands, with its own slow drift. */
+.nexamon-foil-idle-slow {
+  position: absolute;
+  inset: 0;
+  animation: nexamon-foil-idle 16s var(--ease-in-out) infinite alternate;
+}
+.nexamon-foil-iris {
+  background-image: repeating-linear-gradient(
+    78deg,
+    rgb(63 240 208) 0%,
+    rgb(88 180 255) 7%,
+    rgb(154 124 255) 14%,
+    rgb(224 112 255) 21%,
+    rgb(255 122 176) 28%,
+    rgb(63 240 208) 35%
+  );
+}
+
 .nexamon-foil-gold {
   background-image: repeating-linear-gradient(
     112deg,
@@ -158,6 +176,16 @@
     rgb(255 90 110 / 0.8)
   );
   mask-image: radial-gradient(circle, black 0%, rgb(0 0 0 / 0.5) 40%, transparent 68%);
+}
+.nexamon-glow-one_of_one {
+  background-image: radial-gradient(
+    circle,
+    rgb(255 255 255 / 1) 0%,
+    rgb(255 227 138 / 0.85) 22%,
+    rgb(154 124 255 / 0.55) 42%,
+    rgb(63 240 208 / 0.3) 58%,
+    transparent 72%
+  );
 }
 .nexamon-glow-legendary {
   background-image: radial-gradient(

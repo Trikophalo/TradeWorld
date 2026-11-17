@@ -1,8 +1,9 @@
 import { BALANCE } from "@/config/balance";
 import {
   NEXAMON_CARDS,
-  NEXAMON_RARITIES,
+  NEXAMON_RARITY_RANK,
   NEXAMON_SETS,
+  nexamonSetRarities,
   nexamonCard,
   type NexamonCard,
   type NexamonRarity,
@@ -24,6 +25,7 @@ import {
   nexamonGradingFeeCents,
   nexamonMarketFeeCents,
   nexamonQuickSellCents,
+  nexamonPackRule,
   nexamonSlotOdds,
 } from "@/lib/sim/nexamon";
 
@@ -45,21 +47,64 @@ export interface OddsRow {
   perPack: number;
   /** "One in n packs" on average; null for commons (several per pack). */
   oneInPacks: number | null;
+  /**
+   * How the rarity gets into a pack: "slots" (slot 4/5 table), "one_of_one" (slot 5 rolls 1 in n first, each card
+   * once in the game), "tier" (a set's own tier rule: 1 in n packs, min..max cards), "base" (the rest of a tier pack).
+   */
+  kind: "slots" | "one_of_one" | "tier" | "base";
+  /** Tier rule: cards of the tier when it shows up. */
+  min?: number;
+  max?: number;
 }
 
-/** Pull rates of a pack, best rarity first: the two rolling slots and the average per pack. */
-export function packOdds(): OddsRow[] {
+/**
+ * Pull rates of a pack of a set (default: the first set), best rarity first (ADR-174). The slot table for the
+ * classic rarities, a One of One row for a set with One of Ones, a tier rule's rows for a set with its own rule.
+ */
+export function packOdds(set: NexamonSetKey = "mystic_energy"): OddsRow[] {
+  const rarities = nexamonSetRarities(set).sort((a, b) => NEXAMON_RARITY_RANK[b] - NEXAMON_RARITY_RANK[a]);
+  const rule = nexamonPackRule(set);
+  if (rule) {
+    return rarities.map((rarity) => {
+      const tier = rule.tiers.find((x) => x.rarity === rarity);
+      if (!tier) return { rarity, slot4: 0, slot5: 0, denominator: 1, perPack: 0, oneInPacks: null, kind: "base" };
+      return {
+        rarity,
+        slot4: 0,
+        slot5: 0,
+        denominator: tier.packs,
+        perPack: ((tier.min + tier.max) / 2 / tier.packs) * 1,
+        oneInPacks: tier.packs,
+        kind: "tier",
+        min: tier.min,
+        max: tier.max,
+      };
+    });
+  }
   const slot4 = nexamonSlotOdds(4);
   const slot5 = nexamonSlotOdds(5);
   const expected = nexamonExpectedPerPack();
-  return [...NEXAMON_RARITIES].reverse().map((rarity) => ({
-    rarity,
-    slot4: slot4[rarity],
-    slot5: slot5[rarity],
-    denominator: cfg.odds.denominator,
-    perPack: expected[rarity],
-    oneInPacks: rarity === "common" || expected[rarity] <= 0 ? null : Math.round(1 / expected[rarity]),
-  }));
+  return rarities.map((rarity): OddsRow => {
+    if (rarity === "one_of_one")
+      return {
+        rarity,
+        slot4: 0,
+        slot5: 1,
+        denominator: cfg.oneOfOne.packs,
+        perPack: 1 / cfg.oneOfOne.packs,
+        oneInPacks: cfg.oneOfOne.packs,
+        kind: "one_of_one",
+      };
+    return {
+      rarity,
+      slot4: slot4[rarity],
+      slot5: slot5[rarity],
+      denominator: cfg.odds.denominator,
+      perPack: expected[rarity],
+      oneInPacks: rarity === "common" || expected[rarity] <= 0 ? null : Math.round(1 / expected[rarity]),
+      kind: "slots",
+    };
+  });
 }
 
 /** A chance as basis points with two decimals kept (4 of 3600 = 11.11 bps), for `formatChance`. */
@@ -99,7 +144,7 @@ export interface SetContentsGroup {
 export function setContents(set: NexamonSetKey, copies: readonly Pick<NexamonCopy, "cardKey">[]): SetContentsGroup[] {
   const count = new Map<string, number>();
   for (const copy of copies) count.set(copy.cardKey, (count.get(copy.cardKey) ?? 0) + 1);
-  return packOdds().map((odds) => {
+  return packOdds(set).map((odds) => {
     const cards = NEXAMON_CARDS.filter((card) => card.set === set && card.rarity === odds.rarity).map((card) => ({
       card,
       owned: count.get(card.key) ?? 0,

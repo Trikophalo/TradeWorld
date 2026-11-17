@@ -14,6 +14,7 @@ const RARITY_TONE: Record<NexamonRarity, BadgeProps["tone"]> = {
   ultra: "warn",
   prisma: "accent",
   legendary: "warn",
+  one_of_one: "neutral",
 };
 
 export interface RarityBadgeProps {
@@ -31,7 +32,11 @@ export function RarityBadge({ rarity, short = false, className }: RarityBadgePro
     <Badge
       tone={RARITY_TONE[rarity]}
       data-rarity={rarity}
-      className={cn(rarity === "legendary" && "bg-gold text-on-accent", className)}
+      className={cn(
+        rarity === "legendary" && "bg-gold text-on-accent",
+        rarity === "one_of_one" && "border-gold bg-fg-1 text-gold",
+        className,
+      )}
       title={short ? t(`rarity.${rarity}`) : undefined}
     >
       <PixelIcon grid={mark.grid} palette={rarity === "legendary" ? { "#": "currentColor" } : mark.palette} scale={2} />

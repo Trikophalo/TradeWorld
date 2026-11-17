@@ -128,7 +128,7 @@ describe("binder", () => {
 
   it("shows every card in set and number order with the own copies", () => {
     const entries = binderEntries(ALL, copies, DEFAULT_BINDER_FILTER);
-    expect(entries).toHaveLength(231);
+    expect(entries).toHaveLength(321);
     expect(entries[0]!.stats.cardKey).toBe("me-001");
     expect(entries[77]!.stats.cardKey).toBe("sa-001");
     const tumpli = entries.find((e) => e.stats.cardKey === "me-003")!;
@@ -147,9 +147,11 @@ describe("binder", () => {
   it("filters by set, rarity and ownership", () => {
     const filter = (patch: object) => binderEntries(ALL, copies, { ...DEFAULT_BINDER_FILTER, ...patch });
     expect(filter({ set: "super_apex" })).toHaveLength(77);
-    expect(filter({ rarity: "legendary" })).toHaveLength(6);
+    expect(filter({ rarity: "legendary" })).toHaveLength(8);
+    expect(filter({ rarity: "one_of_one" })).toHaveLength(3);
+    expect(filter({ set: "cosmic_winds" })).toHaveLength(90);
     expect(filter({ ownership: "owned" }).map((e) => e.stats.cardKey)).toEqual(["me-003", "sa-010"]);
-    expect(filter({ ownership: "missing" })).toHaveLength(229);
+    expect(filter({ ownership: "missing" })).toHaveLength(319);
     expect(filter({ ownership: "duplicates" }).map((e) => e.stats.cardKey)).toEqual(["me-003"]);
     expect(filter({ ownership: "owned", set: "prismatic_peak" })).toEqual([]);
   });
@@ -168,6 +170,7 @@ describe("binder", () => {
       ["mystic_energy", 77],
       ["super_apex", 77],
       ["prismatic_peak", 77],
+      ["cosmic_winds", 90],
     ]);
     expect(groupBySet(entries, "value")).toHaveLength(1);
     expect(groupBySet([], "value")).toEqual([]);
@@ -407,6 +410,7 @@ describe("profileBinder", () => {
       ["mystic_energy", 2, 77],
       ["super_apex", 1, 77],
       ["prismatic_peak", 0, 77],
+      ["cosmic_winds", 0, 90],
     ]);
     expect(groups[0]!.entries.map((e) => e.card.number)).toEqual(first.map((x) => x.number));
     expect(groups[0]!.entries.filter((e) => e.owned !== null)).toHaveLength(2);

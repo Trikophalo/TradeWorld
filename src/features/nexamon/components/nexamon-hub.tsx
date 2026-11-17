@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { BALANCE } from "@/config/balance";
-import { NEXAMON_SET_SIZE, NEXAMON_SETS } from "@/config/nexamon";
+import { NEXAMON_CARDS, NEXAMON_SETS } from "@/config/nexamon";
 import { DISCLOSURE } from "@/config/disclosure";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -182,7 +182,7 @@ function Teaser() {
           ))}
         </ul>
         <ul className="mt-4 space-y-1.5 text-sm text-pretty text-fg-2">
-          <li>{t("locked.point1", { sets: NEXAMON_SETS.length, cards: NEXAMON_SET_SIZE })}</li>
+          <li>{t("locked.point1", { sets: NEXAMON_SETS.length, cards: NEXAMON_CARDS.length })}</li>
           <li>
             {t("locked.point2", {
               best: formatFactor(BALANCE.nexamon.grading.valueBps.at(-1)!),

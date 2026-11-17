@@ -222,7 +222,14 @@ export const NEWS_SHOW_RULES = {
     /** Facts from this many hours back count ("heute"). */
     windowHours: 24,
     hushMoneyCents: 10_000,
-    rarityNames: { common: "Common", rare: "Rare", ultra: "Ultra Rare", prisma: "Prisma", legendary: "Legendär" },
+    rarityNames: {
+      common: "Common",
+      rare: "Rare",
+      ultra: "Ultra Rare",
+      prisma: "Prisma",
+      legendary: "Legendär",
+      one_of_one: "One of One",
+    },
     cards: {
       /** A pull of these rarities is a story; a spree of at least dudMinPacks packs without any of hitRarities too. */
       pullRarities: ["prisma", "legendary"],

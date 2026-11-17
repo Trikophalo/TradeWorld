@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { NEXAMON_RARITY_COUNTS, type NexamonSetKey } from "@/config/nexamon";
+import { nexamonRarityCount, type NexamonSetKey } from "@/config/nexamon";
 import { NEXAMON_CONDITIONS } from "@/config/nexamon-rules";
 import { BALANCE } from "@/config/balance";
 import { Button } from "@/components/ui/button";
@@ -83,13 +83,13 @@ export function Shop({
       )}
 
       {!overview ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-56 rounded-lg lg:h-112" />
           ))}
         </div>
       ) : (
-        <ul className="grid gap-4 lg:grid-cols-3" data-tour="nexamon-packs">
+        <ul className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4" data-tour="nexamon-packs">
           {overview.sets.map((set) => (
             <li key={set.key}>
               <button
@@ -153,6 +153,7 @@ export function Shop({
         onBuy={() => selected && buy(selected)}
         buyState={action.state}
         onFinished={() => setPending(null)}
+        oneOfOnes={overview?.oneOfOnes}
         onClose={() => {
           setSelected(null);
           setPack(null);
@@ -166,6 +167,8 @@ export function Shop({
 function OddsCard({ packSize }: { packSize: number }) {
   const t = useTranslations("nexamon");
   const rows = packOdds();
+  // ADR-174: the One of One row of the set that has them
+  const oneOfOne = packOdds("cosmic_winds").find((row) => row.kind === "one_of_one");
   const weights = BALANCE.nexamon.conditions.weightBps;
   return (
     <Card padding="lg" data-testid="nexamon-odds">
@@ -189,7 +192,12 @@ function OddsCard({ packSize }: { packSize: number }) {
                 <td className="px-2 py-2 sm:px-3">
                   <RarityBadge rarity={row.rarity} short />
                   <span className="mt-0.5 block text-xs text-fg-3">
-                    {t("odds.cardsInSet", { count: NEXAMON_RARITY_COUNTS[row.rarity] })}
+                    {nexamonRarityCount("cosmic_winds", row.rarity) === nexamonRarityCount("mystic_energy", row.rarity)
+                      ? t("odds.cardsInSet", { count: nexamonRarityCount("mystic_energy", row.rarity) })
+                      : t("odds.cardsInSets", {
+                          count: nexamonRarityCount("mystic_energy", row.rarity),
+                          cosmic: nexamonRarityCount("cosmic_winds", row.rarity),
+                        })}
                   </span>
                 </td>
                 <td className="px-1 py-2 text-right nums sm:px-3">
@@ -205,9 +213,31 @@ function OddsCard({ packSize }: { packSize: number }) {
                 </td>
               </tr>
             ))}
+            {oneOfOne && (
+              <tr data-rarity="one_of_one" data-testid="odds-one-of-one">
+                <td className="px-2 py-2 sm:px-3">
+                  <RarityBadge rarity="one_of_one" short />
+                  <span className="mt-0.5 block text-xs text-fg-3">
+                    {t("odds.cardsInSet", { count: nexamonRarityCount("cosmic_winds", "one_of_one") })}
+                  </span>
+                </td>
+                <td className="px-1 py-2 text-right nums sm:px-3">–</td>
+                <td className="px-1 py-2 text-right nums sm:px-3">
+                  {formatChance(chanceBps(oneOfOne.slot5, oneOfOne.denominator))}
+                </td>
+                <td className="px-2 py-2 text-right nums text-xs text-fg-2 sm:px-3 sm:text-sm">
+                  {t("odds.oneOfOne", { count: formatInteger(oneOfOne.denominator) })}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+      {oneOfOne && (
+        <p className="mt-3 text-sm text-pretty text-fg-2">
+          {t("odds.oneOfOneNote", { count: formatInteger(oneOfOne.denominator) })}
+        </p>
+      )}
       <p className="mt-3 text-sm text-pretty text-fg-2">{t("odds.conditionIntro")}</p>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
         {[...NEXAMON_CONDITIONS].reverse().map((condition) => (

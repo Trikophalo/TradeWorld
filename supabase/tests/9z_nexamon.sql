@@ -129,20 +129,20 @@ select tests.assert(
 select public.nexamon_sync() as synced \gset
 select public.nexamon_sync() as synced2 \gset
 select tests.assert(
-  :synced = 231 and :synced2 = 0
-  and (select count(*) from public.nexamon_cards) = 231
+  :synced = 321 and :synced2 = 0
+  and (select count(*) from public.nexamon_cards) = 321
   and (select count(*) from public.nexamon_cards where set_key = 'super_apex' and rarity = 'common') = 50
-  and (select count(*) from public.nexamon_cards where rarity = 'legendary') = 6
+  and (select count(*) from public.nexamon_cards where rarity = 'legendary') = 8
   and not exists (select 1 from public.nexamon_cards where value_e4 <> start_e4 or moved_at is not null)
   and not exists (select 1 from public.nexamon_cards k, jsonb_array_elements(public.nexamon_catalogue()) x
                    where x ->> 'key' = k.card_key and (x ->> 'startPriceCents')::bigint * 100 <> k.start_e4)
-  and (select count(*) from public.nexamon_set_state) = 3,
-  'nexamon_sync(): 231 cards with the catalogue''s start prices, idempotent');
+  and (select count(*) from public.nexamon_set_state) = 4,
+  'nexamon_sync(): 321 cards (three sets of 77, Cosmic Winds 90) with the catalogue''s start prices, idempotent');
 select tests.assert(
-  (select count(*) from public.nexamon_copies) = 3 * (50 * 6 + 10 * 4 + 10 * 2 + 2)
+  (select count(*) from public.nexamon_copies) = 3 * (50 * 6 + 10 * 4 + 10 * 2 + 2) + (50 * 6 + 15 * 4 + 15 * 2 + 2)
   and not exists (select 1 from public.nexamon_copies where owner_id is not null or source <> 'seed')
   and not exists (select 1 from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where k.rarity = 'legendary')
-  and (select count(*) from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where k.rarity = 'prisma') = 6
+  and (select count(*) from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where k.rarity = 'prisma') = 8
   -- only the two cheapest prismas of every set
   and not exists (select 1 from public.nexamon_cards k
                    where k.rarity = 'prisma'
@@ -156,7 +156,7 @@ select tests.assert(
   'the AI starts with 6 commons, 4 rares, 2 ultras per card, the two cheapest prismas of a set once and no legendary; '
   'the population counts them');
 select tests.assert(
-  (select count(*) from public.nexamon_listings) = 3 * (50 * 4 + 10 * 3 + 10 * 2 + 2)
+  (select count(*) from public.nexamon_listings) = 3 * (50 * 4 + 10 * 3 + 10 * 2 + 2) + (50 * 4 + 15 * 3 + 15 * 2 + 2)
   and not exists (select 1 from public.nexamon_listings where seller_ai is null)
   and not exists (select 1 from public.nexamon_listings l join public.nexamon_cards k on k.card_key = l.card_key
                    where k.rarity = 'legendary')
@@ -174,10 +174,10 @@ update public.game_config
  where key = 'nexamon_cards';
 select public.nexamon_sync() as synced3 \gset
 select tests.assert(
-  :synced3 = 231
+  :synced3 = 321
   and (tests.nx('me-001')).start_e4 = 77700 and (tests.nx('me-001')).value_e4 = 77700
   and (tests.nx('me-002')).start_e4 = 77700 and (tests.nx('me-002')).value_e4 = 90000
-  and (tests.nx('me-001')).population = 6 and (select count(*) from public.nexamon_copies) = 1086
+  and (tests.nx('me-001')).population = 6 and (select count(*) from public.nexamon_copies) = 1478
   and not exists (select 1 from public.nexamon_listings l join public.nexamon_copies c on c.id = l.copy_id
                    where l.card_key = 'me-001' and l.price_cents <> tests.nx_ask('me-001', c.condition)),
   'a new start price in the catalogue moves a card that never traded (and the AI''s asks), not one that did');
@@ -202,13 +202,14 @@ reset role;
 select tests.assert(
   not (:'locked'::jsonb ->> 'unlocked')::boolean and (:'locked'::jsonb ->> 'unlock_level')::integer = 10
   and (:'locked'::jsonb ->> 'pack_size')::integer = 5
-  and jsonb_array_length(:'locked'::jsonb -> 'sets') = 3
+  and jsonb_array_length(:'locked'::jsonb -> 'sets') = 4
   and :'locked'::jsonb #>> '{sets,0,key}' = 'mystic_energy' and (:'locked'::jsonb #>> '{sets,0,pack_price_cents}')::bigint = 20000
   and :'locked'::jsonb #>> '{sets,0,name}' = 'Nexamon: Mystic Energy'
   and :'locked'::jsonb #>> '{sets,1,key}' = 'super_apex' and (:'locked'::jsonb #>> '{sets,1,pack_price_cents}')::bigint = 100000
-  and :'locked'::jsonb #>> '{sets,2,key}' = 'prismatic_peak' and (:'locked'::jsonb #>> '{sets,2,pack_price_cents}')::bigint = 1000000
+  and :'locked'::jsonb #>> '{sets,2,key}' = 'cosmic_winds' and (:'locked'::jsonb #>> '{sets,2,pack_price_cents}')::bigint = 500000
+  and :'locked'::jsonb #>> '{sets,3,key}' = 'prismatic_peak' and (:'locked'::jsonb #>> '{sets,3,pack_price_cents}')::bigint = 1000000
   and (:'locked'::jsonb #>> '{sets,0,cards}')::integer = 77 and (:'locked'::jsonb #>> '{collection,copies}')::integer = 0,
-  'get_nexamon(): unlock at level 10, three sets at 200 / 1.000 / 10.000 € with 77 cards and 5 cards per pack');
+  'get_nexamon(): unlock at level 10, four sets at 200 / 1.000 / 5.000 / 10.000 € with 77 cards and 5 cards per pack');
 
 -- =============================================================================
 -- D. Packs: paid to the households, five pulls, populations, idempotent
@@ -830,7 +831,7 @@ select tests.assert(
   and (:'m4'::jsonb #>> '{listings,0,mine}')::boolean and :'m4'::jsonb #>> '{listings,0,seller}' = 'Nx_Bruno'
   and (:'m5'::jsonb ->> 'total')::integer = 3
   and (:'m6'::jsonb ->> 'page')::integer = 2 and jsonb_array_length(:'m6'::jsonb -> 'listings') = 24
-  and jsonb_array_length(:'col_b'::jsonb -> 'cards') = 231
+  and jsonb_array_length(:'col_b'::jsonb -> 'cards') = 321
   and jsonb_array_length(:'col_b'::jsonb -> 'copies') = (select count(*) from public.nexamon_copies where owner_id = :b),
   'get_nexamon_market(): filters by set, rarity, seller, card and graded, sorts and pages');
 

@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import type {
   NexamonCollection,
+  NexamonOneOfOneStatus,
   NexamonPackResult,
   NexamonPull,
   NexamonSetSummary,
@@ -43,6 +44,8 @@ export interface PackOverlayProps {
   onClose: () => void;
   /** The summary is showing (all cards pulled away or skipped). */
   onFinished: () => void;
+  /** ADR-174: who pulled which One of One (from the overview). */
+  oneOfOnes?: readonly NexamonOneOfOneStatus[];
 }
 
 /**
@@ -60,6 +63,7 @@ export function PackOverlay({
   buyState,
   onClose,
   onFinished,
+  oneOfOnes = [],
 }: PackOverlayProps) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
@@ -159,7 +163,7 @@ export function PackOverlay({
                     <p className="text-sm text-pretty text-fg-2">{t("opening.howTo")}</p>
                     <p className="text-xs text-fg-3">{t("opening.scrollHint")}</p>
                   </div>
-                  <SetContents set={set.key} collection={collection} />
+                  <SetContents set={set.key} collection={collection} oneOfOnes={oneOfOnes} />
                 </div>
               )}
               {pack && stage !== "preview" && (
@@ -218,7 +222,16 @@ function Actions({ children }: { children: ReactNode }) {
  * Everything that can be in a pack of the set: the cards by rarity, best first, with the pull rate of the rarity
  * (the two rolling slots and the average per pack) and the cards the player owns in colour, the others grey.
  */
-function SetContents({ set, collection }: { set: NexamonSetKey; collection: NexamonCollection | undefined }) {
+function SetContents({
+  set,
+  collection,
+  oneOfOnes,
+}: {
+  set: NexamonSetKey;
+  collection: NexamonCollection | undefined;
+  oneOfOnes: readonly NexamonOneOfOneStatus[];
+}) {
+  const status = new Map(oneOfOnes.map((x) => [x.cardKey, x]));
   const t = useTranslations("nexamon");
   const groups = useMemo(() => setContents(set, collection?.copies ?? []), [set, collection]);
   // What every card is worth right now: the collection read the page already has.
@@ -237,19 +250,29 @@ function SetContents({ set, collection }: { set: NexamonSetKey; collection: Nexa
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <RarityBadge rarity={group.rarity} />
             <span className="nums text-sm font-medium text-fg-1" data-testid="contents-rate">
-              {group.odds.oneInPacks !== null
-                ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks) })
-                : t("odds.perPack", { count: formatDecimal(group.odds.perPack) })}
+              {group.odds.kind === "one_of_one"
+                ? t("contents.oneOfOne", { count: formatInteger(group.odds.denominator) })
+                : group.odds.kind === "tier"
+                  ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks ?? 0) })
+                  : group.odds.oneInPacks !== null
+                    ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks) })
+                    : t("odds.perPack", { count: formatDecimal(group.odds.perPack) })}
             </span>
             <span className="nums text-xs text-fg-3">
-              {group.odds.slot4 > 0
-                ? t("contents.slots", {
-                    slot4: formatChance(chanceBps(group.odds.slot4, group.odds.denominator)),
-                    slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+              {group.odds.kind === "one_of_one"
+                ? t("contents.oneOfOneLeft", {
+                    count: group.cards.filter(({ card }) => !status.get(card.key)?.pulled).length,
                   })
-                : t("contents.lastSlot", {
-                    slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
-                  })}
+                : group.odds.kind !== "slots"
+                  ? null
+                  : group.odds.slot4 > 0
+                    ? t("contents.slots", {
+                        slot4: formatChance(chanceBps(group.odds.slot4, group.odds.denominator)),
+                        slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                      })
+                    : t("contents.lastSlot", {
+                        slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                      })}
             </span>
             <span className="ml-auto nums text-xs text-fg-2" data-testid="contents-owned">
               {collection ? (
@@ -302,6 +325,19 @@ function SetContents({ set, collection }: { set: NexamonSetKey; collection: Nexa
                       <CardThumb card={card} scale={1} dimmed={collection !== undefined && owned === 0} />
                     </button>
                   </Tooltip>
+                  {card.rarity === "one_of_one" && (
+                    <span
+                      className="mt-1 block w-[72px] text-center text-2xs leading-tight text-pretty text-fg-2"
+                      data-testid="one-of-one-status"
+                      data-pulled={Boolean(status.get(card.key)?.pulled)}
+                    >
+                      {!status.get(card.key)?.pulled
+                        ? t("contents.oneOfOneOpen")
+                        : status.get(card.key)?.pulledBy
+                          ? t("contents.oneOfOneTaken", { name: status.get(card.key)!.pulledBy! })
+                          : t("contents.oneOfOneTakenAnon")}
+                    </span>
+                  )}
                 </li>
               );
             })}

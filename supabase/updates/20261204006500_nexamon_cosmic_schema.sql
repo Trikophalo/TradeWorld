@@ -4,7 +4,8 @@
 -- =============================================================================
 -- NEXA · 6500 · Nexamon: Cosmic Winds and the One of One rarity, schema (ADR-174)
 -- =============================================================================
--- * nexamon_cards.rarity also takes 'one_of_one'; a One of One never has a population above 1.
+-- * nexamon_cards.rarity takes any rarity a set declares (src/config/nexamon/types.ts; 'one_of_one' and, later, a
+--   set's own rarities); a One of One never has a population above 1.
 -- * nexamon_one_of_ones: the registry of pulled One of Ones, one row per card (primary key), written in the same
 --   transaction as the copy. Two pulls of the same card can never both commit.
 -- * Trigger nexamon_copies_ai_guard: a copy of a rarity in ai.excludedRarities never gets an AI owner (pulls,
@@ -51,7 +52,7 @@ begin
   end if;
   if not exists (select 1 from pg_constraint where conname = 'nexamon_cards_rarity_check2') then
     alter table public.nexamon_cards add constraint nexamon_cards_rarity_check2
-      check (rarity in ('common', 'rare', 'ultra', 'prisma', 'legendary', 'one_of_one'));
+      check (char_length(rarity) between 1 and 32);
   end if;
   if not exists (select 1 from pg_constraint where conname = 'nexamon_cards_one_of_one_check') then
     alter table public.nexamon_cards add constraint nexamon_cards_one_of_one_check
@@ -67,6 +68,7 @@ create table if not exists public.nexamon_one_of_ones (
   pack_id   uuid,
   pulled_at timestamptz not null default now()
 );
+create index if not exists nexamon_one_of_ones_player_idx on public.nexamon_one_of_ones (player_id);
 alter table public.nexamon_one_of_ones enable row level security;
 revoke all on public.nexamon_one_of_ones from public, anon, authenticated;
 grant all on public.nexamon_one_of_ones to service_role;

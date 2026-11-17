@@ -1,13 +1,13 @@
 import { NEXAMON_RULES } from "@/config/nexamon-rules";
-import { NEXAMON_RARITIES, NEXAMON_SET_SIZE, type NexamonRarity } from "@/config/nexamon/types";
+import { NEXAMON_RARITY_RANK, nexamonSetSize, type NexamonRarity, type NexamonSetKey } from "@/config/nexamon/types";
 
 /*
  * Pure helpers of the Nexamon card renderer (ADR-165): numbers, grades, text fitting and the decision whether a
  * dragged card flies away. No React, no DOM.
  */
 
-/** "012/077": the number of a card within its set, both zero-padded to three digits. */
-export function formatCardNumber(number: number, total: number = NEXAMON_SET_SIZE): string {
+/** "012/077": the number of a card within its set (default: a set of 77), both zero-padded to three digits. */
+export function formatCardNumber(number: number, total: number = nexamonSetSize("mystic_energy")): string {
   const pad = (n: number) => String(Math.max(0, Math.trunc(n))).padStart(3, "0");
   return `${pad(number)}/${pad(total)}`;
 }
@@ -87,7 +87,7 @@ export function formatSerial(serial: number | string): string {
 }
 
 /** Position of a rarity in the order common … legendary. */
-export const rarityRank = (rarity: NexamonRarity): number => NEXAMON_RARITIES.indexOf(rarity);
+export const rarityRank = (rarity: NexamonRarity): number => NEXAMON_RARITY_RANK[rarity];
 
 /** Rare or better: these get the glow and the sound when a pack reveals them. */
 export const isHit = (rarity: NexamonRarity): boolean => rarityRank(rarity) >= rarityRank("rare");
@@ -231,3 +231,7 @@ export function tearProgress(distance: number, width: number): number {
 
 /** Integer scale for pixel art: at least 1, never fractional. */
 export const pixelScale = (scale: number): number => Math.max(1, Math.round(scale));
+
+/** "012/090": a card's number against the size of its own set. */
+export const formatSetNumber = (card: { number: number; set: NexamonSetKey }): string =>
+  formatCardNumber(card.number, nexamonSetSize(card.set));

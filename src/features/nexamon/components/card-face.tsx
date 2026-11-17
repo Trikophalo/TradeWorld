@@ -11,7 +11,7 @@ import {
   estimateNumberWidth,
   FACE_TEXT,
   fitText,
-  formatCardNumber,
+  formatSetNumber,
   hpBlockWidth,
   pixelScale,
   roomBeforeNumber,
@@ -239,7 +239,7 @@ export const NexamonCardFace = memo(function NexamonCardFace({
             className="font-sans nums font-bold whitespace-nowrap"
             style={{ ...at(layout.number), fontSize: u * 3, lineHeight: `${u * 5}px`, color: inks.number }}
           >
-            {formatCardNumber(card.number)}
+            {formatSetNumber(card)}
           </p>
         </div>
       )}

@@ -44,6 +44,14 @@ export const NEXAMON_RULES = {
    */
   oneOfOne: { slot: 5, packs: 5_000 },
   /**
+   * Pack composition per set (ADR-174). A set without an entry uses `odds` (slots 1-3 common, slots 4 and 5 roll)
+   * and `oneOfOne`. A set with an entry of kind "tiers" fills its pack like this: every tier, best first, appears in
+   * a pack with the chance 1 / `packs`; then it holds `min` to `max` cards (uniform), filled from the last slot
+   * backwards into the slots still free. Every slot left holds the `base` rarity (never twice the same card).
+   * Example (Titans Revenge, ADR-175): base "iron", tiers uranium 1/500 (1), diamond 1/50 (1), titanium 1/5 (1-2).
+   */
+  packRules: {} as Readonly<Record<string, NexamonTierPackRule>>,
+  /**
    * Condition of a pulled card, worst first. Cards worse than "good" are very rare. A raw copy is worth its card's
    * market value x `valueBps` of its condition: poor 70 %, good 90 %, near mint and mint 100 %.
    */
@@ -337,5 +345,11 @@ export const NEXAMON_RULES = {
 } as const;
 
 export type NexamonRules = typeof NEXAMON_RULES;
+/** A set's own pack composition (see `packRules`). Rarity names are those of src/config/nexamon/types.ts. */
+export interface NexamonTierPackRule {
+  kind: "tiers";
+  base: string;
+  tiers: readonly { rarity: string; packs: number; min: number; max: number }[];
+}
 export const NEXAMON_CONDITIONS = NEXAMON_RULES.conditions.order;
 export type NexamonCondition = (typeof NEXAMON_CONDITIONS)[number];

@@ -111,6 +111,18 @@ const overviewSchema = z.object({
   }),
   limits: z.object({ max_listings: num, max_grading: num, packs_per_minute: num }),
   server_time: iso,
+  // ADR-174: only sent by a database with the One of Ones
+  one_of_ones: z
+    .array(
+      z.object({
+        card_key: z.string(),
+        set: setKey,
+        pulled: z.boolean(),
+        pulled_by: z.string().nullable(),
+        pulled_at: iso.nullable(),
+      }),
+    )
+    .default([]),
 });
 
 const packSchema = z.object({
@@ -353,6 +365,13 @@ export const liveNexamonEngine: NexamonEngine = {
         grading: r.collection.grading,
         graded: r.collection.graded,
       },
+      oneOfOnes: r.one_of_ones.map((x) => ({
+        cardKey: x.card_key,
+        set: x.set,
+        pulled: x.pulled,
+        pulledBy: x.pulled_by,
+        pulledAt: x.pulled_at,
+      })),
       limits: {
         maxListings: r.limits.max_listings,
         maxGrading: r.limits.max_grading,

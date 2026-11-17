@@ -67,8 +67,8 @@ select tests.assert(
   'card bonus definitions, slab boost, stacking with knee and cap (same numbers as the unit tests)');
 select tests.assert(
   (select count(*) from public.nexamon_cards k
-    where public.nexamon_card_bonus_def(k.rarity, k.set_key, k.number, public.nexamon_types() ->> k.card_key) is not null) = 54,
-  '54 of 231 cards give a bonus (every ultra, prisma, legendary and rare no. 60 of each set)');
+    where public.nexamon_card_bonus_def(k.rarity, k.set_key, k.number, public.nexamon_types() ->> k.card_key) is not null) = 80,
+  '80 of 321 cards give a bonus (every ultra, prisma, legendary, One of One and rare no. 60 of each set)');
 
 -- =============================================================================
 -- B. A bonus comes with a card and goes with a listing; slabs boost it

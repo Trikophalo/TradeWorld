@@ -33,7 +33,7 @@ import { burstConfetti } from "@/components/ui/effects";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
 import { playSound, type SoundName } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { isHit, isTap, pixelScale, swipeOutcome, tearProgress } from "../lib";
+import { isHit, isTap, pixelScale, rarityRank, swipeOutcome, tearProgress } from "../lib";
 import { RarityBadge } from "./badges";
 import { NexamonCardBack, NexamonCardFace } from "./card-face";
 import { PackFoil, PackSheen } from "./pack";
@@ -73,6 +73,7 @@ const REVEAL_SOUND: Record<NexamonRarity, SoundName> = {
   ultra: "pullUltra",
   prisma: "pullPrisma",
   legendary: "pullLegendary",
+  one_of_one: "pullOneOfOne",
 };
 /** Upper part of the pack (share of its height) where a tear can start. */
 const TEAR_ZONE = 0.45;
@@ -347,8 +348,8 @@ export function PackOpening({
       onReveal?.(card, at);
       if (sound) playSound(REVEAL_SOUND[card.rarity]);
       if (!isHit(card.rarity)) return;
-      if ((card.rarity === "prisma" || card.rarity === "legendary") && stackRef.current)
-        burstConfetti(stackRef.current, card.rarity === "legendary" ? 36 : 22);
+      if (rarityRank(card.rarity) >= rarityRank("prisma") && stackRef.current)
+        burstConfetti(stackRef.current, card.rarity === "one_of_one" ? 64 : card.rarity === "legendary" ? 36 : 22);
     },
     [cards, onReveal, sound],
   );
@@ -612,6 +613,9 @@ export function PackOpening({
           )}
         </AnimatePresence>
 
+        <AnimatePresence>
+          {glow === "one_of_one" && <OneOfOneMoment key={`1of1-${index}`} reduced={reduced} />}
+        </AnimatePresence>
         {phase === "stack" && (
           <motion.div
             ref={stackRef}
@@ -627,7 +631,12 @@ export function PackOpening({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={SPRING.bouncy}
             className="relative rounded-sm focus-ring"
-            style={{ width: cardW, height: cardH }}
+            style={{
+              width: cardW,
+              height: cardH,
+              // above the darkening of a One of One
+              zIndex: glow === "one_of_one" ? "calc(var(--z-celebration) + 1)" : undefined,
+            }}
           >
             <AnimatePresence>
               {glow && (
@@ -710,5 +719,44 @@ export function PackOpening({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The biggest reveal of the game (ADR-174): the page goes dark, a white flash, then "ONE OF ONE" fades in slowly
+ * over the card. Only opacity and transform move; with reduced motion the words just stand there.
+ */
+function OneOfOneMoment({ reduced }: { reduced: boolean }) {
+  const t = useTranslations("nexamon");
+  return (
+    <motion.div
+      aria-hidden
+      data-testid="one-of-one-moment"
+      className="pointer-events-none fixed inset-0 z-celebration"
+      initial={{ opacity: reduced ? 1 : 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: DURATION.slow } }}
+      transition={{ duration: DURATION.slower, ease: EASE.out }}
+    >
+      <div className="absolute inset-0 bg-scrim" />
+      <div className="absolute inset-0 bg-scrim opacity-60" />
+      {!reduced && (
+        <motion.div
+          className="absolute inset-0 bg-fg-inverse"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0, 0.9, 0] }}
+          transition={{ duration: DURATION.slower * 4, times: [0, 0.35, 0.45, 1], ease: EASE.out }}
+        />
+      )}
+      <motion.div
+        className="absolute inset-x-0 top-[12%] text-center"
+        initial={reduced ? false : { opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: reduced ? 0 : DURATION.slower * 2, duration: DURATION.slower * 2, ease: EASE.out }}
+      >
+        <p className="font-pixel text-3xl text-gold uppercase lg:text-5xl">{t("opening.oneOfOne")}</p>
+        <p className="mx-auto mt-2 max-w-xs px-4 text-sm text-pretty text-fg-inverse">{t("opening.oneOfOneText")}</p>
+      </motion.div>
+    </motion.div>
   );
 }

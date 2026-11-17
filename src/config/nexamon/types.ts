@@ -13,38 +13,73 @@ export const NEXAMON_SET_PREFIX: Record<NexamonSetKey, string> = {
   cosmic_winds: "cw",
 };
 
-/** Rarities, worst first. "one_of_one" (ADR-174): a card that exists exactly once in the whole game. */
+/**
+ * Every rarity of every set (ADR-174). A set declares which of them it uses, in card-number order, in
+ * `NEXAMON_SET_LAYOUT`; a new set with its own rarities (e.g. Titans Revenge: iron, titanium, diamond, uranium) adds
+ * them here and fills the per-rarity records (rank, art size, prices, badges, rules); TypeScript lists every place.
+ * "one_of_one": a card that exists exactly once in the whole game.
+ */
 export const NEXAMON_RARITIES = ["common", "rare", "ultra", "prisma", "legendary", "one_of_one"] as const;
 export type NexamonRarity = (typeof NEXAMON_RARITIES)[number];
-/** Cards per rarity of a set, in card-number order (common first, numbered by rarity). */
-export type NexamonRarityLayout = Readonly<Record<NexamonRarity, number>>;
-const CLASSIC_LAYOUT: NexamonRarityLayout = { common: 50, rare: 10, ultra: 10, prisma: 5, legendary: 2, one_of_one: 0 };
 /**
- * The rarity layout of every set: the first three sets 1-50, 51-60, 61-70, 71-75, 76-77; Cosmic Winds 1-50, 51-65,
- * 66-80, 81-85, 86-87 and the One of Ones 88-90.
+ * Rank of a rarity across all sets, higher is rarer: sorting, badges, the Pack Battle tie-break, "is it a hit", the
+ * size of the reveal. Ranks may be shared by rarities of different sets (a set's own scale maps onto this one).
  */
-export const NEXAMON_SET_LAYOUT: Record<NexamonSetKey, NexamonRarityLayout> = {
+export const NEXAMON_RARITY_RANK: Record<NexamonRarity, number> = {
+  common: 0,
+  rare: 1,
+  ultra: 2,
+  prisma: 3,
+  legendary: 4,
+  one_of_one: 5,
+};
+/** One entry of a set's layout: a rarity and how many cards of it, numbered on from the entry before. */
+export type NexamonLayoutEntry = readonly [rarity: NexamonRarity, count: number];
+const CLASSIC_LAYOUT: readonly NexamonLayoutEntry[] = [
+  ["common", 50],
+  ["rare", 10],
+  ["ultra", 10],
+  ["prisma", 5],
+  ["legendary", 2],
+];
+/**
+ * The rarities of every set in card-number order, worst first, with their counts: the first three sets 1-50,
+ * 51-60, 61-70, 71-75, 76-77; Cosmic Winds 1-50, 51-65, 66-80, 81-85, 86-87 and the One of Ones 88-90.
+ */
+export const NEXAMON_SET_LAYOUT: Record<NexamonSetKey, readonly NexamonLayoutEntry[]> = {
   mystic_energy: CLASSIC_LAYOUT,
   super_apex: CLASSIC_LAYOUT,
   prismatic_peak: CLASSIC_LAYOUT,
-  cosmic_winds: { common: 50, rare: 15, ultra: 15, prisma: 5, legendary: 2, one_of_one: 3 },
+  cosmic_winds: [
+    ["common", 50],
+    ["rare", 15],
+    ["ultra", 15],
+    ["prisma", 5],
+    ["legendary", 2],
+    ["one_of_one", 3],
+  ],
 };
+/** Cards of a rarity in a set (0 if the set does not use it). */
+export const nexamonRarityCount = (set: NexamonSetKey, rarity: NexamonRarity): number =>
+  NEXAMON_SET_LAYOUT[set].find(([r]) => r === rarity)?.[1] ?? 0;
 /** Cards of a set. */
 export const nexamonSetSize = (set: NexamonSetKey): number =>
-  NEXAMON_RARITIES.reduce((sum, r) => sum + NEXAMON_SET_LAYOUT[set][r], 0);
+  NEXAMON_SET_LAYOUT[set].reduce((sum, [, n]) => sum + n, 0);
 /** First and last card number of a rarity in a set; null if the set has none. */
 export function nexamonRarityRange(set: NexamonSetKey, rarity: NexamonRarity): readonly [number, number] | null {
   let first = 1;
-  for (const r of NEXAMON_RARITIES) {
-    const n = NEXAMON_SET_LAYOUT[set][r];
+  for (const [r, n] of NEXAMON_SET_LAYOUT[set]) {
     if (r === rarity) return n > 0 ? [first, first + n - 1] : null;
     first += n;
   }
   return null;
 }
-/** Rarities a set has, worst first. */
+/** Rarities a set has, worst first (its number order). */
 export const nexamonSetRarities = (set: NexamonSetKey): NexamonRarity[] =>
-  NEXAMON_RARITIES.filter((r) => NEXAMON_SET_LAYOUT[set][r] > 0);
+  NEXAMON_SET_LAYOUT[set].filter(([, n]) => n > 0).map(([r]) => r);
+/** All rarities by rank, worst first (rarities of different sets mixed). */
+export const nexamonRaritiesByRank = (): NexamonRarity[] =>
+  [...NEXAMON_RARITIES].sort((a, b) => NEXAMON_RARITY_RANK[a] - NEXAMON_RARITY_RANK[b]);
 
 export const NEXAMON_TYPES = [
   "fire",
@@ -140,9 +175,9 @@ export function nexamonPriceRange(set: NexamonSetKey, rarity: NexamonRarity): re
 /** The rarity of card number `n` in a set (default: the layout of the first three sets). */
 export function nexamonRarityOfNumber(n: number, set: NexamonSetKey = "mystic_energy"): NexamonRarity {
   let last = 0;
-  for (const r of NEXAMON_RARITIES) {
-    last += NEXAMON_SET_LAYOUT[set][r];
-    if (n <= last && NEXAMON_SET_LAYOUT[set][r] > 0) return r;
+  for (const [r, count] of NEXAMON_SET_LAYOUT[set]) {
+    last += count;
+    if (n <= last && count > 0) return r;
   }
   return nexamonSetRarities(set).at(-1)!;
 }
@@ -156,7 +191,7 @@ export function placeholderSet(set: NexamonSetKey): NexamonCard[] {
     const rarity = nexamonRarityOfNumber(number, set);
     const index = (seen[rarity] = (seen[rarity] ?? 0) + 1) - 1;
     const [lo, hi] = nexamonPriceRange(set, rarity);
-    const steps = Math.max(1, NEXAMON_SET_LAYOUT[set][rarity] - 1);
+    const steps = Math.max(1, nexamonRarityCount(set, rarity) - 1);
     const startPriceCents = Math.round(lo + ((hi - lo) * index) / steps);
     return {
       key: nexamonKey(set, number),

@@ -16,7 +16,7 @@ import { GOLD_INK } from "@/components/pixel/nexamon-symbols";
 import {
   clampGrade,
   fitTextScale,
-  formatCardNumber,
+  formatSetNumber,
   formatGrade,
   formatSerial,
   gradeNumber,
@@ -147,7 +147,7 @@ export function NexamonSlab({
               className="overflow-hidden font-sans nums font-semibold whitespace-nowrap"
               style={{ ...at(l.x + 21, l.y + 11, 36, 4), fontSize: u * 2.6, lineHeight: `${u * 4}px` }}
             >
-              {t(`sets.${card.set}`)} · {formatCardNumber(card.number)}
+              {t(`sets.${card.set}`)} · {formatSetNumber(card)}
             </p>
             <p
               className="overflow-hidden font-pixel whitespace-nowrap uppercase"

@@ -7,6 +7,9 @@ import {
   nexamonAiAskCents,
   nexamonOneOfOneChance,
   nexamonOneOfOneHit,
+  nexamonPackRule,
+  nexamonTierOdds,
+  nexamonTierRarities,
   nexamonTradeOnly,
   nexamonAiBuyChanceBps,
   nexamonAiBuyCounts,
@@ -210,6 +213,45 @@ describe("Nexamon packs (ADR-165)", () => {
       if (nexamonOpenPack(cosmic, rng2.next, cfg, { freeOneOfOnes: free })[4]!.rarity === "one_of_one") hits++;
     expect(hits).toBeGreaterThanOrEqual(8);
     expect(hits).toBeLessThanOrEqual(35);
+  }, 60_000);
+
+  it("fills a pack by a set's own tier rule (ADR-174: the shape Titans Revenge uses)", () => {
+    // stand-in rarities: "common" as the base, three tiers above
+    const rule = {
+      kind: "tiers" as const,
+      base: "common",
+      tiers: [
+        { rarity: "legendary", packs: 500, min: 1, max: 1 },
+        { rarity: "prisma", packs: 50, min: 1, max: 1 },
+        { rarity: "rare", packs: 5, min: 1, max: 2 },
+      ],
+    };
+    expect(nexamonPackRule("mystic_energy")).toBeNull();
+    // all tiers hit (roll 0), counts at their max (roll ~1): back to front legendary, prisma, rare, rare
+    const sure = [0, 0.99, 0, 0.99, 0, 0.99];
+    expect(nexamonTierRarities(rule, () => sure.shift() ?? 0.5)).toEqual([
+      "common",
+      "rare",
+      "rare",
+      "prisma",
+      "legendary",
+    ]);
+    expect(nexamonTierRarities(rule, () => 0.5)).toEqual(Array(5).fill("common"));
+    const rng = createRng(175);
+    const seen: Record<string, number> = {};
+    const packs = 50_000;
+    for (let i = 0; i < packs; i++) {
+      const pulls = nexamonOpenPack(SET, rng.next, cfg, { rule });
+      expect(new Set(pulls.filter((p) => p.rarity === "common").map((p) => p.key)).size).toBe(
+        pulls.filter((p) => p.rarity === "common").length,
+      );
+      for (const p of new Set(pulls.map((x) => x.rarity))) seen[p] = (seen[p] ?? 0) + 1;
+    }
+    const near = (got: number, p: number) =>
+      expect(Math.abs(got - packs * p)).toBeLessThan(5 * Math.sqrt(packs * p * (1 - p)));
+    near(seen.rare ?? 0, 1 / 5);
+    near(seen.prisma ?? 0, 1 / 50);
+    expect(nexamonTierOdds(rule).map((t) => t.perPack)).toEqual([1 / 500, 1 / 50, 1 / 5]);
   }, 60_000);
 
   it("keeps the AI away from One of Ones and their value trade-only", () => {
