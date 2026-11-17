@@ -25,6 +25,17 @@ const prizeSchema = z
       name: z.string().optional(),
     }),
     z.object({ kind: z.literal("nft"), artwork: artworkSchema }),
+    z.object({
+      kind: z.literal("accessory"),
+      tier: z.string(),
+      key: z.string().optional(),
+      name: z.string().optional(),
+    }),
+    z.object({
+      kind: z.literal("packs"),
+      packs: z.array(z.object({ set: z.string(), count: z.number(), name: z.string() })),
+      cents: z.number(),
+    }),
     z.object({ kind: z.literal("none") }),
   ])
   .catch({ kind: "none" });

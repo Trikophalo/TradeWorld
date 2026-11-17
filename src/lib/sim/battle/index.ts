@@ -16,6 +16,11 @@ import { potatoClone, potatoInit, potatoRanking, potatoStep, type PotatoState } 
 import { pumpClone, pumpInit, pumpRanking, pumpStep, type PumpState } from "./pump.ts";
 import { rodeoClone, rodeoInit, rodeoRanking, rodeoStep, type RodeoState } from "./rodeo.ts";
 import { sumoClone, sumoInit, sumoRanking, sumoStep, type SumoState } from "./sumo.ts";
+import { zoneClone, zoneInit, zoneRanking, zoneStep, type ZoneState } from "./zone.ts";
+import { tagClone, tagInit, tagRanking, tagStep, type TagState } from "./tag.ts";
+import { tilesClone, tilesInit, tilesRanking, tilesStep, type TilesState } from "./tiles.ts";
+import { paintClone, paintInit, paintRanking, paintStep, type PaintState } from "./paint.ts";
+import { crashClone, crashInit, crashRanking, crashStep, type CrashState } from "./crash.ts";
 
 export type { SimParams } from "./core.ts";
 
@@ -32,6 +37,11 @@ export interface StateOf {
   elevator: ElevatorState;
   laser: LaserState;
   rodeo: RodeoState;
+  zone: ZoneState;
+  tag: TagState;
+  tiles: TilesState;
+  paint: PaintState;
+  crash: CrashState;
 }
 export type AnyBattleState = StateOf[TickKind];
 
@@ -111,6 +121,29 @@ const GAMES: { [K in TickKind]: Game<StateOf[K], (typeof BATTLE_RULES.games)[K]>
     step: rodeoStep,
     clone: rodeoClone,
     ranking: rodeoRanking,
+    maxTicks: (p) => p.game.maxTicks,
+  },
+  zone: { init: zoneInit, step: zoneStep, clone: zoneClone, ranking: zoneRanking, maxTicks: (p) => p.game.maxTicks },
+  tag: { init: tagInit, step: tagStep, clone: tagClone, ranking: tagRanking, maxTicks: (p) => p.game.maxTicks },
+  tiles: {
+    init: tilesInit,
+    step: tilesStep,
+    clone: tilesClone,
+    ranking: tilesRanking,
+    maxTicks: (p) => p.game.maxTicks,
+  },
+  paint: {
+    init: paintInit,
+    step: paintStep,
+    clone: paintClone,
+    ranking: paintRanking,
+    maxTicks: (p) => p.game.durationTicks,
+  },
+  crash: {
+    init: crashInit,
+    step: crashStep,
+    clone: crashClone,
+    ranking: crashRanking,
     maxTicks: (p) => p.game.maxTicks,
   },
 };

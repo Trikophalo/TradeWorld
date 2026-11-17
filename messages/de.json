@@ -8134,7 +8134,19 @@
       "skinHint": "Gibt es nur hier",
       "nft": "NFT „{title}“",
       "none": "Ruhm und Ehre",
-      "fallback": "(statt des Preises, der vergeben war)"
+      "fallback": "(statt des Preises, der vergeben war)",
+      "accessory": "Zufälliges Accessoire: {tier}",
+      "accessoryHint": "Eins, das du noch nicht hast",
+      "packs": "Ungeöffnete Booster",
+      "packsHint": "Landen bei Collectibles, öffnen, wann du willst",
+      "packLine": "{count} × {set}",
+      "tiers": {
+        "common": "Gewöhnlich",
+        "rare": "Selten",
+        "epic": "Episch",
+        "legendary": "Legendär",
+        "mythic": "Mythisch"
+      }
     },
     "prizeWinsLeft": "{count, plural, =0 {Heute keine Preise mehr: Du spielst um die Ehre.} one {Noch # Sieg mit Preis heute} other {Noch # Siege mit Preis heute}}",
     "running": "Battle läuft: {game}",
@@ -8242,6 +8254,31 @@
         "name": "Wer bietet mehr?",
         "tagline": "Geheime Gebote, nur einer bekommt den Zuschlag.",
         "rules": "Jeder hat 1.000 Taler Spielgeld. In jeder Runde kommt ein Schatz mit Punkten unter den Hammer. Biete geheim: Das höchste Gebot bekommt die Punkte und zahlt. Wer am Ende die meisten Punkte hat, gewinnt."
+      },
+      "zone": {
+        "name": "Goldrausch-Zone",
+        "tagline": "Die Zone schrumpft. Gold einsammeln, drinbleiben!",
+        "rules": "Sammel Münzen in der goldenen Zone, jede fünfte ist Gold (3). Die Zone schrumpft Ring für Ring, wer beim Schrumpfen draußen steht, ist raus. Wer zuletzt steht, gewinnt, sonst die meisten Münzen."
+      },
+      "tag": {
+        "name": "Bulle und Bär",
+        "tagline": "Lauf, kleiner Bulle, der Bär kommt!",
+        "rules": "Einer ist der Bär und ein bisschen schneller. Läuft er in einen Bullen, wird der zum Bären und steht kurz still. Wer am kürzesten Bär war, gewinnt."
+      },
+      "tiles": {
+        "name": "Wackelparkett",
+        "tagline": "Jeder Schritt bricht hinter dir weg.",
+        "rules": "Wo du warst, bricht der Boden kurz danach weg und wächst erst später nach. Wer zu lange stehen bleibt oder auf einem brechenden Feld steht, fällt. Wer zuletzt steht, gewinnt."
+      },
+      "paint": {
+        "name": "Farbrausch",
+        "tagline": "Mal das Parkett in deiner Farbe an!",
+        "rules": "Jedes Feld, auf dem du stehst, bekommt deine Farbe. Mit der Aktion wirfst du eine Farbbombe (3 × 3), dann lädt sie kurz nach. Wer am Ende die meisten Felder hat, gewinnt."
+      },
+      "crash": {
+        "name": "Crash-Regen",
+        "tagline": "Es regnet Kursstürze. Ausweichen!",
+        "rules": "Rote Warnkreuze zeigen, wo gleich ein Crash einschlägt. Ein Treffer kostet ein Herz. Die Wellen kommen schneller und größer. Wer zuletzt steht, gewinnt."
       }
     },
     "controls": {
@@ -8264,7 +8301,9 @@
       "vaultKeys": "Tasten 1 bis 6, Enter zum Probieren",
       "tickerKeys": "Tippen oder das Kürzel eintippen",
       "higherKeys": "Pfeil hoch oder runter, oder tippen",
-      "auctionKeys": "Gebot wählen und abgeben"
+      "auctionKeys": "Gebot wählen und abgeben",
+      "paintAction": "Leertaste: Farbbombe",
+      "bombButton": "Bombe"
     },
     "intro": {
       "battle": "News-Battle #{id}",
@@ -8295,7 +8334,13 @@
       "called": "Gong!",
       "height": "{rows} m",
       "jump": "Spring!",
-      "laserComing": "Laser!"
+      "laserComing": "Laser!",
+      "zoneShrink": "Die Zone schrumpft!",
+      "bear": "Du bist der Bär!",
+      "bearName": "Bär: {name}",
+      "bearTime": "{seconds} s Bär",
+      "tiles": "{count} Felder",
+      "crashComing": "Crash im Anflug!"
     },
     "pump": {
       "green": "Pumpen!",

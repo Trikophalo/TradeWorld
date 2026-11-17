@@ -31,6 +31,8 @@ export type BattlePrize =
   | { kind: "money"; cents: number; fallback?: boolean }
   | { kind: "skin"; accessories?: string[]; key?: string; name?: string }
   | { kind: "nft"; artwork: BattleArtwork }
+  | { kind: "accessory"; tier: string; key?: string; name?: string; fallback?: boolean }
+  | { kind: "packs"; packs: { set: string; count: number; name: string }[]; cents: number }
   | { kind: "none" };
 
 /** The rules of a running battle, copied by the server at the start (battles.params). */
