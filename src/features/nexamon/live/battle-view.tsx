@@ -234,16 +234,19 @@ function Arena({
             innerRef={winner === seat.seat ? winnerRef : undefined}
           />
         ))}
-        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
-          <motion.span
-            className="rounded-pill border-2 border-line-2 bg-surface-1 px-3 py-1 font-pixel text-sm text-fg-1 shadow-2"
-            animate={phase === "countdown" && !reduced ? { scale: [1, 1.25, 1] } : undefined}
-            transition={{ duration: DURATION.slower, repeat: phase === "countdown" ? Infinity : 0 }}
-            data-testid="battle-center"
-          >
-            {phase === "countdown" ? countdown : t("battle.vs")}
-          </motion.span>
-        </div>
+        {/* With 3 or 4 seats the badge sits on the cards: only the countdown, no "VS" */}
+        {(!many || phase === "countdown") && (
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
+            <motion.span
+              className="rounded-pill border-2 border-line-2 bg-surface-1 px-3 py-1 font-pixel text-sm text-fg-1 shadow-2"
+              animate={phase === "countdown" && !reduced ? { scale: [1, 1.25, 1] } : undefined}
+              transition={{ duration: DURATION.slower, repeat: phase === "countdown" ? Infinity : 0 }}
+              data-testid="battle-center"
+            >
+              {phase === "countdown" ? countdown : t("battle.vs")}
+            </motion.span>
+          </div>
+        )}
       </div>
       <AnimatePresence>
         {decided && winnerSeat && (
