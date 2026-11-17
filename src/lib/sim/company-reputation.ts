@@ -47,10 +47,11 @@ export function reputationDrivers(
   const quality = clamp(h.quality, 0, 1);
   const neutral = clamp(cfg.qualityNeutral, 0.01, 0.99);
   const q = quality >= neutral ? (quality - neutral) / (1 - neutral) : (quality - neutral) / neutral;
+  const qualityPoints = q >= 0 ? cfg.qualityMax * q : cfg.qualityMaxLoss * q;
   const served = h.demandCents > 0 ? clamp(h.capacityCents / h.demandCents, 0, 1) : 1;
   const paid = clamp(h.payFactorBps / 10_000, 0, 1);
   return {
-    quality: cfg.qualityMax * q,
+    quality: qualityPoints,
     delivery: -cfg.deliveryMaxLoss * (1 - served),
     price:
       h.priceLevel === "premium" && quality < premiumMinQuality

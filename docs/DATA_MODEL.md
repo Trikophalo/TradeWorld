@@ -8055,3 +8055,27 @@ Migrationen `20261204006900_company_economy`, `…6910_company_autopilot`, `…6
 - RPCs: `get_company_autopilot()` (Mitglieder) und `set_company_autopilot(p_request_id, p_on)` (Gründer, idempotent)
   liefern `{on, can_toggle, mood, chance_bps, reward_bps, fail_penalty_bps, max_per_day, every_minutes,
 pay_factor_bps, today {done, success, cents}, log [...], last_hour {…, ai_utilization_bps, awareness_parts}}`.
+
+## Nachtrag: Ruf für jede Firma, robuste Stunde, Daten für „Was jeder leistet“ (ADR-183)
+
+- `player_companies.reputation` (`double precision`, Standard 50, 0 … 100): Ruf jeder Spielerfirma. Notierte Firmen
+  spiegeln `listed_companies.reputation` (Quelle der notierten Regeln); `company_reputation_record` und
+  `company_reputation_bump` schreiben beide.
+- `player_company_hours.reputation`, `reputation_target` (`double precision`), `reputation_drivers` (`jsonb`: quality,
+  delivery, price, wages, bills, crisis, campaign; notiert zusätzlich base, items, greed, reinvest, dividends,
+  scandal): der Ruf nach der Stunde, sein Ziel und die Treiber.
+- `job_runs` mit `job_name = 'company_hour_step'`, `run_key = '<company_id>:<schritt>'`: ein Nebenschritt der
+  Stundenabrechnung (reputation, projects, quit_notice, mood_notice, greed_feed, fair_value, missions, tax_office,
+  board) ist gescheitert; die Stunde selbst ist verbucht. Jede Stunde löscht die Einträge der Firma vorher.
+- Funktionen (intern, `SECURITY DEFINER`, nur der Server): `company_reputation_cfg`, `company_reputation_drivers`,
+  `company_reputation_target`, `company_reputation_demand_factor`, `company_reputation_drivers_of`,
+  `company_reputation_record`, `company_reputation_bump`, `company_close_warn`, `company_close_warnings_json`,
+  `company_reputation_json`. Voll neu definiert: `listed_ensure` (Börsengang behält den Ruf), `listed_reputation_bump`,
+  `listed_hour_effect` (private Firmen: Nachfragefaktor des Rufs), `listed_hour_after` (Ruf jeder Firma, jeder
+  Nebenschritt in einem eigenen Block), `company_interview_finish` (Ruf jeder Firma), `company_hours_json`,
+  `company_state`.
+- **COMPANY** (`get_my_company` und jede RPC mit `company`): neu `reputation` = `{value, target, demand_factor,
+drivers, at, history: [{hour_start, value, target}]}` (letzte 48 Stunden) und `close_warnings` =
+  `[{step, at, error, failures}]` (letzte 24 Stunden). Jede Stunde in `hours` trägt zusätzlich `demand_cents`,
+  `capacity_cents`, `strength_bonus_cents`, `ai_utilization_bps`, `ai_wages_paid_cents`, `player_wages_paid_cents`,
+  `reputation`.

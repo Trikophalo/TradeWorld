@@ -12,7 +12,7 @@ import { reputationTarget } from "./listed.ts";
 
 const cfg = BALANCE.companyHealth.reputation;
 const calm: ReputationHour = {
-  quality: 0.5,
+  quality: 0.4,
   demandCents: 10_000,
   capacityCents: 12_000,
   priceLevel: "normal",
@@ -52,7 +52,7 @@ describe("company reputation (ADR-183)", () => {
       },
       cfg,
     );
-    expect(d.quality).toBeCloseTo(-cfg.qualityMax);
+    expect(d.quality).toBeCloseTo(-cfg.qualityMaxLoss);
     expect(d.delivery).toBeCloseTo(-cfg.deliveryMaxLoss / 2);
     expect(d.wages).toBeCloseTo(-cfg.wagesMaxLoss / 2);
     expect(d.bills).toBe(-cfg.billsLoss);

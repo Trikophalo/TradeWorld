@@ -4029,3 +4029,62 @@ Haushalte haben. Das Haushaltskonto ist im Auge zu behalten. Die Garage-Simulati
 jetzt unter 5 % Pleiten und über 85 % Gewinn (vorher 20–45 % Pleiten); das Risiko liegt bei den großen Rechtsformen.
 Ältere SQL-Tests prüfen die Mechanik weiter mit den alten Zahlen (Vorspann in den Dateien). Die Demo macht alles nach,
 den Autopiloten nur, wenn die Seite offen ist.
+
+## ADR-183: Firma-Überarbeitung – Ruf für jede Firma, robuste Stunde, „Was jeder leistet“ wie die Abrechnung, flacher Aufbau — `Annahme`
+
+**Kontext.** Aktive Spieler melden: Die Firma ist zu verschachtelt, der Ruf wirkt nicht oder nur teilweise, „Wo es
+fehlt“ ist unübersichtlich, „Was jeder leistet“ zeigt Kosten, aber 0 € Leistung. Zusätzlich hing der Live-Deploy
+stundenlang an Migration 6600, sodass neuer Client-Code gegen eine alte Datenbank lief. Volle Analyse mit
+Funktionskarte: `docs/FIRMA_ANALYSE.md`.
+
+**Befunde (nachgestellt über die echten RPCs auf einer lokalen Datenbank, Client-Abbildung mit echten Antworten).**
+
+1. _Ruf:_ nur `listed_companies.reputation` (notiert), `profiles.reputation` wird nie bewegt. Private Firmen hatten
+   keinen Ruf, Interviews rechneten ihn für sie auf 0. Das Ziel notierter Firmen kannte nur Basis, Forschung, Gier,
+   Reinvestition, Dividenden und Skandal: Eine ordentlich geführte Firma ohne Auszahlung und Dividende stand exakt bei
+   50, der Graph flach. Der Börsengang setzte den Ruf auf 50.
+2. _Stunde:_ `listed_hour_after` (Finanzamt, Geschäftsrat, Meldungen, Missionen, fairer Kurs) lief ohne eigene
+   Fehlerbehandlung am Ende der Stundenabrechnung. Ein Fehler dort rollte die ganze Stunde der Firma zurück: keine
+   Stunde, kein Ruf, „Verlauf“ leer, „bringt 0 €“ (die Meldungen aus ADR-176). Auf Live fehlte ohne 6600 auch die
+   Anzeige `close_error`.
+3. _„Was jeder leistet“:_ Leistung nur aus den letzten Stunden, ohne Stunde also überall 0 €. Aufgeteilt nach
+   Produktivität, obwohl seit ADR-180 Gründer und Spieler zuerst bedienen und KI-Kräfte nur den Rest; KI-Kräfte mit
+   vollem Lohn statt nach Auslastung, Spieler mit 8 h statt dem gezahlten Lohn.
+4. _„Wo es fehlt“:_ Rechnung richtig, Darstellung unklar (keine Skala, keine Erklärung, kein Was-tun, eingeklappt).
+5. _Aufbau:_ bis zu drei Ebenen (Tab → Gruppe → Akkordeon → Karte), 17 Akkordeons, Tutorial-Ziele teils eingeklappt,
+   Chat auf dem Handy vor dem Team.
+
+**Entscheidung.**
+
+- **Ruf für jede Firma** (Migration 7300, `src/lib/sim/company-reputation.ts`, Werte `companyHealth.reputation`):
+  `player_companies.reputation` für alle, notierte Firmen spiegeln `listed_companies.reputation` (die Quelle aller
+  notierten Regeln bleibt). Jede Stunde: Ziel = 50 (notiert: das Aktionärsziel aus ADR-167) + Qualität (−5 bei 0,
+  neutral bei 40 %, +10 bei 100 %) + Lieferfähigkeit (−8 × unbedienter Anteil) + Preis (günstig +2, Premium unter der
+  Mindestqualität −6) + Löhne (−10 × unbezahlter Anteil) + offene Rechnungen (−6) + Krise (−3 je Stufe) + Kampagne
+  (+3), auf 0 … 100 begrenzt; der Wert rückt 8 % der Lücke vor. Nachfrage × (1 + 0,2 × (Ruf − 50) / 50) jetzt auch für
+  private Firmen (`listed_hour_effect`, `closeStartupHour.reputationDemandFactor`). Die Stunde speichert Wert, Ziel und
+  Treiber (`player_company_hours.reputation*`), `company_state.reputation` liefert sie mit 48 Stunden Verlauf.
+  Interviews wirken auf jede Firma (`company_interview_finish`, `interviewEffects`), der Börsengang behält den Ruf
+  (`listed_ensure`), Einmaländerungen halten beide Werte gleich (`company_reputation_bump`).
+- **Robuste Stunde:** jeder Nebenschritt von `listed_hour_after` in einem eigenen Block; ein Fehler wird als Warnung in
+  `job_runs` (`company_hour_step`) vermerkt, steht auf dem Dashboard (`company_state.close_warnings`) und verschwindet
+  mit der nächsten guten Stunde. Die Stunde selbst bleibt verbucht.
+- **„Was jeder leistet“** (Migration 7310, `staff-value.ts`): `company_hours_json` liefert Nachfrage, Kapazität,
+  Stärken-Bonus, KI-Auslastung und gezahlte Löhne; der Client teilt wie die Abrechnung (Menschen zuerst, KI-Kräfte den
+  Rest, Auftragsarbeit nach freier Kapazität, Bonus mit den Verkäufen) und nimmt die gezahlten Löhne. Ältere Server
+  ohne diese Felder: nach Auslastung, dann nach Produktivität.
+- **„Wo es fehlt“:** acht Faktoren und Logik unverändert; Netzdiagramm mit Skala und farbigen Werten, Legende,
+  Gesamtwert, größter Hebel mit „Was tun“, Liste nach möglichem Gewinn, je Faktor: was er misst, Grund in Zahlen, was zu
+  tun ist, Bezug zur Stärke, möglicher Gewinn, Mira.
+- **Aufbau:** Statuszeile unter dem Firmenschild (Zustand, Bekanntheit, Qualität, Ruf, Stärken, je mit „i“). Jeder Tab
+  in flache Abschnitte mit Symbol, Titel und Zweck (`FirmSection`, `SubSection`), klebende Sprungleiste
+  (`SectionNav`), keine Akkordeons mehr (der Store `sections.ts` entfällt). Kennzahlen und Marketing mit „i“-Erklärung
+  (`InfoTip` über die vorhandene Tooltip-Komponente). Deep Links und Mira-Ziele führen auf dieselben Stellen
+  (`tabs.ts`), `data-tour` bleibt.
+- **Tests:** `company-reputation.test.ts`, `staff-value.test.ts`, `interviews.test.ts`, SQL `c3_firma_qa.sql`, E2E
+  `firma-qa.spec.ts`; ältere SQL-Tests, die exakte Nachfragezahlen prüfen, setzen `demandMaxEffect` des Rufs auf 0
+  (Vorspann in den Dateien).
+
+**Offen.** Ob auf Live eine Firma an einem Nebenschritt scheiterte, zeigt nach dem Deploy
+`select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
+aus Spec 6.6) bleibt unbenutzt.

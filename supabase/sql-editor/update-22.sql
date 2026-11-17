@@ -3053,7 +3053,7 @@ as $$
 declare
   cfg       jsonb := public.company_reputation_cfg();
   v_q       double precision := least(1.0, greatest(0.0, coalesce(p_quality, 0)));
-  v_neutral double precision := least(0.99, greatest(0.01, public.cfg_num(cfg, '{qualityNeutral}', 0.5)));
+  v_neutral double precision := least(0.99, greatest(0.01, public.cfg_num(cfg, '{qualityNeutral}', 0.4)));
   v_rel     double precision;
   v_served  double precision;
   v_paid    double precision := least(1.0, greatest(0.0, coalesce(p_pay_factor_bps, 10000) / 10000.0));
@@ -3062,7 +3062,8 @@ begin
   v_rel := case when v_q >= v_neutral then (v_q - v_neutral) / (1 - v_neutral) else (v_q - v_neutral) / v_neutral end;
   v_served := case when coalesce(p_demand, 0) > 0 then least(1.0, greatest(0.0, coalesce(p_capacity, 0) / p_demand)) else 1 end;
   return jsonb_build_object(
-    'quality', public.cfg_num(cfg, '{qualityMax}', 10) * v_rel,
+    'quality', case when v_rel >= 0 then public.cfg_num(cfg, '{qualityMax}', 10) * v_rel
+                    else public.cfg_num(cfg, '{qualityMaxLoss}', 5) * v_rel end,
     'delivery', -public.cfg_num(cfg, '{deliveryMaxLoss}', 8) * (1 - v_served),
     'price', case when p_price_level = 'premium' and v_q < v_premium then -public.cfg_num(cfg, '{premiumLowQualityLoss}', 6)
                   when p_price_level = 'budget' then public.cfg_num(cfg, '{budgetGain}', 2)

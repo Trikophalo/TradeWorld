@@ -986,8 +986,10 @@ export interface BalanceConfig {
       readonly base: number;
       readonly adjustPerHour: number;
       readonly demandMaxEffect: number;
-      /** Points at quality 1 (and minus at 0); 0.5 is neutral. */
+      /** Points at quality 1; between the neutral quality and 1 linear. */
       readonly qualityMax: number;
+      /** Points lost at quality 0; between 0 and the neutral quality linear (new companies start at 0.25). */
+      readonly qualityMaxLoss: number;
       /** Quality that counts as neutral. */
       readonly qualityNeutral: number;
       /** Points lost when no customer could be served (scaled by the unserved share of the demand). */
@@ -2768,7 +2770,8 @@ export const BALANCE = {
       adjustPerHour: 0.08,
       demandMaxEffect: 0.2,
       qualityMax: 10,
-      qualityNeutral: 0.5,
+      qualityMaxLoss: 5,
+      qualityNeutral: 0.4,
       deliveryMaxLoss: 8,
       premiumLowQualityLoss: 6,
       budgetGain: 2,
