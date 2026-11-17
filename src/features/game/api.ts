@@ -13,6 +13,7 @@ import { DEAL_RPC_SCHEMAS, liveDealEngine } from "./api-deals";
 import { PROPERTY_RPC_SCHEMAS, livePropertyEngine } from "./api-property";
 import { RENTAL_RPC_SCHEMAS, liveRentalEngine } from "./api-rentals";
 import { TASK_RPC_SCHEMAS, liveTaskEngine } from "./api-tasks";
+import { AWARENESS_RPC_SCHEMAS, liveAwarenessEngine } from "./api-awareness";
 import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
@@ -563,6 +564,7 @@ export const RPC_SCHEMAS = {
   ...PROPERTY_RPC_SCHEMAS,
   ...RENTAL_RPC_SCHEMAS,
   ...TASK_RPC_SCHEMAS,
+  ...AWARENESS_RPC_SCHEMAS,
   ...PITCH_RPC_SCHEMAS,
   ...PROTEST_RPC_SCHEMAS,
   ...TOUR_RPC_SCHEMAS,
@@ -592,6 +594,7 @@ export const RPC_SCHEMAS = {
 
 export const liveEngine: GameEngine = {
   ...liveTaskEngine,
+  ...liveAwarenessEngine,
   ...livePitchEngine,
   ...liveProtestEngine,
   ...liveTourEngine,

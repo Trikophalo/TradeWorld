@@ -18,6 +18,13 @@ select tests.fund(:a, 90000000, 'test:a8:a');
 select tests.fund(:b, 90000000, 'test:a8:b');
 select coalesce(value -> 'demandNoise', '0.1') as noise0 from public.game_config where key = 'startups' \gset
 select tests.set_cfg('startups', '{demandNoise}', '0');
+-- ADR-188: the awareness model of src/config/balance.ts, whatever earlier files left behind
+select coalesce(value -> 'awareness', 'null') as aw_cfg0 from public.game_config where key = 'startups' \gset
+select tests.set_cfg('startups', '{awareness}',
+  '{"initial": 0.03, "min": 0.02, "cap": {"byTier": {"garage": 0.6, "small_business": 0.7, "gmbh": 0.8, "ag": 0.9},
+    "perStage": 0.05, "perExpansionLevel": 0.03, "max": 1}, "marketingMaxRatePerHour": 0.06,
+    "marketingHalfSaturationShare": 0.01, "marketingMinHalfSaturationCents": 50000, "wordOfMouthPerHour": 0.008,
+    "decayPerHour": 0.004, "taskGain": 0.005, "taskAiShareBps": 5000}') is null as ok \gset
 
 select tests.login_as('authenticated', :a);
 select public.found_company(gen_random_uuid(), 'Laut Werke', 'Werbung wirkt', 'tech', '#224466', 'garage') -> 'company' as fa \gset
@@ -49,11 +56,12 @@ select tests.assert(:nq = 0 or :awa > 0.03 + 0.03 * :nq and :awb > 0.03 and :awb
   'quarter close: marketing lifts awareness by several points per quarter, word of mouth alone a little');
 select tests.assert(:nq = 0 or
   (select awareness_bps from public.player_company_reports where company_id = :'aco' order by game_quarter_id desc limit 1)
-    = round(:awa * 10000)::int,
-  'report: awareness_bps is the new awareness in basis points');
+    between 300 and round(:awa * 10000)::int,
+  'report: awareness_bps is the awareness at the quarter close in basis points (ADR-180/188: it moves every hour)');
 select tests.login_as('authenticated', :a);
 select tests.assert((public.get_my_company() #>> '{company,awareness_bps}')::int = round(:awa * 10000)::int,
   'get_my_company(): awareness_bps = awareness x 10 000 (the client divides by 10 000)');
 reset role;
 
 select tests.set_cfg('startups', '{demandNoise}', :'noise0'::jsonb);
+select tests.set_cfg('startups', '{awareness}', :'aw_cfg0'::jsonb) is null as ok \gset

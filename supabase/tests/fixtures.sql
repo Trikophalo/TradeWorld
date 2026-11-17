@@ -1145,6 +1145,8 @@ select tests.login_as('authenticated', :fx_ta) is null as ok \gset
 select public.set_company_autopilot(gen_random_uuid(), true);
 \o :fixture_dir/get_company_autopilot.json
 select public.get_company_autopilot();
+\o :fixture_dir/get_company_awareness.json
+select public.get_company_awareness();
 \o
 select public.set_company_autopilot(gen_random_uuid(), false) is not null as ok \gset
 reset role;

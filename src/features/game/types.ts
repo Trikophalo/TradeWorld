@@ -1499,6 +1499,32 @@ export interface CompanyAutopilot {
   } | null;
 }
 
+/**
+ * Awareness of the company (ADR-188): one value 0..1, its cap (tier base + stages + expansion) and what moved it,
+ * per source as shares (0.012 = 1,2 Punkte): marketing, word_of_mouth, decay (negative), tasks, campaign, moves,
+ * interview, news, pitch, protest, event, rescale.
+ */
+export interface CompanyAwareness {
+  awareness: number;
+  cap: number;
+  floor: number;
+  tier: string;
+  stage: number;
+  expansionLevel: number;
+  /** Cap of the tier at stage 0 without expansion. */
+  tierCap: number;
+  perStage: number;
+  perExpansionLevel: number;
+  /** The strength "Bekanntheit" 0..100 (follows 100 × awareness / cap). */
+  strength: number;
+  /** The last closed hour, by source. */
+  lastHour: { hourStart: string; parts: Record<string, number> } | null;
+  /** Single events since that hour, by source. */
+  since: Record<string, number>;
+  /** Awareness after each of the last (up to 24) closed hours, oldest first. */
+  history: { hourStart: string; after: number }[];
+}
+
 export interface CompanyTaskPlay {
   id: number;
   key: string;
@@ -2463,6 +2489,8 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   setJobSupervisor(requestId: string, nickname: string, supervisor: string | null): Promise<CompanyTasks>;
   setCompanyTasksAutoAi(requestId: string, on: boolean): Promise<CompanyTasks>;
   companyAutopilot(): Promise<CompanyAutopilot>;
+  /** ADR-188: awareness, its cap and what moved it. */
+  companyAwareness(): Promise<CompanyAwareness>;
   setCompanyAutopilot(requestId: string, on: boolean): Promise<CompanyAutopilot>;
   newsFeed(kind: NewsFeedKind, limit: number): Promise<NewsFeedItem[]>;
   snapshot(): Promise<MarketSnapshot>;

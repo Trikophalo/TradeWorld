@@ -993,8 +993,11 @@ export interface BalanceConfig {
       readonly marginFull: number;
       /** Hours of running costs in cash that count as 100. */
       readonly cashHoursFull: number;
-      /** ADR-180: awareness that counts as 100 (before: 1.0, so 5 % awareness showed as 5 of 100). */
-      readonly awarenessFull: number;
+      /**
+       * ADR-188: the awareness score is awareness / cap × 100 and follows it this fast, up and down (the other scores
+       * use gainPerHour / decayPerHour).
+       */
+      readonly awarenessFollowPerHour: number;
       /** Bonus on the hour's revenue from an overall score (floor of the mean): the highest tier reached counts. */
       readonly rewards: readonly { readonly at: number; readonly bps: number }[];
     };
@@ -1537,17 +1540,39 @@ export interface StartupsConfig {
     readonly maxAnnualCents: number;
     readonly paretoAlpha: number;
   };
+  /**
+   * Awareness (ADR-188): one value per company, 0..1, moved every closed hour and by single events. Every change is
+   * booked by source into company_awareness_log, so the page can say what moved it.
+   */
   readonly awareness: {
     readonly initial: number;
+    /** Floor: nobody forgets the company completely; decay pulls toward it. */
     readonly min: number;
-    /** Word of mouth: + growth × a × (1 − a) × (0.5 + quality) per quarter. */
-    readonly growthPerQuarter: number;
-    readonly decayPerQuarter: number;
-    /** Marketing: + maxGain × budget / (budget + halfSaturation), halfSaturation = share × quarterly potential. */
-    readonly marketingMaxGain: number;
+    /**
+     * Highest awareness = tier base + perStage × stage + perExpansionLevel × level, at most max. A garage starts at
+     * 60 %; skills (stages) and expansion raise it. Shown to the player.
+     */
+    readonly cap: {
+      readonly byTier: Readonly<Record<"garage" | "small_business" | "gmbh" | "ag", number>>;
+      readonly perStage: number;
+      readonly perExpansionLevel: number;
+      readonly max: number;
+    };
+    /**
+     * Marketing: closes rate × (cap − awareness) per hour, rate = maxRatePerHour × q / (q + half), q = the hour's
+     * marketing × quarterHours, half = max(minHalfSaturationCents, share × quarterly potential).
+     */
+    readonly marketingMaxRatePerHour: number;
     readonly marketingHalfSaturationShare: number;
     readonly marketingMinHalfSaturationCents: number;
-    /** ADR-180: awareness a solved company task adds at once (share, 0.002 = 0,2 Punkte); AI and autopilot less. */
+    /**
+     * Word of mouth per hour: rate × a × (1 − a / cap) × (0.5 + quality) × price strategy × served share × (0.5 +
+     * reputation / 100).
+     */
+    readonly wordOfMouthPerHour: number;
+    /** Forgetting per hour: rate × (awareness − min). */
+    readonly decayPerHour: number;
+    /** Awareness a solved company task adds at once (share, 0.005 = 0,5 Punkte); AI and autopilot less. */
     readonly taskGain: number;
     readonly taskAiShareBps: number;
   };
@@ -1590,7 +1615,10 @@ export interface StartupsConfig {
    */
   readonly products: Readonly<Record<SectorId, readonly ProductConfig[]>>;
   readonly stages: {
-    /** Highest awareness per reached stage (index = stage 0..4). */
+    /**
+     * Display only (ADR-188): the awareness cap of a garage without expansion per stage 0..4. The rule is
+     * awareness.cap (awarenessCap in src/lib/sim/awareness.ts); the length still names the number of stages.
+     */
     readonly awarenessCaps: readonly number[];
     readonly qualityBonusPerStage: number;
     /** Specialists make the whole team more effective: capacity × (1 + bonus × stage). */
@@ -2634,13 +2662,19 @@ export const BALANCE = {
     potential: { minAnnualCents: 100_000, maxAnnualCents: 200_000_000_000, paretoAlpha: 0.57 },
     awareness: {
       initial: 0.03,
-      min: 0.01,
-      growthPerQuarter: 0.2,
-      decayPerQuarter: 0.12,
-      marketingMaxGain: 0.24,
+      min: 0.02,
+      cap: {
+        byTier: { garage: 0.6, small_business: 0.7, gmbh: 0.8, ag: 0.9 },
+        perStage: 0.05,
+        perExpansionLevel: 0.03,
+        max: 1,
+      },
+      marketingMaxRatePerHour: 0.06,
       marketingHalfSaturationShare: 0.01,
       marketingMinHalfSaturationCents: 50_000,
-      taskGain: 0.002,
+      wordOfMouthPerHour: 0.008,
+      decayPerHour: 0.004,
+      taskGain: 0.005,
       taskAiShareBps: 5_000,
     },
     quality: { base: 0.25, halfSaturationScore: 20, adjustPerQuarter: 0.35 },
@@ -2660,7 +2694,7 @@ export const BALANCE = {
     estimate: { initialSpread: 2.3, decayPerQuarter: 0.85 },
     insolvency: { graceQuarters: 4, loanWithholdingBps: 5_000, foundingLockoutDays: 3 },
     products: PRODUCTS,
-    stages: { awarenessCaps: [0.5, 0.7, 0.85, 0.95, 1], qualityBonusPerStage: 0.05, capacityBonusPerStage: 0.25 },
+    stages: { awarenessCaps: [0.6, 0.65, 0.7, 0.75, 0.8], qualityBonusPerStage: 0.05, capacityBonusPerStage: 0.25 },
     training: {
       costCentsByTier: [200_000, 500_000, 1_200_000, 2_500_000, 5_000_000],
       wageRaiseBpsByTier: [300, 500, 800, 1_200, 2_000],
@@ -2668,9 +2702,9 @@ export const BALANCE = {
     },
     campaigns: {
       kinds: {
-        flyer: { hours: 24, costHours: 2, demandBps: 2_500, awareness: 0.02 },
-        online: { hours: 48, costHours: 6, demandBps: 4_000, awareness: 0.04 },
-        tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.08 },
+        flyer: { hours: 24, costHours: 2, demandBps: 2_500, awareness: 0.03 },
+        online: { hours: 48, costHours: 6, demandBps: 4_000, awareness: 0.06 },
+        tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.12 },
       },
       minCostCents: 20_000,
       luckMin: 0.4,
@@ -2793,7 +2827,7 @@ export const BALANCE = {
       decayPerHour: 0.05,
       marginFull: 0.25,
       cashHoursFull: 24,
-      awarenessFull: 0.5,
+      awarenessFollowPerHour: 0.25,
       rewards: [
         { at: 50, bps: 200 },
         { at: 75, bps: 500 },

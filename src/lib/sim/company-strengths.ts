@@ -3,6 +3,8 @@
  * The value an hour shows (its "instant" value) is only a target: a score closes `gainPerHour` of the gap when the
  * hour was better and `decayPerHour` when it was worse. With 2 % per hour, 99 takes about ten days of good hours;
  * neglect costs faster. A high overall score (floor of the mean) pays a bonus on the hour's revenue.
+ * ADR-188: "Bekanntheit" is the awareness as a share of the company's cap (awarenessOfCap) and follows it with
+ * `awarenessFollowPerHour` (25 % of the gap per hour, both ways), so the score and the awareness never contradict.
  *
  * Mirrored 1:1 in SQL (company_strengths_instant, company_strengths_step, company_strengths_reward_bps;
  * migration 20261204006600). Pure: no clock, no randomness, no imports besides the config.
@@ -18,7 +20,7 @@ type StrengthsConfig = BalanceConfig["companyHealth"]["strengths"];
 
 /** What a closed hour shows. Money in cents. */
 export interface StrengthHour {
-  /** 0..1 */
+  /** Awareness as a share of its cap, 0..1 (ADR-188, awarenessOfCap in awareness.ts). */
   readonly awareness: number;
   /** 0..1 */
   readonly quality: number;
@@ -48,7 +50,7 @@ export const EMPTY_STRENGTHS: StrengthScores = {
 export function strengthsInstant(h: StrengthHour, cfg: StrengthsConfig): StrengthScores {
   const costs = Math.max(1, h.revenueCents - h.profitCents);
   return {
-    awareness: clamp((100 * h.awareness) / Math.max(0.01, cfg.awarenessFull ?? 1), 0, 100),
+    awareness: clamp(100 * h.awareness, 0, 100),
     quality: clamp(100 * h.quality, 0, 100),
     // can the company deliver what is asked? (no demand: nothing to judge, half marks)
     delivery: h.demandCents > 0 ? clamp((100 * h.capacityCents) / h.demandCents, 0, 100) : 50,
@@ -64,7 +66,7 @@ export function strengthsStep(prev: StrengthScores, instant: StrengthScores, cfg
   for (const k of STRENGTH_KEYS) {
     const p = prev[k] ?? 0;
     const v = instant[k];
-    const rate = v > p ? cfg.gainPerHour : cfg.decayPerHour;
+    const rate = k === "awareness" ? cfg.awarenessFollowPerHour : v > p ? cfg.gainPerHour : cfg.decayPerHour;
     out[k] = clamp(p + rate * (v - p), 0, 100);
   }
   return out;

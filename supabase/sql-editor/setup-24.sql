@@ -799,126 +799,102 @@ begin
 end;
 $$;
 
--- ===== supabase/migrations/20261204007400_stock_company_revenue.sql =====
+-- ===== supabase/migrations/20261204007700_awareness_model.sql =====
 -- =============================================================================
--- NEXA · 7400 · Business figures of listed companies at the stock exchange (ADR-184)
+-- NEXA · 7700 · Awareness, one model (ADR-188): cap by size, hourly step, a ledger of every change
 -- =============================================================================
--- * get_stock_revenue(p_ticker): a new public read RPC (any signed-in player). Without a ticker it lists every listed
---   stock with its figures (market list, one compact line per row); with a ticker it returns that one stock plus a
---   small history for the sparkline (stock detail page).
--- * Player companies: their hourly economy (player_company_hours, ADR-072/180). Revenue of the last closed hour, the
---   sums of revenue and profit of the last 24 hours, the previous 24 hours scaled to the same number of hours (for
---   the trend arrow), reputation (ADR-183) and awareness. Only these aggregates leave the server; the company page
---   (ADR-051 "open any company") already shows awareness and quality to everybody.
--- * AI companies: their latest published quarterly report (and the one before for the trend), labelled with game
---   year and quarter; without a report the trailing figures divided by four, like get_security_details.
--- New functions only, no existing function is changed.
--- Idempotent: runs unchanged as supabase/updates/20261204007400_stock_company_revenue.sql.
+-- * Before: the hourly step (ADR-180) added a fixed amount of marketing, took 2 % of the value per hour as decay and
+--   stopped at a hidden stage cap (garage 50 %). Campaigns, tasks, moves, interviews, pitches, protests and the news
+--   show wrote player_companies.awareness each in their own way, mostly without a trace; the diagnosis asked for more
+--   awareness than the cap allowed; the strength "Bekanntheit" climbed 2 % of the gap per hour (4 of 100 after
+--   three hours while the awareness stood at 49 %).
+-- * Now (ports of src/lib/sim/awareness.ts):
+--   company_awareness_cap(tier, stage, expansion)  tier base (garage 60 %) + per stage + per expansion level
+--   company_awareness_step(...)                    marketing closes a share of the gap to the cap, word of mouth,
+--                                                  slow decay toward the floor
+--   company_awareness_add(company, source, delta)  every single event: capped, floored, booked
+--   company_awareness_log                          what moved the awareness, per company, hour and source
+--   get_company_awareness()                        value, cap and its parts, strength, last hour by source
+-- Values come from game_config.startups.awareness; the defaults below equal src/config/balance.ts, so the functions
+-- work before the update writes the new config. Idempotent: runs unchanged as supabase/updates/.
 
-create or replace function public.stock_figures_json(p_company uuid, p_history boolean)
+-- ---------------------------------------------------------------------------
+-- A. The ledger
+-- ---------------------------------------------------------------------------
+create table if not exists public.company_awareness_log (
+  company_id uuid not null references public.player_companies (company_id) on delete cascade,
+  hour_start timestamptz not null,
+  source     text not null,
+  delta      double precision not null default 0,
+  events     integer not null default 0 check (events >= 0),
+  primary key (company_id, hour_start, source)
+);
+alter table public.company_awareness_log enable row level security;
+revoke all on public.company_awareness_log from anon, authenticated;
+comment on table public.company_awareness_log is
+  'Awareness changes per company, hour and source (ADR-188): marketing, word_of_mouth, decay (hourly close), tasks, '
+  'campaign, moves, interview, news, pitch, protest, event, rescale. delta in shares (0.01 = 1 point). Read through '
+  'get_company_awareness(); kept for eight days.';
+
+-- ---------------------------------------------------------------------------
+-- B. Rules
+-- ---------------------------------------------------------------------------
+create or replace function public.company_awareness_cfg()
 returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('startups') -> 'awareness', '{}'::jsonb);
+$$;
+
+-- awarenessCap: tier base + perStage x stage + perExpansionLevel x level, between min and cap.max
+create or replace function public.company_awareness_cap(p_tier text, p_stage integer, p_expansion integer)
+returns double precision
 language plpgsql
 stable
 security definer
 set search_path = ''
 as $$
 declare
-  c          public.companies;
-  pc         public.player_companies;
-  v_now      timestamptz := date_trunc('hour', public.game_now());
-  v_last_at  timestamptz;
-  v_last_rev bigint;
-  v_rev      bigint;
-  v_profit   bigint;
-  v_hours    integer;
-  v_prev     bigint;
-  v_prev_n   integer;
-  v_hist     jsonb := '[]'::jsonb;
-  v_reports  jsonb;
+  a jsonb := public.company_awareness_cfg();
+  v_base double precision;
 begin
-  select * into c from public.companies where id = p_company;
-  if c.id is null then
-    return null;
-  end if;
+  v_base := public.cfg_num(a, array['cap', 'byTier', coalesce(p_tier, 'garage')],
+              case p_tier when 'small_business' then 0.7 when 'gmbh' then 0.8 when 'ag' then 0.9 else 0.6 end);
+  return least(public.cfg_num(a, '{cap,max}', 1),
+               greatest(public.cfg_num(a, '{min}', 0.02),
+                        v_base + public.cfg_num(a, '{cap,perStage}', 0.05) * greatest(0, coalesce(p_stage, 0))
+                               + public.cfg_num(a, '{cap,perExpansionLevel}', 0.03) * greatest(0, coalesce(p_expansion, 0))));
+end;
+$$;
+
+-- the cap of a company now (its tier, the stage its team reached, its expansion level)
+create or replace function public.company_awareness_cap_of(p_company uuid)
+returns double precision
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  pc public.player_companies;
+begin
   select * into pc from public.player_companies where company_id = p_company;
-
-  if not c.is_ai and pc.company_id is not null then
-    select h.hour_start, h.revenue_cents into v_last_at, v_last_rev
-      from public.player_company_hours h
-     where h.company_id = p_company
-     order by h.hour_start desc limit 1;
-    select coalesce(sum(h.revenue_cents), 0), coalesce(sum(h.profit_cents), 0), count(*)
-      into v_rev, v_profit, v_hours
-      from public.player_company_hours h
-     where h.company_id = p_company and h.hour_start >= v_now - interval '24 hours';
-    select sum(h.revenue_cents), count(*) into v_prev, v_prev_n
-      from public.player_company_hours h
-     where h.company_id = p_company
-       and h.hour_start >= v_now - interval '48 hours' and h.hour_start < v_now - interval '24 hours';
-    if p_history then
-      select coalesce(jsonb_agg(x.revenue_cents order by x.hour_start), '[]'::jsonb) into v_hist
-        from (select h.hour_start, h.revenue_cents from public.player_company_hours h
-               where h.company_id = p_company and h.hour_start >= v_now - interval '24 hours'
-               order by h.hour_start desc limit 24) x;
-    end if;
-    return jsonb_build_object(
-      'period',                  'day',
-      'revenue_cents',           v_rev,
-      'profit_cents',            v_profit,
-      'hours',                   v_hours,
-      -- the previous day per hour times this day's hours: a young company is compared fairly
-      'prev_revenue_cents',      case when v_prev_n > 0 and v_hours > 0
-                                      then round(v_prev::numeric * v_hours / v_prev_n)::bigint end,
-      'last_hour_at',            v_last_at,
-      'last_hour_revenue_cents', v_last_rev,
-      'game_year',               null,
-      'quarter',                 null,
-      'reputation',              round(pc.reputation::numeric)::integer,
-      'awareness_bps',           round(pc.awareness::numeric * 10000)::integer,
-      'history',                 v_hist);
+  if pc.company_id is null then
+    return 1;
   end if;
-
-  -- AI company (or a company without hours): the published quarterly reports, newest first
-  select coalesce(jsonb_agg(jsonb_build_object('revenue_cents', x.revenue_cents, 'profit_cents', x.net_income_cents,
-                                               'game_year', x.game_year, 'quarter', x.quarter)
-                            order by x.starts_at desc), '[]'::jsonb)
-    into v_reports
-    from (select r.revenue_cents, r.net_income_cents, gq.game_year, gq.quarter, gq.starts_at
-            from public.company_quarter_reports r
-            join public.game_quarters gq on gq.id = r.game_quarter_id
-           where r.company_id = p_company and r.published_at is not null and r.published_at <= now()
-           order by gq.starts_at desc limit case when p_history then 8 else 2 end) x;
-  if jsonb_array_length(v_reports) = 0 then
-    return jsonb_build_object(
-      'period', 'quarter', 'revenue_cents', round(c.ttm_revenue_cents / 4.0)::bigint,
-      'profit_cents', round(c.ttm_net_income_cents / 4.0)::bigint, 'hours', null, 'prev_revenue_cents', null,
-      'last_hour_at', null, 'last_hour_revenue_cents', null, 'game_year', null, 'quarter', null,
-      'reputation', null, 'awareness_bps', null, 'history', '[]'::jsonb);
-  end if;
-  if p_history then
-    select coalesce(jsonb_agg((e.v ->> 'revenue_cents')::bigint order by e.n desc), '[]'::jsonb) into v_hist
-      from jsonb_array_elements(v_reports) with ordinality e(v, n);
-  end if;
-  return jsonb_build_object(
-    'period',                  'quarter',
-    'revenue_cents',           (v_reports -> 0 ->> 'revenue_cents')::bigint,
-    'profit_cents',            (v_reports -> 0 ->> 'profit_cents')::bigint,
-    'hours',                   null,
-    'prev_revenue_cents',      (v_reports -> 1 ->> 'revenue_cents')::bigint,
-    'last_hour_at',            null,
-    'last_hour_revenue_cents', null,
-    'game_year',               (v_reports -> 0 ->> 'game_year')::integer,
-    'quarter',                 (v_reports -> 0 ->> 'quarter')::integer,
-    'reputation',              null,
-    'awareness_bps',           null,
-    'history',                 v_hist);
+  return public.company_awareness_cap(pc.tier, coalesce((public.player_company_team(p_company) ->> 'stage')::integer, 0),
+                                      coalesce(pc.expansion_level, 0));
 end;
 $$;
-comment on function public.stock_figures_json(uuid, boolean) is
-  'Public business figures of a listed company for the stock exchange (ADR-184): player companies from their hours, '
-  'AI companies from their latest quarterly report. Internal helper of get_stock_revenue.';
 
-create or replace function public.get_stock_revenue(p_ticker text default null)
+-- awarenessHour: one closed hour. p_marketing_cents = the hour's marketing, p_potential = effective annual potential,
+-- p_served = sold / demand (0..1), p_reputation 0..100. Returns before, next, marketing, word_of_mouth, decay, cap.
+create or replace function public.company_awareness_step(p_awareness double precision, p_cap double precision,
+  p_quality double precision, p_price_awareness double precision, p_marketing_cents double precision,
+  p_potential double precision, p_served double precision, p_reputation double precision)
 returns jsonb
 language plpgsql
 stable
@@ -926,647 +902,1138 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_id   uuid;
-  v_rows jsonb;
+  a       jsonb := public.company_awareness_cfg();
+  v_hours double precision := greatest(1, public.config_double('time', '{quarterHours}', 6));
+  v_min   double precision := public.cfg_num(a, '{min}', 0.02);
+  v_a     double precision := least(1, greatest(0, coalesce(p_awareness, 0)));
+  v_cap   double precision;
+  v_q     double precision := greatest(0, coalesce(p_marketing_cents, 0)) * v_hours;
+  v_half  double precision;
+  v_rate  double precision := 0;
+  v_mk    double precision;
+  v_wom   double precision;
+  v_decay double precision;
 begin
-  perform public.require_player();
-  if p_ticker is not null then
-    v_id := public.resolve_security(p_ticker);
-    if v_id is null then
-      perform public.api_error('unknown_security');
-    end if;
+  v_cap := least(1, greatest(v_min, coalesce(p_cap, 1)));
+  if v_q > 0 then
+    v_half := greatest(public.cfg_num(a, '{marketingMinHalfSaturationCents}', 50000),
+                       greatest(0, coalesce(p_potential, 0)) / 4.0 * public.cfg_num(a, '{marketingHalfSaturationShare}', 0.01));
+    v_rate := public.cfg_num(a, '{marketingMaxRatePerHour}', 0.06) * v_q / (v_q + v_half);
   end if;
-  select coalesce(jsonb_agg(x.f order by x.ticker), '[]'::jsonb) into v_rows
-    from (select s.ticker,
-                 jsonb_build_object('ticker', s.ticker,
-                                    'company_kind', case when c.is_ai then 'ai' else 'player' end)
-                   || public.stock_figures_json(s.company_id, v_id is not null) as f
-            from public.securities s
-            join public.companies c on c.id = s.company_id
-           where s.kind = 'stock'
-             and (case when v_id is null then s.status = 'listed' else s.id = v_id end)) x
-   where x.f is not null;
-  return jsonb_build_object('figures', v_rows);
+  v_mk := v_rate * greatest(0, v_cap - v_a);
+  v_wom := public.cfg_num(a, '{wordOfMouthPerHour}', 0.008) * v_a * greatest(0, 1 - v_a / v_cap)
+           * (0.5 + least(1, greatest(0, coalesce(p_quality, 0)))) * greatest(0, coalesce(p_price_awareness, 1))
+           * least(1, greatest(0, coalesce(p_served, 1))) * (0.5 + least(100, greatest(0, coalesce(p_reputation, 50))) / 100.0);
+  v_decay := public.cfg_num(a, '{decayPerHour}', 0.004) * greatest(0, v_a - v_min);
+  return jsonb_build_object('before', v_a,
+                            'next', least(greatest(v_cap, v_a), greatest(v_min, v_a + v_mk + v_wom - v_decay)),
+                            'marketing', v_mk, 'word_of_mouth', v_wom, 'decay', v_decay, 'cap', v_cap);
 end;
 $$;
-comment on function public.get_stock_revenue(text) is
-  'Revenue, profit, trend, reputation and awareness of listed companies for the stock exchange (ADR-184). Read-only.';
 
-revoke all on function public.stock_figures_json(uuid, boolean) from public, anon, authenticated;
-revoke all on function public.get_stock_revenue(text) from public, anon;
-grant execute on function public.get_stock_revenue(text) to authenticated;
+-- book a change (no change of the value itself)
+create or replace function public.company_awareness_log_add(p_company uuid, p_hour timestamptz, p_source text,
+  p_delta double precision)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.company_awareness_log as l (company_id, hour_start, source, delta, events)
+  values (p_company, date_trunc('hour', p_hour), p_source, coalesce(p_delta, 0), 1)
+  on conflict (company_id, hour_start, source) do update
+    set delta = l.delta + excluded.delta, events = l.events + 1;
+$$;
 
--- ===== supabase/migrations/20261204007800_order_fill_preview.sql =====
--- =============================================================================
--- NEXA · 7800 · The preview is the fill: one plan for quote and execution, capped impact (ADR-189)
--- =============================================================================
--- Bug: "I sold for over 100k and got 50k." The order sheet showed quantity x bid (96.000 EUR), the server filled
--- along the player-impact price path (ADR-126): 1 % per 1.000 EUR for a penny stock, so 96.000 EUR moved the price
--- by 96 % and the average fill was 52 % of the bid (58.877,58 shares at 0,8489 EUR = 49.981 EUR). Nothing capped it.
--- Fix (the owner also wants no size limit: "So viel kaufen und verkaufen, wie man mag"):
--- 1. market_order_plan(): the one fill plan (src/lib/sim/order-fill.ts). The n-th share moves the price by
---    min(a x n, maxTickReturnBps): small orders pay half their move as before (ADR-126), but no order can push the
---    price further than one tick can move it, so a large order fills completely at a fair price (at most 10 % from
---    the quote, 96.000 EUR above: average -9,5 % instead of -48 %). No share of a player stock fills outside the
---    daily band (ADR-170). Amounts are solved along the price path.
--- 2. quote_order(): read-only preview with exactly this plan plus fee and the capital gains tax (FIFO lots, loss pot).
--- 3. place_order(): market orders fill exactly the plan; trading.maxOrderQuantity is only a technical bound now.
---    Limit orders are unchanged.
--- Idempotent: runs unchanged as supabase/updates/20261204007800_order_fill_preview.sql.
+-- awarenessAdd: a single event (task, campaign, move, interview, news, pitch, protest, event). A gain stops at the
+-- cap (nothing when already above it), a loss at the floor. Returns the applied change; booked in the open hour.
+create or replace function public.company_awareness_add(p_company uuid, p_source text, p_delta double precision)
+returns double precision
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pc      public.player_companies;
+  v_min   double precision := public.cfg_num(public.company_awareness_cfg(), '{min}', 0.02);
+  v_cap   double precision;
+  v_apply double precision;
+begin
+  select * into pc from public.player_companies where company_id = p_company and status = 'active' for update;
+  if pc.company_id is null or coalesce(p_delta, 0) = 0 then
+    return 0;
+  end if;
+  if p_delta > 0 then
+    v_cap := public.company_awareness_cap_of(p_company);
+    v_apply := greatest(0, least(p_delta, v_cap - pc.awareness));
+  else
+    v_apply := least(0, greatest(p_delta, v_min - pc.awareness));
+  end if;
+  if v_apply <> 0 then
+    update public.player_companies set awareness = awareness + v_apply where company_id = p_company;
+  end if;
+  perform public.company_awareness_log_add(p_company, public.game_now(), coalesce(p_source, 'event'), v_apply);
+  return v_apply;
+end;
+$$;
 
--- ---------------------------------------------------------------------------
--- A. The fill plan (mirrors planMarketOrder in src/lib/sim/order-fill.ts)
--- ---------------------------------------------------------------------------
--- n-th share moves the price by min(a x n, maxMove); maxMove = trading.maxTickReturnBps (what one tick can move).
--- Summed move of the first x shares: x <= k = maxMove / a: a x^2 / 2, else maxMove x - maxMove k / 2.
-create or replace function public.order_move_integral(p_x double precision, p_a double precision, p_m double precision)
+-- ADR-180 name for tasks and the autopilot: now a booked event of the source "tasks"
+create or replace function public.company_awareness_boost(p_company uuid, p_add double precision)
 returns double precision
 language sql
-immutable
+security definer
 set search_path = ''
-as $function$
-  select case when p_a <= 0 then 0
-              when p_x <= p_m / p_a then p_a * p_x * p_x / 2
-              else p_m * p_x - p_m * (p_m / p_a) / 2 end;
-$function$;
+as $$
+  select public.company_awareness_add(p_company, 'tasks', p_add);
+$$;
 
--- average fill price (e4) of p_q (e6) shares along that path, inside the band, at least the minimum price
-create or replace function public.market_order_avg_e4(
-  p_touch bigint, p_dir integer, p_a double precision, p_pos double precision, p_m double precision,
-  p_q bigint, p_lo bigint, p_hi bigint, p_min bigint)
-returns bigint
+-- one hour of the ledger as {source: delta}
+create or replace function public.company_awareness_hour_json(p_company uuid, p_hour timestamptz)
+returns jsonb
 language sql
-immutable
+stable
+security definer
 set search_path = ''
-as $function$
-  -- the band only stops a move away from the quote: a sale never fills above the bid, a buy never below the ask
-  select greatest(p_min, case when p_dir < 0 then least(p_touch, greatest(coalesce(p_lo, x.p), x.p))
-                              else greatest(p_touch, least(coalesce(p_hi, x.p), x.p)) end)
-    from (select case when p_q <= 0 then p_touch
-                      else round(p_touch * (1 + p_dir
-                             * (public.order_move_integral(p_pos + p_q / 1000000.0, p_a, p_m)
-                                - public.order_move_integral(p_pos, p_a, p_m)) / (p_q / 1000000.0)))::bigint
-                 end as p) x;
-$function$;
+as $$
+  select coalesce(jsonb_object_agg(l.source, l.delta), '{}'::jsonb)
+    from public.company_awareness_log l
+   where l.company_id = p_company and l.hour_start = date_trunc('hour', p_hour);
+$$;
 
-create or replace function public.market_order_plan(
-  p_security_id  uuid,
-  p_side         public.order_side,
-  p_quantity_e6  bigint,
-  p_amount_cents bigint
-)
+-- What the page shows: the value, its cap and why, the strength, the last closed hour and the time since by source,
+-- and the last 24 closed hours.
+create or replace function public.company_awareness_json(p_company uuid)
 returns jsonb
 language plpgsql
 stable
 security definer
 set search_path = ''
-as $function$
+as $$
 declare
-  v_trading   jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
-  s           public.securities;
-  v_bid       bigint;
-  v_ask       bigint;
-  v_prev      bigint;
-  v_last      bigint;
-  v_pending   bigint;
-  v_touch     bigint;
-  v_dir       integer;
-  v_a         double precision;
-  v_pos       double precision;
-  v_fee       bigint;
-  v_min_price bigint;
-  v_m         double precision;
-  v_band      double precision;
-  v_lo        bigint;
-  v_hi        bigint;
-  v_q         bigint;
-  v_avg       bigint;
-  v_lastp     bigint;
-  v_gross     bigint := 0;
-  v_target    bigint;
-  b_lo        bigint;
-  b_hi        bigint;
-  b_mid       bigint;
-  i           integer := 0;
+  pc      public.player_companies;
+  a       jsonb := public.company_awareness_cfg();
+  v_stage integer;
+  v_last  timestamptz;
+  v_score double precision;
 begin
-  select * into s from public.securities where id = p_security_id;
-  select q.bid_e4, q.ask_e4, q.prev_close_e4, q.last_price_e4 into v_bid, v_ask, v_prev, v_last
-    from public.security_quotes q where q.security_id = p_security_id;
-  if s.id is null or v_bid is null or v_ask is null then
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
     return null;
   end if;
-  select st.pending_player_flow_e6 into v_pending from public.security_sim_state st where st.security_id = s.id;
-  v_pending   := coalesce(v_pending, 0);
-  v_fee       := greatest(0, public.cfg_num(v_trading, '{orderFeeCents}', 100))::bigint;
-  v_min_price := greatest(1, public.cfg_num(v_trading, '{minPriceE4}', 1))::bigint;
-  v_m         := greatest(0, public.cfg_num(v_trading, '{maxTickReturnBps}', 1000)) / 10000.0;
-  v_a         := public.cfg_num(v_trading, '{priceImpact,impactBpsPerDepth}', 100) / 10000.0
-                 / public.security_depth(s.id, public.market_session_at(public.game_now()) = 'regular');
-  if p_side = 'buy' then
-    v_touch := v_ask;  v_dir := 1;  v_pos := greatest(v_pending, 0) / 1000000.0;
-  else
-    v_touch := v_bid;  v_dir := -1; v_pos := greatest(-v_pending, 0) / 1000000.0;
-  end if;
-  if s.kind = 'stock' then
-    -- ADR-126: 1 % per depthCentsPer100Bps of value
-    v_a := greatest(v_a, 0.01 * (v_touch / 100.0)
-                         / greatest(1, public.cfg_num(v_trading,
-                                         array['playerImpact', 'depthCentsPer100Bps',
-                                               coalesce((select c.tier::text from public.companies c where c.id = s.company_id), 'midcap')],
-                                         2500000)));
-  end if;
-  -- ADR-170: no share of a player stock fills outside the daily band
-  v_band := greatest(0, public.cfg_num(v_trading, '{playerStocks,dailyBandBps}', 0)) / 10000.0;
-  if s.kind = 'stock' and v_band > 0
-     and exists (select 1 from public.player_companies pc where pc.company_id = s.company_id) then
-    v_hi := ceil(coalesce(v_prev, v_last, v_touch) * (1 + v_band))::bigint;
-    v_lo := floor(coalesce(v_prev, v_last, v_touch) / (1 + v_band))::bigint;
-  end if;
-
-  -- quantity: given, or the largest (buy) / smallest (sell) one whose gross matches the amount (bisection)
-  if p_quantity_e6 is not null then
-    v_q := p_quantity_e6;
-  else
-    v_target := case when p_side = 'buy' then p_amount_cents - v_fee else p_amount_cents end;
-    b_lo := 0;
-    b_hi := ceil(v_target * 100000000.0
-                 / greatest(1, least(case when p_side = 'buy' then v_touch else v_touch * (1 - v_m) end,
-                                     coalesce(v_lo, v_touch))))::bigint + 1;
-    if v_target <= 0 then
-      b_hi := 0;
-    end if;
-    while b_hi - b_lo > 1 and i < 200 loop
-      b_mid := (b_lo + b_hi) / 2;
-      if public.value_cents(b_mid, public.market_order_avg_e4(v_touch, v_dir, v_a, v_pos, v_m, b_mid, v_lo, v_hi, v_min_price))
-         <= v_target then
-        b_lo := b_mid;
-      else
-        b_hi := b_mid;
-      end if;
-      i := i + 1;
-    end loop;
-    v_q := case when p_side = 'buy' or b_lo = 0 then b_lo
-                when public.value_cents(b_lo, public.market_order_avg_e4(v_touch, v_dir, v_a, v_pos, v_m, b_lo, v_lo, v_hi, v_min_price)) >= v_target then b_lo
-                else b_hi end;
-  end if;
-
-  v_avg := public.market_order_avg_e4(v_touch, v_dir, v_a, v_pos, v_m, v_q, v_lo, v_hi, v_min_price);
-  if v_q > 0 then
-    v_gross := public.value_cents(v_q, v_avg);
-  end if;
-  v_lastp := round(v_touch * (1 + v_dir * least(v_a * (v_pos + v_q / 1000000.0), v_m)))::bigint;
-  v_lastp := greatest(v_min_price, case when v_dir < 0 then least(v_touch, greatest(coalesce(v_lo, v_lastp), v_lastp))
-                                       else greatest(v_touch, least(coalesce(v_hi, v_lastp), v_lastp)) end);
-
+  v_stage := coalesce((public.player_company_team(p_company) ->> 'stage')::integer, 0);
+  select max(h.hour_start) into v_last from public.player_company_hours h where h.company_id = p_company;
+  select (s.scores ->> 'awareness')::double precision into v_score from public.company_strengths s where s.company_id = p_company;
   return jsonb_build_object(
-    'touch_e4',              v_touch,
-    'requested_quantity_e6', v_q,
-    'fill_quantity_e6',      v_q,
-    'unfilled_quantity_e6',  0,
-    'avg_price_e4',          v_avg,
-    'last_price_e4',         v_lastp,
-    'gross_cents',           v_gross,
-    'fee_cents',             case when v_q > 0 then v_fee else 0 end,
-    'slippage_bps',          round(abs(v_avg - v_touch)::double precision / v_touch * 10000)::integer,
-    'impact_bps',            round((v_lastp - v_touch)::double precision / v_touch * 10000)::integer,
-    'limited_by',            null);
+    'awareness', pc.awareness,
+    'cap', public.company_awareness_cap(pc.tier, v_stage, coalesce(pc.expansion_level, 0)),
+    'floor', public.cfg_num(a, '{min}', 0.02),
+    'tier', pc.tier,
+    'stage', v_stage,
+    'expansion_level', coalesce(pc.expansion_level, 0),
+    'tier_cap', public.company_awareness_cap(pc.tier, 0, 0),
+    'per_stage', public.cfg_num(a, '{cap,perStage}', 0.05),
+    'per_expansion_level', public.cfg_num(a, '{cap,perExpansionLevel}', 0.03),
+    'strength', coalesce(v_score, 0),
+    'last_hour', case when v_last is null then null else jsonb_build_object(
+      'hour_start', v_last, 'parts', public.company_awareness_hour_json(p_company, v_last)) end,
+    'since', (select coalesce(jsonb_object_agg(x.source, x.delta), '{}'::jsonb)
+                from (select l.source, sum(l.delta) as delta from public.company_awareness_log l
+                       where l.company_id = p_company and l.hour_start > coalesce(v_last, '-infinity'::timestamptz)
+                       group by l.source) x),
+    'history', (select coalesce(jsonb_agg(jsonb_build_object('hour_start', h.hour_start, 'after', h.awareness_after)
+                                          order by h.hour_start), '[]'::jsonb)
+                  from (select hh.hour_start, hh.awareness_after from public.player_company_hours hh
+                         where hh.company_id = p_company and hh.awareness_after is not null
+                         order by hh.hour_start desc limit 24) h));
 end;
-$function$;
+$$;
 
-revoke all on function public.market_order_plan(uuid, public.order_side, bigint, bigint) from public, anon, authenticated;
-
--- ---------------------------------------------------------------------------
--- B. quote_order: the preview the order sheet shows before confirming
--- ---------------------------------------------------------------------------
-create or replace function public.quote_order(
-  p_ticker       text,
-  p_side         text,
-  p_quantity_e6  bigint default null,
-  p_amount_cents bigint default null
-)
+create or replace function public.get_company_awareness()
 returns jsonb
 language plpgsql
 stable
 security definer
 set search_path = ''
-as $function$
+as $$
 declare
-  v_player  uuid := public.require_player();
-  v_trading jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
-  s         public.securities;
-  v_side    public.order_side;
-  v_plan    jsonb;
-  v_pos     public.positions;
-  v_fill    bigint;
-  v_left    bigint;
-  v_take    bigint;
-  v_cost    bigint := 0;
-  v_pnl     bigint;
-  v_pot     bigint;
-  v_tax     bigint := 0;
-  v_gross   bigint;
-  v_fee     bigint;
-  lot       record;
+  v_player uuid := public.require_player();
+  m        record;
 begin
-  if lower(coalesce(p_side, '')) not in ('buy', 'sell') or (p_quantity_e6 is null) = (p_amount_cents is null)
-     or coalesce(p_quantity_e6, p_amount_cents) < 1 then
-    perform public.api_error('invalid_argument');
+  select * into m from public.company_task_member(v_player);
+  if m.company_id is null then
+    perform public.api_error('company_not_found');
   end if;
-  v_side := lower(p_side)::public.order_side;
-  select * into s from public.securities where id = public.resolve_security(p_ticker);
-  if s.id is null then
-    perform public.api_error('unknown_security');
-  end if;
-  v_plan := public.market_order_plan(s.id, v_side, p_quantity_e6, p_amount_cents);
-  if v_plan is null then
-    perform public.api_error('not_tradable');
-  end if;
-  -- ADR-153: a buy gets at most the free shares, as place_order does
-  if v_side = 'buy' and s.kind = 'stock' and public.security_free_float_e6(s.id) is not null
-     and (v_plan ->> 'fill_quantity_e6')::bigint > greatest(0, public.security_free_float_e6(s.id)) then
-    v_fill := (v_plan ->> 'requested_quantity_e6')::bigint;
-    v_plan := public.market_order_plan(s.id, v_side, greatest(0, public.security_free_float_e6(s.id)), null)
-              || jsonb_build_object('requested_quantity_e6', v_fill,
-                                    'unfilled_quantity_e6', v_fill - greatest(0, public.security_free_float_e6(s.id)),
-                                    'limited_by', 'supply');
-  end if;
-  v_fill  := (v_plan ->> 'fill_quantity_e6')::bigint;
-  v_fee   := (v_plan ->> 'fee_cents')::bigint;
-  v_gross := (v_plan ->> 'gross_cents')::bigint;
-  v_fee   := (v_plan ->> 'fee_cents')::bigint;
-
-  -- sells: capital gains tax exactly like execute_fill (FIFO lots, loss pot)
-  if v_side = 'sell' and v_fill > 0 then
-    select * into v_pos from public.positions p
-     where p.player_id = v_player and p.security_id = s.id and p.side = 'long' and p.leverage = 1 and p.status = 'open';
-    if v_pos.id is not null then
-      v_left := v_fill;
-      for lot in
-        select l.quantity_open_e6, l.price_e4 from public.position_lots l
-         where l.position_id = v_pos.id and l.quantity_open_e6 > 0 order by l.acquired_at, l.id
-      loop
-        exit when v_left = 0;
-        v_take := least(v_left, lot.quantity_open_e6);
-        v_cost := v_cost + public.value_cents(v_take, lot.price_e4);
-        v_left := v_left - v_take;
-      end loop;
-      if v_left > 0 then
-        v_cost := v_cost + public.value_cents(v_left, v_pos.avg_entry_price_e4);
-      end if;
-      v_pnl := v_gross - v_fee - v_cost;
-      select pp.tax_loss_pot_cents into v_pot from public.player_private pp where pp.player_id = v_player;
-      if v_pnl > 0 then
-        v_tax := public.apply_bps(v_pnl - least(v_pnl, coalesce(v_pot, 0)),
-                                  public.cfg_num(v_trading, '{capitalGainsTaxBps}', 2500)::numeric);
-      end if;
-    end if;
-  end if;
-
-  return v_plan || jsonb_build_object(
-    'ticker',             s.ticker,
-    'side',               v_side,
-    'tax_cents',          v_tax,
-    'realized_pnl_cents', v_pnl,
-    -- what the player pays (buy) or receives (sell) in cash
-    'net_cents',          case when v_fill = 0 then 0
-                               when v_side = 'buy' then v_gross + v_fee
-                               else v_gross - v_fee - v_tax end);
+  return public.company_awareness_json(m.company_id);
 end;
-$function$;
-
-revoke all on function public.quote_order(text, text, bigint, bigint) from public, anon;
-grant execute on function public.quote_order(text, text, bigint, bigint) to authenticated;
+$$;
 
 -- ---------------------------------------------------------------------------
--- C. place_order: market orders fill exactly the plan (full latest definition, incl. ADR-153 and ADR-170)
+-- C. Grants
 -- ---------------------------------------------------------------------------
-create or replace function public.place_order(
-  p_request_id     uuid,
-  p_ticker         text,
-  p_side           text,
-  p_type           text,
-  p_quantity_e6    bigint default null,
-  p_limit_price_e4 bigint default null,
-  p_amount_cents   bigint default null
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $function$
+do $$
 declare
-  v_player     uuid;
-  v_replay     jsonb;
-  v_trading    jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
-  v_abuse      jsonb := coalesce(public.config_jsonb('abuse'), '{}'::jsonb);
-  v_scale      numeric := greatest(1, public.cfg_num(v_trading, '{quantityScale}', 1000000))::numeric;
-  v_side       public.order_side;
-  v_type       public.order_type;
-  v_limit      bigint;
-  s            public.securities;
-  v_level      integer;
-  v_cash       bigint;
-  v_bid        bigint;
-  v_ask        bigint;
-  v_pending    bigint;
-  v_regular    boolean;
-  v_depth      double precision;
-  v_a          double precision;
-  v_pos        double precision;
-  v_touch      bigint;
-  v_qty        bigint;
-  v_fill_qty   bigint := 0;
-  v_fill_price bigint;
-  v_rest       bigint;
-  v_fee        bigint;
-  v_min_value  bigint;
-  v_need       bigint;
-  v_reserve    bigint := 0;
-  v_avail      bigint;
-  v_net_amount bigint;
-  v_order_id   uuid := gen_random_uuid();
-  v_fill       jsonb;
-  o            public.orders;
-  v_prof       public.profiles;
-  v_min_price  bigint;
-  v_plan       jsonb;
-  v_requested  bigint;
+  f text;
+begin
+  foreach f in array array[
+    'public.company_awareness_cfg()',
+    'public.company_awareness_cap(text, integer, integer)',
+    'public.company_awareness_cap_of(uuid)',
+    'public.company_awareness_step(double precision, double precision, double precision, double precision, double precision, double precision, double precision, double precision)',
+    'public.company_awareness_log_add(uuid, timestamptz, text, double precision)',
+    'public.company_awareness_add(uuid, text, double precision)',
+    'public.company_awareness_boost(uuid, double precision)',
+    'public.company_awareness_hour_json(uuid, timestamptz)',
+    'public.company_awareness_json(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+end;
+$$;
+revoke all on function public.get_company_awareness() from public, anon;
+grant execute on function public.get_company_awareness() to authenticated;
+
+-- ===== supabase/migrations/20261204007710_awareness_sources.sql =====
+-- =============================================================================
+-- NEXA · 7710 · Awareness, one model (ADR-188): every single event goes through company_awareness_add
+-- =============================================================================
+-- Campaigns, solved events, CEO interviews, business moves, pitches, protests and the news show used to write
+-- player_companies.awareness directly (some without any cap, some with the old stage cap, none with a trace). They
+-- now call company_awareness_add(company, source, delta): capped by the company's cap, floored, booked by source in
+-- company_awareness_log. Tasks and the autopilot already go through company_awareness_boost, now a wrapper of it.
+-- Full redefinitions of the live functions (copied from the database after 7310), changed only at the awareness
+-- write. Idempotent: runs unchanged as supabase/updates/.
+
+create or replace function public.start_campaign(p_request_id uuid, p_company_id uuid, p_kind text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_now    timestamptz := public.game_now();
+  v_su     jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_cost   bigint;
+  v_free   bigint;
+  v_luck   double precision;
+  v_factor double precision;
+  v_stage  integer;
+  v_cap    double precision;
+  v_aw     double precision;
+  v_id     uuid;
 begin
   v_player := public.require_player();
-  if p_request_id is null then
+  if p_request_id is null or p_company_id is null or coalesce(p_kind, '') not in ('flyer', 'online', 'tv') then
     perform public.api_error('invalid_argument');
   end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'place_order');
+  perform public.require_company_owner(p_company_id);
+  v_replay := public.request_begin(v_player, p_request_id, 'start_campaign');
   if v_replay is not null then
     return v_replay;
   end if;
-
-  -- inputs -------------------------------------------------------------------
-  if lower(coalesce(p_side, '')) not in ('buy', 'sell') or lower(coalesce(p_type, '')) not in ('market', 'limit')
-     or (p_quantity_e6 is null) = (p_amount_cents is null) then
-    perform public.api_error('invalid_argument');
+  select * into pc from public.player_companies where company_id = p_company_id and status = 'active' for update;
+  if pc.company_id is null then
+    perform public.api_error('company_not_found');
   end if;
-  v_side := lower(p_side)::public.order_side;
-  v_type := lower(p_type)::public.order_type;
-  if (p_quantity_e6 is not null and p_quantity_e6 < 1) or (p_amount_cents is not null and p_amount_cents < 1) then
-    perform public.api_error('invalid_quantity');
+  if exists (select 1 from public.company_campaigns x where x.company_id = p_company_id and x.ends_at > v_now) then
+    perform public.api_error('campaign_running');
   end if;
-  if v_type = 'limit' then
-    if p_limit_price_e4 is null or p_limit_price_e4 < 1 or p_limit_price_e4 > 100000000000 then
-      perform public.api_error('invalid_price');
-    end if;
-    v_limit := p_limit_price_e4;
+  -- ADR-134 ad_agency of the founder
+  v_cost := public.company_campaign_cost_cents(p_company_id, p_kind);
+  -- free cash: open bills come first (as expand_company and event steps)
+  select a.balance_cents - pc.unpaid_cents into v_free
+    from public.ledger_accounts a where a.owner_company_id = p_company_id and a.kind = 'company_cash' for update;
+  if coalesce(v_free, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
   end if;
-
-  select * into s from public.securities where id = public.resolve_security(p_ticker);
-  if s.id is null then
-    perform public.api_error('unknown_security');
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(p_company_id), public.ledger_system_account('households'), v_cost,
+                                   'company_costs', 'Marketing-Kampagne', 'company', p_company_id,
+                                   'campaign:' || p_company_id::text || ':' || p_request_id::text, v_player);
   end if;
-  if s.kind not in ('stock', 'bond') or s.status <> 'listed' or not s.is_tradable then
-    perform public.api_error('not_tradable');
-  end if;
-  if (select r.is_paused from public.sim_runtime r where r.id) then
-    perform public.api_error('market_paused');
-  end if;
-
-  select p.level into v_level from public.profiles p where p.id = v_player;
-  if v_type = 'limit' and v_level < public.unlock_level('limit_orders') then
-    perform public.api_error('locked');
-  end if;
-  if s.kind = 'bond' and v_level < public.unlock_level('bonds') then
-    perform public.api_error('locked');
-  end if;
-  -- ADR-170: no buying the own stock with money just taken out of the company
-  if v_side = 'buy' and s.kind = 'stock' and public.player_stock_insider_blocked(v_player, s.id) then
-    perform public.api_error('insider_cooldown');
-  end if;
-
-  if not public.rate_limit_hit(v_player, 'place_order',
-           greatest(1, public.cfg_num(v_abuse, '{rateLimits,ordersPerMinute}', 20))::integer, 60)
-     or not public.rate_limit_hit(v_player, 'place_order_day',
-           greatest(1, public.cfg_num(v_abuse, '{rateLimits,ordersPerDay}', 500))::integer, 86400) then
-    perform public.api_error('rate_limited');
-  end if;
-
-  -- locks, quote ---------------------------------------------------------------
-  v_cash := public.lock_player_accounts(v_player);
-  select q.bid_e4, q.ask_e4 into v_bid, v_ask from public.security_quotes q where q.security_id = s.id;
-  select st.pending_player_flow_e6 into v_pending from public.security_sim_state st where st.security_id = s.id;
-  if v_bid is null or v_ask is null then
-    perform public.api_error('not_tradable');
-  end if;
-  v_pending   := coalesce(v_pending, 0);
-  v_regular   := public.market_session_at(public.game_now()) = 'regular';
-  v_depth     := public.security_depth(s.id, v_regular);                 -- whole shares
-  v_a         := public.cfg_num(v_trading, '{priceImpact,impactBpsPerDepth}', 100) / 10000.0 / v_depth;
-  v_fee       := greatest(0, public.cfg_num(v_trading, '{orderFeeCents}', 100))::bigint;
-  v_min_value := greatest(1, public.cfg_num(v_trading, '{minOrderValueCents}', 100))::bigint;
-  v_min_price := greatest(1, public.cfg_num(v_trading, '{minPriceE4}', 1))::bigint;
-  if v_side = 'buy' then
-    v_touch := v_ask;
-    v_pos := greatest(v_pending, 0) / 1000000.0;
-  else
-    v_touch := v_bid;
-    v_pos := greatest(-v_pending, 0) / 1000000.0;
-  end if;
-  -- Stocks: a fill pays for the move it causes (ADR-126). The next tick moves the price by the player impact
-  -- (0.01 x value / depthCentsPer100Bps); the fill pays half of that on average, so buying and selling right away
-  -- can never earn the move one causes oneself.
-  if s.kind = 'stock' then
-    v_a := greatest(v_a, 0.01 * (v_touch / 100.0)
-                         / greatest(1, public.cfg_num(v_trading,
-                                         array['playerImpact', 'depthCentsPer100Bps',
-                                               coalesce((select c.tier::text from public.companies c where c.id = s.company_id), 'midcap')],
-                                         2500000)));
-  end if;
-
-  -- quantity from the amount (neo-broker semantics) ------------------------------
-  if p_amount_cents is not null then
-    if v_side = 'buy' then
-      -- the player pays at most the amount including the fee
-      v_net_amount := p_amount_cents - v_fee;
-      if v_net_amount < v_min_value then
-        perform public.api_error('order_too_small');
-      end if;
-      if v_type = 'limit' then
-        v_qty := floor(v_net_amount * 100000000.0 / v_limit)::bigint;
-      else
-        -- ADR-189: the quantity the amount buys along the price path, the same plan the preview shows
-        v_qty := (public.market_order_plan(s.id, v_side, null, p_amount_cents) ->> 'requested_quantity_e6')::bigint;
-      end if;
-    else
-      -- the amount is the gross proceeds before fee and tax
-      if p_amount_cents < v_min_value then
-        perform public.api_error('order_too_small');
-      end if;
-      if v_type = 'limit' then
-        v_qty := ceil(p_amount_cents * 100000000.0 / v_limit)::bigint;
-      else
-        v_qty := (public.market_order_plan(s.id, v_side, null, p_amount_cents) ->> 'requested_quantity_e6')::bigint;
-      end if;
-    end if;
-  else
-    v_qty := p_quantity_e6;
-  end if;
-  v_requested := v_qty;
-
-  if v_qty < 1 then
-    perform public.api_error('order_too_small');
-  end if;
-  if v_qty > public.cfg_num(v_trading, '{maxOrderQuantity}', 100000) * v_scale then
-    perform public.api_error('invalid_quantity');
-  end if;
-
-  -- sells: free position; >= 99.9 % of it is rounded up to the whole position
-  if v_side = 'sell' then
-    select p.quantity_e6 - p.reserved_quantity_e6 into v_avail
-      from public.positions p
-     where p.player_id = v_player and p.security_id = s.id and p.side = 'long' and p.leverage = 1 and p.status = 'open'
-       for update;
-    v_avail := coalesce(v_avail, 0);
-    if v_qty < v_avail and v_qty * 1000 >= v_avail * 999 then
-      v_qty := v_avail;
-    end if;
-    if v_avail < v_qty then
-      perform public.api_error('insufficient_position');
-    end if;
-  end if;
-
-  -- ADR-153: a stock has a supply. Buyers of one stock go one after the other, so the float cannot be oversold.
-  if v_side = 'buy' and s.kind = 'stock' then
-    perform 1 from public.securities x where x.id = s.id for update;
-    if public.security_free_float_e6(s.id) is not null then
-      if public.security_free_float_e6(s.id) < 1 then
-        perform public.api_error('no_shares_left');
-      end if;
-      v_qty := least(v_qty, public.security_free_float_e6(s.id));
-    end if;
-  end if;
-
-  -- minimum order value at the price it would execute or rest at
-  if public.value_cents(v_qty, coalesce(v_limit, v_touch)) < v_min_value
-     and not (v_side = 'sell' and v_qty = v_avail) then
-    perform public.api_error('order_too_small');
-  end if;
-
-  -- how much executes now ---------------------------------------------------------
-  if v_type = 'market' then
-    -- ADR-189: the fill is exactly the plan the preview (quote_order) showed, for any quantity
-    v_plan := public.market_order_plan(s.id, v_side, v_qty, null);
-    v_fill_qty := v_qty;
-    v_fill_price := (v_plan ->> 'avg_price_e4')::bigint;
-  elsif v_side = 'buy' and v_touch <= v_limit then
-    if v_touch * (1 + v_a * (v_pos + v_qty / v_scale)) <= v_limit then
-      v_fill_qty := v_qty;
-    else
-      v_fill_qty := greatest(0, least(v_qty, floor(((v_limit::double precision / v_touch - 1) / v_a - v_pos) * v_scale)::bigint));
-    end if;
-  elsif v_side = 'sell' and v_touch >= v_limit then
-    if v_touch * (1 - v_a * (v_pos + v_qty / v_scale)) >= v_limit then
-      v_fill_qty := v_qty;
-    else
-      v_fill_qty := greatest(0, least(v_qty, floor(((1 - v_limit::double precision / v_touch) / v_a - v_pos) * v_scale)::bigint));
-    end if;
-  end if;
-
-  if v_fill_qty > 0 then
-    if v_side = 'buy' then
-      if v_type = 'limit' then
-        v_fill_price := round(v_touch * (1 + v_a * (v_pos + v_fill_qty / v_scale / 2)))::bigint;
-      end if;
-      if v_type = 'limit' then
-        v_fill_price := least(v_fill_price, v_limit);
-      end if;
-    else
-      if v_type = 'limit' then
-        v_fill_price := greatest(v_min_price, round(v_touch * (1 - v_a * (v_pos + v_fill_qty / v_scale / 2)))::bigint);
-      end if;
-      if v_type = 'limit' then
-        v_fill_price := greatest(v_fill_price, v_limit);
-      end if;
-    end if;
-  end if;
-  v_rest := v_qty - v_fill_qty;
-
-  if v_side = 'buy' then
-    v_need := 0;
-    if v_fill_qty > 0 then
-      v_need := public.value_cents(v_fill_qty, v_fill_price) + v_fee;
-    end if;
-    if v_rest > 0 then
-      v_need := v_need + public.value_cents(v_rest, v_limit) + case when v_fill_qty > 0 then 0 else v_fee end;
-    end if;
-    if v_need > v_cash then
-      perform public.api_error('insufficient_funds');
-    end if;
-  end if;
-
-  -- order, fill, reservation ---------------------------------------------------------
-  insert into public.orders (id, player_id, security_id, request_id, side, type, quantity_e6, limit_price_e4, status)
-  values (v_order_id, v_player, s.id, p_request_id, v_side, v_type, v_qty, v_limit, 'pending');
-
-  if v_fill_qty > 0 then
-    v_fill := public.execute_fill(v_order_id, v_fill_qty, v_fill_price, false, false);
-  end if;
-
-  if v_rest > 0 then
-    select * into o from public.orders where id = v_order_id;
-    if v_side = 'buy' then
-      v_reserve := public.value_cents(v_rest, v_limit) + case when o.fee_cents = 0 then v_fee else 0 end;
-      if v_reserve > 0 then
-        perform public.ledger_transfer(
-          public.ledger_player_account(v_player, 'player_cash'),
-          public.ledger_player_account(v_player, 'player_reserve'),
-          v_reserve, 'order_reserve', 'Reservierung Limit-Order', 'order', v_order_id,
-          'reserve:' || v_order_id::text, v_player);
-      end if;
-      update public.orders set reserved_cents = v_reserve where id = v_order_id;
-    else
-      update public.positions p
-         set reserved_quantity_e6 = p.reserved_quantity_e6 + v_rest
-       where p.player_id = v_player and p.security_id = s.id and p.side = 'long' and p.leverage = 1 and p.status = 'open';
-      update public.orders set reserved_quantity_e6 = v_rest where id = v_order_id;
-    end if;
-    update public.orders
-       set status = case when v_fill_qty > 0 then 'partially_filled'::public.order_status else 'open'::public.order_status end
-     where id = v_order_id;
-  end if;
-  if v_type = 'limit' then
-    perform public.mission_event(v_player, 'limit_order', 1, null);
-  end if;
-
-  select * into o from public.orders where id = v_order_id;
-  select * into v_prof from public.profiles where id = v_player;
-  return public.request_complete(v_player, p_request_id, jsonb_build_object(
-    'order_id',           o.id,
-    'status',             o.status,
-    'quantity_e6',        o.quantity_e6,
-    'filled_quantity_e6', o.filled_quantity_e6,
-    'avg_price_e4',       o.avg_fill_price_e4,
-    'gross_cents',        coalesce((v_fill ->> 'gross_cents')::bigint, 0),
-    'fee_cents',          o.fee_cents,
-    'tax_cents',          coalesce((v_fill ->> 'tax_cents')::bigint, 0),
-    'realized_pnl_cents', (v_fill ->> 'realized_pnl_cents')::bigint,
-    'cash_cents',         (select a.balance_cents from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash'),
-    'reserved_cents',     o.reserved_cents,
-    'xp_awarded',         coalesce((v_fill ->> 'xp_awarded')::integer, 0),
-    'level',              v_prof.level,
-    'xp_total',           v_prof.xp_total,
-    'ticker',             s.ticker,
-    'side',               o.side,
-    'type',               o.type,
-    'limit_price_e4',     o.limit_price_e4,
-    'amount_cents',       p_amount_cents,
-    'requested_quantity_e6', coalesce(v_requested, o.quantity_e6),
-    'unfilled_quantity_e6',  case when v_type = 'market' then greatest(0, v_requested - o.quantity_e6) else 0 end,
-    -- only the stock supply (ADR-153) can make a market order smaller than asked
-    'limited_by',            case when v_type = 'market' and v_requested > o.quantity_e6 then 'supply' end,
-    'impact_bps',            coalesce((v_plan ->> 'impact_bps')::integer, 0)));
+  v_luck := public.campaign_luck(random());
+  v_factor := public.campaign_factor(p_kind, pc.quality, v_luck);
+  -- awareness at once, capped by the growth stage (ADR-062) as in the quarter close; never lowered
+  v_stage := least(greatest(coalesce(public.company_stage(p_company_id), 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_cap := greatest(public.cfg_num(v_su, '{awareness,min}', 0.01),
+                    coalesce((v_su #>> array['stages', 'awarenessCaps', v_stage::text])::double precision, 1));
+  -- ADR-188: the jump at once, capped by the company's awareness cap and booked as "campaign"
+  v_aw := pc.awareness + public.company_awareness_add(p_company_id, 'campaign', public.campaign_kind_num(p_kind, 'awareness'));
+  insert into public.company_campaigns (company_id, kind, cost_cents, luck, demand_factor, awareness_gain, started_at, ends_at,
+                                        created_by, request_id)
+  values (p_company_id, p_kind, v_cost, v_luck, v_factor, greatest(0, v_aw - pc.awareness), v_now,
+          v_now + make_interval(secs => greatest(1, public.campaign_kind_num(p_kind, 'hours')) * 3600), v_player, p_request_id)
+  returning id into v_id;
+  perform public.company_news_add(p_company_id, 'campaign_started',
+    jsonb_build_object('kind', p_kind, 'resonance', public.campaign_resonance(v_luck),
+                       'demand_bps', round(((v_factor - 1) * 10000)::numeric)::integer));
+  return public.request_complete(v_player, p_request_id, public.campaign_json(v_id));
 end;
 $function$;
 
-revoke all on function public.place_order(uuid, text, text, text, bigint, bigint, bigint) from public, anon;
-grant execute on function public.place_order(uuid, text, text, text, bigint, bigint, bigint) to authenticated;
+create or replace function public.company_event_solve(p_event uuid, p_at timestamp with time zone)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  e       public.player_company_events;
+  v_strat jsonb;
+  v_mit   double precision;
+  v_size  double precision;
+  v_bps   integer;
+  v_shock integer;
+  v_name  text;
+begin
+  select * into e from public.player_company_events where id = p_event for update;
+  if e.id is null or e.status not in ('open', 'in_force') then
+    return;
+  end if;
+  v_strat := public.company_event_strategy_def(e);
+  v_mit := least(1, greatest(0, public.cfg_num(v_strat, '{mitigation}', 0)));
+  update public.player_company_events set status = 'solved', resolved_at = p_at, mitigation = v_mit where id = e.id;
+  if not e.bonus_applied then
+    perform public.company_awareness_add(e.company_id, 'event', public.cfg_num(v_strat, '{bonus,awareness}', 0));  -- ADR-188
+    update public.player_companies
+       set quality = least(1, greatest(0, quality + public.cfg_num(v_strat, '{bonus,quality}', 0)))
+     where company_id = e.company_id;
+    update public.player_company_events set bonus_applied = true where id = e.id;
+  end if;
+  -- resolutionShockBps: crisis size × mitigation, chance size / 2 × mitigation
+  v_size := public.cfg_num(public.company_events_cfg(), array['shareShockBps', (e.severity - 1)::text],
+                           case e.severity when 1 then 400 when 2 then 900 else 1500 end);
+  v_bps := round((case when e.polarity = 'crisis' then v_size * v_mit else v_size / 2 * v_mit end)::numeric)::integer;
+  v_shock := public.company_event_share_shock(e.company_id, v_bps);
+  update public.player_company_events set resolution_shock_bps = v_shock where id = e.id;
+  perform public.company_news_add(e.company_id, 'event_solved',
+    jsonb_build_object('event_id', e.id, 'archetype', e.archetype, 'polarity', e.polarity, 'severity', e.severity,
+                       'strategy', e.strategy, 'mitigation', round(v_mit::numeric, 4)::double precision, 'share_shock_bps', v_shock));
+  select c.name into v_name from public.companies c where c.id = e.company_id;
+  perform public.company_event_notify(e.id,
+    case when e.polarity = 'crisis' then 'Krise gemeistert: ' || v_name else 'Chance genutzt: ' || v_name end,
+    null, 'company_event:' || e.id::text || ':solved');
+end;
+$function$;
+
+create or replace function public.company_interview_finish(p_id bigint, p_status text, p_answers jsonb, p_points integer, p_now timestamp with time zone)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  e        jsonb := coalesce(public.interviews_cfg() -> 'effects', '{}'::jsonb);
+  iv       public.company_interviews;
+  v_aw     integer;
+  v_rep    double precision;
+  v_max    integer := coalesce((e ->> 'maxAwarenessBps')::integer, 300);
+  v_maxr   double precision := coalesce((e ->> 'maxReputation')::double precision, 3);
+begin
+  select * into iv from public.company_interviews where id = p_id for update;
+  if iv.id is null or iv.status <> 'requested' then
+    return;
+  end if;
+  v_aw := case p_status
+            when 'answered' then greatest(-v_max, least(v_max, coalesce(p_points, 0) * coalesce((e ->> 'awarenessPerPointBps')::integer, 60)))
+            when 'declined' then coalesce((e ->> 'declineAwarenessBps')::integer, -80)
+            else coalesce((e ->> 'ignoreAwarenessBps')::integer, -120) end;
+  v_rep := case when p_status = 'answered' then greatest(-v_maxr, least(v_maxr, coalesce(p_points, 0) * coalesce((e ->> 'reputationPerPoint')::double precision, 0.5)))
+                when p_status = 'declined' then coalesce((e ->> 'declineReputation')::double precision, -0.5)
+                else coalesce((e ->> 'ignoreReputation')::double precision, -1) end;
+  perform public.company_awareness_add(iv.company_id, 'interview', v_aw / 10000.0);  -- ADR-188
+  if v_rep <> 0 then
+    perform public.listed_ensure(iv.company_id);
+    perform public.company_reputation_bump(iv.company_id, v_rep);
+  end if;
+  update public.company_interviews
+     set status = p_status, answers = p_answers, score = p_points, awareness_bps = v_aw, reputation_delta = v_rep,
+         answered_at = p_now
+   where id = p_id;
+end;
+$function$;
+
+create or replace function public.company_moves_run_due(p_now timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_cfg     jsonb := public.company_moves_cfg();
+  v_now     timestamptz := coalesce(p_now, public.game_now());
+  m         record;
+  v_kind    text;
+  v_risk    text;
+  v_ok      boolean;
+  v_pay     bigint;
+  v_gain    double precision;
+  v_hh      uuid := public.ledger_system_account('households');
+  v_hh_bal  bigint;
+  v_done    integer := 0;
+begin
+  for m in select x.* from public.company_moves x where x.status = 'running' and x.ends_at <= v_now
+            order by x.ends_at, x.id for update skip locked loop
+    select mv ->> 'kind', mv ->> 'risk' into v_kind, v_risk
+      from jsonb_array_elements(coalesce(v_cfg -> 'moves', '[]'::jsonb)) mv where mv ->> 'key' = m.move_key;
+    v_kind := coalesce(v_kind, 'cash');
+    v_risk := coalesce(v_risk, 'normal');
+    v_ok := random() * 10000 < m.chance_bps;
+    v_gain := 0;
+    if v_ok and v_kind = 'cash' then
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'payoutBps'])::numeric, 15000) / 10000)::bigint;
+      -- ADR-134 dealmaker of the founder
+      v_pay := public.apply_bps(v_pay, 10000 + public.company_upgrade_bps(m.company_id, 'dealmaker'));
+    elsif v_ok then
+      v_pay := 0;
+      v_gain := coalesce((v_cfg #>> array['risk', v_risk, 'gain'])::double precision, 0.04);
+    else
+      v_pay := round(m.cost_cents * coalesce((v_cfg #>> array['risk', v_risk, 'refundBps'])::numeric, 3000) / 10000)::bigint;
+    end if;
+    if not exists (select 1 from public.player_companies pc where pc.company_id = m.company_id and pc.status = 'active') then
+      v_pay := 0;
+      v_gain := 0;
+    end if;
+    if v_pay > 0 then
+      select a.balance_cents into v_hh_bal from public.ledger_accounts a where a.id = v_hh for update;
+      v_pay := least(v_pay, greatest(0, coalesce(v_hh_bal, 0)));
+    end if;
+    if v_pay > 0 then
+      perform public.ledger_transfer(v_hh, public.company_cash_account(m.company_id), v_pay, 'company_revenue',
+                                     'Geschäftszug: ' || m.move_key, 'company', m.company_id,
+                                     'move:result:' || m.id::text, null, jsonb_build_object('move', m.move_key, 'success', v_ok));
+    end if;
+    if v_gain > 0 then
+      if v_kind = 'awareness' then
+        perform public.company_awareness_add(m.company_id, 'moves', v_gain);  -- ADR-188
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = m.company_id;
+      end if;
+    end if;
+    update public.company_moves set status = case when v_ok then 'success' else 'failure' end, payout_cents = v_pay,
+                                    gain = v_gain, resolved_at = v_now where id = m.id;
+    perform public.company_system_message(m.company_id,
+      case when v_ok and v_kind = 'cash' then 'Geschäftszug geschafft: ' || public.format_eur(v_pay) || ' eingenommen.'
+           when v_ok then 'Geschäftszug geschafft: die Firma ist jetzt '
+                          || case when v_kind = 'awareness' then 'bekannter' else 'besser' end || '.'
+           else 'Geschäftszug daneben gegangen, ' || public.format_eur(v_pay) || ' zurück.' end);
+    v_done := v_done + 1;
+  end loop;
+  return jsonb_build_object('resolved', v_done);
+end;
+$function$;
+
+create or replace function public.company_pitch_resolve(p_pitch_id bigint, p_u double precision, p_u2 double precision)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg      jsonb := public.pitches_cfg();
+  p        public.company_pitches;
+  v_out    text;
+  v_amount bigint := 0;
+  v_avail  bigint;
+  v_gain   double precision;
+  v_text   text;
+begin
+  select * into p from public.company_pitches where id = p_pitch_id for update;
+  if p.id is null or p.status <> 'running' then
+    return null;
+  end if;
+  v_out := case when p_u * 10000 < p.chance_bps then 'success'
+                when p_u2 * 100 < p.backfire then 'backfire'
+                else 'failure' end;
+  if v_out = 'success' then
+    if p.kind = 'event' then
+      update public.player_company_events
+         set status = 'solved', resolved_at = public.game_now(),
+             mitigation = least((cfg ->> 'maxMitigation')::double precision,
+                                (cfg ->> 'mitigationBase')::double precision + p.fit * (cfg ->> 'mitigationPerFit')::double precision)
+       where id = p.event_id and status in ('open', 'in_force');
+    elsif p.move_kind = 'cash' then
+      v_amount := round(p.cost_cents * ((cfg ->> 'movePayoutBase')::numeric + p.fit * (cfg ->> 'movePayoutPerFit')::numeric))::bigint;
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.ledger_system_account('households') for update;
+      v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+      if v_amount > 0 then
+        perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                       v_amount, 'company_revenue', 'Eigener Geschäftszug', 'company', p.company_id,
+                                       'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    else
+      v_gain := (cfg ->> 'moveGainBase')::double precision + p.fit * (cfg ->> 'moveGainPerFit')::double precision;
+      if p.move_kind = 'awareness' then
+        perform public.company_awareness_add(p.company_id, 'pitch', v_gain);  -- ADR-188
+      else
+        update public.player_companies set quality = least(1, quality + v_gain) where company_id = p.company_id;
+      end if;
+    end if;
+  elsif v_out = 'backfire' then
+    perform public.company_awareness_add(p.company_id, 'pitch', -(cfg ->> 'backfireAwareness')::double precision);  -- ADR-188
+    if p.kind = 'event' and p.cost_cents > 0 then
+      select a.balance_cents into v_avail from public.ledger_accounts a
+       where a.id = public.company_cash_account(p.company_id) for update;
+      v_amount := -least(p.cost_cents, greatest(coalesce(v_avail, 0), 0));
+      if v_amount < 0 then
+        perform public.ledger_transfer(public.company_cash_account(p.company_id), public.ledger_system_account('households'),
+                                       -v_amount, 'company_costs', 'Eigene Strategie ging nach hinten los', 'company',
+                                       p.company_id, 'pitch:result:' || p.id::text, p.created_by);
+      end if;
+    end if;
+  elsif p.kind = 'move' then
+    v_amount := (p.cost_cents * (cfg ->> 'moveRefundBps')::integer) / 10000;
+    select a.balance_cents into v_avail from public.ledger_accounts a
+     where a.id = public.ledger_system_account('households') for update;
+    v_amount := least(v_amount, greatest(coalesce(v_avail, 0), 0));
+    if v_amount > 0 then
+      perform public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(p.company_id),
+                                     v_amount, 'company_revenue', 'Eigener Geschäftszug: Erstattung', 'company', p.company_id,
+                                     'pitch:result:' || p.id::text, p.created_by);
+    end if;
+  end if;
+  update public.company_pitches set status = v_out, result_cents = v_amount, resolved_at = public.game_now() where id = p.id;
+  v_text := case v_out when 'success' then p.success_text when 'backfire' then p.backfire_text else p.failure_text end;
+  perform public.company_news_add(p.company_id, 'pitch_' || v_out,
+    jsonb_build_object('outcome', v_text, 'pitch', left(p.pitch_text, 120), 'kind', p.kind, 'amount_cents', v_amount));
+  perform public.company_system_message(p.company_id, coalesce(v_text, 'Eigene Strategie: ' || v_out));
+  return v_out;
+end;
+$function$;
+
+create or replace function public.protest_check(p_protest_id bigint, p_u double precision, p_u2 double precision)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg       jsonb := public.protests_cfg();
+  k         public.company_protests;
+  c         public.companies;
+  v_players integer;
+  v_chance  integer;
+  v_bps     integer;
+  v_label   text;
+begin
+  select * into k from public.company_protests where id = p_protest_id for update;
+  if k.id is null or k.status <> 'open' then
+    return null;
+  end if;
+  select count(*) into v_players from public.company_protest_supporters s where s.protest_id = k.id;
+  if v_players + k.ai_supporters < k.goal then
+    return 'open';
+  end if;
+  select * into c from public.companies where id = k.company_id;
+  v_label := case k.kind when 'boycott' then 'Boykott-Aufruf' when 'shitstorm' then 'Shitstorm'
+                         when 'petition' then 'Petition' else 'Protestmarsch' end;
+  v_chance := least((cfg ->> 'effectChanceMaxBps')::integer,
+                    (cfg ->> 'effectChanceBaseBps')::integer + v_players * (cfg ->> 'effectChancePerPlayerBps')::integer)
+              -- ADR-134 activist of the starter, on top of the cap
+              + public.player_upgrade_bps(k.started_by, 'activist');
+  if p_u * 10000 < v_chance then
+    v_bps := (cfg ->> 'priceHitMinBps')::integer
+             + floor(p_u2 * ((cfg ->> 'priceHitMaxBps')::integer - (cfg ->> 'priceHitMinBps')::integer + 1))::integer;
+    if c.security_id is not null
+       and exists (select 1 from public.securities s where s.id = c.security_id and s.status = 'listed') then
+      perform public.event_price_shock(c.security_id, -v_bps, public.game_now());
+    end if;
+    perform public.company_awareness_add(c.id, 'protest', -(cfg ->> 'awarenessHit')::double precision);  -- ADR-188
+    if exists (select 1 from public.player_companies pc where pc.company_id = c.id) then
+      perform public.company_news_add(c.id, 'protest_hit', jsonb_build_object('kind', k.kind, 'players', v_players));
+    end if;
+    update public.company_protests set status = 'hit', effect_bps = v_bps, resolved_at = public.game_now() where id = k.id;
+    insert into public.news_items (category, headline, body, importance, company_id, security_id, published_at)
+    values ('market', v_label || ' gegen ' || c.name || ' zeigt Wirkung',
+            v_players || ' Spieler und ' || k.ai_supporters || ' weitere Unterstützer machen mit. Das Thema ist in aller Munde.',
+            2, c.id, c.security_id, public.game_now());
+    return 'hit';
+  end if;
+  update public.company_protests set status = 'fizzled', resolved_at = public.game_now() where id = k.id;
+  insert into public.news_items (category, headline, body, importance, company_id, security_id, published_at)
+  values ('market', v_label || ' gegen ' || c.name || ' verpufft',
+          'Viele haben mitgemacht, doch Kunden und Anleger zucken nur mit den Schultern.', 1, c.id, c.security_id,
+          public.game_now());
+  return 'fizzled';
+end;
+$function$;
+
+create or replace function public.news_show_start(p_show_id bigint, p_now timestamp with time zone)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg     jsonb := public.news_show_cfg();
+  s       public.news_shows;
+  seg     jsonb;
+  a       jsonb;
+  v_idx   integer := 0;
+  v_house uuid := public.ledger_system_account('households');
+  v_cash  bigint;
+  v_news  bigint;
+  v_sec   uuid;
+  r       record;
+begin
+  select * into s from public.news_shows where id = p_show_id for update;
+  if s.id is null or s.status <> 'scheduled' or p_now < s.airs_at
+     or p_now >= s.airs_at + make_interval(mins => coalesce((cfg ->> 'waitMinutes')::integer, 10)) then
+    return false;
+  end if;
+  for seg in select x from jsonb_array_elements(s.segments) x loop
+    v_idx := v_idx + 1;
+    v_sec := null;
+    for a in select x from jsonb_array_elements(coalesce(seg -> 'apply', '[]'::jsonb)) x loop
+      case a ->> 'type'
+        when 'stock' then
+          v_sec := (a ->> 'security_id')::uuid;
+          if exists (select 1 from public.securities sec where sec.id = v_sec and sec.status = 'listed') then
+            perform public.event_price_shock(v_sec, (a ->> 'bps')::integer, p_now);
+          end if;
+        when 'sector' then
+          for r in select sec.id from public.securities sec
+                    where sec.sector_key = a ->> 'sector_key' and sec.kind = 'stock' and sec.status = 'listed' loop
+            perform public.event_price_shock(r.id, (a ->> 'bps')::integer, p_now);
+          end loop;
+        when 'company' then
+          -- ADR-188: a share of the current awareness, capped and booked as "news"
+          perform public.company_awareness_add((a ->> 'company_id')::uuid, 'news',
+            coalesce((select x.awareness from public.player_companies x where x.company_id = (a ->> 'company_id')::uuid), 0)
+              * (a ->> 'awareness_bps')::double precision / 10000.0);
+          update public.player_companies pc
+             set task_momentum = case when coalesce((a ->> 'scandal')::boolean, false)
+                                      then greatest(1.0, 1.0 + (coalesce(pc.task_momentum, 1.0) - 1.0)
+                                             * (1.0 - coalesce((cfg #>> '{company,momentumLossBps}')::numeric, 0) / 10000.0))
+                                      else pc.task_momentum end
+           where pc.company_id = (a ->> 'company_id')::uuid and pc.status = 'active';
+        when 'interview' then
+          update public.company_interviews i set aired_at = p_now, show_id = s.id
+           where i.id = (a ->> 'interview_id')::bigint and i.aired_at is null;
+        when 'gag' then
+          if exists (select 1 from public.companies c where c.id = (a ->> 'company_id')::uuid) then
+            insert into public.news_running_gags as rg (gag_key, company_id, episodes, last_line, last_show_id, first_at, last_at)
+            values (a ->> 'gag', (a ->> 'company_id')::uuid, 1, (a ->> 'line')::integer, s.id, p_now, p_now)
+            on conflict (gag_key, company_id) do update
+              set episodes = rg.episodes + 1, last_line = excluded.last_line, last_show_id = excluded.last_show_id,
+                  last_at = excluded.last_at
+              where rg.last_show_id is distinct from excluded.last_show_id;
+          end if;
+        when 'tasks' then
+          update public.company_tasks t
+             set value_cents = greatest(100, (t.value_cents * (10000 + (a ->> 'bps')::bigint)) / 10000)
+           where t.status in ('open', 'assigned');
+        when 'cash' then
+          select x.balance_cents into v_cash from public.ledger_accounts x where x.id = v_house for update;
+          if coalesce(v_cash, 0) >= (a ->> 'cents')::bigint
+             and exists (select 1 from public.profiles p where p.id = (a ->> 'player_id')::uuid) then
+            perform public.ledger_transfer(v_house, public.ledger_player_account((a ->> 'player_id')::uuid, 'player_cash'),
+                                           (a ->> 'cents')::bigint, 'random_event', 'NEXA Nachrichten: Trostpflaster',
+                                           'player', (a ->> 'player_id')::uuid,
+                                           'newsshow:' || s.id::text || ':' || v_idx::text, null,
+                                           jsonb_build_object('show_id', s.id));
+          end if;
+        when 'tip' then
+          v_sec := (a ->> 'security_id')::uuid;
+          if exists (select 1 from public.securities sec where sec.id = v_sec and sec.status = 'listed')
+             and not exists (select 1 from public.stock_tips x where x.security_id = v_sec and x.applied_at is null) then
+            insert into public.news_items (category, headline, body, importance, security_id, published_at)
+            values ('company', seg ->> 'headline', seg ->> 'text', 2, v_sec, p_now) returning id into v_news;
+            insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                           published_at, due_at)
+            values (v_sec, v_news, (a ->> 'direction')::smallint, (a ->> 'bps')::integer, 2, (a ->> 'comes_true')::boolean,
+                    seg ->> 'headline', seg ->> 'text', p_now,
+                    p_now + make_interval(mins => (a ->> 'lead_minutes')::integer));
+          end if;
+        else
+          null;
+      end case;
+    end loop;
+    -- the news feed keeps what was said (the hint wrote its own item above)
+    if seg ->> 'kind' <> 'tip' then
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values (case when seg ->> 'kind' in ('loser', 'winner', 'gossip', 'nft') then 'player'
+                   when seg ->> 'kind' in ('scandal', 'hype', 'stock', 'tax', 'corp', 'interview', 'gag') then 'company' else 'market' end::public.news_category,
+              seg ->> 'headline', seg ->> 'text', 2, v_sec, p_now + make_interval(secs => v_idx));
+    end if;
+    -- whoever is talked about hears of it
+    if seg -> 'subject' ? 'player_id'
+       and exists (select 1 from public.profiles p where p.id = (seg -> 'subject' ->> 'player_id')::uuid) then
+      perform public.social_notify((seg -> 'subject' ->> 'player_id')::uuid, 'news_show',
+        'Mr. Doodle Dangle spricht über dich', seg ->> 'headline',
+        jsonb_build_object('show_id', s.id, 'kind', seg ->> 'kind'), '/news',
+        'news_show:' || s.id::text || ':' || v_idx::text);
+    end if;
+  end loop;
+  update public.news_shows set status = 'aired', started_at = p_now where id = s.id;
+  return true;
+end;
+$function$;
+
+-- ===== supabase/migrations/20261204007720_awareness_close.sql =====
+-- =============================================================================
+-- NEXA · 7720 · Awareness, one model (ADR-188): the hourly close and the strength "Bekanntheit"
+-- =============================================================================
+-- * player_company_close_hour: full redefinition of the live function (6600, 6900, 7300, 7310 changed it; copied
+--   from the database after 7310). Only the awareness block changed: company_awareness_step with the company's cap,
+--   served share and reputation, the parts booked in company_awareness_log, the hour row's awareness_parts with the
+--   cap and all sources, the strength counted as awareness / cap.
+-- * company_strengths_instant: the awareness score is 100 x (awareness / cap); the caller divides.
+-- * company_strengths_step: the awareness score follows with awarenessFollowPerHour (25 % of the gap per hour, both
+--   ways) instead of 2 % up, so it cannot stand at 4 while the awareness is at 49 %.
+-- Idempotent: runs unchanged as supabase/updates/.
+
+create or replace function public.company_strengths_instant(p_awareness double precision, p_quality double precision, p_demand double precision, p_capacity double precision, p_revenue bigint, p_profit bigint, p_pay_factor_bps integer, p_cash bigint, p_unpaid bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg     jsonb := public.company_strengths_cfg();
+  v_costs double precision := greatest(1, coalesce(p_revenue, 0) - coalesce(p_profit, 0));
+begin
+  return jsonb_build_object(
+    -- ADR-188: p_awareness is the awareness as a share of the company's cap (the caller divides)
+    'awareness', least(100.0, greatest(0.0, 100 * coalesce(p_awareness, 0))),
+    'quality', least(100.0, greatest(0.0, 100 * coalesce(p_quality, 0))),
+    'delivery', case when coalesce(p_demand, 0) > 0
+                     then least(100.0, greatest(0.0, 100 * coalesce(p_capacity, 0) / p_demand)) else 50 end,
+    'margin', case when coalesce(p_revenue, 0) > 0
+                   then least(100.0, greatest(0.0, 100.0 * p_profit / p_revenue / public.cfg_num(cfg, '{marginFull}', 0.25)))
+                   else 0 end,
+    'team', least(100.0, greatest(0.0, coalesce(p_pay_factor_bps, 0) / 100.0)),
+    'finance', case when coalesce(p_unpaid, 0) > 0 then 0
+                    else least(100.0, greatest(0.0, 100.0 * coalesce(p_cash, 0) / (v_costs * public.cfg_num(cfg, '{cashHoursFull}', 24)))) end);
+end;
+$function$;
+
+create or replace function public.company_strengths_step(p_prev jsonb, p_instant jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg  jsonb := public.company_strengths_cfg();
+  k    text;
+  p    double precision;
+  v    double precision;
+  out  jsonb := '{}'::jsonb;
+begin
+  foreach k in array array['awareness', 'quality', 'delivery', 'margin', 'team', 'finance'] loop
+    p := coalesce((p_prev ->> k)::double precision, 0);
+    v := coalesce((p_instant ->> k)::double precision, 0);
+    out := out || jsonb_build_object(k, least(100.0, greatest(0.0,
+             p + case when k = 'awareness' then public.cfg_num(cfg, '{awarenessFollowPerHour}', 0.25)  -- ADR-188
+                      when v > p then public.cfg_num(cfg, '{gainPerHour}', 0.02) else public.cfg_num(cfg, '{decayPerHour}', 0.05) end
+                 * (v - p))));
+  end loop;
+  return out;
+end;
+$function$;
+
+create or replace function public.player_company_close_hour(p_company uuid, p_hour_start timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pc        public.player_companies;
+  v_momentum double precision;
+  v_lx      jsonb;
+  v_lxc     bigint := 0;
+  v_sbonus  bigint := 0;  -- ADR-176 (company_strengths)
+  v_aiutil  integer := 0;  -- ADR-180
+  v_awh     jsonb;
+  v_aw0     double precision;
+  v_q0      double precision;
+  v_boost   double precision;
+  v_awcap   double precision;  -- ADR-188
+  v_awnext  double precision;
+  v_sscore  jsonb;
+  v_scash   bigint;
+  c         public.companies;
+  v_su      jsonb := coalesce(public.config_jsonb('startups'), '{}'::jsonb);
+  v_hours   double precision := greatest(1, public.config_double('time', '{quarterHours}', 6));
+  v_start   timestamptz := date_trunc('hour', p_hour_start);
+  v_end     timestamptz;
+  v_qid     bigint;
+  v_team    jsonb;
+  v_price   jsonb;
+  v_ev      jsonb;
+  v_camp    public.company_campaigns;
+  v_stage   integer;
+  v_demand  double precision;
+  v_cap     double precision;
+  v_sold    double precision;
+  v_ctr     double precision;
+  v_own     bigint;
+  v_crev    bigint;
+  v_hhbal   bigint;
+  v_rev     bigint;
+  v_cogs    bigint;
+  v_gross   bigint;
+  v_aidue   bigint;
+  v_aipaid  bigint;
+  v_pdue    bigint := 0;
+  v_ppaid   bigint := 0;
+  v_due     bigint;
+  v_factor  integer;
+  v_fixed   bigint;
+  v_mk      bigint;
+  v_costs   bigint;
+  v_paid    bigint := 0;
+  v_unpaid  bigint := 0;
+  v_settle  bigint := 0;
+  v_cash    bigint;
+  v_acc     uuid;
+  v_hh      uuid;
+  v_profit  bigint;
+  v_owed    bigint;
+  v_free    bigint;
+  v_stakes  bigint := 0;
+  v_sp      bigint;
+  v_payout  bigint := 0;
+  v_bps     integer;
+  v_until   timestamptz;
+  v_news    bigint;
+  k         text;
+  j         record;
+  s         record;
+begin
+  if p_company is null or p_hour_start is null then
+    return null;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company and status = 'active' for update;
+  if pc.company_id is null then
+    return null;
+  end if;
+  -- task momentum (ADR-148): solved tasks lift demand; it drifts back toward 1 every hour, so it must be kept up
+  v_momentum := greatest(1.0, 1.0 + (coalesce(pc.task_momentum, 1.0) - 1.0)
+                  * (1.0 - public.cfg_num(public.company_tasks_cfg(), '{momentum,decayPerHourBps}', 300) / 10000.0));
+  if v_momentum <> coalesce(pc.task_momentum, 1.0) then
+    update public.player_companies set task_momentum = v_momentum where company_id = p_company;
+    pc.task_momentum := v_momentum;
+  end if;
+  if exists (select 1 from public.player_company_hours h where h.company_id = p_company and h.hour_start = v_start) then
+    update public.player_companies set last_hour_at = greatest(last_hour_at, v_start + interval '1 hour')
+     where company_id = p_company and last_hour_at < v_start + interval '1 hour';
+    return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'skipped', 'already_closed');
+  end if;
+  v_end := v_start + interval '1 hour';
+  select * into c from public.companies where id = p_company;
+  select gq.id into v_qid from public.game_quarters gq where gq.starts_at <= v_start and gq.ends_at > v_start;
+  v_team := public.player_company_team(p_company);
+  v_acc := public.company_cash_account(p_company);
+  v_hh := public.ledger_system_account('households');
+  k := 'pch:' || p_company::text || ':' || to_char(v_start at time zone 'UTC', 'YYYYMMDDHH24');
+  -- company event of this hour (ADR-091): demand and capacity factors, extra costs as a share of the own revenue
+  v_ev := public.company_event_hour_effect(p_company, v_start, v_end);
+  -- marketing campaign (ADR-097, campaignDemandFactor): its factor when the hour starts inside its window
+  v_camp := public.company_campaign_at(p_company, v_start);
+  -- listed companies (ADR-167): research, products, regions, benefits, mood and reputation as terms of the hour
+  v_lx := public.listed_hour_effect(p_company, v_start);
+  pc.awareness := least(1.0, pc.awareness + (v_lx ->> 'awareness_add')::double precision);
+  pc.quality := least(1.0, greatest(0.0, pc.quality + (v_lx ->> 'quality_add')::double precision));
+
+  -- sales of the hour with the quarter's awareness and quality; demand and capacity count in units at the
+  -- normal price, the price strategy changes both price and demand (ADR-083)
+  v_price := public.company_price_effect(pc.price_level, pc.quality);
+  v_stage := least(greatest(coalesce((v_team ->> 'stage')::integer, 0), 0),
+                   greatest(jsonb_array_length(coalesce(v_su #> '{stages,awarenessCaps}', '[1]'::jsonb)) - 1, 0));
+  v_demand := pc.potential_annual_cents * public.company_market_factor(pc.tier, pc.expansion_level) / 4.0 / v_hours
+            * pc.awareness * (0.5 + 0.5 * pc.quality)
+            * exp(public.cfg_num(v_su, '{demandNoise}', 0.1) * public.gauss_random())
+            * (v_price ->> 'demand')::double precision
+            * (v_ev ->> 'demand_factor')::double precision
+            * greatest(0, coalesce(v_camp.demand_factor, 1))
+            * coalesce(pc.task_momentum, 1.0)
+            * (v_lx ->> 'demand_factor')::double precision;
+  v_cap := (v_team ->> 'team_productivity_bps')::double precision / 10000.0
+         * public.cfg_num(v_su, array['capacityCentsPerProductivity', c.sector_key], 250000)
+         * (1 + public.cfg_num(v_su, '{stages,capacityBonusPerStage}', 0.25) * v_stage)
+         * public.company_capacity_factor(pc.expansion_level)
+         * (v_ev ->> 'capacity_factor')::double precision
+         * (v_lx ->> 'capacity_factor')::double precision / v_hours;
+  v_sold := least(v_demand, v_cap);
+  -- contract work: a share of the unused capacity at the normal price (ADR-083)
+  v_ctr := case when pc.contract_work
+                then greatest(0, v_cap - v_sold) * public.cfg_num(v_su, '{contractWork,shareOfFreeCapacity}', 0.25)
+                else 0 end;
+  v_own := round((v_sold * (v_price ->> 'price')::double precision)::numeric)::bigint;
+  v_crev := round(v_ctr::numeric)::bigint;
+  -- closed money system: the households pay at most what they have (own sales first)
+  v_hhbal := greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a where a.id = v_hh), 0));
+  if v_own + v_crev > v_hhbal then
+    v_own := least(v_own, v_hhbal);
+    v_crev := least(v_crev, v_hhbal - v_own);
+    v_sold := least(v_sold, v_own / greatest((v_price ->> 'price')::double precision, 0.0001));
+    v_ctr := v_crev;
+  end if;
+  v_rev := v_own + v_crev;
+  -- goods; an event's extra costs (or savings) move with the own revenue, goods never cost less than nothing
+  v_cogs := round(greatest(0, v_sold * (1 - public.cfg_num(v_su, array['grossMargin', c.sector_key], 0.5)) * (v_lx ->> 'cogs_factor')::double precision
+                              + v_own * (v_ev ->> 'extra_cost_share')::double precision)::numeric)::bigint
+          + round((v_ctr * (1 - public.cfg_num(v_su, '{contractWork,grossMargin}', 0.3)))::numeric)::bigint;
+  v_gross := v_rev - v_cogs;
+
+  -- presence (ADR-103): employees away for careers.inactivity.fireAfterHours lose the job first, paid up to that moment
+  for j in select pj.id from public.player_jobs pj where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    perform public.job_absence_check(j.id, v_end);
+  end loop;
+  -- wages due: AI workers and the hourly contract wages of the players (the founder draws no wage)
+  -- ADR-180: AI workers fill what founder and players cannot; the full wage only for the used capacity
+  v_aiutil := public.company_ai_utilization_bps(v_sold, v_cap, pc.ai_workers,
+                (v_team ->> 'team_productivity_bps')::double precision / 10000.0);
+  v_aidue := public.company_ai_wage_due_cents(pc.ai_workers, v_aiutil);
+  for j in select pj.id, pj.salary_cents_per_hour, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    v_pdue := v_pdue + j.salary_cents_per_hour * public.job_payable_minutes(j.id, v_until) / 60;
+  end loop;
+  v_due := v_aidue + v_pdue;
+  -- never more than the hour earned; everyone gets the same share (ADR-072)
+  v_factor := case when v_due <= 0 then 10000 else least(10000, greatest(0, v_gross) * 10000 / v_due)::integer end;
+  v_aipaid := v_aidue * v_factor / 10000;
+
+  -- money: revenue (own sales and contract work) from the households, goods and AI wages back to them
+  if v_rev > 0 then
+    perform public.ledger_transfer(v_hh, v_acc, v_rev, 'company_revenue',
+                                   'Umsatz ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':revenue', pc.founder_id);
+  end if;
+  -- strengths bonus (ADR-176): the reward tier of the scores before this hour
+  select cst.scores into v_sscore from public.company_strengths cst where cst.company_id = p_company;
+  if v_rev > 0 and public.company_strengths_reward_bps(coalesce(v_sscore, '{}'::jsonb)) > 0 then
+    v_sbonus := least(floor(v_rev * public.company_strengths_reward_bps(v_sscore) / 10000.0)::bigint,
+                      greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a where a.id = v_hh), 0)));
+    if v_sbonus > 0 then
+      perform public.ledger_transfer(v_hh, v_acc, v_sbonus, 'company_revenue', 'Stärken-Bonus',
+                                     'company', p_company, k || ':strengths', pc.founder_id);
+      v_rev := v_rev + v_sbonus;
+    end if;
+  end if;
+  if v_cogs + v_aipaid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_cogs + v_aipaid, 'company_costs', 'Wareneinsatz und KI-Kräfte',
+                                   'company', p_company, k || ':goods', pc.founder_id);
+  end if;
+  -- players: the hour (up to the end of a notice) at contract wage x factor, with XP and branch minutes
+  update public.player_companies set pay_factor_bps = v_factor where company_id = p_company;
+  for j in select pj.id, pj.player_id, pj.notice_ends_at from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' order by pj.id loop
+    v_until := least(v_end, coalesce(j.notice_ends_at, v_end));
+    perform public.lock_player_accounts(j.player_id);
+    v_ppaid := v_ppaid + public.accrue_job_salary(j.id, v_until);
+  end loop;
+
+  -- fixed costs (with the expansion level) and marketing from the cash; the rest becomes an open bill
+  -- efficiency upgrade of the founder (ADR-100): the hour's fixed costs x (10 000 − fixedCostDiscountBps) / 10 000
+  v_fixed := public.apply_bps(round((public.company_fixed_cost_cents(pc.tier, pc.expansion_level) / v_hours)::numeric)::bigint,
+                              10000 - public.player_fixed_cost_discount_bps(pc.founder_id));
+  v_fixed := round(v_fixed * (v_lx ->> 'fixed_factor')::double precision)::bigint;  -- ADR-167
+  v_mk := round((pc.marketing_cents_per_quarter / v_hours)::numeric)::bigint;
+  v_costs := v_fixed + v_mk;
+  select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+  v_paid := least(v_costs, coalesce(v_cash, 0));
+  if v_paid > 0 then
+    perform public.ledger_transfer(v_acc, v_hh, v_paid, 'company_costs', 'Fixkosten und Marketing',
+                                   'company', p_company, k || ':costs', pc.founder_id);
+  end if;
+  v_unpaid := v_costs - v_paid;
+  if v_unpaid = 0 and pc.unpaid_cents > 0 then
+    select greatest(0, a.balance_cents) into v_cash from public.ledger_accounts a where a.id = v_acc;
+    v_settle := least(pc.unpaid_cents, coalesce(v_cash, 0));
+    if v_settle > 0 then
+      perform public.ledger_transfer(v_acc, v_hh, v_settle, 'company_costs', 'Offene Rechnungen',
+                                     'company', p_company, k || ':settle', pc.founder_id);
+    end if;
+  end if;
+
+  -- listed companies (ADR-167): running costs of products, regions, machines, benefits and the tax advisor
+  v_lxc := public.listed_hour_costs(p_company, v_start, k);
+  v_fixed := v_fixed + v_lxc;
+  v_paid := v_paid + v_lxc;
+  v_profit := v_rev - v_cogs - v_ppaid - v_aipaid - v_fixed - v_mk;
+  v_owed := pc.unpaid_cents + v_unpaid - v_settle;
+
+  -- stakes (ADR-098, stakePayoutCents): every running stake whose term holds this hour takes its share of a
+  -- profitable hour (rounded down), never more than the free cash; served before the CEO payout. The hour is marked
+  -- as handled (settled_until) whether it paid or not.
+  for s in select x.id, x.investor_id, x.share_bps from public.deals x
+            where x.kind = 'stake' and x.status = 'active' and x.company_id = p_company
+              and x.settled_until <= v_start and x.ends_at > v_start
+            order by x.accepted_at, x.id for update of x
+  loop
+    v_sp := 0;
+    if v_profit > 0 then
+      select a.balance_cents - v_owed - public.listed_reserved_cents(p_company) into v_free from public.ledger_accounts a where a.id = v_acc;
+      v_sp := least(v_profit * s.share_bps / 10000, greatest(0, coalesce(v_free, 0)));
+    end if;
+    if v_sp > 0 then
+      perform public.lock_player_accounts(s.investor_id);
+      perform public.ledger_transfer(v_acc, public.ledger_player_account(s.investor_id, 'player_cash'), v_sp, 'dividend',
+                                     'Gewinnanteil ' || c.name || ' ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                     'deal', s.id, k || ':stake:' || s.id::text, s.investor_id);
+      perform public.loan_withhold(s.investor_id, v_sp, k || ':stake:' || s.id::text);
+      v_stakes := v_stakes + v_sp;
+    end if;
+    update public.deals set payouts_cents = payouts_cents + v_sp, settled_until = v_end where id = s.id;
+  end loop;
+
+  -- automatic CEO payout (ADR-086, founderPayoutCents): after the hour's own bookings and the stakes, a share of the
+  -- profit left after the stake payouts (rounded down) moves from the company cash to the founder's private cash like
+  -- company_withdraw, never more than the free cash. A transfer, not a cost: profit_cents stays as computed above.
+  v_bps := least(10000, greatest(0, least(coalesce(pc.founder_payout_bps, 0), public.listed_payout_cap_bps(p_company, v_start))));
+  if v_profit - v_stakes > 0 and v_bps > 0 then
+    select a.balance_cents - v_owed - public.listed_reserved_cents(p_company) into v_free from public.ledger_accounts a where a.id = v_acc;
+    v_payout := least((v_profit - v_stakes) * v_bps / 10000, greatest(0, coalesce(v_free, 0)));
+  end if;
+  if v_payout > 0 then
+    perform public.lock_player_accounts(pc.founder_id);
+    perform public.ledger_transfer(v_acc, public.ledger_player_account(pc.founder_id, 'player_cash'), v_payout, 'transfer',
+                                   'CEO-Auszahlung ' || to_char(v_start at time zone 'Europe/Berlin', 'HH24') || ' Uhr',
+                                   'company', p_company, k || ':payout', pc.founder_id);
+    perform public.loan_withhold(pc.founder_id, v_payout, k || ':payout');
+  end if;
+
+  -- record hour (ADR-091): beating an earlier best hour is news, at most one item per Berlin day (updated while the
+  -- day's record keeps rising and no AI text was written for it)
+  if v_profit > coalesce(pc.best_hour_profit_cents, 0) and coalesce(pc.best_hour_profit_cents, 0) > 0 then
+    select n.id into v_news from public.company_news n
+     where n.company_id = p_company and n.kind = 'record_hour'
+       and ((n.payload ->> 'hour_start')::timestamptz at time zone 'Europe/Berlin')::date
+           = (v_start at time zone 'Europe/Berlin')::date
+     order by n.id desc limit 1;
+    if v_news is null then
+      perform public.company_news_add(p_company, 'record_hour',
+                                      jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start));
+    else
+      update public.company_news set payload = jsonb_build_object('profit_cents', v_profit, 'hour_start', v_start)
+       where id = v_news and ai_headline is null;
+    end if;
+  end if;
+
+  update public.player_companies
+     set unpaid_cents = v_owed,
+         distress = v_owed > 0,
+         last_hour_at = greatest(pc.last_hour_at, v_end),
+         best_hour_profit_cents = greatest(best_hour_profit_cents, v_profit)
+   where company_id = p_company;
+  insert into public.player_company_hours (company_id, hour_start, game_quarter_id, demand_cents, capacity_cents, revenue_cents,
+                                           contract_revenue_cents, cogs_cents, fixed_cents, marketing_cents, player_wages_due_cents,
+                                           player_wages_paid_cents, ai_wages_due_cents, ai_wages_paid_cents, pay_factor_bps,
+                                           paid_costs_cents, unpaid_added_cents, profit_cents, founder_payout_cents, event_id,
+                                           stake_payout_cents, campaign_id)
+  values (p_company, v_start, v_qid, round(v_demand::numeric)::bigint, round(v_cap::numeric)::bigint, v_rev,
+          v_crev, v_cogs, v_fixed, v_mk, v_pdue, v_ppaid, v_aidue, v_aipaid, v_factor, v_paid, v_unpaid, v_profit, v_payout,
+          (v_ev ->> 'event_id')::uuid, v_stakes, v_camp.id);
+
+  -- strengths (ADR-176): every score moves a step toward what this hour showed
+  update public.player_company_hours set strength_bonus_cents = v_sbonus where company_id = p_company and hour_start = v_start;
+  -- ADR-188: one awareness model. Marketing closes a share of the gap to the cap (tier, stage, expansion), word of
+  -- mouth from served customers and reputation, slow decay toward the floor. Single events of this hour (tasks,
+  -- campaigns, moves, ...) are already in the value and in company_awareness_log; the hour books its three parts there
+  -- too (decay takes any clamp, so the parts always add up).
+  select x.awareness, x.quality into v_aw0, v_q0 from public.player_companies x where x.company_id = p_company;
+  select coalesce(sum(l.delta), 0) into v_boost from public.company_awareness_log l
+   where l.company_id = p_company and l.hour_start = v_start and l.source not in ('marketing', 'word_of_mouth', 'decay');
+  v_awcap := public.company_awareness_cap(pc.tier, v_stage, coalesce(pc.expansion_level, 0));
+  v_awh := public.company_awareness_step(v_aw0, v_awcap, v_q0,
+             (public.company_price_effect(pc.price_level, v_q0) ->> 'awareness')::double precision, v_mk::double precision,
+             pc.potential_annual_cents * public.company_market_factor(pc.tier, pc.expansion_level),
+             case when v_demand > 0 then v_sold / v_demand else 1 end, coalesce(pc.reputation, 50));
+  v_awnext := (v_awh ->> 'next')::double precision;
+  update public.player_companies set awareness = v_awnext, awareness_boost = 0 where company_id = p_company;
+  perform public.company_awareness_log_add(p_company, v_start, 'marketing', (v_awh ->> 'marketing')::double precision);
+  perform public.company_awareness_log_add(p_company, v_start, 'word_of_mouth', (v_awh ->> 'word_of_mouth')::double precision);
+  perform public.company_awareness_log_add(p_company, v_start, 'decay', v_awnext - v_aw0
+             - (v_awh ->> 'marketing')::double precision - (v_awh ->> 'word_of_mouth')::double precision);
+  delete from public.company_awareness_log l where l.company_id = p_company and l.hour_start < v_start - interval '8 days';
+  update public.player_company_hours
+     set ai_utilization_bps = v_aiutil, awareness_before = v_aw0 - v_boost,
+         awareness_after = v_awnext,
+         awareness_parts = jsonb_build_object('word_of_mouth', v_awh -> 'word_of_mouth', 'marketing', v_awh -> 'marketing',
+                                              'decay', -(v_awnext - v_aw0 - (v_awh ->> 'marketing')::double precision
+                                                         - (v_awh ->> 'word_of_mouth')::double precision),
+                                              'extra', v_boost, 'cap', v_awcap,
+                                              'sources', public.company_awareness_hour_json(p_company, v_start))
+   where company_id = p_company and hour_start = v_start;
+  select greatest(0, a.balance_cents) into v_scash from public.ledger_accounts a where a.id = v_acc;
+  insert into public.company_strengths as cs (company_id, scores, hours, updated_at)
+  values (p_company,
+          public.company_strengths_step('{}'::jsonb,
+            public.company_strengths_instant(v_awnext / greatest(0.01, v_awcap), pc.quality, v_demand, v_cap, v_rev, v_profit, v_factor, v_scash, v_owed)),
+          1, now())
+  on conflict (company_id) do update
+    set scores = public.company_strengths_step(cs.scores,
+                   public.company_strengths_instant(v_awnext / greatest(0.01, v_awcap), pc.quality, v_demand, v_cap, v_rev, v_profit, v_factor, v_scash, v_owed)),
+        hours = cs.hours + 1, updated_at = now();
+  perform public.listed_hour_after(p_company, v_start, v_demand, v_cap, v_rev, v_profit, v_factor, v_payout);  -- ADR-167
+  return jsonb_build_object('company_id', p_company, 'hour_start', v_start, 'quarter_id', v_qid, 'revenue_cents', v_rev,
+                            'contract_revenue_cents', v_crev, 'profit_cents', v_profit, 'pay_factor_bps', v_factor,
+                            'player_wages_paid_cents', v_ppaid, 'ai_wages_paid_cents', v_aipaid, 'unpaid_added_cents', v_unpaid,
+                            'founder_payout_cents', v_payout, 'event_id', v_ev -> 'event_id', 'stake_payout_cents', v_stakes,
+                            'campaign_id', v_camp.id);
+end;
+$function$;
+
+-- ===== supabase/migrations/20261204007730_awareness_rescale.sql =====
+-- =============================================================================
+-- NEXA · 7730 · Awareness, one model (ADR-188): existing companies move to the new caps, once
+-- =============================================================================
+-- * Every active player company keeps its standing relative to its cap: awareness / old stage cap (garage 50 %,
+--   then 70, 85, 95, 100 %) x the new cap (tier, stage, expansion). Nobody drops to 0; a company at its old cap
+--   stands at its new cap. The change is booked as "rescale" in the open hour, so the ledger has a start.
+-- * The strength "Bekanntheit" is set to 100 x awareness / cap, so it agrees with the value from the first hour on.
+-- * Runs once (public.data_migrations), however often the update script is executed.
+-- * The old six-argument company_awareness_hour (ADR-180) is gone; company_awareness_step replaces it.
+-- Idempotent: runs unchanged as supabase/updates/.
+
+create table if not exists public.data_migrations (
+  key        text primary key,
+  applied_at timestamptz not null default now()
+);
+alter table public.data_migrations enable row level security;
+revoke all on public.data_migrations from anon, authenticated;
+comment on table public.data_migrations is 'One-time data changes that must not repeat when the update script runs again.';
+
+do $$
+declare
+  r        record;
+  v_old    double precision[] := array[0.5, 0.7, 0.85, 0.95, 1.0];
+  v_stage  integer;
+  v_oldcap double precision;
+  v_newcap double precision;
+  v_min    double precision := public.cfg_num(public.company_awareness_cfg(), '{min}', 0.02);
+  v_new    double precision;
+begin
+  if exists (select 1 from public.data_migrations where key = 'awareness_rescale_188') then
+    return;
+  end if;
+  for r in select pc.company_id, pc.tier, pc.expansion_level, pc.awareness
+             from public.player_companies pc where pc.status = 'active' for update loop
+    v_stage := least(4, greatest(0, coalesce((public.player_company_team(r.company_id) ->> 'stage')::integer, 0)));
+    v_oldcap := v_old[v_stage + 1];
+    v_newcap := public.company_awareness_cap(r.tier, v_stage, coalesce(r.expansion_level, 0));
+    v_new := least(v_newcap, greatest(v_min, coalesce(r.awareness, 0) / v_oldcap * v_newcap));
+    update public.player_companies set awareness = v_new, awareness_boost = 0 where company_id = r.company_id;
+    perform public.company_awareness_log_add(r.company_id, public.game_now(), 'rescale', v_new - coalesce(r.awareness, 0));
+    update public.company_strengths s
+       set scores = s.scores || jsonb_build_object('awareness', round((100 * least(1, v_new / v_newcap))::numeric, 4))
+     where s.company_id = r.company_id;
+  end loop;
+  insert into public.data_migrations (key) values ('awareness_rescale_188') on conflict do nothing;
+end;
+$$;
+
+drop function if exists public.company_awareness_hour(double precision, double precision, double precision,
+  double precision, double precision, integer);
 
 -- ===== supabase/seed.sql =====
 -- =============================================================================

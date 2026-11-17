@@ -169,7 +169,7 @@ describe("company health: each factor", () => {
 
   it("awareness at the stage's cap asks for the next stage, not for marketing", () => {
     const c = company({
-      awareness: 0.5,
+      awareness: 0.7, // ADR-188: a small business of stage 0 tops out at 70 %
       productivity: [15_000, 15_000, 15_000, 15_000],
       input: { stage: 0 },
       company: { stages: stages(0, false) },
@@ -278,7 +278,7 @@ describe("company health: each factor", () => {
     expect(burn.status).toBe("critical");
 
     const capped = company({
-      awareness: 0.5,
+      awareness: 0.7,
       input: { stage: 0, marketingCentsPerQuarter: BigInt(120_000) },
       company: { stages: stages(0, false) },
     });

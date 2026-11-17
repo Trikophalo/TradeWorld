@@ -1,4 +1,5 @@
 import { BALANCE } from "@/config/balance";
+import { awarenessAdd, awarenessCap } from "@/lib/sim/awareness";
 import {
   MAX_QUANTITY_E6,
   MIN_ORDER_CENTS,
@@ -72,6 +73,7 @@ import { createDealEngine, initialDeals, type DemoDealsState } from "./demo/deal
 import { tagFromUniform } from "@/lib/player-tag";
 import {
   createCompanyEngine,
+  demoAwareness,
   demoLastHour,
   demoStrengths,
   type DemoCompanyState,
@@ -1716,9 +1718,10 @@ const companyTasks = createCompanyTasksEngine({
   boostAwareness: (add) => {
     const c = p().company;
     if (!c) return;
-    const next = Math.min(Math.max(c.awareness, 1), c.awareness + add);
-    c.awarenessBoost = (c.awarenessBoost ?? 0) + (next - c.awareness);
-    c.awareness = next;
+    // ADR-188: never above the company's cap (the one of the last closed hour)
+    const applied = awarenessAdd(c.awareness, c.awarenessCap ?? awarenessCap(c.tier, 0, c.expansionLevel ?? 0), add);
+    c.awarenessBoost = (c.awarenessBoost ?? 0) + applied;
+    c.awareness += applied;
     persist();
   },
   lastHour: () => demoLastHour(p().company ?? null),
@@ -1945,6 +1948,12 @@ const protests = createProtestsEngine({
 });
 
 export const demoEngine: GameEngine = {
+  // ADR-188: awareness, its cap and what moved it
+  companyAwareness: async () => {
+    const c = p().company;
+    if (!c) throw new GameError("company_not_found");
+    return demoAwareness(c);
+  },
   battle: battles.battle,
   joinBattle: battles.joinBattle,
   leaveBattle: battles.leaveBattle,

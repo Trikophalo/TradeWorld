@@ -572,7 +572,7 @@
       "text": "Deine Firma teilt sich die Kunden ihres Markts mit allen anderen Anbietern. Wie viele zu dir kommen, hängt an vier Dingen:",
       "price": "Preis: Kunden vergleichen. Beim doppelten Marktpreis behältst du im Handel nur etwa {retailKeep} % deiner Anziehungskraft, in der Pharmabranche {pharmaKeep} %.",
       "quality": "Qualität: Bessere Produkte ziehen mehr Kunden an. Sie kommt von deinen Entwicklern und veraltet ohne sie.",
-      "awareness": "Bekanntheit: Nur wer dich kennt, kauft bei dir. Ohne Werbung verlierst du jedes Quartal {decay} % davon. Doppeltes Budget bringt nur etwa 40 % mehr.",
+      "awareness": "Bekanntheit: Nur wer dich kennt, kauft bei dir. Marketing schließt jede Stunde einen Teil der Lücke zur Obergrenze, ohne Werbung vergessen dich die Leute langsam. Doppeltes Budget bringt weniger als doppelt so viel.",
       "capacity": "Kapazität: Du verkaufst höchstens, was deine Produktion schafft. Neue Mitarbeiter leisten erst nach zwei Quartalen voll.",
       "example": "Im lokalen Tech-Markt geben Kunden rund {market} im Quartal aus. Holst du ein Viertel davon, sind das {revenue} Umsatz.",
       "where": "Im Firmen-Dashboard: Marktanteil, Qualität, Bekanntheit und Auslastung. Der Preisregler zeigt den erwarteten Marktanteil."
@@ -8818,8 +8818,8 @@
     "reasons": {
       "awareness": {
         "enough": "{awarenessPct} % kennen dich: Die Nachfrage ({demandCents}/h) reicht für alles, was du schaffst ({capacityCents}/h).",
-        "low": "Nachfrage {demandCents}/h, du könntest {capacityCents}/h liefern. Bekanntheit {awarenessPct} %, nötig wären {neededPct} %.",
-        "capped": "Bekanntheit {awarenessPct} %: Mehr geht auf Stufe {stage} nicht (Grenze {capPct} %). Erst die nächste Stufe hebt die Grenze."
+        "low": "Nachfrage {demandCents}/h, du könntest {capacityCents}/h liefern. Bekanntheit {awarenessPct} %, erreichbar wären {neededPct} % (Obergrenze {capPct} %).",
+        "capped": "Bekanntheit {awarenessPct} % von höchstens {capPct} %: Mehr geht jetzt nicht. Die Obergrenze steigt mit der nächsten Stufe, dem Ausbau und der Rechtsform."
       },
       "capacity": {
         "soldOut": "Nachfrage {demandCents}/h, du schaffst nur {capacityCents}/h. {count, plural, one {Eine Kraft mehr reicht} other {# Kräfte mehr reichen}}.",
@@ -10183,7 +10183,7 @@
       "title": "Was die letzte Stunde sagt",
       "awarenessUp": "Bekanntheit +{total} Punkte: +{marketing} durch Marketing, +{word} durch Mundpropaganda, +{extra} durch Aufgaben, −{decay} vergessen.",
       "awarenessDown": "Bekanntheit −{total} Punkte: −{decay} vergessen, nur +{marketing} durch Marketing und +{word} durch Mundpropaganda. Mehr Marketing hilft.",
-      "awarenessCap": "Die Bekanntheit steht an der Obergrenze deiner Stufe. Weiter geht es erst mit dem Fachwissen der nächsten Stufe.",
+      "awarenessCap": "Die Bekanntheit steht an ihrer Obergrenze. Höher geht es mit der nächsten Stufe, dem Ausbau oder einer größeren Rechtsform.",
       "aiBusy": "{count, plural, one {Deine KI-Kraft ist voll ausgelastet und bringt mehr ein, als sie kostet.} other {Deine # KI-Kräfte sind voll ausgelastet und bringen mehr ein, als sie kosten.}}",
       "aiPartly": "{idle} von {count} KI-Kräften haben zu wenig zu tun (zu wenig Nachfrage). Im Leerlauf kostet eine KI-Kraft nur {standby} % ihres Lohns.",
       "aiIdle": "Zu wenig Nachfrage: {count, plural, one {deine KI-Kraft steht still und kostet} other {deine # KI-Kräfte stehen still und kosten je}} {standby} % des Lohns. Erst Bekanntheit aufbauen, dann einstellen.",
@@ -10333,7 +10333,7 @@
         "profit": "Gewinn in der letzten Stunde"
       },
       "awareness": "Bekanntheit",
-      "awarenessInfo": "Anteil der Kundschaft, die deine Firma kennt. Nur wer dich kennt, kauft. Steigt jede Stunde mit Marketing und Mundpropaganda, sinkt ohne Werbung langsam. Jede Stufe hat eine Obergrenze.",
+      "awarenessInfo": "Anteil der Kundschaft, die deine Firma kennt. Nur wer dich kennt, kauft. Steigt jede Stunde mit Marketing und Mundpropaganda, sofort mit Aufgaben, Kampagnen und Geschäftszügen, sinkt ohne Werbung langsam. Die Obergrenze (Garage 60 %) steigt mit Stufe, Ausbau und Rechtsform.",
       "quality": "Qualität",
       "qualityInfo": "Wie gut deine Produkte sind. Mehr Qualität verkauft mehr, Premium-Preise brauchen mindestens 50 %. Fähigkeiten im Team, Schulungen und Forschung heben sie.",
       "reputation": "Ruf",
@@ -10448,6 +10448,35 @@
       "declined": "Kein Kommentar",
       "expired": "Anfrage verpasst",
       "requested": "Interviewanfrage"
+    }
+  },
+  "awareness": {
+    "title": "Bekanntheit",
+    "valueOfCap": "{value} % von höchstens {cap} %",
+    "capWhy": "Obergrenze: {tierCap} % als {tier}, +{stagePts} für Stufe {stage}, +{levelPts} für Ausbaustufe {level}. Sie steigt mit Fachwissen, Ausbau und Rechtsform.",
+    "strength": "Stärke Bekanntheit: {score}/100 (folgt dem Anteil an der Obergrenze, ein Viertel des Abstands je Stunde)",
+    "lastHour": "Letzte Stunde",
+    "nothing": "Noch keine abgeschlossene Stunde.",
+    "since": "Seitdem:",
+    "tier": {
+      "garage": "Garage",
+      "small_business": "Kleinunternehmen",
+      "gmbh": "GmbH",
+      "ag": "AG"
+    },
+    "source": {
+      "marketing": "Marketing",
+      "word_of_mouth": "Mundpropaganda",
+      "decay": "Vergessen",
+      "tasks": "Aufgaben",
+      "campaign": "Kampagne",
+      "moves": "Geschäftszüge",
+      "interview": "Interview",
+      "news": "Nachrichten",
+      "pitch": "Eigener Zug",
+      "protest": "Protest",
+      "event": "Ereignis",
+      "rescale": "Umstellung"
     }
   }
 }

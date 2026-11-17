@@ -1,5 +1,6 @@
 "use client";
 
+import { AwarenessMeter } from "@/features/company/awareness/awareness-meter";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
@@ -236,7 +237,8 @@ export function MarketCard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
   return (
     <Panel title={t("marketTitle")}>
-      <Meter label={t("awareness")} bps={company.awarenessBps} tone="accent" />
+      {/* ADR-188: the same value and cap as the dashboard's status bar (awarenessView) */}
+      <AwarenessMeter company={company} />
       <Meter label={t("quality")} bps={company.qualityBps} tone="gain" />
       <div className="rounded-md bg-surface-2 px-3 py-2.5">
         <p className="text-sm text-fg-2">{t("estimate")}</p>

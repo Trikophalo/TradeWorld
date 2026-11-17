@@ -1563,3 +1563,22 @@ One), Prismatic Peak 166,9 %. Ohne den Faktor 1,125 läge Titans bei 79,9 %.
 
 Beispiele: neue Firma (Qualität 25 %, normale Preise, ruhig) Ziel 48 (−0,8 % Nachfrage); gute Firma (Qualität 70 %,
 günstig, Kampagne) Ziel 60 (+4 %); Firma mit halben Löhnen, offenen Rechnungen und Krise Stufe 2 Ziel etwa 33 (−7 %).
+
+## Nachtrag: Bekanntheit neu (ADR-188)
+
+| Wert                                             | vorher                                            | nachher                                                                     |
+| ------------------------------------------------ | ------------------------------------------------- | --------------------------------------------------------------------------- |
+| Obergrenze                                       | Stufe 0…4: 50/70/85/95/100 %                      | Garage 60, Kleinunternehmen 70, GmbH 80, AG 90 % + 5 je Stufe + 3 je Ausbau |
+| `startups.awareness.min`                         | 0,01                                              | 0,02 (Untergrenze, Vergessen zieht dorthin)                                 |
+| Marketing                                        | fester Betrag, `marketingMaxGain` 0,24 je Quartal | `marketingMaxRatePerHour` 0,06 × Lücke zur Grenze                           |
+| Mundpropaganda                                   | `growthPerQuarter` 0,2 ÷ 6                        | `wordOfMouthPerHour` 0,008 × bedient × Ruf-Faktor                           |
+| Vergessen                                        | `decayPerQuarter` 0,12 ÷ 6 × a                    | `decayPerHour` 0,004 × (a − min)                                            |
+| `startups.awareness.taskGain`                    | 0,002                                             | 0,005                                                                       |
+| Kampagnen Flyer / Online / TV                    | 0,02 / 0,04 / 0,08                                | 0,03 / 0,06 / 0,12                                                          |
+| `companyHealth.strengths.awarenessFull`          | 0,5                                               | entfällt (Stärke = a / Grenze)                                              |
+| `companyHealth.strengths.awarenessFollowPerHour` | – (2 % hoch, 5 % runter)                          | 0,25 in beide Richtungen                                                    |
+
+Gemessen (Garage, Median-Markt, vorgeschlagenes Marketing 500 €/Quartal): 3 % → 33 % nach 24 h, 53 % nach 96 h
+(Gleichgewicht knapp 55 % bei 60 % Grenze); mit einer Aufgabe je Stunde und einem Flyer am Tag 42 % nach 24 h und die
+Grenze nach drei Tagen; ohne Marketing nur Mundpropaganda (7 % nach einer Woche). Tabelle in ADR-188.
+`scripts/company-harness.ts` (Kleinunternehmen mit 3 KI): 43 % nach 24 h, 64 % nach 72 h; Gewinne wie in ADR-180.

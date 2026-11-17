@@ -13,19 +13,22 @@ select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 10, "small_
 select tests.set_cfg('startups', '{capacityCentsPerProductivity}',
   '{"tech": 450000, "retail": 375000, "energy": 375000, "pharma": 450000, "logistics": 375000}') is null as ok \gset
 select tests.set_cfg('startups', '{aiWorkerStandbyBps}', '2500') is null as ok \gset
+-- ADR-188: the awareness model of src/config/balance.ts
 select tests.set_cfg('startups', '{awareness}',
-  '{"initial": 0.03, "min": 0.01, "growthPerQuarter": 0.2, "decayPerQuarter": 0.12, "marketingMaxGain": 0.24,
-    "marketingHalfSaturationShare": 0.01, "marketingMinHalfSaturationCents": 50000, "taskGain": 0.002,
-    "taskAiShareBps": 5000}') is null as ok \gset
+  '{"initial": 0.03, "min": 0.02, "cap": {"byTier": {"garage": 0.6, "small_business": 0.7, "gmbh": 0.8, "ag": 0.9},
+    "perStage": 0.05, "perExpansionLevel": 0.03, "max": 1}, "marketingMaxRatePerHour": 0.06,
+    "marketingHalfSaturationShare": 0.01, "marketingMinHalfSaturationCents": 50000, "wordOfMouthPerHour": 0.008,
+    "decayPerHour": 0.004, "taskGain": 0.005, "taskAiShareBps": 5000}') is null as ok \gset
 
 -- ---------------------------------------------------------------------------
 -- 1. Pure rules: the same numbers as src/lib/sim/startup.ts (awarenessHour, aiUtilizationBps, aiWageDueCents)
 -- ---------------------------------------------------------------------------
-select tests.assert(tests.near((public.company_awareness_hour(0.2, 0.5, 100000, 1e7, 1, 2) ->> 'next')::double precision,
-                               0.23825641025641026)
-                and tests.near((public.company_awareness_hour(0.2, 0.5, 100000, 1e7, 1, 2) ->> 'marketing')::double precision,
-                               0.036923076923076927),
-  'company_awareness_hour(): same result as awarenessHour (TS)');
+-- ADR-188: the same numbers as src/lib/sim/awareness.test.ts ("SQL: the same step")
+select tests.assert(tests.near((public.company_awareness_step(0.2, 0.6, 0.5, 1.5, 10000, 1e7, 0.8, 70) ->> 'next')::double precision,
+                               0.21390690909090912)
+                and tests.near((public.company_awareness_step(0.2, 0.6, 0.5, 1.5, 10000, 1e7, 0.8, 70) ->> 'marketing')::double precision,
+                               0.01309090909090909),
+  'company_awareness_step(): same result as awarenessHour (TS)');
 select tests.assert(public.company_ai_utilization_bps(200, 300, 2, 3) = 5000
                 and public.company_ai_utilization_bps(250, 300, 2, 3) = 7500
                 and public.company_ai_utilization_bps(50, 300, 2, 3) = 0,
@@ -90,7 +93,7 @@ select tests.assert((select ai_utilization_bps from public.player_company_hours 
 select tests.assert((select profit_cents from public.player_company_hours where company_id = :'aco' and hour_start = :'h0') > 0,
   'close_hour: a well-known small business with busy AI workers makes a profit');
 
-select tests.assert((select awareness_after > awareness_before and (awareness_parts ->> 'marketing')::double precision > 0
+select tests.assert((select (awareness_parts ->> 'marketing')::double precision > 0
                        from public.player_company_hours where company_id = :'aco' and hour_start = :'h0'),
   'close_hour: marketing shows in the hour as its own awareness part');
 select tests.assert((select (awareness_parts ->> 'marketing')::double precision = 0
