@@ -933,6 +933,27 @@ export interface BalanceConfig {
     readonly busyTasks: number;
     readonly urgentMinutes: number;
     readonly historyTurns: number;
+    /** Mira's advice from the company facts (ADR-185). */
+    readonly advice: {
+      /** Advice briefings Mira posts on her own at once (urgent ones always). */
+      readonly briefings: number;
+      /** Suggestions in "Was soll ich tun?". */
+      readonly nextSteps: number;
+      /** Advice below this estimated gain per hour is not worth a briefing (cents). */
+      readonly minImpactCents: number;
+      /** AI workers count as idle below this utilisation (bps). */
+      readonly aiIdleBelowBps: number;
+      /** Free capacity worth a campaign or contract work: share of the capacity (bps). */
+      readonly freeCapacityBps: number;
+      /** Reputation below this is worth a warning (0..100). */
+      readonly reputationLow: number;
+      /** A driver that takes at least this many points from the reputation target is named. */
+      readonly reputationDriverPoints: number;
+      /** Cash that lasts fewer hours than this at the current loss is an alarm. */
+      readonly runwayHours: number;
+      /** A strengths reward this many points away counts as "almost there". */
+      readonly strengthsNearPoints: number;
+    };
   };
   /** Company health (ADR-162): eight factors of a player company, each 0..100 against what profit needs. */
   readonly companyHealth: {
@@ -2738,6 +2759,17 @@ export const BALANCE = {
     urgentMinutes: 10,
     /** Chat turns Claude gets as memory. */
     historyTurns: 8,
+    advice: {
+      briefings: 2,
+      nextSteps: 3,
+      minImpactCents: 500,
+      aiIdleBelowBps: 5_000,
+      freeCapacityBps: 2_000,
+      reputationLow: 45,
+      reputationDriverPoints: 2,
+      runwayHours: 6,
+      strengthsNearPoints: 5,
+    },
   },
   /** Company health (ADR-162). */
   companyHealth: {

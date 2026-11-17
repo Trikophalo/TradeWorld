@@ -29,7 +29,7 @@ const TAB_ALIASES: Record<string, CompanyTarget> = {
 };
 
 /** Sections by name: the old overview sections, Mira's sections and the new ones. */
-const SECTIONS: Record<string, CompanyTarget> = {
+const SECTIONS = {
   // Dashboard
   mira: { tab: "dashboard", target: "mira" },
   health: { tab: "dashboard", target: "health" },
@@ -79,7 +79,44 @@ const SECTIONS: Record<string, CompanyTarget> = {
   advisor: { tab: "books", target: "advisor" },
   // Geschäftsrat
   board: { tab: "board" },
-};
+  // ADR-185: more of Mira's places
+  applications: { tab: "staff", target: "applications" },
+  interview: { tab: "dashboard", section: "situation" },
+} as const satisfies Record<string, CompanyTarget>;
+
+export type CompanySection = keyof typeof SECTIONS;
+export const COMPANY_SECTIONS = Object.keys(SECTIONS) as CompanySection[];
+
+export function isCompanySection(value: string | null | undefined): value is CompanySection {
+  return typeof value === "string" && Object.hasOwn(SECTIONS, value);
+}
+
+/** The place a section name leads to. */
+export function sectionTarget(section: CompanySection): CompanyTarget {
+  return SECTIONS[section];
+}
+
+/** Sections of the other tabs that render only for a listed company. */
+const LISTED_SECTIONS = new Set<CompanySection>([
+  "research",
+  "growth",
+  "dividends",
+  "mood",
+  "staff",
+  "satisfaction",
+  "benefits",
+]);
+
+/**
+ * Whether a section is on the page right now (ADR-185): the listed parts only while the company is listed, the
+ * trainings once the team is big enough. Mira links only to places that are there.
+ */
+export function sectionAvailable(section: CompanySection, page: { listed: boolean; trainingOpen: boolean }): boolean {
+  const target: CompanyTarget = SECTIONS[section];
+  if (LISTED_TABS.includes(target.tab) || LISTED_SECTIONS.has(section)) return page.listed;
+  if (section === "training") return page.trainingOpen;
+  return true;
+}
 
 export function isCompanyTab(value: string | null | undefined): value is CompanyTab {
   return COMPANY_TABS.includes(value as CompanyTab);
@@ -90,7 +127,7 @@ export function isCompanyTab(value: string | null | undefined): value is Company
  * Mira still says `overview` + `books`, and that is the Buchhaltung tab now.
  */
 export function resolveCompanyTarget(tab?: string | null, section?: string | null): CompanyTarget {
-  const bySection = section ? SECTIONS[section] : undefined;
+  const bySection: CompanyTarget | undefined = isCompanySection(section) ? SECTIONS[section] : undefined;
   if (bySection) return bySection;
   if (isCompanyTab(tab)) return section ? { tab, target: section } : { tab };
   const alias = tab ? TAB_ALIASES[tab] : undefined;

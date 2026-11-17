@@ -7717,7 +7717,10 @@
       "autoOn": "Okay: Die KI übernimmt ab jetzt offene Aufgaben automatisch, kurz bevor sie verfallen.",
       "autoOff": "Okay: Die KI übernimmt nichts mehr von allein.",
       "order": "Auftrag läuft! Die Jury prüft ihn kurz, das Ergebnis kommt in etwa {minutes} Min. Der nächste freie Auftrag geht in {wait} Min.",
-      "plan": "Plan umgesetzt: {done} von {count} Aufgaben sind vergeben."
+      "plan": "Plan umgesetzt: {done} von {count} Aufgaben sind vergeben.",
+      "autopilotOn": "Okay: Der Autopilot übernimmt jetzt jede offene Aufgabe nach ein paar Minuten, auch nachts.",
+      "autopilotOff": "Okay: Der Autopilot ist aus. Aufgaben machst du oder dein Team.",
+      "expand": "Erledigt: Die Firma ist eine Stufe größer. Mehr Markt, mehr Plätze, mehr Kapazität."
     },
     "listed": {
       "brief": {
@@ -7732,7 +7735,8 @@
         "board": "Im Geschäftsrat {count, plural, one {wartet ein Antrag} other {warten # Anträge}} auf deine Stimme.",
         "researchNext": "{count, plural, one {Eine Forschung ist} other {# Forschungen sind}} fertig und das Labor steht still. Weiter geht’s?",
         "researchDone": "{count, plural, one {Eine Forschung ist} other {# Forschungen sind}} fertig. Für die nächste fehlt noch Geld oder eine Voraussetzung.",
-        "greed": "Du zahlst dir {ratio} % des Gewinns aus. Der Ruf sinkt ({reputation}), das kostet schon {demand} % Nachfrage. Dividenden und Investitionen holen ihn zurück."
+        "greed": "Du zahlst dir {ratio} % des Gewinns aus. Der Ruf sinkt ({reputation}), das kostet schon {demand} % Nachfrage. Weniger Auszahlung, Dividenden und Investitionen holen ihn zurück.",
+        "greedEarly": "Du zahlst dir {ratio} % des Gewinns aus. Der Ruf ({reputation}) sinkt deshalb. Noch hebt er die Nachfrage um {demand} %, unter 50 kostet er Kundschaft."
       },
       "options": {
         "openBooks": "Bücher öffnen",
@@ -7743,7 +7747,8 @@
         "invest": "{item} buchen",
         "payTax": "{amount} Steuer zahlen",
         "hireAdvisor": "Steuerberater einstellen",
-        "fireAdvisor": "Steuerberater entlassen"
+        "fireAdvisor": "Steuerberater entlassen",
+        "openPayout": "Zur CEO-Auszahlung"
       },
       "why": {
         "cost": "Kostet {cost}.",
@@ -7788,7 +7793,10 @@
       "autoOff": "KI automatisch aus",
       "freeOrder": "Freier Auftrag an mich",
       "runPlan": "Plan ausführen ({count, plural, one {# Aufgabe} other {# Aufgaben}})",
-      "hire": "Team aufbauen"
+      "hire": "Team aufbauen",
+      "autopilotOn": "Autopilot einschalten",
+      "autopilotOff": "Autopilot ausschalten",
+      "expand": "Firma ausbauen ({cost})"
     },
     "why": {
       "busy": "{name} hat schon {open} offene Aufgaben. Das könnte knapp werden.",
@@ -7812,7 +7820,11 @@
       "autoOn": "„KI automatisch an“",
       "autoOff": "„KI automatisch aus“",
       "plan": "„Verteil alle Aufgaben“",
-      "analysis": "„Wie läuft die Firma?“"
+      "analysis": "„Wie läuft die Firma?“",
+      "next": "„Was soll ich als Nächstes tun?“",
+      "report": "„Lagebericht“",
+      "profit": "„Warum mache ich Verlust?“",
+      "revenue": "„Wie mache ich mehr Umsatz?“"
     },
     "plain": "{text}",
     "urgent": "Achtung: „{task}“ verfällt in {minutes} Min. Sonst sind {amount} weg und es gibt eine Strafe.",
@@ -7882,7 +7894,7 @@
       "fine": "Das sieht gut aus. Hier ist nichts Dringendes zu tun.",
       "noGain": "Das kostet gerade kein Geld, bremst dich aber.",
       "steps": "Das kannst du jetzt tun:",
-      "noSteps": "Dafür habe ich gerade keinen Knopf. Schau dir den Bereich in der Übersicht an.",
+      "noSteps": "Dafür habe ich gerade keinen Knopf, der jetzt geht. Im Dashboard unter „Wo es fehlt“ steht, was zu tun ist.",
       "founderOnly": "Wie es der Firma geht, steuert die Gründerin oder der Gründer.",
       "loading": "Die Firmenwerte lade ich noch. Frag gleich noch einmal.",
       "summary": "Gesamt {score} von 100. Am meisten verlierst du bei: {factor}.",
@@ -7901,11 +7913,11 @@
         "expand": "Firma ausbauen",
         "upgrade": "Nächste Rechtsform ansehen",
         "openTasks": "Aufgaben ansehen",
-        "event": "Krise in der Übersicht ansehen",
+        "event": "Lage im Dashboard ansehen",
         "deposit": "Geld in die Firma einzahlen"
       },
       "why": {
-        "marketing": "Mehr Leute lernen dich kennen, über das ganze Quartal. Bisher: {now}.",
+        "marketing": "Mehr Leute lernen dich kennen; das wirkt jede Stunde. Bisher: {now} je Quartal.",
         "marketingStop": "Spart etwa {amount} pro Stunde, mehr Bekanntheit geht gerade nicht.",
         "campaign": "Schub für ein paar Stunden, solange du Kapazität frei hast. Kostet {cost}.",
         "price": "Etwa +{amount} pro Stunde.",
@@ -7921,17 +7933,141 @@
         "tasks": "Jede gelöste Aufgabe hebt die Nachfrage.",
         "autoAi": "Keine Aufgabe verfällt mehr, das hält den Schwung.",
         "event": "Mit der richtigen Strategie wird die Krise kleiner.",
-        "deposit": "Begleicht offene Rechnungen ({amount}), bevor es zur Insolvenz kommt."
+        "deposit": "Begleicht offene Rechnungen ({amount}), bevor es zur Insolvenz kommt.",
+        "marketingGain": "Bringt etwa +{gain} Punkte Bekanntheit je Stunde, jede Stunde neu. Bisher: {now} je Quartal."
       },
       "ok": {
         "marketing": "Erledigt: Marketing läuft jetzt mit {amount} pro Quartal.",
         "marketingStop": "Erledigt: Kein Marketing mehr, das spart Geld.",
         "price": "Erledigt: Der Preis steht jetzt auf „{level, select, budget {Budget} premium {Premium} other {Normal}}“.",
         "contract": "Erledigt: Freie Kapazität geht jetzt in Auftragsarbeit.",
-        "campaign": "Die Kampagne „{kind, select, flyer {Flyer} online {Online} other {TV-Spot}}“ läuft! Wie sie ankommt, siehst du in der Übersicht.",
+        "campaign": "Die Kampagne „{kind, select, flyer {Flyer} online {Online} other {TV-Spot}}“ läuft! Wie sie ankommt, siehst du im Controlling unter Marketing.",
         "hireAi": "Erledigt: {count, plural, one {Eine KI-Kraft ist} other {# KI-Kräfte sind}} an Bord.",
         "dismissAi": "Erledigt: {count, plural, one {Eine KI-Kraft} other {# KI-Kräfte}} weniger."
+      },
+      "facts": {
+        "awareness": "Bekanntheit {points} von höchstens {cap} Punkten. Letzte Stunde: +{marketing} durch Marketing, +{word} durch Mundpropaganda, −{decay} vergessen.",
+        "atCap": "Am Deckel dieser Stufe bringt Marketing nichts mehr; erst die nächste Stufe hebt ihn.",
+        "marketing": "Marketing bringt gerade etwa +{now} Punkte je Stunde; mit meinem Vorschlag wären es etwa +{gain}."
       }
+    },
+    "open": {
+      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} other {Hinschauen}}"
+    },
+    "advice": {
+      "distress": "Alarm: Die Firma hat {unpaid} offene Rechnungen. Bleiben sie offen, droht die Insolvenz. Zahl Geld ein, bevor die Schonfrist abläuft.",
+      "runway": "Die Kasse reicht bei {loss} Verlust je Stunde nur noch etwa {hours} Stunden. Danach bleiben Rechnungen offen.",
+      "loss": "Die letzte Stunde brachte {loss} Verlust. Größter Posten: {item, select, goods {Ware und Löhne} ai {KI-Löhne} fixed {Fixkosten} other {Marketing}} mit {amount}. Das bringt am meisten:",
+      "aiIdle": "{idle} von {workers} KI-Kräften haben nichts zu tun (Auslastung {util} %). Sie kosten trotzdem einen Teil ihres Lohns. Entlassen spart etwa {saving} je Stunde.",
+      "marketing": "Ohne Marketing wächst die Bekanntheit ({awareness} von höchstens {cap} Punkten) nur durch Mundpropaganda. Mit {amount} je Quartal ({perHour} je Stunde) kommen etwa +{gain} Punkte je Stunde dazu.",
+      "marketingMore": "Marketing auf {amount} je Quartal heben bringt etwa +{gain} statt +{now} Punkte Bekanntheit je Stunde ({awareness} von höchstens {cap}).",
+      "marketingWasted": "Die Bekanntheit steht am Deckel dieser Stufe ({cap} Punkte). Marketing bringt nichts mehr und kostet etwa {amount} je Stunde. Höher geht es erst mit der nächsten Stufe.",
+      "contract": "Die Kapazität ist nur zu {util} % ausgelastet: {free} je Stunde liegen brach. Auftragsarbeit macht daraus etwa {gain} Gewinn je Stunde.",
+      "price": "Mit dem Preis „{level, select, budget {Budget} premium {Premium} other {Normal}}“ verdient die Firma bei der jetzigen Lage etwa {gain} mehr je Stunde.",
+      "premiumLow": "Premium bei {quality} Punkten Qualität fühlt sich für die Kundschaft nach Abzocke an (nötig sind {needed}). Das kostet Nachfrage und {points} Punkte Ruf.",
+      "soldOut": "Ausverkauft: {missing} Nachfrage je Stunde bleiben liegen (Auslastung {util} %). Eine KI-Kraft bringt mehr, als sie kostet ({wage} je Stunde).",
+      "soldOutFull": "Ausverkauft: {missing} Nachfrage je Stunde bleiben liegen, und alle Plätze sind besetzt. Mehr geht nur mit Ausbau oder der nächsten Rechtsform.",
+      "campaign": "Es ist Kapazität frei. Eine Kampagne „{kind, select, flyer {Flyer} online {Online} other {TV-Spot}}“ für {cost} bringt {hours} Stunden lang etwa +{demand} % Nachfrage (ca. {gain} Gewinn je Stunde) und +{points} Punkte Bekanntheit.",
+      "expand": "Die Firma ist zu {util} % ausgelastet und verdient. Ein Ausbau für {cost} bringt mehr Markt, mehr Plätze und mehr Kapazität.",
+      "upgrade": "Die nächste Rechtsform ist in Reichweite ({cost}). Sie bringt mehr Plätze und einen größeren Markt.",
+      "autopilot": "{open, plural, one {Eine Aufgabe ist} other {# Aufgaben sind}} offen. Der Autopilot erledigt sie mit {chance} % Chance und zahlt {reward} % des Werts, etwa {value}.",
+      "reputation": "Der Ruf steht bei {value} und strebt zu {target}. Am meisten drückt {driver, select, quality {Qualität} delivery {Lieferfähigkeit} price {Preis} wages {Löhne} bills {offene Rechnungen} crisis {Krise} campaign {Kampagne} items {Investitionen} greed {hohe Auszahlungen} reinvest {Reinvestition} dividends {Dividenden} scandal {Skandal} other {{driver}}} ({points} Punkte). Der Ruf bewegt die Nachfrage gerade um {sign, select, minus {−} other {+}}{demand} %.",
+      "strengths": "Die Stärken stehen bei {overall}; ab {at} gibt es +{bonus} % Bonus auf jeden Umsatz (etwa {gain} je Stunde). Am schwächsten: {weakest, select, awareness {Bekanntheit} quality {Qualität} delivery {Lieferfähigkeit} margin {Rendite} team {Team} finance {Finanzen} other {{weakest}}}.",
+      "skill": "Für die nächste Stufe fehlt {count, plural, one {eine Fähigkeit} other {# Fähigkeiten}}, zuerst {skill}. Die Stufe bringt etwa {gain} je Stunde.",
+      "interview": "NEXA Nachrichten wollen ein Interview mit dir, noch {minutes} Min. Gute Antworten bringen Bekanntheit und Ruf.",
+      "ipo": "Die Firma kann an die Börse. Das bringt Kapital, Forschung und Wachstum, aber auch Pflichten wie Bücher und Steuern.",
+      "subscription": "Deine Zeichnung läuft. Im Kapital-Bereich siehst du, wie viel schon gezeichnet ist.",
+      "why": {
+        "deposit": "Einzahlen begleicht zuerst offene Rechnungen.",
+        "dismiss": "Spart etwa {saving} je Stunde.",
+        "moreDemand": "Oder mehr Nachfrage schaffen, dann arbeiten sie wieder.",
+        "save": "Spart etwa {amount} je Stunde.",
+        "nextStage": "Die nächste Stufe hebt den Deckel der Bekanntheit.",
+        "marketing": "Etwa +{gain} Punkte Bekanntheit je Stunde.",
+        "expand": "Kostet {cost} aus der Firmenkasse."
+      }
+    },
+    "next": {
+      "intro": "Das würde ich jetzt tun, das Wichtigste zuerst:",
+      "item": "{n}.",
+      "tasks": "Dazu {count, plural, one {wartet eine Aufgabe} other {warten # Aufgaben}} auf dich oder dein Team.",
+      "none": "Gerade gibt es nichts, was sich lohnt. Die Firma läuft, ich melde mich, sobald sich etwas ändert.",
+      "employee": "Als Mitarbeiter:in sind deine Aufgaben dran. Die Firma steuert die Gründerin oder der Gründer."
+    },
+    "profit": {
+      "noHour": "Es ist noch keine Betriebsstunde abgeschlossen. Nach der ersten vollen Stunde sage ich dir, woran es liegt.",
+      "loss": "Die letzte Stunde: {revenue} Umsatz, {costs} Kosten, also {profit} Verlust.",
+      "gain": "Die letzte Stunde: {revenue} Umsatz, {costs} Kosten, also {profit} Gewinn.",
+      "costs": "Die Kosten: Ware und Löhne {goods}, KI-Löhne {ai}, Fixkosten {fixed}, Marketing {marketing}.",
+      "biggest": "Größter Posten: {item, select, goods {Ware und Löhne} ai {KI-Löhne} fixed {Fixkosten} other {Marketing}} mit {amount}.",
+      "lowDemand": "Zu wenig Kundschaft: Nachfrage {demand} bei {capacity} Kapazität, nur {util} % ausgelastet.",
+      "soldOut": "Ausverkauft: {missing} Nachfrage je Stunde bleiben liegen.",
+      "aiIdle": "{idle} KI-Kräfte stehen still (Auslastung {util} %); entlassen spart {saving} je Stunde.",
+      "marketingWasted": "Marketing ({amount} je Stunde) bringt am Deckel der Bekanntheit nichts mehr.",
+      "unpaid": "Die Löhne wurden nur zu {paid} % bezahlt. Das drückt Team und Ruf.",
+      "fixedHigh": "Die Fixkosten ({fixed} je Stunde) sind höher als der Rohertrag. Mehr Umsatz ist der einzige Weg.",
+      "day": "Letzte {hours} Stunden: {revenue} Umsatz, {profit} Ergebnis, {loss, plural, =0 {keine Stunde} one {eine Stunde} other {# Stunden}} im Minus.",
+      "fixes": "Das bringt am meisten:",
+      "noFixes": "Einen Knopf, der jetzt sofort hilft, habe ich nicht. Mehr Bekanntheit braucht Zeit."
+    },
+    "revenue": {
+      "demand": "Der Engpass ist die Nachfrage: {demand} je Stunde bei {capacity} Kapazität ({util} %). Mehr Umsatz kommt über Bekanntheit, Ruf und Preis.",
+      "capacity": "Der Engpass ist die Kapazität: {demand} Nachfrage, aber nur {capacity} je Stunde lieferbar. Mehr Hände bringen sofort mehr Umsatz.",
+      "steps": "Damit geht es los:",
+      "none": "Gerade habe ich keinen Knopf, der sofort mehr Umsatz bringt."
+    },
+    "rep": {
+      "what": "Der Ruf (0 bis 100) bewegt die Nachfrage: bei {base} neutral, bei 100 bis +{max} %, bei 0 bis −{max} %. Er rückt jede Stunde ein Stück zu seinem Ziel.",
+      "now": "Gerade: {value}, Ziel {target}. Nachfrage dadurch {sign, select, minus {−} other {+}}{demand} %.",
+      "driverMinus": "• {driver, select, quality {Qualität} delivery {Lieferfähigkeit} price {Preis} wages {Löhne} bills {offene Rechnungen} crisis {Krise} campaign {Kampagne} items {Investitionen} greed {hohe Auszahlungen} reinvest {Reinvestition} dividends {Dividenden} scandal {Skandal} other {{driver}}}: −{points} Punkte",
+      "driverPlus": "• {driver, select, quality {Qualität} delivery {Lieferfähigkeit} price {Preis} wages {Löhne} bills {offene Rechnungen} crisis {Krise} campaign {Kampagne} items {Investitionen} greed {hohe Auszahlungen} reinvest {Reinvestition} dividends {Dividenden} scandal {Skandal} other {{driver}}}: +{points} Punkte",
+      "neutral": "Nichts zieht ihn gerade nach oben oder unten.",
+      "fix": "Das hebt ihn:",
+      "keep": "Gute Qualität, faire Preise, bezahlte Löhne und Kampagnen halten ihn oben.",
+      "none": "Für deine Firma gibt es noch keinen Ruf-Wert. Er kommt mit der nächsten Stunde."
+    },
+    "str": {
+      "now": "Stärken gesamt: {overall} von 100. Bonus gerade +{bonus} % auf jeden Umsatz.",
+      "next": "Ab {at} gibt es +{bonus} %, es fehlen noch {missing} Punkte.",
+      "top": "Die höchste Stufe ist erreicht.",
+      "weakest": "Am schwächsten: {key, select, awareness {Bekanntheit} quality {Qualität} delivery {Lieferfähigkeit} margin {Rendite} team {Team} finance {Finanzen} other {{key}}} ({score}).",
+      "how": "Jede Stunde rückt jede Stärke ein Stück zu dem, was die Stunde zeigt; gute Stunden heben, schlechte senken sie schneller.",
+      "none": "Die Stärken kenne ich noch nicht, es fehlt die erste Betriebsstunde."
+    },
+    "auto": {
+      "on": "Der Autopilot ist an: {chance} % Chance je Aufgabe (+{bonus} % Lohnbonus), er zahlt {reward} % des Werts. Heute: {done} erledigt.",
+      "off": "Der Autopilot ist aus. Eingeschaltet erledigt er jede Aufgabe nach ein paar Minuten mit {chance} % Chance und zahlt {reward} % des Werts.",
+      "how": "Die Chance folgt der Stimmung im Team. Selbst spielen bringt den vollen Wert.",
+      "none": "Den Autopiloten lade ich noch. Frag gleich noch einmal."
+    },
+    "ai": {
+      "how": "Eine KI-Kraft kostet {wage} je Stunde, aber nur für die Arbeit, die es gibt; ohne Arbeit {standby} % davon. Menschen bedienen zuerst, die KI den Rest.",
+      "none": "Du hast keine KI-Kräfte. Freie Plätze: {free}.",
+      "noData": "{workers} KI-Kräfte; wie ausgelastet sie sind, zeigt die nächste Stunde.",
+      "state": "{workers} KI-Kräfte, zu {util} % ausgelastet, {idle} ohne Arbeit. Entlassen spart etwa {saving} je Stunde.",
+      "fits": "Die Zahl passt gerade."
+    },
+    "report": {
+      "title": "Lagebericht für {company}:",
+      "cash": "Kasse: {cash}, davon frei {free}.",
+      "cashUnpaid": "Kasse: {cash}, offene Rechnungen: {unpaid}!",
+      "hour": "Letzte Stunde: {revenue} Umsatz, {costs} Kosten, {profit} Gewinn.",
+      "hourLoss": "Letzte Stunde: {revenue} Umsatz, {costs} Kosten, {profit} Verlust.",
+      "noHour": "Noch keine abgeschlossene Betriebsstunde.",
+      "day": "Letzte {hours} Stunden: {revenue} Umsatz, {profit} Ergebnis.",
+      "demand": "Nachfrage {demand} je Stunde bei {capacity} Kapazität ({util} %).",
+      "soldOut": "Ausverkauft: Nachfrage {demand}, Kapazität nur {capacity} je Stunde.",
+      "ai": "KI-Kräfte: {workers}, Auslastung {util} %.",
+      "awareness": "Bekanntheit {points} von höchstens {cap}, letzte Stunde {sign, select, minus {−} other {+}}{change}.",
+      "awarenessFlat": "Bekanntheit {points} von höchstens {cap}.",
+      "reputation": "Ruf {value} (Ziel {target}), Nachfrage {sign, select, minus {−} other {+}}{demand} %.",
+      "strengths": "Stärken {overall} von 100, Bonus +{bonus} %.",
+      "listed": "Zufriedenheit {mood} ({zone, select, green {grün} yellow {gelb} other {rot}}), Steuer fällig: {tax}.",
+      "autopilotOn": "Autopilot an, heute {done} erledigt.",
+      "autopilotOff": "Autopilot aus.",
+      "todo": "Offen: {tasks, plural, =0 {keine Aufgabe} one {eine Aufgabe} other {# Aufgaben}}{event, select, crisis {, eine Krise} chance {, eine Chance} other {}}.",
+      "best": "Mein wichtigster Tipp:",
+      "calm": "Gerade gibt es nichts, was sich lohnt anzupacken."
     }
   },
   "newsShow": {

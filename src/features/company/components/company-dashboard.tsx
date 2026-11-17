@@ -24,7 +24,7 @@ import { useCompanyHealth } from "../health";
 import { BoardView } from "../listed/board";
 import { useListedCompany } from "../listed/shared";
 import { companyTodos } from "../listed/view";
-import { companyHref, resolveCompanyTarget, type CompanyTab, type CompanyTarget } from "../tabs";
+import { companyHref, resolveCompanyTarget, sectionTarget, type CompanyTab, type CompanyTarget } from "../tabs";
 import { useCompanyTasks } from "../tasks/task-board";
 import { BannerEditor } from "./banner-editor";
 import { HireSheet, type HireRequest } from "./employer";
@@ -129,7 +129,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
     askMira(questions(factor));
     go({ tab: "dashboard", target: "mira" });
   };
-  const onMira: MiraOpen = (to, id) => go(resolveCompanyTarget(to, id));
+  const onMira: MiraOpen = (section) => go(sectionTarget(section));
 
   const todos = listed && now !== null ? companyTodos(listed, now) : [];
   const booksBadge = todos.filter((x) => x.key === "books" || x.key === "tax").length;
