@@ -4170,3 +4170,17 @@ Funktionskarte: `docs/FIRMA_ANALYSE.md`.
 **Offen.** Ob auf Live eine Firma an einem Nebenschritt scheiterte, zeigt nach dem Deploy
 `select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
 aus Spec 6.6) bleibt unbenutzt.
+
+## ADR-184: Aktuelle Umsätze an der Börse — `Annahme`
+
+**Kontext.** Der Besitzer wünscht: „Auch an der Börse sollen bei den Unternehmen die aktuellen Umsätze stehen.“
+
+**Entscheidung.** Neue Lese-RPC `get_stock_revenue(p_ticker)` (Migration 7400, nur neue Funktionen, für angemeldete
+Spieler). Spielerfirmen: aus `player_company_hours` Umsatz der letzten abgeschlossenen Stunde, Umsatz und Gewinn der
+letzten 24 h, die 24 h davor je Stunde auf gleich viele Stunden umgerechnet (Trendpfeil), Ruf und Bekanntheit.
+KI-Firmen: letzter veröffentlichter Quartalsbericht (mit Spieljahr und Quartal), das Quartal davor für den Trend.
+Nur diese Summen verlassen den Server; Bekanntheit und Qualität zeigt die Firmenseite (ADR-051) schon heute allen.
+Marktliste: eine Zeile „Umsatz 24 h … €“ bzw. „Umsatz Quartal … €“ mit Pfeil; Detailseite: Karte „Geschäftszahlen“
+mit kleinem Balkenverlauf (24 Stunden bzw. 8 Quartale). Sichtbar ab Level 2 (`stockFigures`), wie die Kennzahlen.
+
+**Folgen.** Eine Anfrage für die ganze Liste (2 min frisch). Im Demo-Modus sind die KI-Quartale aus der Größe abgeleitet.
