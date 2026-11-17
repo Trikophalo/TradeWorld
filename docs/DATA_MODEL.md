@@ -5290,6 +5290,11 @@ Quartalsabschluss: Der Marketing-Zuwachs rechnet mit dem wirksamen Markt, die Mu
 
 Plätze für Spieler und KI-Kräfte = `maxEmployees` der Rechtsform + `expansion.employeesPerLevel` × Stufe
 (`company_max_employees`), geprüft in `sign_contract`, `set_ai_workers` und `hire_ai_workers`.
+Seit Migration 7350 (ADR-188) ist die Kopie `companies.max_employees` abgeleitet: Die Trigger `company_seats_sync`
+(nach neuer Rechtsform oder Stufe in `player_companies`) und `company_seats_guard` (vor jedem Schreiben der Spalte)
+setzen sie auf `company_max_employees`. `company_growth_path(company)` liefert Wachstumsstufe, Stufenzahl,
+Ausbaustufe, `step` = Stufe + Ausbaustufe, das nächste Ziel, die nächsten Ausbaukosten und die Plätze (nur
+`service_role`, für Tests und Auswertungen).
 
 ### Gründung und Börsengang
 
