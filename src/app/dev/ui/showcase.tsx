@@ -248,6 +248,33 @@ const SAMPLE_TASKS: CompanyTasks = {
   ],
 };
 
+/** A CEO interview request (ADR-173); sending goes to the demo engine, which knows no such id. */
+const SAMPLE_INTERVIEW = {
+  maxChars: 240,
+  interview: {
+    id: 999,
+    status: "requested" as const,
+    company: "Pixelwerft",
+    requestedAt: "2026-11-14T10:00:00.000Z",
+    expiresAt: "2099-11-14T16:00:00.000Z",
+    answeredAt: null,
+    airedAt: null,
+    questions: [
+      {
+        text: "Wo steht Pixelwerft in fünf Jahren? Und bitte nicht „auf dem Mond“.",
+        quick: ["Marktführer, mit glücklichen Kunden und Team.", "Hoffentlich noch da.", "Auf dem Mond."],
+      },
+      {
+        text: "Letzte Frage, sehr wichtig: Wie finden Sie meine Krawatte?",
+        quick: ["Mutig. Fast so mutig wie unser nächstes Produkt.", "Sie ist… eine Krawatte.", "Ehrlich? Furchtbar."],
+      },
+    ],
+    answers: null,
+    awarenessBps: 0,
+    reputation: 0,
+  },
+};
+
 /** Hands-on task games (ADR-144) with fixed puzzles; answers only go to the toast. */
 const SAMPLE_GAMES = [
   { game: "sort", taskKey: "pay_invoices", puzzle: { items: [5, 0, 3, 6, 1, 7, 2, 4] } },
@@ -992,10 +1019,10 @@ export function Showcase() {
         <HealthShowcase />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
-        <InterviewCard />
         {SAMPLE_GAMES.map((sample) => (
           <SampleGame key={sample.game} sample={sample} />
         ))}
+        <InterviewCard preview={SAMPLE_INTERVIEW} />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />

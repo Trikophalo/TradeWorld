@@ -33,22 +33,30 @@ export function MemoryGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
   const [pairs, setPairs] = useState<[number, number][]>([]);
   const [misses, setMisses] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // the truth lives in a ref, so two quick taps between renders never see a stale state
+  const live = useRef({ open: [] as number[], pairs: [] as [number, number][], misses: 0 });
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
   const matched = new Set(pairs.flat());
   const flip = (i: number) => {
-    if (disabled || open.length >= 2 || open.includes(i) || matched.has(i)) return;
-    const next = [...open, i];
-    setOpen(next);
-    if (next.length < 2) return;
-    const [a, b] = next as [number, number];
+    const s = live.current;
+    if (disabled || s.open.length >= 2 || s.open.includes(i) || s.pairs.some((p) => p.includes(i))) return;
+    s.open = [...s.open, i];
+    setOpen(s.open);
+    if (s.open.length < 2) return;
+    const [a, b] = s.open as [number, number];
     if (cards[a] === cards[b]) {
-      const done = [...pairs, [a, b] as [number, number]];
-      setPairs(done);
+      s.pairs = [...s.pairs, [a, b]];
+      s.open = [];
+      setPairs(s.pairs);
       setOpen([]);
-      if (done.length * 2 === cards.length) onAnswer({ pairs: done, misses });
+      if (s.pairs.length * 2 === cards.length) onAnswer({ pairs: s.pairs, misses: s.misses });
     } else {
-      setMisses((m) => m + 1);
-      timer.current = setTimeout(() => setOpen([]), 700);
+      s.misses += 1;
+      setMisses(s.misses);
+      timer.current = setTimeout(() => {
+        s.open = [];
+        setOpen([]);
+      }, 700);
     }
   };
   return (
@@ -108,11 +116,12 @@ export function TimingGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
   // with reduced motion the marker moves half as fast and in coarse steps
   const sweep = Number(puzzle.sweep_ms ?? 1600) * (reduced ? 2 : 1);
   const [stops, setStops] = useState<number[]>([]);
+  const [running, setRunning] = useState(false);
   const [ms, setMs] = useState(0);
   const started = useRef<number | null>(null);
   const round = stops.length;
   useEffect(() => {
-    if (disabled || round >= targets.length) return;
+    if (disabled || !running || round >= targets.length) return;
     let raf = 0;
     let id: ReturnType<typeof setInterval> | null = null;
     const step = () => {
@@ -132,7 +141,7 @@ export function TimingGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
       cancelAnimationFrame(raf);
       if (id) clearInterval(id);
     };
-  }, [disabled, reduced, round, targets.length]);
+  }, [disabled, reduced, round, running, targets.length]);
   const pos = sweepPosition(ms, sweep);
   const target = targets[round] ?? targets[targets.length - 1] ?? 50;
   const stop = () => {
@@ -162,9 +171,15 @@ export function TimingGame({ taskKey, puzzle, disabled, onAnswer }: GameProps) {
           <div className="absolute inset-y-1 -left-1 w-2 rounded-xs bg-fg-1" />
         </div>
       </div>
-      <Button block size="lg" disabled={disabled || round >= targets.length} onClick={stop} data-testid="timing-stop">
-        {t("timingStop")}
-      </Button>
+      {running ? (
+        <Button block size="lg" disabled={disabled || round >= targets.length} onClick={stop} data-testid="timing-stop">
+          {t("timingStop")}
+        </Button>
+      ) : (
+        <Button block size="lg" disabled={disabled} onClick={() => setRunning(true)} data-testid="timing-start">
+          {t("start")}
+        </Button>
+      )}
     </div>
   );
 }

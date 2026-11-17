@@ -214,8 +214,8 @@ test("business moves fit the product, cost company cash and run for minutes (ADR
   const card = page.getByTestId("company-moves");
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByText("Geschäftszüge")).toBeVisible();
-  // Six moves for every company plus six for the product.
-  await expect(card.locator('[data-testid^="move-"]')).toHaveCount(12);
+  // Ten moves a garage may start for every company (ADR-173) plus six for the product.
+  await expect(card.locator('[data-testid^="move-"]')).toHaveCount(16);
 
   await card.getByRole("radio", { name: "Geld" }).click();
   const first = card.locator('[data-testid^="move-"]').first();
@@ -310,4 +310,57 @@ test("protest campaign: start one against an AI company, it shows in the news ta
   const card = page.getByTestId("protests");
   await expect(card).toContainText("Petition gegen KlarSoft AG");
   await expect(card.locator('[data-protest="open"]').first()).toContainText("von 20 Unterstützern");
+});
+
+test("a new business move starts, the tier moves stay hidden (ADR-173)", async ({ page }) => {
+  await preparePlayer(page, "Zugneuling", 21_000, 2_000_000);
+  await found(page, "garage", "Neuzugwerk");
+  const card = page.getByTestId("company-moves");
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByTestId("move-tv_commercial")).toHaveCount(0);
+  const move = card.getByTestId("move-supplier_switch");
+  await move.scrollIntoViewIfNeeded();
+  await move.getByRole("button", { name: "Starten" }).click();
+  await expect(page.getByText("Zug gestartet").first()).toBeVisible();
+  await expect(card.getByTestId("moves-running")).toBeVisible();
+});
+
+test("a CEO interview: answer it on the dashboard, it airs in the news show (ADR-173)", async ({ page }) => {
+  test.setTimeout(150_000);
+  await preparePlayer(page, "Interviewchefin", 21_000, 2_000_000);
+  await found(page, "garage", "Plauderwerk");
+  await page
+    .getByTestId("company-tabs")
+    .getByRole("tab", { name: /Dashboard/ })
+    .click();
+  const card = page.getByTestId("interview-card");
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByText("Interviewanfrage")).toBeVisible();
+  await card.getByTestId("interview-open").click();
+  const questions = card.getByTestId("interview-question");
+  await expect(questions).toHaveCount(3);
+  await questions.nth(0).getByTestId("interview-text").fill("Wir danken unseren Kunden und dem ganzen Team.");
+  await questions.nth(1).getByTestId("interview-quick").first().click();
+  await questions.nth(2).getByTestId("interview-quick").nth(1).click();
+  await card.getByTestId("interview-submit").click();
+  const result = page.getByTestId("interview-result");
+  await expect(result).toBeVisible();
+  await expect(result.getByText(/Wir danken unseren Kunden/)).toBeVisible();
+  await page.screenshot({
+    path: process.env.NEXA_SHOT_DIR
+      ? `${process.env.NEXA_SHOT_DIR}/interview-${test.info().project.name}.png`
+      : test.info().outputPath("interview.png"),
+  });
+
+  await page.goto("/news");
+  const button = page.getByTestId("demo-start-show");
+  await expect(button).toBeVisible();
+  await button.click();
+  const tv = page.getByTestId("news-show");
+  await expect(tv.getByText(/Interview mit Interviewchefin/).first()).toBeVisible({ timeout: 90_000 });
+  await page.screenshot({
+    path: process.env.NEXA_SHOT_DIR
+      ? `${process.env.NEXA_SHOT_DIR}/interview-show-${test.info().project.name}.png`
+      : test.info().outputPath("show.png"),
+  });
 });

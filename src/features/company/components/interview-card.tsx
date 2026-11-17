@@ -24,12 +24,14 @@ export const INTERVIEW_KEY = ["company", "interview"] as const;
  * the three questions in free text or with a quick answer, or says "kein Kommentar"; the result airs in the next show.
  * Hidden while there is no interview.
  */
-export function InterviewCard() {
-  const query = useQuery({
+export function InterviewCard({ preview }: { preview?: CompanyInterviewState } = {}) {
+  const live = useQuery({
     queryKey: INTERVIEW_KEY,
     queryFn: () => engine.companyInterview(),
     refetchInterval: 60_000,
+    enabled: !preview,
   });
+  const query = preview ? { data: preview, isPending: false } : live;
   if (query.isPending) return <Skeleton className="h-28 w-full rounded-md" aria-hidden />;
   const iv = query.data?.interview;
   if (!iv) return null;
