@@ -1295,17 +1295,21 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   4 / 3 / 2 / 1 / 0, immer Wert + 10 %. KI-Booster je Stunde: 4 / 2 / 1 (Mystic Energy / Super Apex / Prismatic Peak),
   also je Common etwa 8 neue Kopien am Tag im ersten Set, je Prisma eine in gut vier Tagen, je Legendary eine in
   knapp drei Wochen. Eine Legendary der KI kommt mit 0,2 % je Stunde in den Verkauf.
-- **KI-Sammler (seit Migration 6010):** kaufen jedes Angebot zum Wert der Kopie oder darunter sofort (nächster
-  Minutenlauf, kein Würfel, auch Slabs zum vollen Wert). Darüber zahlen sie einen Aufschlag: roh Poor 0 %, Good 3 %,
-  Near Mint 8 %, Mint 12 %; Slabs 8: 5 %, 8,5: 7 %, 9: 10 %, 9,5: 12 %, 10: 15 %, Black Label 20 %. Knapp über dem
-  Wert 30 % × (1 + Beliebtheit) je Minute, bis zum Höchstpreis linear fallend auf 20 % davon. Bessere Kopien zuerst,
-  höchstens 100 Käufe je Lauf, je Set und Tag für 300 Booster-Preise (60.000 € / 300.000 € / 1.500.000 €). Den Wert
-  heben nur KI-Käufe im Band ± 25 %, höchstens 6 / 6 / 4 / 3 / 2 je Karte und Tag. Das ist die einzige Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es
-  wieder heraus.
+- **KI-Sammler (seit Migration 6010, ADR-195 ab 8500):** kaufen jedes Angebot zum Wert der Kopie (wie angezeigt, Slabs
+  mit dem Faktor nach Beliebtheit) oder darunter im nächsten Minutenlauf, egal wie teuer, ohne Budget; nur das Geld der
+  Haushalte begrenzt. Faire Angebote zuerst. Darüber zahlen sie einen Aufschlag, nie mehr als `maxPremiumBps` 15 %:
+  roh Poor 0 %, Good 3 %, Near Mint 8 %, Mint 12 %; Slabs 8: 5 %, 8,5: 7 %, 9: 10 %, 9,5: 12 %, 10 und Black Label
+  15 %. Chance je Minute knapp über dem Wert 0,04 % (`buyChanceMinBps`) plus Beliebtheit × 0,96 % bis 1 %
+  (`buyChanceBps`), bis zum Höchstpreis linear fallend auf 20 % davon (Legendary bei + 10 %: rund 0,4 % je Minute,
+  also im Mittel nach gut vier Stunden; Common: fast nie). Höchstens 100 Käufe je Lauf. Nur Käufe über dem Wert
+  prüfen das Budget je Set und Tag von 300 Booster-Preisen (60.000 € / 300.000 € / 3 Mio. € …, gezählt werden alle
+  KI-Käufe des Sets). Höchste KI-Ausgabe am Tag also: diese Budgets plus die Summe aller fair angebotenen Karten.
+  Den Wert heben nur KI-Käufe im Band ± 25 %, höchstens 6 / 6 / 4 / 3 / 2 je Karte und Tag. Das ist die einzige
+  Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es wieder heraus.
 - **Sofortverkauf:** rohe Commons und Rares zu 50 % des Werts, bis zu 50 Kopien je Aufruf.
 - **Markt:** 5 % Gebühr für verkaufende Spieler, Preis 0,10 € bis 1 Mrd. €, höchstens 30 offene Angebote.
 - **Stellschrauben, falls Booster zu lohnend oder zu teuer sind:** `ai.dailyBudgetPacks`, `ai.buysPerCardWindow`,
-  `ai.premiumBps`, `ai.gradePremiumBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
+  `ai.premiumBps`, `ai.gradePremiumBps`, `ai.maxPremiumBps`, `ai.buyChanceBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
   Platzhalter-Preisen (gleichmäßig über die Spannen) liegt der Inhalt eines Boosters rechnerisch über seinem Preis;
   die begrenzte KI-Nachfrage und der Sofortverkauf zu 50 % halten den tatsächlichen Erlös darunter.
 

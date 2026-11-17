@@ -552,7 +552,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         const spent = aiBuys
           .filter((x) => berlinDay(x.at) === today && nexamonCard(x.cardKey)?.set === card.set)
           .reduce((sum, x) => sum + x.priceCents, 0);
-        if (spent + price > cfg.ai.dailyBudgetPacks * cfg.sets[card.set].packPriceCents) continue;
+        // only buys above the value count against the daily budget (ADR-195)
+        if (chanceBps < 10_000 && spent + price > cfg.ai.dailyBudgetPacks * cfg.sets[card.set].packPriceCents) continue;
         // at or below the value the AI always buys; above it the chance is per minute
         const perMinute = chanceBps / 10_000;
         if (chanceBps < 10_000 && host.random() >= 1 - Math.pow(1 - perMinute, minutes)) continue;
