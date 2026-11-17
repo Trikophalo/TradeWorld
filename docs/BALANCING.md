@@ -1458,7 +1458,7 @@ vervielfachen. Ein Master-Set von Mystic Energy bringt einmalig 15.000 € (75 �
 | Rares/Ultras/Prismas/Legendaries | gleiche Raten je Pack wie die anderen Sets                          | `odds`                                       |
 | Bonusart Typ „cosmic“            | XP; Set-Faktor 1,5; One of One 5 % × 1,5                            | `bonuses`                                    |
 | Bulk an das Spiel                | Wert − 20 % (ADR-196; vorher 35 %, 50 %), bis 500 Kopien, 10/min    | `quickSell`                                  |
-| Sofort an das Spiel (ADR-196)    | 90 % des Werts frischer Züge, 15 min, bis 200 Kopien, 20/min        | `instantSell`                                |
+| Sofort an das Spiel (ADR-196)    | 85 % des Werts frischer Züge, 15 min, bis 200 Kopien, 20/min        | `instantSell`                                |
 | KI-Angebote                      | alle 6 h neu; Bestand je Karte höchstens 12/8/4/2/1/0               | `ai.listingResetHours`, `ai.stockCap`        |
 
 Erwartung je Cosmic-Winds-Pack ohne One of One wie bei den anderen Sets (½ Rare, 1/12 Ultra, 1/80 Prisma, 1/900
