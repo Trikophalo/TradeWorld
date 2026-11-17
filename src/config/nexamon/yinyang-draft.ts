@@ -25,13 +25,16 @@ export interface YinYangCardDraft {
   startPriceCents: number;
 }
 
-/** Start price ranges in cents: the base ranges x 10 (2 x Super Apex). */
+/**
+ * Start price ranges in cents: the base ranges x 10 (2 x Super Apex); from ultra upwards x 1.12 more (owner decision:
+ * Yin Yang chase cards are worth 12 % more, and their pull rates are 10 % worse: `YINYANG_CHASE_PULL_FACTOR`).
+ */
 export const YINYANG_PRICE_RANGE: Record<YinYangRarity, readonly [number, number]> = {
   common: [1_000, 10_000],
   rare: [7_000, 80_000],
-  ultra: [160_000, 2_500_000],
-  prisma: [5_000_000, 25_000_000],
-  legendary: [90_000_000, 180_000_000],
+  ultra: [179_200, 2_800_000],
+  prisma: [5_600_000, 28_000_000],
+  legendary: [100_800_000, 201_600_000],
 };
 
 export const YINYANG_ART_SIZE: Record<YinYangRarity, { width: number; height: number }> = {
@@ -41,3 +44,7 @@ export const YINYANG_ART_SIZE: Record<YinYangRarity, { width: number; height: nu
   prisma: { width: 72, height: 100 },
   legendary: { width: 72, height: 100 },
 };
+
+/** From ultra upwards: card values x 1.12 and pull chances x 0.9 compared with the other sets. */
+export const YINYANG_CHASE_VALUE_FACTOR = 1.12;
+export const YINYANG_CHASE_PULL_FACTOR = 0.9;

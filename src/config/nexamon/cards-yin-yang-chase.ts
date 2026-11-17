@@ -5,6 +5,7 @@ import { YY_ART_CHASE_ULTRAS_1 } from "./art-yin-yang/chase-ultras-1";
 import { YY_ART_CHASE_ULTRAS_2 } from "./art-yin-yang/chase-ultras-2";
 import type { NexamonArt } from "./types";
 import type { YinYangCardDraft, YinYangRarity, YinYangType } from "./yinyang-draft";
+import { YINYANG_CHASE_VALUE_FACTOR } from "./yinyang-draft";
 
 /*
  * "Nexamon: Yin Yang", chase part (cards 85-110): ultra rares breaking out of the frame, the eight prisma
@@ -76,7 +77,8 @@ export const YIN_YANG_CHASE_CARDS: YinYangCardDraft[] = ROWS.map(
     evolvesFrom: from === null ? null : key(from),
     attack: { name: attack, damage, text },
     flavor,
-    startPriceCents,
+    // 12 % more value from ultra upwards (YINYANG_CHASE_VALUE_FACTOR), rounded to whole euros
+    startPriceCents: Math.round((startPriceCents * YINYANG_CHASE_VALUE_FACTOR) / 100) * 100,
   }),
 );
 
