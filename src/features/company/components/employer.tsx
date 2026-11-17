@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Avatar } from "@/components/ui/avatar";
 import { PlayerFigure } from "@/components/ui/player-figure";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +35,7 @@ import { playSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { useCompanyApplications, useCompanyPostings, useCompanyRefresh, useCompanyTeam, useFloorLooks } from "../hooks";
+import { SubSection } from "./firm-layout";
 
 type BranchKey = Parameters<ReturnType<typeof useTranslations<"skills.branches">>>[0];
 const TIERS = BALANCE.careers.tiers.map((t) => t.id) as CareerTier[];
@@ -681,17 +681,13 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
   const free = Math.max(0, company.maxEmployees - used);
   const people = team.data?.length ?? 0;
   const ai = company.aiWorkers;
-  // A big company (an AG) gets a long plan: then it starts folded, with a one-line summary.
-  const [planOpen, setPlanOpen] = useState(used <= PLAN_OPEN_UP_TO);
+  // ADR-183: the plan stands open (no folding inside a section); long seat lists still fold per group.
   return (
     <div className="space-y-8">
-      <CollapsibleSection
+      <SubSection
         id="staffing-plan"
-        open={planOpen}
-        onOpenChange={setPlanOpen}
         title={t("planTitle")}
-        summary={t("planSummary", { people: people + 1, ai, free, postings: company.openPostings })}
-        icon={<PixelIcon {...UI_ICONS.profile} scale={2} />}
+        description={t("planSummary", { people: people + 1, ai, free, postings: company.openPostings })}
       >
         <OrgChart companyId={company.id} />
         <Section title={t("seatsTitle")} aside={t("staffCount", { used, max: company.maxEmployees })}>
@@ -735,7 +731,7 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
             </div>
           )}
         </Section>
-      </CollapsibleSection>
+      </SubSection>
       <Section id="applications" title={t("tabApplications")}>
         <Applications company={company} />
       </Section>

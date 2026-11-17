@@ -9954,7 +9954,7 @@
     "staffValue": {
       "title": "Was jeder leistet und kostet",
       "perMonth": "je Monat ({days} Tage)",
-      "noRevenue": "Noch keine abgeschlossene Betriebsstunde: Die Leistung zeigt sich ab der ersten Abrechnung.",
+      "noRevenue": "Noch keine abgerechnete Stunde: Die Leistung zeigt sich ab der ersten Abrechnung. Die Kosten unten sind die vollen Lohnsätze.",
       "ai": "KI-Kraft {n}",
       "founder": "Gründer",
       "worth": "Lohnt sich",
@@ -9964,7 +9964,9 @@
       "totalBrings": "Leistung gesamt",
       "totalCosts": "Lohnkosten gesamt",
       "totalNet": "Bleibt",
-      "hint": "Ein Monat sind hier {days} Tage. Leistung: Umsatz der letzten 24 Stunden × {days}, aufgeteilt nach dem Anteil an der Produktivität des Teams. Kosten: Spieler bekommen höchstens {hours} bezahlte Stunden am Tag, KI-Kräfte jede Betriebsstunde. Wareneinsatz und Fixkosten sind nicht abgezogen."
+      "hint": "Ein Monat sind hier {days} Tage, hochgerechnet aus den letzten abgerechneten Stunden. Leistung: Umsatz so verteilt wie in der Abrechnung – erst bedienen Gründer und Spieler (nach ihrer Produktivität), KI-Kräfte nur, was übrig bleibt; freie Kapazität bringt Auftragsarbeit. Kosten: die wirklich gezahlten Löhne (Spieler höchstens {hours} Stunden am Tag, KI-Kräfte nach Auslastung, im Leerlauf ein Viertel). Wareneinsatz und Fixkosten sind nicht abgezogen.",
+      "aiUse": "KI-Kräfte im Schnitt zu {percent} % ausgelastet",
+      "basis": "aus {count, plural, one {# Stunde} other {# Stunden}}"
     },
     "pulse": {
       "title": "Was die letzte Stunde sagt",
