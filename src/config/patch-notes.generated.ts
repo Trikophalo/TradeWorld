@@ -543,6 +543,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Firma aufgeräumt",
         text: "klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-f759f69f",
+        title: "Mira kennt jetzt deine Zahlen",
+        text: "Sie rät nur noch zu Dingen, die gerade gehen, sagt, was sie je Stunde bringen, und beantwortet „Was soll ich tun?“, „Warum Verlust?“, „Mehr…",
+      },
     ],
   },
   {

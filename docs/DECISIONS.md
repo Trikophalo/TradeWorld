@@ -4170,3 +4170,98 @@ Funktionskarte: `docs/FIRMA_ANALYSE.md`.
 **Offen.** Ob auf Live eine Firma an einem Nebenschritt scheiterte, zeigt nach dem Deploy
 `select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
 aus Spec 6.6) bleibt unbenutzt.
+
+## ADR-185: Mira liest Fakten statt Vermutungen – Prüfung aller Regeln, Knöpfe nur, wenn sie gehen, mehr Fragen — `Annahme`
+
+**Kontext.** Der Owner: „Mira sagt manchmal Sachen, die nicht stimmen, sie schickt dich manchmal wohin, wo es nichts
+zu tun gibt. Mira liegt oft sehr falsch. Sie muss viel mehr Kapazität haben.“ Seit ADR-138 sind die Firma
+(ADR-176 Stärken, ADR-180 Wirtschaft und Autopilot, ADR-183 Ruf und flacher Aufbau) und die Tabs (`tabs.ts`) stark
+umgebaut worden; Miras Regeln (`assistant/brain.ts`) lasen aber nur Aufgaben, Züge, die acht Faktoren und die
+Börsendaten, und ihre Links zeigten noch auf die alten Bereiche.
+
+**Prüfung (jede Regel gegen das heutige Spiel).** Geprüft wurden Bedingung (Einheiten bps/Prozent/Anteil, Cent/Euro,
+von ADR-176/180/183 ersetzte Felder, privat/börsennotiert, Demo/Live), Text und Ziel (gibt es die Stelle, ist die
+Aktion dort jetzt möglich).
+
+|   # | Regel                                          | Urteil                       | Befund und Änderung                                                                                                                                                                                                    |
+| --: | ---------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   1 | Aufgabe melden und beraten (`adviseTask`)      | falscher Text                | „voller Wert“ ohne den Stärken-Lohnfaktor (ADR-180, 0,9× bis 1,5×); KI-Chance ohne den Bonus einer passend geschulten KI-Kraft. Jetzt beides wie auf dem Server.                                                       |
+|   2 | Warnung bei überlasteter Person (`warningFor`) | ok                           | –                                                                                                                                                                                                                      |
+|   3 | Krise/Chance melden                            | ok                           | Link „Lage“ bleibt.                                                                                                                                                                                                    |
+|   4 | Geschäftszüge vorschlagen                      | falsche Bedingung            | „Freier Auftrag“ stand auch während der Stunde Pause da und scheiterte. Jetzt nur, wenn einer starten kann.                                                                                                            |
+|   5 | Freier Auftrag (`orderTurn`)                   | ok                           | –                                                                                                                                                                                                                      |
+|   6 | Bewerbungen                                    | veraltet                     | Link auf den ganzen Mitarbeiter-Tab; jetzt direkt „Bewerbungen“.                                                                                                                                                       |
+|   7 | Ruhe und Beispiele                             | ok                           | Um „Was soll ich tun?“, „Lagebericht“, „Warum Verlust?“/„Mehr Umsatz?“ erweitert.                                                                                                                                      |
+|   8 | Plan für alle Aufgaben                         | ok                           | –                                                                                                                                                                                                                      |
+|   9 | Analyse                                        | ok                           | Jetzt mit Lagebericht in Zahlen; Knöpfe geprüft.                                                                                                                                                                       |
+|  10 | Dringende Aufgaben                             | ok                           | –                                                                                                                                                                                                                      |
+|  11 | Ergebnisse                                     | ok                           | –                                                                                                                                                                                                                      |
+|  12 | Schwächster Faktor (Briefing)                  | ok                           | Knöpfe, die schon ein Rat zeigt, fallen weg.                                                                                                                                                                           |
+|  13 | Hebel Marketing                                | falscher Text                | „über das ganze Quartal“ – seit ADR-180 wirkt Marketing jede Stunde. Jetzt mit „+Y Punkte je Stunde“.                                                                                                                  |
+|  14 | Hebel Kampagne                                 | falscher Text                | Erfolgsmeldung verwies auf die „Übersicht“ (gibt es nicht mehr); jetzt Controlling › Marketing.                                                                                                                        |
+|  15 | Hebel Preis                                    | falsche Bedingung            | Preisbindung des Geschäftsrats (börsennotiert) ignoriert; der Knopf scheiterte.                                                                                                                                        |
+|  16 | Hebel Auftragsarbeit                           | ok                           | –                                                                                                                                                                                                                      |
+|  17 | Hebel KI-Kräfte einstellen                     | falsche Bedingung            | Freie Plätze nicht geprüft (`employee_limit`).                                                                                                                                                                         |
+|  18 | Hebel KI-Kräfte entlassen                      | ok                           | –                                                                                                                                                                                                                      |
+|  19 | Hebel Fähigkeit (KI-Kraft mit Fähigkeit)       | falsche Bedingung            | Schon abgedeckte Fähigkeit nicht geprüft (`skill_already_covered`).                                                                                                                                                    |
+|  20 | Hebel Schulung                                 | toter Link                   | Schulungen gibt es erst ab Teamgröße und nur mit Spielern im Team (in der Demo nie); jetzt nur dann.                                                                                                                   |
+|  21 | Hebel Ausbau                                   | toter Link                   | Ziel „business“ (Betrieb), der Ausbau liegt unter „Ausbau“; jetzt dort und, wenn die Kasse reicht, direkt als Knopf.                                                                                                   |
+|  22 | Hebel Rechtsform                               | toter Link                   | Ziel „boss“ = Marketing-Regler; jetzt „Ausbau“ und nur, wenn die nächste Rechtsform möglich ist.                                                                                                                       |
+|  23 | Hebel Aufgaben (Plan, selbst, KI automatisch)  | ok                           | Autopilot (ADR-180) als eigener Knopf ergänzt.                                                                                                                                                                         |
+|  24 | Hebel Krise                                    | falscher Text                | „Krise in der Übersicht ansehen“; jetzt „Lage im Dashboard“.                                                                                                                                                           |
+|  25 | Hebel Einzahlen                                | ok                           | –                                                                                                                                                                                                                      |
+|  26 | Hebel Geschäftszug                             | ok                           | –                                                                                                                                                                                                                      |
+|  27 | Bücher (börsennotiert)                         | ok                           | –                                                                                                                                                                                                                      |
+|  28 | Steuer                                         | ok                           | –                                                                                                                                                                                                                      |
+|  29 | Stimmung                                       | ok                           | –                                                                                                                                                                                                                      |
+|  30 | Geschäftsrat                                   | ok                           | –                                                                                                                                                                                                                      |
+|  31 | Forschung                                      | ok                           | –                                                                                                                                                                                                                      |
+|  32 | Gier (Auszahlungen)                            | falscher Text, falscher Link | „kostet schon −4 % Nachfrage“ (Vorzeichen) und „kostet“, obwohl der Ruf über 50 noch hebt; Link auf die Dividende statt auf die CEO-Auszahlung. Jetzt eigener Text über 50, Betrag ohne Vorzeichen, zuerst Auszahlung. |
+|  33 | „Kein Knopf“-Antwort                           | veraltet                     | „Schau in der Übersicht“; jetzt Dashboard › „Wo es fehlt“.                                                                                                                                                             |
+|  34 | Beschriftung von Links (`describeAction`)      | falscher Text                | Jeder Link außer dem Team hieß „Fertige Wege ansehen“; jetzt je Ziel („Zu Ausbau und Rechtsform“ …).                                                                                                                   |
+|  35 | Vorschläge von Claude (`validActions`)         | falsche Bedingung            | Nur die Rolle geprüft; jetzt dieselbe Prüfung wie jeder Knopf.                                                                                                                                                         |
+
+**Ergebnis:** 16 von 35 Regeln waren falsch: 3 tote Links (Schulung, Ausbau, Rechtsform), 5 falsche Bedingungen
+(Auftrag in der Pause, Preisbindung, freie Plätze, abgedeckte Fähigkeit, Claude-Vorschläge), 6 falsche Texte
+(Aufgabenwert und KI-Chance, Marketing je Quartal, Kampagne, Krise, Gier samt Link, Linkbeschriftung) und 2 veraltete
+Ziele (Bewerbungen, „Übersicht“). Gemeinsame Ursache: Mira kannte Geld, Stunde,
+Bekanntheit, Ruf, Stärken und Autopilot nicht und prüfte nie, ob ein Knopf gerade geht.
+
+**Entscheidung.**
+
+- **Fakten** (`assistant/facts.ts`, `companyFacts`): ein typisierter Schnappschuss aus denselben Abfragen wie die
+  Seite: Kasse und freie Kasse, offene Rechnungen, Reichweite der Kasse, letzte Stunde (Umsatz, Kosten nach Posten,
+  Gewinn, Lohnfaktor), 24 Stunden, Nachfrage gegen Kapazität, KI-Auslastung und Kräfte ohne Arbeit samt Ersparnis
+  (`aiWageDueCents`), Bekanntheit mit Deckel und Hebeln der letzten Stunde, Marketing-Vorschlag und was er je Stunde
+  bringt (Formel aus `awarenessHour`/`marketingGain`, an der echten Marketing-Wirkung der letzten Stunde geeicht),
+  Qualität, Preis und Preisbindung, Ruf mit Treibern und Nachfragewirkung, Stärken mit nächster Bonusstufe, Diagnose,
+  Team und freie Plätze, Ausbau/Rechtsform/Börsengang, Kampagne, Aufgaben und Schwung, Autopilot, Züge, freier
+  Auftrag, Krise, Interview, Börsendaten (Stimmung, Steuer, Bücher, Rat). Einheiten: Cent, bps, Punkte 0–100.
+- **Regeln** (`assistant/advisor.ts`): 19 Regeln über die Fakten (Rechnungen offen, Kasse reicht nur Stunden,
+  Verlust, KI-Kräfte im Leerlauf, Marketing zu niedrig, Marketing am Deckel, Auftragsarbeit, besserer Preis, Premium
+  ohne Qualität, ausverkauft, Kampagne, Ausbau, Rechtsform, Autopilot, Ruf, Stärken-Bonus, fehlende Fähigkeit,
+  Interview, Börsengang). Jede rechnet mit den Formeln des Spiels aus, was sie je Stunde bringt (z. B. Auftragsarbeit
+  = freie Kapazität × 25 % × 30 % Marge; Kampagne = Mehrnachfrage bis zur freien Kapazität × Rohertrag, nur wenn das
+  mehr ist als die Kosten) und nennt die Zahl. Alarme zuerst, sonst nach Euro je Stunde; von selbst meldet Mira
+  alle Alarme und die zwei besten Ratschläge (`companyAssistant.advice`).
+- **Nur Knöpfe, die gehen** (`actionEnabled`): jede Aktion wird gegen die Fakten geprüft wie der Server (Kasse,
+  Plätze, Pause, Preisbindung, laufende Kampagne, unveränderte Werte). Ein Rat ohne gültigen Knopf wird nicht
+  gezeigt; Briefings, Antworten und Claude-Vorschläge laufen durch dieselbe Prüfung.
+- **Links:** `open` trägt nur noch eine Abschnitts-ID aus `tabs.ts` (`CompanySection`); `sectionAvailable` blendet
+  Börsen-Abschnitte und Schulungen aus, wenn es sie nicht gibt. Neue IDs `applications`, `interview`.
+- **Fragen:** „Warum mache ich Verlust?“, „Wie mache ich mehr Umsatz?“ (Engpass Nachfrage oder Kapazität), „Was soll
+  ich als Nächstes tun?“, „Lagebericht“, „Was bringt der Ruf?“, „Was bringen die Stärken?“, „Lohnen sich meine
+  KI-Kräfte?“, „Autopilot an/aus“ und Fragen dazu, „Erklär mir …“ zu jedem Faktor (Bekanntheit mit Hebeln der
+  Stunde). „Wie läuft die Firma?“ beginnt mit dem Lagebericht.
+- **Claude** (`company-assistant`): bekommt die Fakten als `<fakten>` (Euro und Punkte, höchstens 120 Werte) und die
+  Regel, keine Zahl zu erfinden und „Das weiß ich nicht“ zu sagen, was dort fehlt. Ohne Schlüssel antwortet die
+  deterministische Mira auf alle Fragen oben selbst.
+
+**Tests.** `advisor.test.ts`: jede Regel mit Fakten, die sie wahr und falsch machen, und ihren Zahlen; jeder
+angebotene Knopf ist für seine Fakten möglich; jeder Abschnitt aus `tabs.ts` ist ein Element der Seite; jeder Link
+Miras hat eine Beschriftung und ist sichtbar; Fragen und Antworten; alle Textschlüssel existieren. E2E
+`mira-advice.spec.ts` (Demo): Lagebericht, „Was soll ich tun?“, der erste Vorschlag läuft ohne Fehler.
+
+**Folgen.** Die Ratschläge sind Schätzungen „ca. je Stunde“ auf der letzten Stunde; die Marktgröße ist verborgen
+(Mitte der Spanne, geeicht mit der letzten Stunde). `game_config` hat neue Werte unter `companyAssistant.advice`
+(Seeds neu erzeugt, keine Migration).

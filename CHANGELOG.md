@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Mira kennt jetzt deine Zahlen (ADR-185):** Sie rät nur noch zu Dingen, die gerade gehen, sagt, was sie je Stunde
+  bringen, und beantwortet „Was soll ich tun?“, „Warum Verlust?“, „Mehr Umsatz?“, Ruf, Stärken und einen Lagebericht.
 - **Firma aufgeräumt (ADR-183):** klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter
   dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je Punkt sagt, was zu tun ist.
 - **Ruf für jede Firma:** Qualität, faire Preise, bezahlte Löhne und Kampagnen heben ihn jede Stunde, er bewegt die Nachfrage.
