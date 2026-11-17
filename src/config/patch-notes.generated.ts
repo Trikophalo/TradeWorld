@@ -483,6 +483,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Pack Battles und Live-Öffnen",
         text: "Im Collectibles-Tab stehen deine Freunde als Figuren.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-1e8c5d2d",
+        title: "Fünf neue News-Battles und neue Preise",
+        text: "Goldrausch-Zone, Bulle und Bär, Wackelparkett, Farbrausch und Crash-Regen, alle mit WASD.",
+      },
     ],
   },
   {

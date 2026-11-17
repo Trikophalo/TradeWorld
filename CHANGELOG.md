@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Fünf neue News-Battles und neue Preise (ADR-177):** Goldrausch-Zone, Bulle und Bär, Wackelparkett, Farbrausch und
+  Crash-Regen, alle mit WASD. Gewinnen kannst du jetzt auch zufällige Accessoires und ungeöffnete Nexamon-Booster (bis
+  20.000 € pro Battle); sie liegen bei Collectibles unter „Ungeöffnete Booster“. Booster lassen sich auch kaufen und
+  später öffnen.
+
 - **Pack Battles und Live-Öffnen (ADR-172):** Im Collectibles-Tab stehen deine Freunde als Figuren. Fordere einen zum
   Pack Battle heraus: beide zahlen ein Pack vom gleichen Set, wer mehr Wert zieht, bekommt alle zehn Karten. Über
   „Live“ schaust du anderen beim Öffnen zu und schickst Emojis; abschalten geht in den Einstellungen.

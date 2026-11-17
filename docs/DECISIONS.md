@@ -3697,3 +3697,44 @@ Erfolgs- und Misserfolgszeilen im Verlauf. Der Erwartungswert bleibt der der Ris
 - Demo: das erste Interview kommt sofort, sobald die Demo-Firma existiert; danach per Zufall wie auf dem Server.
 - Annahmen: Claude bewertet Interviews (noch) nicht; die Spalte `judge` ist dafür vorgesehen, die Mini-KI ist
   Rückfallebene und derzeit allein aktiv.
+
+## ADR-177: Fünf WASD-Battles, Accessoires und versiegelte Booster als Preise — `Annahme`
+
+- **Wunsch:** fünf neue Minispiele für die News-Battles im WASD-Stil; als Preise auch Accessoires, NFTs und
+  Nexamon-Booster, mehrere Booster höchstens 20.000 € wert; gewonnene Booster liegen bei Collectibles und lassen sich
+  öffnen. Booster sollen sich auch kaufen und später öffnen lassen.
+- **Spiele** (Ganzzahl-Simulation in `src/lib/sim/battle/{zone,tag,tiles,paint,crash}.ts`, gespiegelt in PL/pgSQL,
+  Testvektoren in beiden Welten, Werte in `battles.games`):
+  - **Goldrausch-Zone:** Münzen in einer goldenen Zone, die Ring für Ring schrumpft (Chebyshev-Radius, alle 8,5 s).
+    Man kann sie nicht verlassen; wer beim Schrumpfen draußen steht, ist raus. Zuletzt stehend, dann Münzen.
+  - **Bulle und Bär:** Fangen. Der Bär ist schneller (3 statt 4 Takte je Feld), sein Opfer wird Bär und steht kurz
+    still. Am kürzesten Bär gewinnt. Geht der Bär, übernimmt der mit den wenigsten Bär-Takten.
+  - **Wackelparkett:** Ein verlassenes Feld bricht nach 2 s (später schneller) weg und wächst erst nach 7 s (später
+    länger) nach; 1,5 s Stillstand bricht das eigene Feld. Zuletzt stehend.
+  - **Farbrausch:** Revier malen. Jedes betretene Feld wird eigenfarbig, Aktion = Farbbombe 3 × 3 (alle 8 s); trifft
+    zwei Bomben dasselbe Feld im selben Takt, bleibt es, wie es war (keine Slot-Bevorzugung). Meiste Felder gewinnt.
+  - **Crash-Regen:** Wellen roter Warnkreuze (je fünf Felder), 1,5 s später der Einschlag, drei Herzen, Wellen
+    werden schneller und größer (abhängig von der Spielerzahl). Zuletzt stehend.
+    Alle funktionieren mit 3 bis 10 Spielern (Spawns der Arena, Münz- und Crash-Zahlen wachsen mit der Spielerzahl).
+- **Preise:** neue Gewichte `xp 25, money 25, skin 15, nft 15, accessory 15, packs 15`. Gezogen beim Öffnen der Lobby
+  und vorher angezeigt.
+  - **accessory:** Stufe gewichtet (`selten 60, episch 30, legendär 10`); der Gewinner bekommt ein zufälliges
+    Shop-Accessoire dieser Stufe (nie ein Battle-Exklusives), das er noch nicht hat, für 0 €; hat er alle, gibt es Geld.
+  - **nft:** unverändert der saubere Weg von ADR-160: ein Galerie-NFT ohne Besitzer und ohne Auktion wechselt per
+    `owner_id` zum Gewinner (kein Prägen, keine Buchung); ist keins frei, gibt es Geld.
+  - **packs:** versiegelte Booster von höchstens zwei Sets, Summe der Packpreise höchstens `packsCapCents` = 20.000 €,
+    höchstens 8 Packs: ein Hauptset (gleichverteilt unter den Sets, die passen) 1..so viele wie passen, mit 50 % der
+    Rest im billigsten anderen Set, das noch passt (z. B. „1 × Prismatic Peak + 7 × Mystic Energy“, „3 × Super Apex“,
+    „1 × Prismatic Peak“). Preise kommen zur Laufzeit aus `game_config.nexamon`, neue Sets passen automatisch.
+    Reine Funktion `pickPackPrize` mit Test, SQL-Spiegel `battle_pick_packs` (gleiche Zufallszahlen, gleiches Ergebnis).
+- **Versiegelte Booster:** Tabelle `nexamon_sealed_packs`; Gewinn und Kauf legen Zeilen an, `open_nexamon_sealed_pack`
+  ruft die bestehende Zugfunktion `nexamon_open_pack` und legt wie ein Kauf eine Zeile in `nexamon_packs` an (damit
+  laufen Population, Live-Öffnen per Trigger, Missionen und Zähler unverändert). `buy_nexamon_pack` bleibt
+  unangetastet; `buy_nexamon_sealed_pack` bucht denselben Packpreis mit derselben Buchungsart `nexamon_pack`.
+  Öffnen ist einmalig (Zeile gesperrt, `opened_at`), per `request_id` idempotent. Gesperrtes Nexamon: Gewinne kommen
+  trotzdem an, Öffnen erst ab der Freischaltung.
+- **Oberfläche:** Streifen „Ungeöffnete Booster“ oben im Shop (`sealed-packs.tsx`), „Öffnen“ übergibt den Pack an das
+  bestehende Popup mit `PackOpening`; im Pack-Popup „Kaufen und später öffnen“. Die neuen Arenen zeichnet
+  `render/arena-five.ts`; Demo mit Bots für alle fünf Spiele und denselben Preisregeln.
+- **Annahmen:** Der Demo-Gewinn landet sofort im Demo-Inventar. Ein Battle-Accessoire zählt nicht als Kauf (kein
+  Feed-Eintrag für legendäre Käufe).
