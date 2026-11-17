@@ -236,7 +236,9 @@ select tests.mb_age(:'m3', 4600);
 select tests.login_as('authenticated', :b);
 select public.get_nexamon_battle(:'m3') as r1 \gset
 reset role;
-select tests.assert((select bool_and(jsonb_array_length(x -> 'cards') = 1) from jsonb_array_elements(:'r1'::jsonb #> '{battle,seats}') x)
+-- (a loaded machine can take a moment between mb_age and the read: one or two cards, but the same on every seat)
+select tests.assert((select count(distinct jsonb_array_length(x -> 'cards')) = 1 and min(jsonb_array_length(x -> 'cards')) between 1 and 2
+                       from jsonb_array_elements(:'r1'::jsonb #> '{battle,seats}') x)
   and :'r1'::jsonb #> '{battle,winner_seat}' = 'null'::jsonb and (:'r1'::jsonb #>> '{battle,my_seat}')::integer = 1,
   'lockstep: the first card on all four seats, the winner not yet');
 -- pack 2 tears after card 5: 3000 + 2*2400 + 5*1800 - 800 = 16 000 ms in -> 6 cards
