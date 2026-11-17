@@ -143,6 +143,8 @@ export interface TradingConfig {
   readonly minPriceE4: number;
   /** Circuit breaker for the non-event part of a tick return. */
   readonly maxTickReturnBps: number;
+  /** ADR-189: the order sheet warns and shows the exact amount when an order moves the price at least this much. */
+  readonly highImpactWarnBps: number;
   /**
    * Players move prices (owner decision, ADR-056). Player orders are measured in euros, not
    * against the company size, so a few players already move a stock and many players decide it.
@@ -1789,7 +1791,8 @@ export const BALANCE = {
   trading: {
     limitOrders: false,
     orderFeeCents: 100,
-    maxOrderQuantity: 100_000,
+    // ADR-189: no order-size limit; only a technical bound (supply, cash and holdings limit real orders)
+    maxOrderQuantity: 1_000_000_000,
     quantityScale: 1_000_000,
     minOrderValueCents: 100,
     capitalGainsTaxBps: 2500,
@@ -1828,6 +1831,8 @@ export const BALANCE = {
     minPriceE4: 1,
     // Wide enough for a strong player order to show at once (ADR-120).
     maxTickReturnBps: 1000,
+    // ADR-189: from a 5 % price move the order sheet warns before confirming
+    highImpactWarnBps: 500,
     playerImpact: {
       // Active players move prices strongly (ADR-120): 10.000 € net buying moves a penny stock by 10 %,
       // a mid cap by 2 %, a blue chip by 0.5 %.

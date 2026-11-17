@@ -30,6 +30,7 @@ import {
   type GameEngine,
   type MarketSnapshot,
   type OrderBook,
+  type OrderQuote,
   type OrderResult,
   type Portfolio,
   type SecurityDetails,
@@ -219,6 +220,26 @@ const orderResultSchema = z.object({
   xp_awarded: num.default(0),
   level: num.default(1),
   xp_total: num.default(0),
+  requested_quantity_e6: num.optional(),
+  unfilled_quantity_e6: num.optional(),
+  limited_by: z.enum(["supply"]).nullable().optional(),
+  impact_bps: num.optional(),
+});
+
+const orderQuoteSchema = z.object({
+  touch_e4: num,
+  requested_quantity_e6: num,
+  fill_quantity_e6: num,
+  unfilled_quantity_e6: num,
+  avg_price_e4: num,
+  last_price_e4: num,
+  gross_cents: num,
+  fee_cents: num,
+  tax_cents: num,
+  net_cents: num,
+  slippage_bps: num,
+  impact_bps: num,
+  limited_by: z.enum(["supply"]).nullable(),
 });
 
 const progressSchema = z.object({ xp_awarded: num, level: num, xp_total: num });
@@ -519,6 +540,7 @@ export const RPC_SCHEMAS = {
   get_stock_revenue: stockFiguresSchema,
   get_my_portfolio: portfolioSchema,
   place_order: orderResultSchema,
+  quote_order: orderQuoteSchema,
   cancel_order: z.object({ order_id: z.string(), status: z.literal("cancelled") }),
   claim_vault: z.object({ claimed_cents: num, cash_cents: num }),
   complete_tutorial: progressSchema,
@@ -908,6 +930,38 @@ export const liveEngine: GameEngine = {
       xpAwarded: r.xp_awarded,
       level: r.level,
       xpTotal: r.xp_total,
+      requestedQuantityE6: r.requested_quantity_e6,
+      unfilledQuantityE6: r.unfilled_quantity_e6,
+      limitedBy: r.limited_by ?? null,
+      impactBps: r.impact_bps,
+    };
+  },
+
+  async quoteOrder(input): Promise<OrderQuote> {
+    const r = await rpc(
+      "quote_order",
+      {
+        p_ticker: input.ticker,
+        p_side: input.side,
+        p_quantity_e6: input.quantityE6 ?? null,
+        p_amount_cents: input.amountCents ?? null,
+      },
+      orderQuoteSchema,
+    );
+    return {
+      touchE4: r.touch_e4,
+      requestedQuantityE6: r.requested_quantity_e6,
+      fillQuantityE6: r.fill_quantity_e6,
+      unfilledQuantityE6: r.unfilled_quantity_e6,
+      avgPriceE4: r.avg_price_e4,
+      lastPriceE4: r.last_price_e4,
+      grossCents: r.gross_cents,
+      feeCents: r.fee_cents,
+      taxCents: r.tax_cents,
+      netCents: r.net_cents,
+      slippageBps: r.slippage_bps,
+      impactBps: r.impact_bps,
+      limitedBy: r.limited_by,
     };
   },
 

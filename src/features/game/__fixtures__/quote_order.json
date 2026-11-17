@@ -1,0 +1,18 @@
+{
+  "side": "buy",
+  "ticker": "VLT",
+  "touch_e4": 468125,
+  "fee_cents": 100,
+  "net_cents": 100000,
+  "tax_cents": 0,
+  "impact_bps": 1,
+  "limited_by": null,
+  "gross_cents": 99900,
+  "avg_price_e4": 468148,
+  "slippage_bps": 0,
+  "last_price_e4": 468172,
+  "fill_quantity_e6": 21339512,
+  "realized_pnl_cents": null,
+  "unfilled_quantity_e6": 0,
+  "requested_quantity_e6": 21339512
+}

@@ -106,7 +106,9 @@ select tests.assert(
           -- company autopilot (b8)
           || array['get_company_autopilot', 'set_company_autopilot']
           -- business figures at the stock exchange (c4)
-          || array['get_stock_revenue']) x),
+          || array['get_stock_revenue']
+          -- order preview (ADR-189)
+          || array['quote_order']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

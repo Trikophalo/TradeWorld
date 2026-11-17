@@ -243,6 +243,40 @@ export interface OrderResult {
   xpAwarded: number;
   level: number;
   xpTotal: number;
+  /** ADR-189: what the order asked for and why part of a market order was not executed. */
+  requestedQuantityE6?: number;
+  unfilledQuantityE6?: number;
+  limitedBy?: OrderLimit | null;
+  /** Price move of this order (last share against the quote), signed bps. */
+  impactBps?: number;
+}
+
+/** Why a market order fills less than asked (ADR-189): only the stock supply (ADR-153) can limit it. */
+export type OrderLimit = "supply";
+
+/** Server preview of a market order (`quote_order`, ADR-189): exactly what `place_order` would execute now. */
+export interface OrderQuote {
+  touchE4: number;
+  requestedQuantityE6: number;
+  fillQuantityE6: number;
+  unfilledQuantityE6: number;
+  avgPriceE4: number;
+  lastPriceE4: number;
+  grossCents: number;
+  feeCents: number;
+  taxCents: number;
+  /** Buy: what is paid. Sell: what is credited (after fee and tax). */
+  netCents: number;
+  slippageBps: number;
+  impactBps: number;
+  limitedBy: OrderLimit | null;
+}
+
+export interface OrderQuoteInput {
+  ticker: string;
+  side: OrderSide;
+  quantityE6?: number | null;
+  amountCents?: number | null;
 }
 
 export interface RichListEntry {
@@ -2441,6 +2475,8 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   stockFigures(ticker?: string): Promise<StockFigures[]>;
   portfolio(): Promise<Portfolio>;
   placeOrder(input: OrderInput): Promise<OrderResult>;
+  /** ADR-189: the exact preview of a market order. */
+  quoteOrder(input: OrderQuoteInput): Promise<OrderQuote>;
   cancelOrder(requestId: string, orderId: string): Promise<void>;
   claimVault(requestId: string): Promise<{ claimedCents: number; cashCents: number }>;
   completeTutorial(requestId: string): Promise<ProgressResult>;

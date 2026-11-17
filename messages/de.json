@@ -348,7 +348,16 @@
     "pickHint": "Wähle mit dem Regler oder tippe einen Betrag ein.",
     "slider": "Menge wählen",
     "tooSmall": "Eine Order muss mindestens 1 € wert sein.",
-    "holdLimit": "Halten: Limit setzen"
+    "holdLimit": "Halten: Limit setzen",
+    "avgPrice": "Ø Ausführungskurs",
+    "impact": "Kursauswirkung",
+    "receiveAbout": "Du erhältst ca.",
+    "payAbout": "Du zahlst ca.",
+    "quoting": "Berechne Ausführung …",
+    "limitedSupply": "Nur {filled} von {requested} Stück sind noch frei; mehr Aktien gibt es nicht.",
+    "highImpactSell": "Große Order: Sie drückt den Kurs um {impact}. Du erhältst ca. {amount}, nicht Stückzahl × Kurs.",
+    "highImpactBuy": "Große Order: Sie hebt den Kurs um {impact}. Du zahlst ca. {amount}.",
+    "filledPartial": "{filled} von {requested} Stück ausgeführt"
   },
   "company": {
     "title": "Unternehmen",
@@ -726,7 +735,7 @@
     "not_authenticated": "Du bist nicht angemeldet. Bitte melde dich neu an.",
     "unknown_security": "Dieses Wertpapier gibt es nicht.",
     "not_tradable": "Dieses Wertpapier ist gerade nicht handelbar.",
-    "invalid_quantity": "Diese Menge geht nicht. Kleine Aktien gibt es pro Order nur bis zu einer Grenze; teile große Käufe auf.",
+    "invalid_quantity": "Diese Menge geht nicht. Gib eine Stückzahl größer als 0 ein.",
     "invalid_price": "Der Limit-Preis ist ungültig.",
     "insufficient_funds": "Dafür reicht dein Guthaben nicht.",
     "insufficient_position": "So viele Stück hast du nicht im Depot.",

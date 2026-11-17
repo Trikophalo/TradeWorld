@@ -143,7 +143,8 @@ select tests.login_as('authenticated', :c);
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', 100000000000)$$, 'insufficient_funds', 'buy beyond cash');
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'VLT', 'sell', 'market', 5000000)$$, 'insufficient_position', 'sell without position');
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', 0)$$, 'invalid_quantity', 'quantity 0');
-select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', 100001000000)$$, 'invalid_quantity', 'quantity above 100 000');
+-- ADR-189: no order size limit; a huge order only fails for lack of money
+select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', 100001000000)$$, 'insufficient_funds', 'quantity above 100 000: only the cash limits it');
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'hold', 'market', 1000000)$$, 'invalid_argument', 'unknown side');
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'NOPE', 'buy', 'market', 1000000)$$, 'unknown_security', 'unknown ticker');
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'NEXA30', 'buy', 'market', 1000000)$$, 'not_tradable', 'the index is not tradable');

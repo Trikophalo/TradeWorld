@@ -8108,3 +8108,17 @@ drivers, at, history: [{hour_start, value, target}]}` (letzte 48 Stunden) und `c
   `[{step, at, error, failures}]` (letzte 24 Stunden). Jede Stunde in `hours` trägt zusätzlich `demand_cents`,
   `capacity_cents`, `strength_bonus_cents`, `ai_utilization_bps`, `ai_wages_paid_cents`, `player_wages_paid_cents`,
   `reputation`.
+
+## Migration 7800: Vorschau = Ausführung (ADR-189)
+
+- `market_order_plan(security_id, side, quantity_e6 | null, amount_cents | null)` (intern): der Ausführungsplan einer
+  Sofort-Order wie `planMarketOrder()` in `src/lib/sim/order-fill.ts`; Hilfen `order_move_integral()`,
+  `market_order_avg_e4()`. Die n-te Aktie bewegt den Kurs um `min(a × n, trading.maxTickReturnBps)`, Spieleraktien
+  bleiben im Tagesband. Liefert `touch_e4`, `requested_quantity_e6`, `fill_quantity_e6`, `unfilled_quantity_e6`,
+  `avg_price_e4`, `last_price_e4`, `gross_cents`, `fee_cents`, `slippage_bps`, `impact_bps`, `limited_by`.
+- RPC `quote_order(p_ticker, p_side, p_quantity_e6 = null, p_amount_cents = null)` (nur lesend): der Plan (Käufe auf
+  den freien Bestand begrenzt, dann `limited_by = 'supply'`) plus `ticker`, `side`, `tax_cents`,
+  `realized_pnl_cents` und `net_cents` (Kauf: Brutto + Gebühr, Verkauf: Brutto − Gebühr − Steuer).
+- `place_order` (Sofort-Orders): führt genau diesen Plan aus, jede Menge ganz. Ergebnis zusätzlich
+  `requested_quantity_e6`, `unfilled_quantity_e6`, `limited_by` (`supply` oder null), `impact_bps`.
+  `trading.maxOrderQuantity` ist nur noch eine technische Schranke. Limit-Orders unverändert.
