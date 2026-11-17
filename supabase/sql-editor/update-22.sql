@@ -2825,7 +2825,8 @@ $do$;
 -- * nexamon_slot_rarity(set, slot, u): the slot table of a set, its entry in setOdds (Yin Yang: every chance from
 --   ultra upwards x 0.9, in parts of 36 000) or else odds. Port of nexamonSlotRarity(slot, u, cfg, set).
 -- * nexamon_open_pack(): rolls slots 4 and 5 on the set's own table; in an AI pack (no owner) a tier of a rarity in
---   ai.excludedRarities (Titans Revenge's uranium) is skipped, its slots stay the base rarity (iron). Before, the
+--   ai.excludedRarities (Titans Revenge's uranium) is skipped (the next tier takes the free slots,
+--   the rest stays the base rarity, iron). Before, the
 --   AI guard trigger would have stopped the whole AI pack run.
 -- The cards (30 + 110) and the rules (packRules.titans_revenge, setOdds.yin_yang, quickSell.setRarities) come from
 -- game_config (`pnpm db:config`); nexamon_sync() mirrors the new sets and seeds the AI stock on its next run.

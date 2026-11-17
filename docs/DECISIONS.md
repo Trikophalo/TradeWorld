@@ -4050,8 +4050,8 @@ Popup, Pack Battles, Live-Öffnungen, versiegelte Packs, Demo und Datenbank.
   „ab Ultra je 10 % weniger“. Gleiche Regel in `nexamonSlotOdds(slot, cfg, set)` und `nexamon_slot_rarity(set, …)`.
 - **KI:** darf Iron und Titanium halten und anbieten (Startbestand wie Common/Ultra: 6 und 2 Kopien je Karte),
   Diamond nur aus eigenen Packs (kein Startbestand, ~1 in 50 KI-Titans-Packs, dann einmal angeboten, Bestand höchstens
-  1), Uranium nie: `ai.excludedRarities` enthält `uranium`. Würfelt ein KI-Pack die Uranium-Stufe, bleibt der Platz
-  Iron (sonst hätte der KI-Schutz-Trigger den ganzen Lauf abgebrochen). Uranium-Werte bewegen sich wie Legendaries
+  1), Uranium nie: `ai.excludedRarities` enthält `uranium`. Würfelt ein KI-Pack die Uranium-Stufe, fällt sie weg (die
+  nächste Stufe rückt nach hinten, der Rest ist Iron; sonst hätte der KI-Schutz-Trigger den ganzen Lauf abgebrochen). Uranium-Werte bewegen sich wie Legendaries
   (Angebot/Nachfrage, ohne KI-Käufe). Eigene Migration (7200/7210), die KI-Slab-Logik bleibt unberührt.
 - **Boni (ADR-171):** Titanium, Diamond und Uranium geben Boni wie Ultra, Prisma und Legendary (0,5 / 1 / 2,5 %),
   Iron keinen. Set-Faktor Titans 1,75 (teuerstes Pack), Yin Yang 1,5. Die Deckel und das Knie bleiben, also kann

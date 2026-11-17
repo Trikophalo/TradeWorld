@@ -8067,7 +8067,7 @@ KI-Startbestand an.
   `titanium`, `diamond`, `uranium`. `game_config.nexamon_rarities.rank` mit den neuen Rängen.
 - Intern (service_role): neu `nexamon_slot_rarity(p_set, p_slot, p_u)` (Tabelle des Sets, sonst `odds`). Gepatcht:
   `nexamon_open_pack()` würfelt Platz 4/5 mit der Set-Tabelle und überspringt in KI-Packs Stufen einer KI-gesperrten
-  Seltenheit (der Platz bleibt Basis); `buy_nexamon_pack()`, `open_nexamon_sealed_pack()`, `nexamon_battle_pull()`
+  Seltenheit (die nächste Stufe rückt nach, der Rest ist Basis); `buy_nexamon_pack()`, `open_nexamon_sealed_pack()`, `nexamon_battle_pull()`
   zählen die Missionen nach `nexamon_rarity_rank()` (≥ 1 Rare, ≥ 2 Ultra).
 - RPC `get_nexamon_market()`: der Filter `p_rarity` nimmt jede Seltenheit mit bekanntem Rang.
 - Kartenart `warrior` gibt es nur im Client-Katalog (Anzeige), die Datenbank kennt sie nicht.

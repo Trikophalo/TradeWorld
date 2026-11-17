@@ -125,10 +125,10 @@ select tests.assert(public.feed_item_label('nexamon_pull', '{"rarity": "uranium"
 select tests.ns_ai_open('titans_revenge') as aip \gset
 select tests.assert(
   not exists (select 1 from jsonb_array_elements(:'aip'::jsonb) x where x ->> 'rarity' = 'uranium')
-  and :'aip'::jsonb #>> '{4,rarity}' = 'iron' and :'aip'::jsonb #>> '{3,rarity}' = 'diamond'
+  and :'aip'::jsonb #>> '{4,rarity}' = 'diamond' and :'aip'::jsonb #>> '{0,rarity}' = 'iron'
   and not exists (select 1 from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
                    where k.rarity = 'uranium' and c.ai_owner is not null),
-  'an AI Titans pack never holds uranium (its slot stays iron), even when every tier hits');
+  'an AI Titans pack never holds uranium (the next tier moves up, the rest stays iron), even when every tier hits');
 select tests.throws_key(format($$select public.nexamon_mint_copy('tr-027', null, 'Karten-Kalle', 'mint', 'seed', null, now())$$),
   'nexamon_ai_excluded', 'the AI guard refuses a uranium copy for the AI');
 
