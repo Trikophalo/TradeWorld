@@ -249,6 +249,71 @@ export const NEXAMON_RULES = {
     reactionsPerMinute: 30,
     maxSessions: 12,
   },
+  /**
+   * Card bonuses (ADR-171): some cards give a small passive account bonus while the player owns a copy that is not
+   * on the market (a listed copy does not count, so selling costs the bonus). Every card of `rarities` gives one,
+   * and in every set the rares numbered `extraNumbers`. The kind follows the card's type (`typeKind`), the size its
+   * rarity (`rarityBps`) times its set (`setBps`). A slab of the card at `slab.minGrade` or better multiplies it by
+   * `slab.gradeBps`, a Black Label by `slab.blackLabelBps` (the best own copy counts, each card once).
+   * Bonuses of one kind add up to `raw`; the effective bonus is raw up to the knee (kneeShareBps of the cap), above
+   * it only `tailBps` of the rest counts, never more than `caps[kind]`.
+   */
+  bonuses: {
+    kinds: ["xp", "mission_xp", "trade_xp", "wage", "vault", "daily", "company"],
+    typeKind: {
+      fire: "company",
+      dragon: "company",
+      water: "vault",
+      grass: "daily",
+      electric: "trade_xp",
+      psychic: "mission_xp",
+      fairy: "mission_xp",
+      rock: "wage",
+      steel: "wage",
+      dark: "xp",
+    },
+    rarities: ["ultra", "prisma", "legendary"],
+    extraNumbers: [60],
+    rarityBps: { common: 25, rare: 50, ultra: 50, prisma: 100, legendary: 250 },
+    setBps: { mystic_energy: 10_000, super_apex: 12_500, prismatic_peak: 15_000 },
+    slab: { minGrade: 9, gradeBps: 15_000, blackLabelBps: 20_000 },
+    /** Hard cap per kind in bps (xp 10 %, mission and trade XP 15 %, wage 10 %, vault 15 %, daily 20 %, company 10 %). */
+    caps: { xp: 1_000, mission_xp: 1_500, trade_xp: 1_500, wage: 1_000, vault: 1_500, daily: 2_000, company: 1_000 },
+    kneeShareBps: 5_000,
+    tailBps: 5_000,
+    /**
+     * Collections. "type": every card of one type in a set; "complete": all 77 cards of a set; "master": all 77 and
+     * every prisma and legendary of the set as an own slab of grade `masterMinGrade` or better. Owned means not
+     * listed, like the cards. While a collection stays complete it adds `bps` (times the set's setBps) to the type's
+     * kind ("type"), to `kind` ("complete") or to every kind ("master"); the first completion pays `rewardPacks`
+     * pack prices of the set (from the households, as far as they have it) and `rewardXp` XP, once per player.
+     */
+    sets: {
+      type: { bps: 50, rewardPacks: 3, rewardXp: 300 },
+      complete: { kind: "xp", bps: 200, rewardPacks: 20, rewardXp: 2_500 },
+      master: { bps: 100, rewardPacks: 75, rewardXp: 10_000 },
+      masterMinGrade: 9,
+      masterRarities: ["prisma", "legendary"],
+    },
+  },
+  /**
+   * Black Label hype (ADR-171): the Black Labels of a card carry their own factor (start grading.blackLabel.valueBps).
+   * Once per hour per card with at least one Black Label, the chance
+   *   rarityChanceBps[rarity] x (10 000 + popularity) / 10 000 x blRef / (blRef + Black Labels of the card - 1)
+   * that the factor jumps by minJumpBps..maxJumpBps of itself (uniform), at most capBps. Every hour the factor loses
+   * decayBps of what it lies above the base (half-life about 69 hours). A jump of bigJumpBps or more is news.
+   */
+  blackLabelHype: {
+    rarityChanceBps: { common: 5, rare: 10, ultra: 25, prisma: 60, legendary: 120 },
+    blRef: 3,
+    minJumpBps: 1_000,
+    maxJumpBps: 6_000,
+    capBps: 250_000,
+    decayBps: 100,
+    bigJumpBps: 4_000,
+    /** Points of the hype history on a card's page. */
+    historyPoints: 30,
+  },
 } as const;
 
 export type NexamonRules = typeof NEXAMON_RULES;

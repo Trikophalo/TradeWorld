@@ -15,7 +15,7 @@ import { formatMoney } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { formatCardNumber } from "../lib";
-import { useNexamonAction } from "../hooks";
+import { useNexamonAction, useNexamonBonuses } from "../hooks";
 import { dealBps, dealTone, formatChance } from "../view";
 import { RarityBadge, SetIcon } from "./badges";
 import { CopyQuality, CopyVisual, FactRow } from "./parts";
@@ -74,6 +74,10 @@ export function ListingRow({
 }) {
   const t = useTranslations("nexamon");
   const card = nexamonCard(listing.cardKey);
+  // ADR-171: a card that gives a bonus the player does not have yet
+  const bonuses = useNexamonBonuses();
+  const bonusMissing =
+    !listing.mine && bonuses.data?.cards.some((c) => c.cardKey === listing.cardKey && !c.active) === true;
   if (!card) return null;
   return (
     <li
@@ -107,6 +111,11 @@ export function ListingRow({
           <CopyQuality copy={listing} short={!compact} />
           {!compact && <RarityBadge rarity={listing.rarity} short />}
           <span className="nums text-xs text-fg-3">{t("serial", { serial: listing.serial })}</span>
+          {bonusMissing && (
+            <Badge tone="gain" data-testid="listing-bonus-missing">
+              {t("bonuses.missingTag")}
+            </Badge>
+          )}
         </p>
         {!compact && (
           <p className="flex items-center gap-1.5 text-xs text-fg-3">

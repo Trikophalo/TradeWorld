@@ -22,6 +22,7 @@ export const NEXAMON_KEYS = {
   card: (key: string) => ["nexamon", "card", key] as const,
   market: (query: NexamonMarketQuery) => ["nexamon", "market", query] as const,
   player: (nickname: string | null, limit: number | null) => ["nexamon", "player", nickname ?? "", limit] as const,
+  bonuses: ["nexamon", "bonuses"] as const,
 };
 
 /** Sets, pack prices and the own collection in numbers. Works while the area is still locked. */
@@ -68,6 +69,16 @@ export function usePlayerNexamon(nickname: string | null, limit: number | null =
     queryFn: () => engine.playerNexamon(nickname, limit),
     enabled,
     staleTime: REFRESH_MS,
+  });
+}
+
+/** The own card bonuses, their totals against the caps and the collections (ADR-171). */
+export function useNexamonBonuses(enabled = true) {
+  return useQuery({
+    queryKey: NEXAMON_KEYS.bonuses,
+    queryFn: () => engine.nexamonBonuses(),
+    enabled,
+    refetchInterval: REFRESH_MS,
   });
 }
 

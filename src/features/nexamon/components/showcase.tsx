@@ -17,6 +17,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { NexamonListing } from "@/features/game/nexamon-types";
 import { NEXAMON_CONDITIONS } from "../lib";
 import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
+import { BonusTag } from "./bonuses";
 import { ProfileNexamon } from "./profile-collection";
 import { NexamonCard } from "./card";
 import { CardThumb, NexamonCardBack, NexamonCardFace } from "./card-face";
@@ -111,6 +112,14 @@ export function NexamonShowcase() {
               <RarityBadge rarity={card.rarity} short />
             </div>
           ))}
+        </div>
+      </Block>
+
+      <Block label="Karten-Boni (ADR-171): aktiv, mit Slab-Boost, nicht aktiv" testId="nexamon-bonus-tags">
+        <div className="flex flex-wrap items-center gap-4">
+          <BonusTag bonus={{ kind: "vault", bps: 100, boostedBps: 100, active: true }} />
+          <BonusTag bonus={{ kind: "xp", bps: 250, boostedBps: 500, active: true }} />
+          <BonusTag bonus={{ kind: "company", bps: 50, boostedBps: 50, active: false }} />
         </div>
       </Block>
 

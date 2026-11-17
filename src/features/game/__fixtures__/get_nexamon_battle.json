@@ -1,143 +1,143 @@
 {
   "battle": {
-    "id": "12484b2a-b8c0-4065-9da8-8951be04857d",
+    "id": "913c51ed-a6c7-4b15-a3a1-3902dcce19fc",
     "me": "challenger",
     "set": "mystic_energy",
     "status": "done",
     "winner": "opponent",
-    "ends_at": "2026-11-17T00:20:24.279863+00:00",
-    "live_id": "68335559-3ca8-4127-8965-4f800d300cba",
+    "ends_at": "2026-11-17T00:03:56.339355+00:00",
+    "live_id": "9ebe79eb-dcd4-4b09-87e5-d06da68aa845",
     "slot_ms": 1800,
     "tear_ms": 2400,
     "viewers": 0,
     "opponent": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] },
-    "coin_seed": 1629709073,
-    "decide_at": "2026-11-17T00:20:16.279863+00:00",
+    "coin_seed": 1346599927,
+    "decide_at": "2026-11-17T00:03:48.339355+00:00",
     "reactions": [],
-    "starts_at": "2026-11-17T00:20:04.879863+00:00",
+    "starts_at": "2026-11-17T00:03:36.939355+00:00",
     "tie_break": "value",
     "challenger": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
-    "created_at": "2026-11-17T00:20:31.876601+00:00",
-    "expires_at": "2026-11-17T00:21:31.876601+00:00",
-    "accepted_at": "2026-11-17T00:20:01.879863+00:00",
+    "created_at": "2026-11-17T00:04:03.933992+00:00",
+    "expires_at": "2026-11-17T00:05:03.933992+00:00",
+    "accepted_at": "2026-11-17T00:03:33.939355+00:00",
     "price_cents": 20000,
-    "server_time": "2026-11-17T00:20:31.898963+00:00",
+    "server_time": "2026-11-17T00:04:03.956401+00:00",
     "abort_reason": null,
     "opponent_cards": [
       {
         "slot": 1,
         "is_new": true,
         "rarity": "common",
-        "serial": 9,
-        "copy_id": "4852e324-46c9-4010-a6fd-9fbe7999b6d7",
-        "card_key": "me-037",
-        "condition": "mint",
-        "population": 9,
-        "value_cents": 520
+        "serial": 8,
+        "copy_id": "f1ba85eb-47a8-4782-9e81-ffe148b56176",
+        "card_key": "me-040",
+        "condition": "good",
+        "population": 8,
+        "value_cents": 279
       },
       {
         "slot": 2,
         "is_new": true,
         "rarity": "common",
-        "serial": 8,
-        "copy_id": "4adce446-7d05-43b6-af10-eaceb638b733",
-        "card_key": "me-011",
-        "condition": "near_mint",
-        "population": 8,
-        "value_cents": 3000
+        "serial": 9,
+        "copy_id": "5aa82e8f-a8c3-4a40-ab88-a82e495bb31d",
+        "card_key": "me-028",
+        "condition": "mint",
+        "population": 9,
+        "value_cents": 700
       },
       {
         "slot": 3,
         "is_new": true,
         "rarity": "common",
-        "serial": 7,
-        "copy_id": "921519c8-0ef3-4e49-8b84-a41ada1b118e",
-        "card_key": "me-010",
-        "condition": "near_mint",
-        "population": 7,
-        "value_cents": 19000
+        "serial": 8,
+        "copy_id": "281d1034-477c-4d3e-8d2e-548baa2e32aa",
+        "card_key": "me-047",
+        "condition": "mint",
+        "population": 8,
+        "value_cents": 560
       },
       {
         "slot": 4,
         "is_new": true,
         "rarity": "common",
-        "serial": 8,
-        "copy_id": "decc04ca-9325-4ce8-9dac-1496ff622ffb",
-        "card_key": "me-045",
+        "serial": 9,
+        "copy_id": "bcd19fba-e631-4229-964b-ddaa8d618879",
+        "card_key": "me-034",
         "condition": "near_mint",
-        "population": 8,
-        "value_cents": 620
+        "population": 9,
+        "value_cents": 210
       },
       {
         "slot": 5,
         "is_new": true,
-        "rarity": "common",
-        "serial": 8,
-        "copy_id": "8c782be1-5b60-44d1-84af-20c371fe0daa",
-        "card_key": "me-021",
-        "condition": "poor",
-        "population": 8,
-        "value_cents": 119
+        "rarity": "ultra",
+        "serial": 6,
+        "copy_id": "bb137e85-aeef-4c94-bacf-ce0553a3735b",
+        "card_key": "me-062",
+        "condition": "near_mint",
+        "population": 6,
+        "value_cents": 128442
       }
     ],
-    "opponent_cents": 23259,
+    "opponent_cents": 130191,
     "challenger_cards": [
       {
         "slot": 1,
         "is_new": true,
         "rarity": "common",
-        "serial": 8,
-        "copy_id": "8b485b9b-f4f5-495d-9563-31891cd0917e",
-        "card_key": "me-048",
-        "condition": "poor",
-        "population": 8,
-        "value_cents": 77
+        "serial": 9,
+        "copy_id": "e7dff983-fd76-4de1-8dad-ec60ce969576",
+        "card_key": "me-026",
+        "condition": "near_mint",
+        "population": 9,
+        "value_cents": 250
       },
       {
         "slot": 2,
         "is_new": true,
         "rarity": "common",
         "serial": 7,
-        "copy_id": "afe5e6af-6925-4909-a01f-a02fb6e4b26a",
-        "card_key": "me-047",
-        "condition": "mint",
+        "copy_id": "31408a7a-bd43-4e3a-9a56-7daf15aa01e6",
+        "card_key": "me-040",
+        "condition": "near_mint",
         "population": 7,
-        "value_cents": 560
+        "value_cents": 310
       },
       {
         "slot": 3,
         "is_new": true,
         "rarity": "common",
-        "serial": 8,
-        "copy_id": "de461f9d-506f-4b51-817d-f26a6f082b04",
-        "card_key": "me-026",
-        "condition": "near_mint",
-        "population": 8,
-        "value_cents": 250
+        "serial": 7,
+        "copy_id": "c2b14378-8e6c-48e8-8c86-e514039201c8",
+        "card_key": "me-050",
+        "condition": "good",
+        "population": 7,
+        "value_cents": 576
       },
       {
         "slot": 4,
         "is_new": true,
         "rarity": "common",
         "serial": 7,
-        "copy_id": "41a3a27d-30cc-4ad7-b52c-ebbbb2acc4bd",
-        "card_key": "me-023",
+        "copy_id": "a48875f9-96e5-4cee-bbdf-b66a767b9967",
+        "card_key": "me-007",
         "condition": "near_mint",
         "population": 7,
-        "value_cents": 330
+        "value_cents": 180
       },
       {
         "slot": 5,
         "is_new": true,
         "rarity": "common",
         "serial": 8,
-        "copy_id": "a9694718-0e87-455e-8627-cb0bb12c1ae0",
-        "card_key": "me-007",
+        "copy_id": "a82dc4aa-d65f-42f4-ab57-bc47f8c56b30",
+        "card_key": "me-028",
         "condition": "near_mint",
         "population": 8,
-        "value_cents": 180
+        "value_cents": 700
       }
     ],
-    "challenger_cents": 1397
+    "challenger_cents": 2016
   }
 }

@@ -7,7 +7,8 @@
  *
  * The Nexamon catalogue (ADR-165) gets its own row "nexamon_cards": key, set, number, rarity and start price of
  * every card from src/config/nexamon (artwork and texts stay in the client). The card names get the row
- * "nexamon_names" (key -> name): the news show names cards in its stories (ADR-169).
+ * "nexamon_names" (key -> name): the news show names cards in its stories (ADR-169). The card types get the row
+ * "nexamon_types" (key -> type) for the card bonuses (ADR-171).
  *
  * Run with `pnpm db:config` after every change to balance.ts or to the Nexamon catalogue.
  */
@@ -35,6 +36,11 @@ const nexamonCards = NEXAMON_CARDS.map(({ key, set, number, rarity, startPriceCe
 }));
 rows.push(
   `  ('nexamon_cards', ${quote(JSON.stringify(nexamonCards))}::jsonb, 'Nexamon catalogue from src/config/nexamon (ADR-165)')`,
+);
+// ADR-171: the card types (key -> type) for the card bonuses and the type collections
+const nexamonTypes = Object.fromEntries(NEXAMON_CARDS.map(({ key, type }) => [key, type]));
+rows.push(
+  `  ('nexamon_types', ${quote(JSON.stringify(nexamonTypes))}::jsonb, 'Nexamon card types for the card bonuses (ADR-171)')`,
 );
 const nexamonNames = Object.fromEntries(NEXAMON_CARDS.map(({ key, name }) => [key, name]));
 rows.push(

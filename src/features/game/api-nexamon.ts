@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { NEXAMON_CONDITIONS, NEXAMON_RULES } from "@/config/nexamon-rules";
 import { NEXAMON_RARITIES, NEXAMON_SETS } from "@/config/nexamon/types";
-import type { NexamonCardStats, NexamonCopy, NexamonEngine, NexamonListing, NexamonMarketQuery } from "./nexamon-types";
+import type {
+  NexamonBonusKind,
+  NexamonCardStats,
+  NexamonCopy,
+  NexamonEngine,
+  NexamonListing,
+  NexamonMarketQuery,
+} from "./nexamon-types";
 import { rpc } from "./rpc";
 
 /*
@@ -32,6 +39,15 @@ const copySchema = z.object({
   acquired_at: iso,
 });
 
+const bonusKind = z.enum(NEXAMON_RULES.bonuses.kinds as unknown as [NexamonBonusKind, ...NexamonBonusKind[]]);
+const cardBonusSchema = z.object({
+  kind: bonusKind,
+  bps: num,
+  boosted_bps: num,
+  active: z.boolean(),
+  best_grade: num.nullable(),
+});
+
 const cardSchema = z.object({
   card_key: z.string(),
   set: setKey,
@@ -46,6 +62,10 @@ const cardSchema = z.object({
   popularity_bps: num,
   floor_cents: num,
   cap_cents: num,
+  // ADR-171: only sent by a database with the card bonuses and the Black Label hype
+  bonus: cardBonusSchema.nullable().default(null),
+  black_label_bps: num.default(NEXAMON_RULES.grading.blackLabel.valueBps),
+  hype_at: iso.nullable().default(null),
 });
 
 const listingSchema = z.object({
@@ -124,6 +144,7 @@ const cardDetailsSchema = z.object({
   history: z.array(z.object({ at: iso, value_cents: num })),
   graded: z.array(num).length(NEXAMON_RULES.grading.grades.length),
   black_labels: num.default(0),
+  hype: z.array(z.object({ at: iso, factor_bps: num, jump_bps: num })).default([]),
   listings: z.array(listingSchema),
   copies: z.array(copySchema),
   sales: z.array(
@@ -153,7 +174,15 @@ const playerSchema = z.object({
   nickname: z.string(),
   is_me: z.boolean(),
   unlocked: z.boolean(),
-  summary: z.object({ copies: num, distinct: num, total: num, value_cents: num, graded: num, tens: num }),
+  summary: z.object({
+    copies: num,
+    distinct: num,
+    total: num,
+    value_cents: num,
+    graded: num,
+    tens: num,
+    black_labels: num.default(0),
+  }),
   sets: z.array(z.object({ key: setKey, cards: num, distinct: num, copies: num })),
   cards: z.array(
     z.object({
@@ -167,6 +196,46 @@ const playerSchema = z.object({
       grade,
       value_cents: num,
       total_cents: num,
+    }),
+  ),
+  slabs: z
+    .array(
+      z.object({
+        card_key: z.string(),
+        set: setKey,
+        number: num,
+        rarity,
+        serial: num,
+        condition,
+        grade: num,
+        value_cents: num,
+      }),
+    )
+    .default([]),
+  badges: z
+    .array(
+      z.object({ set: setKey, kind: z.enum(["type", "complete", "master"]), type: z.string().nullable(), at: iso }),
+    )
+    .default([]),
+  server_time: iso,
+});
+
+const bonusesSchema = z.object({
+  totals: z.array(z.object({ kind: bonusKind, raw_bps: num, effective_bps: num, cap_bps: num })),
+  cards: z.array(cardBonusSchema.extend({ card_key: z.string() })),
+  collections: z.array(
+    z.object({
+      id: z.string(),
+      set: setKey,
+      kind: z.enum(["type", "complete", "master"]),
+      type: z.string().nullable(),
+      have: num,
+      need: num,
+      complete: z.boolean(),
+      missing: z.array(z.string()),
+      bonus_kind: bonusKind.nullable(),
+      bonus_bps: num,
+      completed_at: iso.nullable(),
     }),
   ),
   server_time: iso,
@@ -202,6 +271,7 @@ export const NEXAMON_RPC_SCHEMAS = {
   sell_nexamon_to_ai: quickSoldSchema,
   grade_nexamon_card: gradingSchema,
   crack_nexamon_slab: crackedSchema,
+  get_nexamon_bonuses: bonusesSchema,
 } as const;
 
 const toCopy = (c: z.infer<typeof copySchema>): NexamonCopy => ({
@@ -232,7 +302,14 @@ const toCard = (c: z.infer<typeof cardSchema>): NexamonCardStats => ({
   popularityBps: c.popularity_bps,
   floorCents: c.floor_cents,
   capCents: c.cap_cents,
+  bonus: c.bonus ? toBonus(c.bonus) : null,
+  blackLabelBps: c.black_label_bps,
+  hypeAt: c.hype_at,
 });
+
+function toBonus(b: z.infer<typeof cardBonusSchema>) {
+  return { kind: b.kind, bps: b.bps, boostedBps: b.boosted_bps, active: b.active, bestGrade: b.best_grade };
+}
 
 const toListing = (l: z.infer<typeof listingSchema>): NexamonListing => ({
   id: l.id,
@@ -315,6 +392,7 @@ export const liveNexamonEngine: NexamonEngine = {
       history: r.history.map((h) => ({ at: h.at, valueCents: h.value_cents })),
       graded: r.graded,
       blackLabels: r.black_labels,
+      hype: r.hype.map((h) => ({ at: h.at, factorBps: h.factor_bps, jumpBps: h.jump_bps })),
       listings: r.listings.map(toListing),
       copies: r.copies.map(toCopy),
       sales: r.sales.map((s) => ({
@@ -367,6 +445,7 @@ export const liveNexamonEngine: NexamonEngine = {
         valueCents: r.summary.value_cents,
         graded: r.summary.graded,
         tens: r.summary.tens,
+        blackLabels: r.summary.black_labels,
       },
       sets: r.sets,
       cards: r.cards.map((c) => ({
@@ -381,6 +460,17 @@ export const liveNexamonEngine: NexamonEngine = {
         valueCents: c.value_cents,
         totalCents: c.total_cents,
       })),
+      slabs: r.slabs.map((c) => ({
+        cardKey: c.card_key,
+        set: c.set,
+        number: c.number,
+        rarity: c.rarity,
+        serial: c.serial,
+        condition: c.condition,
+        grade: c.grade,
+        valueCents: c.value_cents,
+      })),
+      badges: r.badges,
       serverTime: r.server_time,
     };
   },
@@ -425,5 +515,31 @@ export const liveNexamonEngine: NexamonEngine = {
   async crackNexamonSlab(requestId, copyId) {
     const r = await rpc("crack_nexamon_slab", { p_request_id: requestId, p_copy_id: copyId }, crackedSchema);
     return { copy: toCopy(r.copy), oldGrade: r.old_grade };
+  },
+  async nexamonBonuses() {
+    const r = await rpc("get_nexamon_bonuses", {}, bonusesSchema);
+    return {
+      totals: r.totals.map((t) => ({
+        kind: t.kind,
+        rawBps: t.raw_bps,
+        effectiveBps: t.effective_bps,
+        capBps: t.cap_bps,
+      })),
+      cards: r.cards.map((c) => ({ cardKey: c.card_key, ...toBonus(c) })),
+      collections: r.collections.map((c) => ({
+        id: c.id,
+        set: c.set,
+        kind: c.kind,
+        type: c.type,
+        have: c.have,
+        need: c.need,
+        complete: c.complete,
+        missing: c.missing,
+        bonusKind: c.bonus_kind,
+        bonusBps: c.bonus_bps,
+        completedAt: c.completed_at,
+      })),
+      serverTime: r.server_time,
+    };
   },
 };

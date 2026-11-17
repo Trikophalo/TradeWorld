@@ -3571,3 +3571,86 @@ Bessere bekommt alles, und man kann anderen beim Öffnen live zuschauen.
 
 **Offen:** Die gewonnenen Kopien liegen schon während der Enthüllung in der Sammlung des Gewinners; wer dort
 nachsieht, kennt das Ergebnis ein paar Sekunden früher.
+
+## ADR-171: Karten-Boni, Sammlungen, „Nur gegradete“ und Black-Label-Hype bei Nexamon — `Annahme`
+
+Vorgaben: „Füg noch hinzu, dass bestimmte Karten bestimmte Account-Boni bringen, das macht es attraktiv, aktiv auf dem
+Markt Karten zu kaufen, oder wenn man ein Master-Set hat, kriegt man mehr XP oder mehr Geld oder whatever.“, „Ich will,
+dass man in seiner eigenen Sammlung auch nur die gegradeten Karten anzeigen lassen kann … auch bei Freunden.“ und
+„Karten mit einem Black Label haben die Chance, random richtig im Preis zu steigen. Das ganze hängt mit der Beliebtheit
+und Seltenheit der Karte zusammen.“
+
+**Welche Karten:** jede Ultra Rare, Prisma und Legendary und in jedem Set die Rare Nr. 60, zusammen 54 von 231 Karten
+(`nexamon.bonuses.rarities`, `extraNumbers`). Die Art folgt dem Kartentyp, damit sich gezieltes Jagen lohnt:
+
+| Typ            | Bonus-Art      | wirkt in                                              |
+| -------------- | -------------- | ----------------------------------------------------- |
+| Feuer, Drache  | Auftragserlöse | `task_pay` der eigenen Firma (company_task_resolve)   |
+| Wasser         | Tresorzinsen   | `vault_interest` (claim_vault, aus der Staatskasse)   |
+| Pflanze        | Tagesbonus     | `daily_bonus` (claim_daily_reward)                    |
+| Elektro        | Handels-XP     | XP-Quelle `trade`                                     |
+| Psycho, Fee    | Missions-XP    | XP-Quelle `mission`                                   |
+| Gestein, Stahl | Gehalt         | `wage_bonus` (accrue_job_salary, aus der Staatskasse) |
+| Unlicht        | XP             | jede XP-Quelle                                        |
+
+Die Boni hängen sich an die Stellen, an denen die Verbesserungen (ADR-134) schon wirken: `player_upgrade_bps()` und
+`player_xp_bonus_bps()` zählen den Karten-Bonus der passenden Art dazu. Kein neuer Geldweg, keine doppelte Logik.
+
+**Größe:** Rare 0,5 %, Ultra 0,5 %, Prisma 1 %, Legendary 2,5 %, mal Set (Mystic Energy ×1, Super Apex ×1,25,
+Prismatic Peak ×1,5). Die beste eigene, nicht angebotene Kopie zählt: Slab ab Note 9 ×1,5, Black Label ×2. Jede Karte
+zählt einmal, Duplikate bringen nichts.
+
+**Angebotene Kopien zählen nicht.** Wer verkauft, verliert den Bonus schon beim Einstellen; Karten bei ASP zählen
+weiter (sie gehören dem Spieler). So kostet Verkaufen etwas, und Kaufen von anderen lohnt sich.
+
+**Stapeln mit Deckel:** Pro Art wird alles addiert (roh). Bis zur halben Grenze zählt es voll, darüber nur die
+Hälfte, nie mehr als die Grenze: XP 10 %, Missions-XP 15 %, Handels-XP 15 %, Gehalt 10 %, Tresorzinsen 15 %,
+Tagesbonus 20 %, Auftragserlöse 10 % (`bonuses.caps`, `kneeShareBps` 50 %, `tailBps` 50 %). Alle 231 Karten als Black
+Label ergeben zum Beispiel Auftragserlöse roh 47 %, wirksam 10 %.
+
+**Sammlungen** je Set, „besitzen“ heißt wie oben nicht angeboten:
+
+| Sammlung     | Bedingung                                                        | Dauerbonus solange komplett       | einmalig beim ersten Mal     |
+| ------------ | ---------------------------------------------------------------- | --------------------------------- | ---------------------------- |
+| Typ-Sammlung | alle Karten eines Typs im Set (3 bis 15 Karten)                  | +0,5 % × Set auf die Art des Typs | 3 Booster-Preise, 300 XP     |
+| Set komplett | alle 77 Karten                                                   | +2 % × Set auf XP                 | 20 Booster-Preise, 2.500 XP  |
+| Master-Set   | alle 77 und jede Prisma und Legendary als eigener Slab ab Note 9 | +1 % × Set auf jede Art           | 75 Booster-Preise, 10.000 XP |
+
+Das Master-Set ist schwer, aber erreichbar: sieben Top-Karten graden lassen, ohne Black Label oder 10 zu verlangen.
+Das Geld kommt aus den Haushalten (Ledger-Art `nexamon_set_reward`, so weit sie es haben), die XP über `grant_xp`
+(Quelle `nexamon_set`). Die Belohnung gibt es pro Spieler und Sammlung genau einmal
+(`nexamon_collection_completions`); wer die Sammlung verliert und wieder vervollständigt, bekommt nur den Dauerbonus
+zurück. Die abgeschlossenen Sammlungen stehen als Abzeichen auf dem Profil. Ein Master-Set ist ein Feed-Eintrag und
+Klatsch für die NEXA Nachrichten.
+
+**Berechnung:** `nexamon_bonus_recompute(player)` schreibt einen Cache (`nexamon_player_bonuses`), aus dem die
+Geld- und XP-Wege lesen. Aufgerufen wird es von verzögerten Constraint-Triggern auf `nexamon_copies` (Besitzer, Note,
+Karte) und `nexamon_listings` beim Commit, einmal je Spieler und Transaktion. So deckt es jede Kartenbewegung ab:
+Booster, Kauf, Verkauf, Einstellen, Zurücknehmen, Grading, Knacken, KI-Käufe, Konto-Reset und künftige Wege (Pack
+Battles). Ein Kauf zeigt dadurch nur den Endzustand, keine „aktiv/weg“-Benachrichtigung dazwischen. Benachrichtigungen
+`nexamon_bonus` (Bonus aktiv/weg) und `nexamon_set` (Sammlung komplett), Missionen „Dein erster Karten-Bonus“, „Erste
+Typ-Sammlung“, „Ein Set komplett“.
+
+**Oberfläche:** Neuer Tab „Boni“ mit den Summen gegen die Grenzen, den aktiven Karten und dem Fortschritt jeder
+Sammlung samt fehlender Karten (Links in den Markt, gefiltert auf die Karte). Kartenseite und Booster-Liste zeigen den
+Bonus einer Karte, der Markt markiert Angebote „Bonus fehlt dir noch“.
+
+**„Nur gegradete“:** Schalter in der eigenen Sammlung (gemerkt mit den anderen Filtern in `nexa-nexamon-filters`)
+und als dritte Ansicht in der Sammlung anderer Spieler. Gezeigt werden die Slabs nach Note, dann Wert, mit Anzahl,
+Zehnen und Black Labels. `get_player_nexamon` liefert dafür `slabs` (alle Slabs, höchstens 500) und
+`summary.black_labels`.
+
+**Black-Label-Hype:** Die Black Labels einer Karte haben einen eigenen Faktor (Start ×10 wie bisher). Jede Stunde, je
+Karte mit mindestens einem Black Label: erst verliert der Faktor 1 % dessen, was er über ×10 liegt (Halbwertszeit
+rund 69 Stunden), dann springt er mit der Chance
+`rarityChanceBps × (1 + Beliebtheit) × 3 / (3 + Black Labels − 1)` um 10 bis 60 % (gleichverteilt), höchstens auf ×25.
+Grundchance je Stunde: Common 0,05 %, Rare 0,1 %, Ultra 0,25 %, Prisma 0,6 %, Legendary 1,2 %; eine beliebte
+Legendary mit nur einem Black Label springt also mit bis zu 2,4 % je Stunde, etwa alle zwei Tage. Der Zufall wird
+übergeben (`nexamonHypeStep(factor, chance, u, u2)`), der Job `nexamon_hype_run_due` läuft stündlich (pg_cron
+`nexa-nexamon-hype`). Kopienwert, KI-Preise und -Käufe, Angebots-Hinweise, Sammlungs- und Profilwert rechnen mit dem
+Faktor der Karte (alle Funktionen, die eine Kopie bewerten, rufen die Form mit Karte auf). Die Kartenseite zeigt den
+Faktor, eine „Hype“-Marke nach einem Sprung und den Verlauf. Der Besitzer bekommt eine Benachrichtigung
+(`nexamon_hype`), ab +40 % ist der Sprung ein Feed-Eintrag und Klatsch.
+
+**Demo:** dieselben Regeln aus `src/lib/sim/nexamon-bonuses.ts`; Karten-XP und Tresorzinsen der Demo zählen den
+Bonus mit, Belohnungen gehen an das Demo-Konto.

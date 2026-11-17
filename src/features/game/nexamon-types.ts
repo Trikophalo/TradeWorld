@@ -50,6 +50,53 @@ export interface NexamonCardStats {
   /** Bounds of the value right now. */
   floorCents: number;
   capCents: number;
+  /** The account bonus this card gives (ADR-171), null for most cards. */
+  bonus: NexamonCardBonus | null;
+  /** Value factor of this card's Black Labels in bps (ADR-171 hype; base grading.blackLabel.valueBps). */
+  blackLabelBps: number;
+  /** Last hype jump while the factor is above the base, else null. */
+  hypeAt: string | null;
+}
+
+/** Account bonus kinds of the card bonuses (ADR-171). */
+export type NexamonBonusKind = "xp" | "mission_xp" | "trade_xp" | "wage" | "vault" | "daily" | "company";
+export type NexamonCollectionKind = "type" | "complete" | "master";
+
+export interface NexamonCardBonus {
+  kind: NexamonBonusKind;
+  /** Bonus of a raw copy. */
+  bps: number;
+  /** With the best own unlisted copy (slab 9+ x1.5, Black Label x2). */
+  boostedBps: number;
+  /** The viewer owns an unlisted copy. */
+  active: boolean;
+  bestGrade: number | null;
+}
+
+export interface NexamonCollectionProgress {
+  id: string;
+  set: NexamonSetKey;
+  kind: NexamonCollectionKind;
+  /** The type of a type collection. */
+  type: string | null;
+  have: number;
+  need: number;
+  complete: boolean;
+  /** Cards still missing (master: also prismas and legendaries without a slab of 9+). */
+  missing: string[];
+  /** null = every kind (master set). */
+  bonusKind: NexamonBonusKind | null;
+  bonusBps: number;
+  /** First completion (reward paid), null = never. */
+  completedAt: string | null;
+}
+
+export interface NexamonBonuses {
+  totals: { kind: NexamonBonusKind; rawBps: number; effectiveBps: number; capBps: number }[];
+  /** Every card that gives a bonus. */
+  cards: (NexamonCardBonus & { cardKey: string })[];
+  collections: NexamonCollectionProgress[];
+  serverTime: string;
 }
 
 export interface NexamonListing {
@@ -155,6 +202,8 @@ export interface NexamonCardDetails {
   graded: number[];
   /** Copies with the Black Label. */
   blackLabels: number;
+  /** Black Label factor history (ADR-171 hype), oldest first; jumpBps > 0 for a jump. */
+  hype: { at: string; factorBps: number; jumpBps: number }[];
   /** The cheapest listings of this card. */
   listings: NexamonListing[];
   /** The own copies of this card. */
@@ -241,6 +290,18 @@ export interface PlayerNexamonCard {
   totalCents: number;
 }
 
+/** One slab of a player, for the "Nur gegradete" view (ADR-171). */
+export interface PlayerNexamonSlab {
+  cardKey: string;
+  set: NexamonSetKey;
+  number: number;
+  rarity: NexamonRarity;
+  serial: number;
+  condition: NexamonCondition;
+  grade: number;
+  valueCents: number;
+}
+
 /** A player's collection for their profile (ADR-165). Listings and gradings in progress stay private. */
 export interface PlayerNexamon {
   nickname: string;
@@ -256,10 +317,15 @@ export interface PlayerNexamon {
     /** Slabs, and how many of them carry a 10. */
     graded: number;
     tens: number;
+    blackLabels: number;
   };
   sets: { key: NexamonSetKey; cards: number; distinct: number; copies: number }[];
   /** One entry per owned card, most valuable first; capped by the limit asked for. */
   cards: PlayerNexamonCard[];
+  /** Every slab (ADR-171 "Nur gegradete"), by grade, then value. */
+  slabs: PlayerNexamonSlab[];
+  /** Completed collections (ADR-171), first completion first. */
+  badges: { set: NexamonSetKey; kind: NexamonCollectionKind; type: string | null; at: string }[];
   serverTime: string;
 }
 
@@ -288,4 +354,6 @@ export interface NexamonEngine {
   gradeNexamonCard(requestId: string, copyId: string): Promise<NexamonGradeResult>;
   /** Cracks a slab: the raw card with its condition comes back, no refund. */
   crackNexamonSlab(requestId: string, copyId: string): Promise<NexamonCrackResult>;
+  /** The own card bonuses, their totals against the caps and the collections (ADR-171). */
+  nexamonBonuses(): Promise<NexamonBonuses>;
 }

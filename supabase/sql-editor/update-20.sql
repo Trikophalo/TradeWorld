@@ -1997,6 +1997,1152 @@ $t$ || v_a);
 end;
 $do$;
 
+-- ===== supabase/updates/20261204006200_nexamon_bonus_enum.sql =====
+-- ===== idempotent copy of migrations/20261204006200_nexamon_bonus_enum.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6200 · Enum values for the Nexamon card bonuses (ADR-171)
+-- =============================================================================
+-- A new enum value cannot be used in the transaction that adds it (SQLSTATE 55P04), so the values get their own file
+-- before 20261204006210_nexamon_card_bonuses.sql, which uses them only inside PL/pgSQL bodies.
+--   ledger_tx_kind 'nexamon_set_reward'  households -> player cash (first completion of a Nexamon collection)
+--   xp_source      'nexamon_set'         XP of the first completion of a Nexamon collection
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+alter type public.ledger_tx_kind add value if not exists 'nexamon_set_reward';
+alter type public.xp_source add value if not exists 'nexamon_set';
+
+-- ===== supabase/updates/20261204006210_nexamon_card_bonuses.sql =====
+-- ===== idempotent copy of migrations/20261204006210_nexamon_card_bonuses.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6210 · Nexamon: card bonuses and collections (ADR-171)
+-- =============================================================================
+-- Rule (game_config.nexamon.bonuses; src/config/nexamon-rules.ts; port of src/lib/sim/nexamon-bonuses.ts):
+--   * a card of bonuses.rarities (ultra, prisma, legendary), or a rare numbered bonuses.extraNumbers, gives
+--     rarityBps[rarity] x setBps[set] / 10 000 bps of the kind typeKind[type] (the card type comes from
+--     game_config.nexamon_types) while the player owns a copy that is NOT listed; the best such copy boosts it
+--     (slab of slab.minGrade or better x gradeBps, Black Label x blackLabelBps)
+--   * collections per set: "type" (every card of a type), "complete" (all 77), "master" (all 77 and every prisma and
+--     legendary as an own unlisted slab of grade masterMinGrade or better); while complete they add sets.<kind>.bps x
+--     setBps (type: to the type's kind, complete: to sets.complete.kind, master: to every kind)
+--   * per kind: raw = sum; effective = raw up to the knee (kneeShareBps of the cap), above it tailBps of the rest,
+--     at most caps[kind]
+--   * the first completion of a collection pays rewardPacks pack prices of the set from the households (as far as
+--     they have it; ledger kind nexamon_set_reward) and rewardXp XP (source nexamon_set), once per player
+-- Model:
+--   nexamon_player_bonuses           cache per player: effective and raw bps per kind, the active sources, the
+--                                    collections; written only by nexamon_bonus_recompute()
+--   nexamon_collection_completions   first completion of a collection per player (the reward is paid once)
+--   nexamon_bonus_recompute(player)  THE entry point: recomputes the cache, notifies (nexamon_bonus) when bonuses
+--                                    come or go, rewards first completions (notification nexamon_set, mission events
+--                                    nexamon_bonus_card, nexamon_type_collection, nexamon_set_complete,
+--                                    nexamon_master_set, feed kind nexamon_master_set). Every code path that moves a
+--                                    copy calls it through the deferred triggers below (pack, buy, sell, list,
+--                                    unlist, grading, crack, AI buys, wipes); other features that move copies (pack
+--                                    battles) get it for free, or may call it directly.
+--   triggers nexamon_copies_bonus / nexamon_listings_bonus: deferred constraint triggers, run at commit once per
+--                                    player and transaction, so a sale shows the final state only
+-- Applied where the upgrades already apply (ADR-134), as one more source:
+--   player_upgrade_bps(): wage_bonus + wage, vault_interest + vault, daily_bonus + daily, task_pay + company
+--                         (accrue_job_salary, claim_vault, claim_daily_reward, company_task_resolve)
+--   player_xp_bonus_bps(): + xp for every source, + mission_xp for 'mission', + trade_xp for 'trade' (grant_xp)
+-- RPC get_nexamon_bonuses(); nexamon_card_json() gets `bonus` {kind, bps, boosted_bps, active} (null: no bonus).
+-- Mission templates m_nexamon_first_bonus, m_nexamon_first_type_set, m_nexamon_first_full_set.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Tables (internal)
+-- ---------------------------------------------------------------------------
+create table if not exists public.nexamon_player_bonuses (
+  player_id   uuid primary key references public.profiles (id) on delete cascade,
+  effective   jsonb not null default '{}'::jsonb,
+  raw         jsonb not null default '{}'::jsonb,
+  sources     jsonb not null default '[]'::jsonb,
+  collections jsonb not null default '[]'::jsonb,
+  computed_at timestamptz not null default now()
+);
+alter table public.nexamon_player_bonuses enable row level security;
+revoke all on public.nexamon_player_bonuses from public, anon, authenticated;
+grant all on public.nexamon_player_bonuses to service_role;
+comment on table public.nexamon_player_bonuses is
+  'Nexamon card bonuses per player (ADR-171): effective {kind: bps} after stacking and cap, raw {kind: bps}, the '
+  'active sources [{id, card_key, kind, bps}] and the collections. Cache, written by nexamon_bonus_recompute().';
+
+create table if not exists public.nexamon_collection_completions (
+  player_id    uuid not null references public.profiles (id) on delete cascade,
+  set_key      text not null,
+  kind         text not null check (kind in ('type', 'complete', 'master')),
+  type_key     text not null default '',
+  first_at     timestamptz not null default now(),
+  reward_cents bigint not null default 0 check (reward_cents >= 0),
+  reward_xp    integer not null default 0 check (reward_xp >= 0),
+  primary key (player_id, set_key, kind, type_key)
+);
+alter table public.nexamon_collection_completions enable row level security;
+revoke all on public.nexamon_collection_completions from public, anon, authenticated;
+grant all on public.nexamon_collection_completions to service_role;
+comment on table public.nexamon_collection_completions is
+  'First completion of a Nexamon collection per player (ADR-171): type (type_key = the type), complete or master; '
+  'the one-time reward paid then. Badges on the profile. Internal.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_bonus', 'social', 'Karten-Bonus', 'Ein Bonus deiner Nexamon-Karten ist aktiv geworden oder weggefallen.',
+        'notif_bell', true, false, false, 301),
+       ('nexamon_set', 'social', 'Sammlung komplett', 'Du hast eine Nexamon-Sammlung vervollständigt.', 'notif_bell',
+        true, true, false, 302)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Rules (port of src/lib/sim/nexamon-bonuses.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_types()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select g.value from public.game_config g where g.key = 'nexamon_types'), '{}'::jsonb);
+$$;
+
+-- nexamonCardBonusDef: {kind, bps} of a raw copy, or null
+create or replace function public.nexamon_card_bonus_def(p_rarity text, p_set text, p_number integer, p_type text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with b as (select public.nexamon_cfg() -> 'bonuses' as v)
+  select case when b.v is null or p_type is null then null
+              when not (coalesce(b.v -> 'rarities', '[]'::jsonb) ? p_rarity
+                        or (p_rarity = 'rare' and coalesce(b.v -> 'extraNumbers', '[]'::jsonb) @> to_jsonb(p_number))) then null
+              when b.v #>> array['typeKind', p_type] is null then null
+              when coalesce((b.v #>> array['rarityBps', p_rarity])::bigint, 0)
+                   * coalesce((b.v #>> array['setBps', p_set])::bigint, 10000) / 10000 <= 0 then null
+              else jsonb_build_object('kind', b.v #>> array['typeKind', p_type],
+                                      'bps', (coalesce((b.v #>> array['rarityBps', p_rarity])::bigint, 0)
+                                              * coalesce((b.v #>> array['setBps', p_set])::bigint, 10000) / 10000)::integer)
+         end
+    from b;
+$$;
+
+-- nexamonSlabBoostBps
+create or replace function public.nexamon_slab_boost_bps(p_grade double precision)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with s as (select public.nexamon_cfg() #> '{bonuses,slab}' as v)
+  select case when p_grade >= 10.75 then coalesce((s.v ->> 'blackLabelBps')::integer, 10000)
+              when p_grade >= coalesce((s.v ->> 'minGrade')::double precision, 9) then coalesce((s.v ->> 'gradeBps')::integer, 10000)
+              else 10000 end
+    from s;
+$$;
+
+-- nexamonStackBps
+create or replace function public.nexamon_stack_bps(p_raw bigint, p_kind text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with b as (select public.nexamon_cfg() -> 'bonuses' as v),
+       c as (select coalesce((b.v #>> array['caps', p_kind])::bigint, 0) as cap,
+                    coalesce((b.v ->> 'kneeShareBps')::bigint, 5000) as knee_share,
+                    coalesce((b.v ->> 'tailBps')::bigint, 5000) as tail
+               from b),
+       k as (select c.cap, c.tail, c.cap * c.knee_share / 10000 as knee, greatest(0, coalesce(p_raw, 0)) as raw from c)
+  select least(k.cap, case when k.raw <= k.knee then k.raw else k.knee + (k.raw - k.knee) * k.tail / 10000 end)::integer
+    from k;
+$$;
+
+-- "0,5 %" for 50 bps
+create or replace function public.nexamon_bps_text(p_bps integer)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select replace(trim(trailing '.' from trim(trailing '0' from to_char(coalesce(p_bps, 0) / 100.0, 'FM999990.00'))), '.', ',') || ' %';
+$$;
+
+create or replace function public.nexamon_bonus_kind_text(p_kind text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_kind when 'xp' then 'XP' when 'mission_xp' then 'Missions-XP' when 'trade_xp' then 'Handels-XP'
+                     when 'wage' then 'Gehalt' when 'vault' then 'Tresorzinsen' when 'daily' then 'Tagesbonus'
+                     when 'company' then 'Auftragserlöse' else coalesce(p_kind, '?') end;
+$$;
+
+-- the bonus of one card for a viewer: {kind, bps, boosted_bps, active, best_grade} (live, not from the cache)
+create or replace function public.nexamon_card_bonus_json(p_card text, p_viewer uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with d as (
+    select public.nexamon_card_bonus_def(k.rarity, k.set_key, k.number, public.nexamon_types() ->> k.card_key) as def
+      from public.nexamon_cards k where k.card_key = p_card
+  ), o as (
+    select count(*) as n, max(c.grade) as best
+      from public.nexamon_copies c
+     where c.card_key = p_card and c.owner_id = p_viewer and p_viewer is not null
+       and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+  )
+  select case when d.def is null then null
+              else d.def || jsonb_build_object(
+                     'boosted_bps', ((d.def ->> 'bps')::bigint * public.nexamon_slab_boost_bps(o.best) / 10000)::integer,
+                     'active', o.n > 0, 'best_grade', o.best) end
+    from d, o;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. The cache: nexamon_bonus_recompute(player)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_bonus_recompute(p_player uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.nexamon_cfg();
+  b         jsonb := public.nexamon_cfg() -> 'bonuses';
+  v_types   jsonb := public.nexamon_types();
+  v_now     timestamptz := public.game_now();
+  v_cards   jsonb;
+  v_cols    jsonb;
+  v_sources jsonb;
+  v_raw     jsonb := '{}'::jsonb;
+  v_eff     jsonb := '{}'::jsonb;
+  v_prev    jsonb;
+  v_on      jsonb;
+  v_off     jsonb;
+  v_kind    text;
+  v_sum     bigint;
+  v_names   jsonb := coalesce((select g.value from public.game_config g where g.key = 'nexamon_names'), '{}'::jsonb);
+  v_text    text;
+  v_cents   bigint;
+  v_xp      integer;
+  v_hh      bigint;
+  v_key     text;
+  v_ok      text;
+  r         record;
+begin
+  if p_player is null or not exists (select 1 from public.profiles p where p.id = p_player) then
+    return null;
+  end if;
+  if b is null then
+    delete from public.nexamon_player_bonuses where player_id = p_player;
+    return null;
+  end if;
+
+  -- every catalogue card with the player's best unlisted copy
+  if to_regclass('pg_temp.nx_bonus_own') is null then
+    create temporary table nx_bonus_own (
+      card_key text, set_key text, number integer, rarity text, type text, owned boolean, best double precision
+    ) on commit drop;
+  end if;
+  truncate pg_temp.nx_bonus_own;
+  insert into pg_temp.nx_bonus_own
+  select k.card_key, k.set_key, k.number, k.rarity, v_types ->> k.card_key, o.card_key is not null, o.best
+    from public.nexamon_cards k
+    left join (select c.card_key, max(c.grade) as best
+                 from public.nexamon_copies c
+                where c.owner_id = p_player
+                  and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+                group by c.card_key) o on o.card_key = k.card_key
+   where k.in_catalogue;
+
+  -- card sources
+  select coalesce(jsonb_agg(jsonb_build_object('id', 'card:' || x.card_key, 'card_key', x.card_key, 'kind', x.def ->> 'kind',
+                                               'bps', ((x.def ->> 'bps')::bigint * public.nexamon_slab_boost_bps(x.best) / 10000)::integer)
+                            order by x.set_key, x.number), '[]'::jsonb)
+    into v_cards
+    from (select o.*, public.nexamon_card_bonus_def(o.rarity, o.set_key, o.number, o.type) as def
+            from pg_temp.nx_bonus_own o where o.owned) x
+   where x.def is not null;
+
+  -- collections (nexamonCollections)
+  with t as (
+    select o.set_key, o.type, count(*) as need, count(*) filter (where o.owned) as have,
+           coalesce(jsonb_agg(o.card_key order by o.number) filter (where not o.owned), '[]'::jsonb) as missing
+      from pg_temp.nx_bonus_own o where o.type is not null group by o.set_key, o.type
+  ), s as (
+    select o.set_key, count(*) as need, count(*) filter (where o.owned) as have,
+           coalesce(jsonb_agg(o.card_key order by o.number) filter (where not o.owned), '[]'::jsonb) as missing,
+           count(*) filter (where coalesce(b #> '{sets,masterRarities}', '[]'::jsonb) ? o.rarity) as top,
+           count(*) filter (where coalesce(b #> '{sets,masterRarities}', '[]'::jsonb) ? o.rarity and o.owned
+                              and o.best >= coalesce((b #>> '{sets,masterMinGrade}')::double precision, 9)) as top_have,
+           coalesce(jsonb_agg(o.card_key order by o.number)
+                      filter (where not o.owned
+                                 or (coalesce(b #> '{sets,masterRarities}', '[]'::jsonb) ? o.rarity
+                                     and not coalesce(o.best >= coalesce((b #>> '{sets,masterMinGrade}')::double precision, 9), false))),
+                    '[]'::jsonb) as master_missing
+      from pg_temp.nx_bonus_own o group by o.set_key
+  ), cols as (
+    select t.set_key, 'type' as kind, t.type, t.have, t.need, t.missing, b #>> array['typeKind', t.type] as bonus_kind,
+           (coalesce((b #>> '{sets,type,bps}')::bigint, 0) * coalesce((b #>> array['setBps', t.set_key])::bigint, 10000) / 10000)::integer as bonus_bps
+      from t
+    union all
+    select s.set_key, 'complete', null, s.have, s.need, s.missing, b #>> '{sets,complete,kind}',
+           (coalesce((b #>> '{sets,complete,bps}')::bigint, 0) * coalesce((b #>> array['setBps', s.set_key])::bigint, 10000) / 10000)::integer
+      from s
+    union all
+    select s.set_key, 'master', null, s.have + s.top_have, s.need + s.top, s.master_missing, null,
+           (coalesce((b #>> '{sets,master,bps}')::bigint, 0) * coalesce((b #>> array['setBps', s.set_key])::bigint, 10000) / 10000)::integer
+      from s
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', 'col:' || c.set_key || ':' || c.kind || coalesce(':' || c.type, ''), 'set', c.set_key, 'kind', c.kind,
+           'type', c.type, 'have', c.have, 'need', c.need, 'complete', c.have = c.need, 'missing', c.missing,
+           'bonus_kind', c.bonus_kind, 'bonus_bps', c.bonus_bps)
+           order by c.set_key, case c.kind when 'type' then 0 when 'complete' then 1 else 2 end, c.type), '[]'::jsonb)
+    into v_cols
+    from cols c;
+
+  -- collection sources: type and complete to one kind, master to every kind
+  select v_cards || coalesce(jsonb_agg(jsonb_build_object('id', c ->> 'id', 'card_key', null, 'kind', k.kind,
+                                                          'bps', (c ->> 'bonus_bps')::integer)), '[]'::jsonb)
+    into v_sources
+    from jsonb_array_elements(v_cols) c
+    cross join lateral (select x as kind from jsonb_array_elements_text(
+                          case when c ->> 'bonus_kind' is null then coalesce(b -> 'kinds', '[]'::jsonb)
+                               else jsonb_build_array(c ->> 'bonus_kind') end) x) k
+   where (c ->> 'complete')::boolean and (c ->> 'bonus_bps')::integer > 0;
+
+  for v_kind in select jsonb_array_elements_text(coalesce(b -> 'kinds', '[]'::jsonb)) loop
+    select coalesce(sum((s ->> 'bps')::bigint), 0) into v_sum from jsonb_array_elements(v_sources) s where s ->> 'kind' = v_kind;
+    v_raw := v_raw || jsonb_build_object(v_kind, v_sum);
+    v_eff := v_eff || jsonb_build_object(v_kind, public.nexamon_stack_bps(v_sum, v_kind));
+  end loop;
+
+  -- what came and what went (by source id, collections once)
+  select p.sources into v_prev from public.nexamon_player_bonuses p where p.player_id = p_player for update;
+  select coalesce(jsonb_agg(distinct x), '[]'::jsonb) into v_on
+    from (select s ->> 'id' as x from jsonb_array_elements(v_sources) s) n
+   where not exists (select 1 from jsonb_array_elements(coalesce(v_prev, '[]'::jsonb)) p where p ->> 'id' = n.x);
+  select coalesce(jsonb_agg(distinct x), '[]'::jsonb) into v_off
+    from (select p ->> 'id' as x from jsonb_array_elements(coalesce(v_prev, '[]'::jsonb)) p) o
+   where not exists (select 1 from jsonb_array_elements(v_sources) s where s ->> 'id' = o.x);
+
+  insert into public.nexamon_player_bonuses as t (player_id, effective, raw, sources, collections, computed_at)
+  values (p_player, v_eff, v_raw, v_sources, v_cols, v_now)
+  on conflict (player_id) do update
+     set effective = excluded.effective, raw = excluded.raw, sources = excluded.sources,
+         collections = excluded.collections, computed_at = excluded.computed_at;
+
+  -- notifications: cards that start or stop giving a bonus (collections get their own below)
+  if v_prev is not null then
+    select string_agg(coalesce(v_names ->> substr(x, 6), substr(x, 6)) || ' (+'
+                      || public.nexamon_bps_text((select (s ->> 'bps')::integer from jsonb_array_elements(v_sources) s where s ->> 'id' = x))
+                      || ' ' || public.nexamon_bonus_kind_text((select s ->> 'kind' from jsonb_array_elements(v_sources) s where s ->> 'id' = x)) || ')',
+                      ', ' order by x)
+      into v_text
+      from jsonb_array_elements_text(v_on) x where x like 'card:%';
+    if v_text is not null then
+      perform public.social_notify(p_player, 'nexamon_bonus', 'Karten-Bonus aktiv', 'Jetzt aktiv: ' || v_text || '.',
+                                   jsonb_build_object('on', v_on), '/nexamon?tab=bonuses',
+                                   'nexamon_bonus:on:' || p_player::text || ':' || txid_current()::text);
+      perform public.mission_event(p_player, 'nexamon_bonus_card',
+                                   (select count(*) from jsonb_array_elements_text(v_on) x where x like 'card:%'), null);
+    end if;
+    select string_agg(coalesce(v_names ->> substr(x, 6), substr(x, 6)), ', ' order by x)
+      into v_text
+      from jsonb_array_elements_text(v_off) x where x like 'card:%';
+    if v_text is not null then
+      perform public.social_notify(p_player, 'nexamon_bonus', 'Karten-Bonus weg',
+                                   'Kein Bonus mehr von: ' || v_text || '. Verkaufte und angebotene Karten zählen nicht.',
+                                   jsonb_build_object('off', v_off), '/nexamon?tab=bonuses',
+                                   'nexamon_bonus:off:' || p_player::text || ':' || txid_current()::text);
+    end if;
+  elsif jsonb_array_length(v_cards) > 0 then
+    perform public.mission_event(p_player, 'nexamon_bonus_card', jsonb_array_length(v_cards), null);
+  end if;
+
+  -- first completions: reward once
+  for r in select c ->> 'set' as set_key, c ->> 'kind' as kind, coalesce(c ->> 'type', '') as type_key
+             from jsonb_array_elements(v_cols) c where (c ->> 'complete')::boolean loop
+    v_cents := coalesce((b #>> array['sets', r.kind, 'rewardPacks'])::bigint, 0)
+               * coalesce((cfg #>> array['sets', r.set_key, 'packPriceCents'])::bigint, 0);
+    v_xp := coalesce((b #>> array['sets', r.kind, 'rewardXp'])::integer, 0);
+    insert into public.nexamon_collection_completions (player_id, set_key, kind, type_key, first_at, reward_cents, reward_xp)
+    values (p_player, r.set_key, r.kind, r.type_key, v_now, 0, 0)
+    on conflict do nothing
+    returning kind into v_ok;
+    continue when v_ok is null;
+    v_ok := null;
+    v_key := 'nexamon_set:' || p_player::text || ':' || r.set_key || ':' || r.kind || ':' || r.type_key;
+    if v_cents > 0 then
+      perform public.lock_player_accounts(p_player);
+      select a.balance_cents into v_hh from public.ledger_accounts a where a.system_key = 'households' for update;
+      v_cents := least(v_cents, greatest(0, coalesce(v_hh, 0)));
+      if v_cents > 0 then
+        perform public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(p_player, 'player_cash'),
+                                       v_cents, 'nexamon_set_reward', 'Nexamon-Sammlung komplett', 'nexamon_set', null, v_key, p_player,
+                                       jsonb_build_object('set', r.set_key, 'kind', r.kind, 'type', nullif(r.type_key, '')));
+        perform public.loan_withhold(p_player, v_cents, v_key);
+      end if;
+    end if;
+    v_xp := coalesce(public.grant_xp(p_player, 'nexamon_set', v_xp, v_key, 'nexamon_set', null), 0);
+    update public.nexamon_collection_completions
+       set reward_cents = v_cents, reward_xp = v_xp
+     where player_id = p_player and set_key = r.set_key and kind = r.kind and type_key = r.type_key;
+    v_text := coalesce(cfg #>> array['sets', r.set_key, 'name'], r.set_key);
+    perform public.social_notify(p_player, 'nexamon_set',
+      case r.kind when 'master' then 'Master-Set!' when 'complete' then 'Set komplett!' else 'Typ-Sammlung komplett' end,
+      case r.kind when 'master' then 'Du hast das Master-Set von ' || v_text || ': alle Karten und jede Prisma und Legendary im Slab.'
+                  when 'complete' then 'Du hast alle Karten von ' || v_text || '.'
+                  else 'Alle Karten vom Typ ' || r.type_key || ' aus ' || v_text || ' sind in deiner Sammlung.' end
+        || ' Belohnung: ' || (v_cents / 100)::text || ' € und ' || v_xp::text || ' XP, dazu ein Bonus, solange sie komplett bleibt.',
+      jsonb_build_object('set', r.set_key, 'kind', r.kind, 'type', nullif(r.type_key, ''), 'cents', v_cents, 'xp', v_xp),
+      '/nexamon?tab=bonuses', v_key);
+    perform public.mission_event(p_player,
+      case r.kind when 'master' then 'nexamon_master_set' when 'complete' then 'nexamon_set_complete' else 'nexamon_type_collection' end,
+      1, null);
+    if r.kind = 'master' then
+      perform public.feed_post(p_player, 'nexamon_master_set', jsonb_build_object('set', r.set_key, 'name', v_text), v_key);
+    end if;
+  end loop;
+
+  return jsonb_build_object('effective', v_eff, 'raw', v_raw, 'sources', v_sources, 'collections', v_cols);
+end;
+$$;
+comment on function public.nexamon_bonus_recompute(uuid) is
+  'Internal (ADR-171): recomputes a player''s Nexamon card bonuses (cache nexamon_player_bonuses), notifies about '
+  'bonuses that come or go and rewards first completions of collections once. Call it after moving copies outside '
+  'the usual RPCs; the deferred triggers on nexamon_copies and nexamon_listings already do.';
+
+-- effective bonus of a kind (0 without cache or config)
+create or replace function public.player_nexamon_bonus_bps(p_player uuid, p_kind text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select (b.effective ->> p_kind)::integer from public.nexamon_player_bonuses b where b.player_id = p_player), 0);
+$$;
+comment on function public.player_nexamon_bonus_bps(uuid, text) is
+  'Internal (ADR-171): a player''s effective Nexamon card bonus of a kind in bps (after stacking and cap).';
+
+-- ---------------------------------------------------------------------------
+-- D. Deferred triggers: once per player and transaction, at commit
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_bonus_touch(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_done text := coalesce(current_setting('nexa.nx_bonus_done', true), '');
+  v_tx   text := txid_current()::text;
+begin
+  if p_player is null then
+    return;
+  end if;
+  if split_part(v_done, '|', 1) = v_tx and position(p_player::text in v_done) > 0 then
+    return;
+  end if;
+  if split_part(v_done, '|', 1) <> v_tx then
+    v_done := v_tx;
+  end if;
+  perform set_config('nexa.nx_bonus_done', v_done || '|' || p_player::text, true);
+  perform public.nexamon_bonus_recompute(p_player);
+end;
+$$;
+
+create or replace function public.nexamon_copies_bonus_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op in ('UPDATE', 'DELETE') then
+    perform public.nexamon_bonus_touch(old.owner_id);
+  end if;
+  if tg_op in ('INSERT', 'UPDATE') then
+    perform public.nexamon_bonus_touch(new.owner_id);
+  end if;
+  return null;
+end;
+$$;
+
+create or replace function public.nexamon_listings_bonus_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op = 'DELETE' then
+    perform public.nexamon_bonus_touch(old.seller_id);
+  else
+    perform public.nexamon_bonus_touch(new.seller_id);
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists nexamon_copies_bonus on public.nexamon_copies;
+create constraint trigger nexamon_copies_bonus after insert or update of owner_id, grade, card_key or delete on public.nexamon_copies
+  deferrable initially deferred for each row execute function public.nexamon_copies_bonus_trigger();
+drop trigger if exists nexamon_listings_bonus on public.nexamon_listings;
+create constraint trigger nexamon_listings_bonus after insert or delete on public.nexamon_listings
+  deferrable initially deferred for each row execute function public.nexamon_listings_bonus_trigger();
+
+-- ---------------------------------------------------------------------------
+-- E. Applied where the upgrades apply (latest definitions: 20261204000700_more_upgrades.sql)
+-- ---------------------------------------------------------------------------
+create or replace function public.player_upgrade_bps(p_player uuid, p_key text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_player is null then 0
+              else least(10000, greatest(0, round(public.player_upgrade_level(p_player, p_key)
+                                                  * coalesce(public.cfg_num(public.upgrade_cfg(p_key), '{perLevel}', 0), 0)))
+                                + case p_key when 'wage_bonus' then public.player_nexamon_bonus_bps(p_player, 'wage')
+                                             when 'vault_interest' then public.player_nexamon_bonus_bps(p_player, 'vault')
+                                             when 'daily_bonus' then public.player_nexamon_bonus_bps(p_player, 'daily')
+                                             when 'task_pay' then public.player_nexamon_bonus_bps(p_player, 'company')
+                                             else 0 end)::integer end;
+$$;
+comment on function public.player_upgrade_bps(uuid, text) is
+  'Internal (ADR-134, ADR-171): level x perLevel of a player''s upgrade in bps plus the Nexamon card bonus of the '
+  'matching kind (wage_bonus: wage, vault_interest: vault, daily_bonus: daily, task_pay: company), 0..10 000; 0 for no player.';
+
+create or replace function public.player_xp_bonus_bps(p_player uuid, p_source text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (coalesce(sum(least(10000, greatest(0, round(least(u.level, public.cfg_num(c.cfg, '{maxLevel}', 0))
+                                                        * public.cfg_num(c.cfg, '{perLevel}', 0))))), 0)
+          + public.player_nexamon_bonus_bps(p_player, 'xp')
+          + case p_source when 'mission' then public.player_nexamon_bonus_bps(p_player, 'mission_xp')
+                          when 'trade' then public.player_nexamon_bonus_bps(p_player, 'trade_xp')
+                          else 0 end)::integer
+    from public.player_upgrades u
+   cross join lateral (select public.upgrade_cfg(u.key) as cfg) c
+   where u.player_id = p_player and u.level > 0 and c.cfg is not null
+     and jsonb_typeof(c.cfg -> 'xpSources') = 'array'
+     and (c.cfg -> 'xpSources' ? p_source or c.cfg -> 'xpSources' ? '*');
+$$;
+comment on function public.player_xp_bonus_bps(uuid, text) is
+  'Internal (ADR-134, ADR-171, xpBonusBps): extra XP of a source in bps from the XP upgrades of a player plus the '
+  'Nexamon card bonuses xp (every source), mission_xp (mission) and trade_xp (trade).';
+
+-- ---------------------------------------------------------------------------
+-- F. Card JSON with the bonus (latest definition: 20261204005210_nexamon.sql)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_card_json(p_card text, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'card_key', k.card_key, 'set', k.set_key, 'number', k.number, 'rarity', k.rarity,
+           'value_cents', public.div_round_half_even(k.value_e4, 100),
+           'start_cents', public.div_round_half_even(k.start_e4, 100),
+           'change_bps', case when k.day_ref_on = (p_now at time zone 'Europe/Berlin')::date and k.day_ref_e4 > 0
+                              then public.div_round_half_even((k.value_e4 - k.day_ref_e4)::numeric * 10000, k.day_ref_e4) else 0 end,
+           'population', k.population,
+           'listed', (select count(*) from public.nexamon_listings l where l.card_key = k.card_key),
+           'owned', (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.owner_id = p_viewer),
+           'popularity_bps', public.nexamon_popularity_bps(k.rarity, k.population),
+           'floor_cents', public.div_round_half_even(b.floor_e4, 100),
+           'cap_cents', public.div_round_half_even(b.cap_e4, 100),
+           'bonus', public.nexamon_card_bonus_json(k.card_key, p_viewer))
+    from public.nexamon_cards k,
+         lateral public.nexamon_bounds(k.start_e4, k.first_pulled_at, k.counted_trades, p_now) b
+   where k.card_key = p_card;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. RPC get_nexamon_bonuses()
+-- ---------------------------------------------------------------------------
+create or replace function public.get_nexamon_bonuses()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  b        jsonb := public.nexamon_cfg() -> 'bonuses';
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  v_state  jsonb;
+begin
+  perform public.nexamon_require_unlock(v_player);
+  perform public.nexamon_sync(v_now);
+  perform public.nexamon_finish_gradings(v_player, v_now);
+  v_state := coalesce(public.nexamon_bonus_recompute(v_player), '{}'::jsonb);
+  return jsonb_build_object(
+    'totals', (select coalesce(jsonb_agg(jsonb_build_object(
+                        'kind', k, 'raw_bps', coalesce((v_state #>> array['raw', k])::integer, 0),
+                        'effective_bps', coalesce((v_state #>> array['effective', k])::integer, 0),
+                        'cap_bps', coalesce((b #>> array['caps', k])::integer, 0)) order by o), '[]'::jsonb)
+                 from jsonb_array_elements_text(coalesce(b -> 'kinds', '[]'::jsonb)) with ordinality x(k, o)),
+    'cards', (select coalesce(jsonb_agg(jsonb_build_object('card_key', k.card_key) || j.v order by k.set_key, k.number), '[]'::jsonb)
+                from public.nexamon_cards k
+               cross join lateral (select public.nexamon_card_bonus_json(k.card_key, v_player) as v) j
+               where k.in_catalogue and j.v is not null),
+    'collections', (select coalesce(jsonb_agg(c || jsonb_build_object('completed_at', x.first_at) order by o), '[]'::jsonb)
+                      from jsonb_array_elements(coalesce(v_state -> 'collections', '[]'::jsonb)) with ordinality e(c, o)
+                      left join public.nexamon_collection_completions x
+                        on x.player_id = v_player and x.set_key = c ->> 'set' and x.kind = c ->> 'kind'
+                       and x.type_key = coalesce(c ->> 'type', '')),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_bonuses() is
+  'RPC (ADR-171): the caller''s Nexamon card bonuses: totals [{kind, raw_bps, effective_bps, cap_bps}], cards [{card_key, '
+  'kind, bps, boosted_bps, active, best_grade}] (every card that gives a bonus), collections [{id, set, kind, type, '
+  'have, need, complete, missing, bonus_kind, bonus_bps, completed_at}], server_time; error nexamon_locked.';
+revoke all on function public.get_nexamon_bonuses() from public, anon;
+grant execute on function public.get_nexamon_bonuses() to authenticated, service_role;
+
+do $do$
+begin
+  revoke all on function public.nexamon_bonus_recompute(uuid) from public, anon, authenticated;
+  revoke all on function public.nexamon_bonus_touch(uuid) from public, anon, authenticated;
+  revoke all on function public.player_nexamon_bonus_bps(uuid, text) from public, anon, authenticated;
+  revoke all on function public.nexamon_card_bonus_json(text, uuid) from public, anon, authenticated;
+  revoke all on function public.nexamon_card_bonus_def(text, text, integer, text) from public, anon, authenticated;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- H. Feed and NEXA Nachrichten: a master set is news
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_master_set' then 'Master-Set von ' || coalesce(p_payload ->> 'name', 'Nexamon') || ' komplett'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_master_set' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kind nexamon_master_set (ADR-171) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_master_set',$t$;
+begin
+  if position('nexamon_master_set' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_master_set (ADR-171) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- I. Missions
+-- ---------------------------------------------------------------------------
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  ('m_nexamon_first_bonus', 'milestone', 'Dein erster Karten-Bonus', 'Besitz eine Nexamon-Karte, die einen Account-Bonus bringt.', 'mission_art', 'nexamon_bonus_card', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 800, 800, 10, 171, false, 40, 1),
+  ('m_nexamon_first_type_set', 'milestone', 'Erste Typ-Sammlung', 'Sammle alle Karten eines Typs aus einem Set.', 'mission_art', 'nexamon_type_collection', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 2000, 2000, 10, 172, false, 30, 1),
+  ('m_nexamon_first_full_set', 'milestone', 'Ein Set komplett', 'Sammle alle 77 Karten eines Sets.', 'mission_art', 'nexamon_set_complete', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 6000, 6000, 10, 173, false, 20, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+
+-- ===== supabase/updates/20261204006220_nexamon_profile_slabs.sql =====
+-- ===== idempotent copy of migrations/20261204006220_nexamon_profile_slabs.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6220 · Nexamon: slabs and collection badges on the profile (ADR-171)
+-- =============================================================================
+-- get_player_nexamon() (latest definition: 20261204005800_nexamon_profile.sql) also returns
+--   summary.black_labels   slabs with the Black Label
+--   slabs                  every graded copy (not the ones at ASP): card, serial, grade, value, sorted by grade, then
+--                          value (at most 500), for the "Nur gegradete" view of a collection
+--   badges                 first completions of collections (nexamon_collection_completions): set, kind, type, at
+-- Read only (STABLE). Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+create or replace function public.get_player_nexamon(p_nickname text default null, p_limit integer default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg        jsonb := public.nexamon_cfg();
+  v_player   uuid := public.require_player();
+  v_target   uuid;
+  v_nick     text;
+  v_unlocked boolean;
+  v_limit    integer := least(greatest(coalesce(p_limit, 500), 1), 500);
+  v_summary  jsonb;
+  v_sets     jsonb;
+  v_cards    jsonb;
+  v_slabs    jsonb;
+  v_badges   jsonb;
+begin
+  if p_nickname is null then
+    v_target := v_player;
+  else
+    select p.id into v_target from public.profiles p where lower(p.nickname) = lower(btrim(p_nickname));
+  end if;
+  select p.nickname into v_nick from public.profiles p where p.id = v_target;
+  if v_nick is null then
+    perform public.api_error('player_not_found');
+  end if;
+  v_unlocked := public.nexamon_unlocked(v_target);
+
+  with own as (
+    select c.card_key, c.serial, c.condition, c.grade, k.set_key, k.number, k.rarity,
+           public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade) as value_cents
+      from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+     where c.owner_id = v_target and v_unlocked
+  ), per_card as (
+    -- the best copy of every card: the most valuable, then the higher grade, then the lower serial
+    select distinct on (o.card_key)
+           o.card_key, o.set_key, o.number, o.rarity, o.serial, o.condition, o.grade, o.value_cents,
+           count(*) over (partition by o.card_key) as copies,
+           (sum(o.value_cents) over (partition by o.card_key))::bigint as total_cents
+      from own o
+     order by o.card_key, o.value_cents desc, o.grade desc nulls last, o.serial
+  )
+  select jsonb_build_object(
+           'copies', (select count(*) from own),
+           'distinct', (select count(*) from per_card),
+           'total', (select count(*) from public.nexamon_cards k where k.in_catalogue),
+           'value_cents', (select coalesce(sum(o.value_cents), 0)::bigint from own o),
+           'graded', (select count(*) from own o where o.grade is not null),
+           'tens', (select count(*) from own o where o.grade >= 10),
+           'black_labels', (select count(*) from own o where o.grade >= 10.75)),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'key', s.set_key, 'cards', s.cards,
+                   'distinct', (select count(*) from per_card p where p.set_key = s.set_key),
+                   'copies', (select count(*) from own o where o.set_key = s.set_key))
+                   order by (cfg #>> array['sets', s.set_key, 'packPriceCents'])::bigint nulls last, s.set_key), '[]'::jsonb)
+            from (select k.set_key, count(*) as cards from public.nexamon_cards k where k.in_catalogue group by k.set_key) s),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'card_key', x.card_key, 'set', x.set_key, 'number', x.number, 'rarity', x.rarity, 'copies', x.copies,
+                   'serial', x.serial, 'condition', x.condition, 'grade', x.grade, 'value_cents', x.value_cents,
+                   'total_cents', x.total_cents)
+                   order by x.value_cents desc, x.set_key, x.number), '[]'::jsonb)
+            from (select p.* from per_card p order by p.value_cents desc, p.set_key, p.number limit v_limit) x),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'card_key', x.card_key, 'set', x.set_key, 'number', x.number, 'rarity', x.rarity, 'serial', x.serial,
+                   'condition', x.condition, 'grade', x.grade, 'value_cents', x.value_cents)
+                   order by x.grade desc, x.value_cents desc, x.set_key, x.number, x.serial), '[]'::jsonb)
+            from (select o.* from own o where o.grade is not null
+                   order by o.grade desc, o.value_cents desc, o.set_key, o.number, o.serial limit 500) x)
+    into v_summary, v_sets, v_cards, v_slabs;
+
+  select coalesce(jsonb_agg(jsonb_build_object('set', x.set_key, 'kind', x.kind, 'type', nullif(x.type_key, ''), 'at', x.first_at)
+                            order by x.first_at, x.set_key, x.kind, x.type_key), '[]'::jsonb)
+    into v_badges
+    from public.nexamon_collection_completions x
+   where x.player_id = v_target and v_unlocked;
+
+  return jsonb_build_object(
+    'nickname', v_nick, 'is_me', v_target = v_player, 'unlocked', v_unlocked,
+    'summary', v_summary, 'sets', v_sets, 'cards', v_cards, 'slabs', v_slabs, 'badges', v_badges,
+    'server_time', public.game_now());
+end;
+$$;
+comment on function public.get_player_nexamon(text, integer) is
+  'RPC: the Nexamon collection of a player by nickname (null = the caller) for their profile (ADR-165, ADR-171): '
+  '{nickname, is_me, unlocked, summary: {copies, distinct, total, value_cents, graded, tens, black_labels}, sets: '
+  '[{key, cards, distinct, copies}], cards: [{card_key, set, number, rarity, copies, serial, condition, grade, '
+  'value_cents, total_cents}] (best copy per card, most valuable first, at most p_limit, 1..500), slabs: [{card_key, '
+  'set, number, rarity, serial, condition, grade, value_cents}] (by grade, then value, at most 500), badges: [{set, '
+  'kind, type, at}], server_time}. Empty for a player below the Nexamon level; error player_not_found.';
+
+revoke all on function public.get_player_nexamon(text, integer) from public, anon;
+grant execute on function public.get_player_nexamon(text, integer) to authenticated, service_role;
+
+-- ===== supabase/updates/20261204006230_nexamon_black_label_hype.sql =====
+-- ===== idempotent copy of migrations/20261204006230_nexamon_black_label_hype.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- =============================================================================
+-- NEXA · 6230 · Nexamon: Black Label hype (ADR-171)
+-- =============================================================================
+-- Rule (game_config.nexamon.blackLabelHype; src/config/nexamon-rules.ts; port of nexamonHypeChanceBps,
+-- nexamonHypeJumpBps, nexamonHypeAfterJump, nexamonHypeDecay, nexamonHypeStep in src/lib/sim/nexamon-bonuses.ts):
+--   the Black Labels of a card are worth its market value x its own factor (start grading.blackLabel.valueBps, 10x).
+--   Once per hour per card with a Black Label: first the decay (the factor loses decayBps of what it lies above the
+--   base, at least 1 bps), then with chance rarityChanceBps[rarity] x (1 + popularity) x blRef / (blRef + Black Labels
+--   - 1) a jump of minJumpBps..maxJumpBps of the factor, at most capBps.
+-- Model:
+--   nexamon_cards.bl_factor_bps (null = the base), bl_hype_at (the last hour handled), bl_jump_at (the last jump)
+--   nexamon_hype_points: the factor per hour it changed (history on the card page)
+--   nexamon_black_label_bps(card), nexamon_copy_value_cents(value, condition, grade, card): a Black Label at the card's
+--   factor; every current function that values a copy with the card at hand (copy and listing JSON, AI asks and
+--   buys, collection and profile value, net worth, news) is patched to the 4-argument form below (regexp on
+--   pg_get_functiondef, idempotent)
+--   nexamon_hype_run_due(now): job nexa-nexamon-hype (pg_cron, every hour at minute 7); a jump notifies the owners
+--   of the card's Black Labels (nexamon_hype); a jump of bigJumpBps or more is a feed item nexamon_hype (friends,
+--   gossip for NEXA Nachrichten)
+--   nexamon_card_json(): black_label_bps, hype_at (last jump while the factor is above the base)
+--   get_nexamon_card(): hype [{at, factor_bps}] (the last historyPoints points)
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+alter table public.nexamon_cards add column if not exists bl_factor_bps integer;
+alter table public.nexamon_cards add column if not exists bl_hype_at timestamptz;
+alter table public.nexamon_cards add column if not exists bl_jump_at timestamptz;
+comment on column public.nexamon_cards.bl_factor_bps is
+  'Black Label hype (ADR-171): value factor of this card''s Black Labels in bps; null = grading.blackLabel.valueBps.';
+
+create table if not exists public.nexamon_hype_points (
+  card_key   text not null references public.nexamon_cards (card_key) on delete cascade,
+  at         timestamptz not null,
+  factor_bps integer not null check (factor_bps > 0),
+  jump_bps   integer not null default 0 check (jump_bps >= 0),
+  primary key (card_key, at)
+);
+alter table public.nexamon_hype_points enable row level security;
+revoke all on public.nexamon_hype_points from public, anon, authenticated;
+grant all on public.nexamon_hype_points to service_role;
+comment on table public.nexamon_hype_points is
+  'Black Label factor of a card per hour it changed (ADR-171), jump_bps > 0 for a jump. Internal.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_hype', 'social', 'Black-Label-Hype', 'Die Black Labels einer deiner Nexamon-Karten sind im Preis gesprungen.',
+        'notif_bell', true, true, false, 303)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- A. Rules
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_hype_base_bps()
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((public.nexamon_cfg() #>> '{grading,blackLabel,valueBps}')::integer, 100000);
+$$;
+
+create or replace function public.nexamon_black_label_bps(p_card text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select k.bl_factor_bps from public.nexamon_cards k where k.card_key = p_card), public.nexamon_hype_base_bps());
+$$;
+
+-- the copy's value with the card's own Black Label factor
+create or replace function public.nexamon_copy_value_cents(p_value_e4 bigint, p_condition text, p_grade double precision, p_card text)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_grade >= 10.75 and p_card is not null
+              then public.div_round_half_even(p_value_e4::numeric * public.nexamon_black_label_bps(p_card), 1000000)
+              else public.nexamon_copy_value_cents(p_value_e4, p_condition, p_grade) end;
+$$;
+
+-- nexamonHypeChanceBps
+create or replace function public.nexamon_hype_chance_bps(p_rarity text, p_popularity integer, p_black_labels bigint)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with h as (select public.nexamon_cfg() -> 'blackLabelHype' as v)
+  select case when coalesce(p_black_labels, 0) <= 0 or h.v is null then 0
+              else (coalesce((h.v #>> array['rarityChanceBps', p_rarity])::bigint, 0)
+                    * (10000 + least(10000, greatest(0, coalesce(p_popularity, 0))))
+                    * coalesce((h.v ->> 'blRef')::bigint, 3)
+                    / (10000 * (coalesce((h.v ->> 'blRef')::bigint, 3) + greatest(0, p_black_labels - 1))))::integer end
+    from h;
+$$;
+
+-- nexamonHypeStep: decay, then the roll -> (factor, jump)
+create or replace function public.nexamon_hype_step(p_factor integer, p_chance integer, p_u double precision, p_u2 double precision,
+                                                    out factor_bps integer, out jump_bps integer)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  h      jsonb := public.nexamon_cfg() -> 'blackLabelHype';
+  v_base integer := public.nexamon_hype_base_bps();
+  v_min  integer := coalesce((h ->> 'minJumpBps')::integer, 1000);
+  v_max  integer := coalesce((h ->> 'maxJumpBps')::integer, 6000);
+  v_u2   double precision := least(greatest(coalesce(p_u2, 0), 0), 0.999999999);
+begin
+  factor_bps := coalesce(p_factor, v_base);
+  if factor_bps <= v_base then
+    factor_bps := v_base;
+  else
+    factor_bps := factor_bps - greatest(1, ceil((factor_bps - v_base)::numeric * coalesce((h ->> 'decayBps')::integer, 100) / 10000))::integer;
+  end if;
+  jump_bps := 0;
+  if p_u * 10000 < coalesce(p_chance, 0) then
+    jump_bps := v_min + floor(v_u2 * (v_max - v_min + 1))::integer;
+    factor_bps := least(coalesce((h ->> 'capBps')::integer, 250000), factor_bps + (factor_bps::bigint * jump_bps / 10000)::integer);
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- B. Every function that values a copy with its card at hand uses the card's Black Label factor
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  r     record;
+  v_def text;
+  v_new text;
+begin
+  for r in select p.oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public'
+              and p.prosrc ~ 'nexamon_copy_value_cents\((k|r)\.value_e4, [a-z0-9_]+\.condition, [a-z0-9_]+\.grade\)|nexamon_copy_value_cents\(v_new, c\.condition, c\.grade\)'
+  loop
+    v_def := pg_get_functiondef(r.oid);
+    v_new := regexp_replace(v_def, 'nexamon_copy_value_cents\((k|r)\.value_e4, ([a-z0-9_]+)\.condition, ([a-z0-9_]+)\.grade\)',
+                            'nexamon_copy_value_cents(\1.value_e4, \2.condition, \3.grade, \1.card_key)', 'g');
+    v_new := replace(v_new, 'nexamon_copy_value_cents(v_new, c.condition, c.grade)', 'nexamon_copy_value_cents(v_new, c.condition, c.grade, p_card)');
+    if v_new <> v_def then
+      execute v_new;
+    end if;
+  end loop;
+  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'nexamon_copy_json'
+                and position('k.card_key)' in p.prosrc) = 0) then
+    raise exception 'nexamon_copy_json() has an unexpected shape; value Black Labels with nexamon_copy_value_cents(..., card) (ADR-171) by hand';
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- C. The job
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_hype_run_due(p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  h        jsonb := public.nexamon_cfg() -> 'blackLabelHype';
+  v_now    timestamptz := coalesce(p_now, public.game_now());
+  v_hour   timestamptz := date_trunc('hour', coalesce(p_now, public.game_now()));
+  v_base   integer := public.nexamon_hype_base_bps();
+  v_names  jsonb := coalesce((select g.value from public.game_config g where g.key = 'nexamon_names'), '{}'::jsonb);
+  v_steps  integer;
+  v_factor integer;
+  v_jump   integer;
+  v_best   integer;
+  v_chance integer;
+  v_n      integer := 0;
+  s        record;
+  r        record;
+  o        record;
+begin
+  if h is null then
+    return 0;
+  end if;
+  for r in select k.card_key, k.rarity, k.population, k.bl_factor_bps, k.bl_hype_at,
+                  (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.grade >= 10.75) as bls
+             from public.nexamon_cards k
+            where (k.bl_hype_at is null or k.bl_hype_at < v_hour)
+              and (k.bl_factor_bps is not null
+                   or exists (select 1 from public.nexamon_copies c where c.card_key = k.card_key and c.grade >= 10.75))
+            order by k.bl_hype_at nulls first, k.card_key
+            limit 500
+            for update of k skip locked loop
+    -- at most two days are caught up on
+    v_steps := least(48, greatest(1, coalesce(floor(extract(epoch from (v_hour - r.bl_hype_at)) / 3600)::integer, 1)));
+    v_factor := coalesce(r.bl_factor_bps, v_base);
+    v_best := 0;
+    v_chance := public.nexamon_hype_chance_bps(r.rarity, public.nexamon_popularity_bps(r.rarity, r.population), r.bls);
+    for i in 1..v_steps loop
+      select * into s from public.nexamon_hype_step(v_factor, v_chance, random(), random());
+      v_factor := s.factor_bps;
+      v_best := greatest(v_best, s.jump_bps);
+    end loop;
+    update public.nexamon_cards
+       set bl_factor_bps = case when v_factor <= v_base then null else v_factor end, bl_hype_at = v_hour,
+           bl_jump_at = case when v_best > 0 then v_now else bl_jump_at end
+     where card_key = r.card_key;
+    if v_factor <> coalesce(r.bl_factor_bps, v_base) then
+      insert into public.nexamon_hype_points (card_key, at, factor_bps, jump_bps)
+      values (r.card_key, v_hour, v_factor, v_best)
+      on conflict (card_key, at) do update set factor_bps = excluded.factor_bps,
+                                               jump_bps = greatest(public.nexamon_hype_points.jump_bps, excluded.jump_bps);
+    end if;
+    if v_best > 0 then
+      v_n := v_n + 1;
+      for o in select distinct c.owner_id from public.nexamon_copies c
+                where c.card_key = r.card_key and c.grade >= 10.75 and c.owner_id is not null loop
+        perform public.social_notify(o.owner_id, 'nexamon_hype', 'Black-Label-Hype!',
+          'Die Black Labels von ' || coalesce(v_names ->> r.card_key, r.card_key) || ' sind um '
+            || public.nexamon_bps_text(v_best) || ' gestiegen: jetzt das '
+            || replace(trim(trailing '.' from trim(trailing '0' from to_char(v_factor / 10000.0, 'FM9990.0'))), '.', ',')
+            || '-Fache der Karte.',
+          jsonb_build_object('card_key', r.card_key, 'jump_bps', v_best, 'factor_bps', v_factor),
+          '/nexamon/' || r.card_key, 'nexamon_hype:' || r.card_key || ':' || to_char(v_hour at time zone 'UTC', 'YYYYMMDDHH24'));
+        if v_best >= coalesce((h ->> 'bigJumpBps')::integer, 4000) then
+          perform public.feed_post(o.owner_id, 'nexamon_hype',
+                                   jsonb_build_object('card_key', r.card_key, 'name', v_names ->> r.card_key,
+                                                      'jump_bps', v_best, 'factor_bps', v_factor),
+                                   'nexamon:hype:' || o.owner_id::text || ':' || r.card_key || ':'
+                                     || to_char(v_hour at time zone 'UTC', 'YYYYMMDDHH24'));
+        end if;
+      end loop;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+comment on function public.nexamon_hype_run_due(timestamptz) is
+  'Internal, cron every hour (ADR-171): Black Label hype of every card with a Black Label: decay toward the base, '
+  'a random jump scaled by rarity, popularity and few Black Labels; notifies owners, feed item for a big jump. '
+  'Returns the number of jumps.';
+
+do $do$
+begin
+  revoke all on function public.nexamon_hype_run_due(timestamptz) from public, anon, authenticated;
+  revoke all on function public.nexamon_hype_step(integer, integer, double precision, double precision) from public, anon, authenticated;
+  revoke all on function public.nexamon_copy_value_cents(bigint, text, double precision, text) from public, anon, authenticated;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-nexamon-hype';
+    perform cron.schedule('nexa-nexamon-hype', '7 * * * *', 'select public.nexamon_hype_run_due()');
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- D. Card JSON and card page (latest card JSON: 20261204006210_nexamon_card_bonuses.sql)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_card_json(p_card text, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'card_key', k.card_key, 'set', k.set_key, 'number', k.number, 'rarity', k.rarity,
+           'value_cents', public.div_round_half_even(k.value_e4, 100),
+           'start_cents', public.div_round_half_even(k.start_e4, 100),
+           'change_bps', case when k.day_ref_on = (p_now at time zone 'Europe/Berlin')::date and k.day_ref_e4 > 0
+                              then public.div_round_half_even((k.value_e4 - k.day_ref_e4)::numeric * 10000, k.day_ref_e4) else 0 end,
+           'population', k.population,
+           'listed', (select count(*) from public.nexamon_listings l where l.card_key = k.card_key),
+           'owned', (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.owner_id = p_viewer),
+           'popularity_bps', public.nexamon_popularity_bps(k.rarity, k.population),
+           'floor_cents', public.div_round_half_even(b.floor_e4, 100),
+           'cap_cents', public.div_round_half_even(b.cap_e4, 100),
+           'bonus', public.nexamon_card_bonus_json(k.card_key, p_viewer),
+           'black_label_bps', coalesce(k.bl_factor_bps, public.nexamon_hype_base_bps()),
+           'hype_at', case when k.bl_factor_bps is not null then k.bl_jump_at end)
+    from public.nexamon_cards k,
+         lateral public.nexamon_bounds(k.start_e4, k.first_pulled_at, k.counted_trades, p_now) b
+   where k.card_key = p_card;
+$$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.get_nexamon_card(text)'::regprocedure);
+  v_old text := $t$    'server_time', v_now);$t$;
+  v_new text := $t$    'hype', (select coalesce(jsonb_agg(jsonb_build_object('at', x.at, 'factor_bps', x.factor_bps, 'jump_bps', x.jump_bps)
+                                       order by x.at), '[]'::jsonb)
+               from (select h.at, h.factor_bps, h.jump_bps from public.nexamon_hype_points h where h.card_key = k.card_key
+                      order by h.at desc limit coalesce((cfg #>> '{blackLabelHype,historyPoints}')::integer, 30)) x),
+    'server_time', v_now);$t$;
+begin
+  if position('nexamon_hype_points' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'get_nexamon_card() has an unexpected shape; add the Black Label hype history (ADR-171) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- E. Feed and NEXA Nachrichten: a big jump is news
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_hype' then 'Black-Label-Hype: ' || coalesce(p_payload ->> 'name', 'eine Nexamon-Karte') || ' springt im Preis'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_hype' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kind nexamon_hype (ADR-171) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_hype',$t$;
+begin
+  if position('nexamon_hype' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_hype (ADR-171) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
 -- ===== supabase/updates/20261204006300_nexamon_battles_schema.sql =====
 -- ===== idempotent copy of migrations/20261204006300_nexamon_battles_schema.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
@@ -2147,895 +3293,5 @@ alter table public.nexamon_live_reactions enable row level security;
 revoke all on public.nexamon_live_reactions from public, anon, authenticated;
 grant all on public.nexamon_live_reactions to service_role;
 comment on table public.nexamon_live_reactions is 'Emoji bursts of spectators of a live opening (ADR-172). Internal.';
-
--- ===== supabase/updates/20261204006310_nexamon_lobby_live.sql =====
--- ===== idempotent copy of migrations/20261204006310_nexamon_lobby_live.sql =====
--- (the migration itself is written idempotently; keep both files identical below this line)
--- =============================================================================
--- =============================================================================
--- NEXA · 6310 · Nexamon: who is on the Collectibles tab, live openings and spectators (ADR-172)
--- =============================================================================
--- * nexamon_lobby(p_allow_watch): the Collectibles page asks every presence.pingSeconds. It marks the caller as on
---   the tab (presence only, no game state: no request id, like last_active_at) and returns the friends on the tab as
---   figures (nickname, level, avatar_key, accessories, opening, battling), the running live openings, the caller's
---   open and running Pack Battles and the battle limits.
--- * Every bought pack is a live opening (trigger on nexamon_packs) unless the opener switched watching off. The
---   opener's page reports each card as it shows: nexamon_live_progress(p_pack_id, p_revealed) -> viewers, reactions.
--- * get_nexamon_live(p_live_id): a spectator's view (counts them as a viewer): only the cards the opener has seen,
---   after live.staleMs of silence one more every live.fallbackSlotMs (liveVisibleCards).
--- * nexamon_live_react(p_request_id, p_live_id, p_emoji): an emoji burst (live.reactions, live.reactionsPerMinute).
--- Errors: nexamon_locked, invalid_argument, nexamon_live_unknown, rate_limited.
--- Idempotent: runs unchanged as supabase/updates/20261204006310_nexamon_lobby_live.sql.
-
-create or replace function public.nexamon_ms(p_ms numeric)
-returns interval
-language sql
-immutable
-set search_path = ''
-as $$
-  select make_interval(secs => coalesce(p_ms, 0) / 1000.0);
-$$;
-
--- A player as a figure on the tab: name, level, portrait and worn accessories
-create or replace function public.nexamon_figure_json(p_player uuid)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select jsonb_build_object('nickname', p.nickname, 'level', p.level, 'avatar_key', p.avatar_key,
-                            'accessories', public.player_worn_accessories(p.id))
-    from public.profiles p where p.id = p_player;
-$$;
-
-create or replace function public.nexamon_on_tab(p_player uuid, p_now timestamptz)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (select 1 from public.nexamon_presence x
-                  where x.player_id = p_player
-                    and x.seen_at > p_now - make_interval(secs => coalesce((public.nexamon_cfg() #>> '{presence,presenceSeconds}')::integer, 60)));
-$$;
-
--- How many cards of a live pack a spectator may see at p_now (liveVisibleCards)
-create or replace function public.nexamon_live_visible(l public.nexamon_live, p_now timestamptz)
-returns integer
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  cfg      jsonb := public.nexamon_cfg();
-  v_size   integer := coalesce((cfg ->> 'packSize')::integer, 5);
-  v_silent numeric;
-  v_extra  integer := 0;
-begin
-  v_silent := extract(epoch from (p_now - coalesce(l.progress_at, l.started_at))) * 1000
-              - coalesce((cfg #>> '{live,staleMs}')::numeric, 10000);
-  if v_silent >= 0 then
-    v_extra := floor(v_silent / greatest(1, coalesce((cfg #>> '{live,fallbackSlotMs}')::numeric, 2500)))::integer + 1;
-  end if;
-  return greatest(0, least(v_size, l.progress + v_extra));
-end;
-$$;
-
-create or replace function public.nexamon_live_viewer_count(p_live uuid, p_now timestamptz)
-returns integer
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select count(*)::integer from public.nexamon_live_viewers v
-   where v.live_id = p_live
-     and v.seen_at > p_now - make_interval(secs => coalesce((public.nexamon_cfg() #>> '{live,viewerSeconds}')::integer, 10));
-$$;
-
-create or replace function public.nexamon_live_reactions_json(p_live uuid, p_now timestamptz)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'emoji', r.emoji, 'at', r.at) order by r.id), '[]'::jsonb)
-    from (select * from public.nexamon_live_reactions x
-           where x.live_id = p_live and x.at > p_now - interval '12 seconds'
-           order by x.id desc limit 30) r;
-$$;
-
--- A bought pack becomes a live opening, unless the opener does not want spectators
-create or replace function public.nexamon_pack_live()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  cfg jsonb := public.nexamon_cfg();
-begin
-  if coalesce((select x.allow_watch from public.nexamon_presence x where x.player_id = new.player_id), true) then
-    insert into public.nexamon_live (player_id, kind, pack_id, set_key, cards, started_at, ends_at)
-    values (new.player_id, 'pack', new.id, new.set_key, new.cards, new.opened_at,
-            new.opened_at + public.nexamon_ms(coalesce((cfg #>> '{live,staleMs}')::numeric, 10000)
-                                              + coalesce((cfg ->> 'packSize')::numeric, 5) * coalesce((cfg #>> '{live,fallbackSlotMs}')::numeric, 2500)
-                                              + coalesce((cfg #>> '{live,lingerMs}')::numeric, 8000)))
-    on conflict (pack_id) do nothing;
-  end if;
-  return new;
-end;
-$$;
-drop trigger if exists nexamon_pack_live on public.nexamon_packs;
-create trigger nexamon_pack_live after insert on public.nexamon_packs for each row execute function public.nexamon_pack_live();
-
--- One live opening as the lobby lists it
-create or replace function public.nexamon_live_row_json(l public.nexamon_live, p_viewer uuid, p_now timestamptz)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select jsonb_build_object('id', l.id, 'kind', l.kind, 'set', l.set_key, 'battle_id', l.battle_id,
-                            'player', public.nexamon_figure_json(l.player_id),
-                            'opponent', case when l.kind = 'battle'
-                                          then public.nexamon_figure_json((select b.opponent_id from public.nexamon_battles b where b.id = l.battle_id)) end,
-                            'is_me', l.player_id = p_viewer
-                                     or (l.kind = 'battle' and exists (select 1 from public.nexamon_battles b
-                                                                        where b.id = l.battle_id and p_viewer in (b.challenger_id, b.opponent_id))),
-                            'started_at', l.started_at, 'ends_at', l.ends_at,
-                            'viewers', public.nexamon_live_viewer_count(l.id, p_now));
-$$;
-
--- A Pack Battle as the players and spectators see it at p_now: the pulls only from the shared start, slot by slot
--- (battleKnownSlots), totals of what is known, the winner from decide_at (minus leadMs)
-create or replace function public.nexamon_battle_json(b public.nexamon_battles, p_viewer uuid, p_now timestamptz)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  cfg     jsonb := public.nexamon_cfg();
-  v_size  integer := coalesce((cfg ->> 'packSize')::integer, 5);
-  v_lead  numeric := coalesce((cfg #>> '{battles,leadMs}')::numeric, 800);
-  v_tear  numeric := coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400);
-  v_slot  numeric := coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800);
-  v_known integer := 0;
-  v_done  boolean := false;
-  v_status text := b.status;
-  v_ms    numeric;
-  v_ca    jsonb := '[]'::jsonb;
-  v_oa    jsonb := '[]'::jsonb;
-  v_live  uuid;
-begin
-  if b.status = 'pending' and b.expires_at <= p_now then
-    v_status := 'expired';
-  end if;
-  if b.status = 'accepted' then
-    v_status := case when p_now >= b.ends_at then 'done' else 'running' end;
-    if p_now >= b.starts_at then
-      v_ms := extract(epoch from (p_now - b.starts_at)) * 1000 - v_tear + v_lead;
-      if v_ms >= 0 then
-        v_known := least(v_size, floor(v_ms / v_slot)::integer + 1);
-      end if;
-    end if;
-    v_done := p_now >= b.decide_at - public.nexamon_ms(v_lead);
-    select coalesce(jsonb_agg(x order by (x ->> 'slot')::integer), '[]'::jsonb) into v_ca
-      from jsonb_array_elements(coalesce(b.challenger_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known;
-    select coalesce(jsonb_agg(x order by (x ->> 'slot')::integer), '[]'::jsonb) into v_oa
-      from jsonb_array_elements(coalesce(b.opponent_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known;
-  end if;
-  select l.id into v_live from public.nexamon_live l where l.battle_id = b.id;
-  return jsonb_build_object(
-    'id', b.id, 'set', b.set_key, 'status', v_status, 'price_cents', b.price_cents,
-    'challenger', public.nexamon_figure_json(b.challenger_id), 'opponent', public.nexamon_figure_json(b.opponent_id),
-    'me', case when p_viewer = b.challenger_id then 'challenger' when p_viewer = b.opponent_id then 'opponent' end,
-    'created_at', b.created_at, 'expires_at', b.expires_at, 'accepted_at', b.accepted_at, 'starts_at', b.starts_at,
-    'decide_at', b.decide_at, 'ends_at', b.ends_at, 'tear_ms', v_tear, 'slot_ms', v_slot,
-    'challenger_cards', v_ca, 'opponent_cards', v_oa,
-    'challenger_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_ca) x), 0),
-    'opponent_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_oa) x), 0),
-    'winner', case when v_done then case when b.winner_id = b.challenger_id then 'challenger'
-                                         when b.winner_id = b.opponent_id then 'opponent' end end,
-    'tie_break', case when v_done then b.tie_break end,
-    'coin_seed', case when v_done then b.coin_seed end,
-    'abort_reason', b.abort_reason,
-    'live_id', v_live,
-    'viewers', case when v_live is null then 0 else public.nexamon_live_viewer_count(v_live, p_now) end,
-    'reactions', case when v_live is null then '[]'::jsonb else public.nexamon_live_reactions_json(v_live, p_now) end,
-    'server_time', p_now);
-end;
-$$;
-
-create or replace function public.nexamon_lobby(p_allow_watch boolean default true)
-returns jsonb
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-declare
-  cfg      jsonb := public.nexamon_cfg();
-  v_player uuid;
-  v_now    timestamptz := public.game_now();
-  v_secs   integer := coalesce((cfg #>> '{presence,presenceSeconds}')::integer, 60);
-  v_max    integer := coalesce((cfg #>> '{presence,maxPlayers}')::integer, 24);
-  v_last   timestamptz;
-begin
-  v_player := public.require_player();
-  perform public.nexamon_require_unlock(v_player);
-  insert into public.nexamon_presence (player_id, seen_at, allow_watch)
-  values (v_player, v_now, coalesce(p_allow_watch, true))
-  on conflict (player_id) do update set seen_at = excluded.seen_at, allow_watch = excluded.allow_watch;
-  -- open challenges past their time are expired; old live openings go
-  update public.nexamon_battles set status = 'expired', responded_at = expires_at
-   where status = 'pending' and expires_at <= v_now and v_player in (challenger_id, opponent_id);
-  delete from public.nexamon_live where ends_at < v_now - interval '1 hour';
-  select max(b.created_at) into v_last from public.nexamon_battles b where b.challenger_id = v_player;
-  return jsonb_build_object(
-    'players', coalesce((
-      select jsonb_agg(public.nexamon_figure_json(p.id) || jsonb_build_object(
-                         'is_friend', true,
-                         'opening', exists (select 1 from public.nexamon_live l where l.player_id = p.id and l.kind = 'pack' and l.ends_at > v_now),
-                         'battling', exists (select 1 from public.nexamon_battles b
-                                              where p.id in (b.challenger_id, b.opponent_id)
-                                                and ((b.status = 'accepted' and b.ends_at > v_now) or (b.status = 'pending' and b.expires_at > v_now))))
-                       order by x.seen_at desc, p.id)
-        from (select y.player_id, y.seen_at from public.nexamon_presence y
-                join public.friendships f on f.status = 'accepted'
-                 and ((f.requester_id = v_player and f.addressee_id = y.player_id) or (f.addressee_id = v_player and f.requester_id = y.player_id))
-               where y.seen_at > v_now - make_interval(secs => v_secs) and y.player_id <> v_player
-               order by y.seen_at desc limit v_max) x
-        join public.profiles p on p.id = x.player_id and not p.is_deactivated), '[]'::jsonb),
-    'live', coalesce((
-      select jsonb_agg(public.nexamon_live_row_json(l, v_player, v_now) order by l.started_at desc)
-        from (select * from public.nexamon_live z where z.ends_at > v_now and z.started_at <= v_now
-               order by z.started_at desc limit coalesce((cfg #>> '{live,maxSessions}')::integer, 12)) l), '[]'::jsonb),
-    'battles', coalesce((
-      select jsonb_agg(public.nexamon_battle_json(b, v_player, v_now) order by b.created_at desc)
-        from public.nexamon_battles b
-       where v_player in (b.challenger_id, b.opponent_id)
-         and ((b.status = 'pending' and b.expires_at > v_now) or (b.status = 'accepted' and b.ends_at > v_now))), '[]'::jsonb),
-    'limits', jsonb_build_object(
-      'per_hour', coalesce((cfg #>> '{battles,perHour}')::integer, 6),
-      'used', (select count(*) from public.nexamon_battles b
-                where v_player in (b.challenger_id, b.opponent_id) and b.status = 'accepted' and b.accepted_at > v_now - interval '1 hour'),
-      'cooldown_until', case when v_last is not null
-                               and v_last + make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) > v_now
-                             then v_last + make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) end),
-    'allow_watch', coalesce(p_allow_watch, true),
-    'server_time', v_now);
-end;
-$$;
-comment on function public.nexamon_lobby(boolean) is
-  'RPC (presence, ADR-172): marks the caller as on the Collectibles tab and returns {players: friends on the tab as '
-  'figures with opening/battling, live: running live openings, battles: own open and running Pack Battles, limits, '
-  'allow_watch, server_time}; errors nexamon_locked.';
-
-create or replace function public.nexamon_live_progress(p_pack_id uuid, p_revealed integer)
-returns jsonb
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-declare
-  cfg      jsonb := public.nexamon_cfg();
-  v_player uuid;
-  v_now    timestamptz := public.game_now();
-  l        public.nexamon_live;
-begin
-  v_player := public.require_player();
-  if p_pack_id is null or p_revealed is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  select * into l from public.nexamon_live x where x.pack_id = p_pack_id and x.player_id = v_player for update;
-  if l.id is null then
-    -- watching is off, or the pack is not the caller's: nothing to report, nobody watches
-    return jsonb_build_object('live_id', null, 'viewers', 0, 'reactions', '[]'::jsonb);
-  end if;
-  if greatest(0, least(coalesce((cfg ->> 'packSize')::integer, 5), p_revealed)) > l.progress then
-    update public.nexamon_live
-       set progress = greatest(0, least(coalesce((cfg ->> 'packSize')::integer, 5), p_revealed)), progress_at = v_now,
-           ends_at = least(started_at + public.nexamon_ms(coalesce((cfg #>> '{live,maxMs}')::numeric, 120000)),
-                           greatest(ends_at, v_now + public.nexamon_ms(coalesce((cfg #>> '{live,lingerMs}')::numeric, 8000))))
-     where id = l.id;
-  elsif l.progress_at is null or l.progress_at < v_now - interval '2 seconds' then
-    -- the opener still looks at the card: the fallback pace waits
-    update public.nexamon_live set progress_at = v_now where id = l.id;
-  end if;
-  return jsonb_build_object('live_id', l.id, 'viewers', public.nexamon_live_viewer_count(l.id, v_now),
-                            'reactions', public.nexamon_live_reactions_json(l.id, v_now));
-end;
-$$;
-comment on function public.nexamon_live_progress(uuid, integer) is
-  'RPC (live opening, ADR-172): the opener''s page reports how many cards of a bought pack it has shown; returns '
-  '{live_id, viewers, reactions}. Without a live opening (watching off) live_id is null. Errors invalid_argument.';
-
-create or replace function public.get_nexamon_live(p_live_id uuid)
-returns jsonb
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_now    timestamptz := public.game_now();
-  l        public.nexamon_live;
-  v_n      integer;
-begin
-  v_player := public.require_player();
-  perform public.nexamon_require_unlock(v_player);
-  select * into l from public.nexamon_live x where x.id = p_live_id;
-  if l.id is null or l.started_at > v_now then
-    perform public.api_error('nexamon_live_unknown');
-  end if;
-  if l.player_id <> v_player and l.ends_at > v_now then
-    insert into public.nexamon_live_viewers (live_id, player_id, seen_at) values (l.id, v_player, v_now)
-    on conflict (live_id, player_id) do update set seen_at = excluded.seen_at;
-  end if;
-  v_n := case when l.player_id = v_player or l.ends_at <= v_now then coalesce(jsonb_array_length(l.cards), 0)
-              else public.nexamon_live_visible(l, v_now) end;
-  return public.nexamon_live_row_json(l, v_player, v_now) || jsonb_build_object(
-    'progress', v_n,
-    'cards', case when l.kind = 'pack'
-                  then coalesce((select jsonb_agg(jsonb_build_object('slot', (x ->> 'slot')::integer, 'card_key', x ->> 'card_key',
-                                                                     'rarity', x ->> 'rarity', 'condition', x ->> 'condition',
-                                                                     'serial', (x ->> 'serial')::bigint,
-                                                                     'value_cents', (x ->> 'value_cents')::bigint)
-                                                  order by (x ->> 'slot')::integer)
-                                   from jsonb_array_elements(l.cards) x where (x ->> 'slot')::integer <= v_n), '[]'::jsonb)
-                  else '[]'::jsonb end,
-    'done', l.ends_at <= v_now,
-    'reactions', public.nexamon_live_reactions_json(l.id, v_now),
-    'server_time', v_now);
-end;
-$$;
-comment on function public.get_nexamon_live(uuid) is
-  'RPC (spectating, ADR-172): one live opening with the cards the opener has already seen (fallback pace after '
-  'live.staleMs), viewers and recent reactions; counts the caller as a viewer. Errors nexamon_locked, nexamon_live_unknown.';
-
-create or replace function public.nexamon_live_react(p_request_id uuid, p_live_id uuid, p_emoji text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  cfg      jsonb := public.nexamon_cfg();
-  v_player uuid;
-  v_replay jsonb;
-  v_now    timestamptz := public.game_now();
-  l        public.nexamon_live;
-begin
-  v_player := public.require_player();
-  perform public.nexamon_require_unlock(v_player);
-  if p_request_id is null or p_live_id is null or p_emoji is null
-     or not coalesce(cfg #> '{live,reactions}', '[]'::jsonb) ? p_emoji then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'nexamon_live_react');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  select * into l from public.nexamon_live x where x.id = p_live_id;
-  if l.id is null or l.ends_at <= v_now or l.started_at > v_now then
-    perform public.api_error('nexamon_live_unknown');
-  end if;
-  if not public.rate_limit_hit(v_player, 'nexamon_react', coalesce((cfg #>> '{live,reactionsPerMinute}')::integer, 30), 60) then
-    perform public.api_error('rate_limited');
-  end if;
-  insert into public.nexamon_live_reactions (live_id, player_id, emoji, at) values (l.id, v_player, p_emoji, v_now);
-  return public.request_complete(v_player, p_request_id, jsonb_build_object('reactions', public.nexamon_live_reactions_json(l.id, v_now)));
-end;
-$$;
-comment on function public.nexamon_live_react(uuid, uuid, text) is
-  'RPC (spectating, ADR-172): an emoji burst on a live opening (live.reactions); returns {reactions}. Errors '
-  'nexamon_locked, invalid_argument, nexamon_live_unknown, rate_limited.';
-
-do $do$
-declare
-  f text;
-begin
-  foreach f in array array['public.nexamon_lobby(boolean)', 'public.nexamon_live_progress(uuid, integer)',
-                           'public.get_nexamon_live(uuid)', 'public.nexamon_live_react(uuid, uuid, text)'] loop
-    execute format('revoke all on function %s from public, anon', f);
-    execute format('grant execute on function %s to authenticated', f);
-  end loop;
-  foreach f in array array['public.nexamon_ms(numeric)', 'public.nexamon_figure_json(uuid)', 'public.nexamon_on_tab(uuid, timestamptz)',
-                           'public.nexamon_live_visible(public.nexamon_live, timestamptz)',
-                           'public.nexamon_live_viewer_count(uuid, timestamptz)',
-                           'public.nexamon_live_reactions_json(uuid, timestamptz)', 'public.nexamon_pack_live()',
-                           'public.nexamon_live_row_json(public.nexamon_live, uuid, timestamptz)',
-                           'public.nexamon_battle_json(public.nexamon_battles, uuid, timestamptz)'] loop
-    execute format('revoke all on function %s from public, anon, authenticated', f);
-  end loop;
-end;
-$do$;
-
--- ===== supabase/updates/20261204006320_nexamon_battles.sql =====
--- ===== idempotent copy of migrations/20261204006320_nexamon_battles.sql =====
--- (the migration itself is written idempotently; keep both files identical below this line)
--- =============================================================================
--- =============================================================================
--- NEXA · 6320 · Nexamon Pack Battles: challenge, accept, both packs at once, the winner takes all (ADR-172)
--- =============================================================================
--- * challenge_nexamon_battle(p_request_id, p_nickname, p_set): a friend who is on the Collectibles tab right now,
---   both unlocked, one battle at a time per player, battles.cooldownSeconds between challenges, battles.perHour
---   accepted battles per hour. Open for battles.challengeSeconds. Nothing is paid yet.
--- * respond_nexamon_battle(p_request_id, p_battle_id, p_accept): the challenged friend says yes or no. Yes: both pay
---   one pack of the set (cash -> households, as buy_nexamon_pack), both packs are opened at once with the same pull
---   rules (nexamon_open_pack, every copy counts for the population), the higher total value at pull time wins
---   (tie: rarest single card, then coin_seed % 2 = 0 for the challenger; decideBattle). The winner owns all copies at
---   once; the loser keeps nothing. If the challenger cannot pay any more, the battle is aborted and nobody pays
---   (both payments happen in one transaction with the pulls: a battle never stops between paying and pulling).
---   The result stands even if somebody closes the page during the reveal.
--- * cancel_nexamon_battle(p_request_id, p_battle_id): the challenger takes an open challenge back.
--- * get_nexamon_battle(p_battle_id): the players and anyone watching see the pulls slot by slot from the shared start
---   (nexamon_battle_json); the battle is a live opening for spectators.
--- If public.nexamon_bonus_recompute(uuid) exists (card account bonuses), it runs for both players after the transfer.
--- Errors: nexamon_locked, invalid_argument, nexamon_unknown, nexamon_battle_*, insufficient_funds, rate_limited.
--- Idempotent: runs unchanged as supabase/updates/20261204006320_nexamon_battles.sql.
-
-create or replace function public.nexamon_battle_busy(p_player uuid, p_now timestamptz)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (select 1 from public.nexamon_battles b
-                  where p_player in (b.challenger_id, b.opponent_id)
-                    and ((b.status = 'pending' and b.expires_at > p_now) or (b.status = 'accepted' and b.ends_at > p_now)));
-$$;
-
-create or replace function public.nexamon_battles_last_hour(p_player uuid, p_now timestamptz)
-returns integer
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select count(*)::integer from public.nexamon_battles b
-   where p_player in (b.challenger_id, b.opponent_id) and b.status = 'accepted' and b.accepted_at > p_now - interval '1 hour';
-$$;
-
-create or replace function public.nexamon_rarity_rank(p_rarity text)
-returns integer
-language sql
-immutable
-set search_path = ''
-as $$
-  select coalesce(array_position(array['common', 'rare', 'ultra', 'prisma', 'legendary'], p_rarity), 0) - 1;
-$$;
-
--- Who wins (decideBattle): the higher total value, then the rarest single card, then the coin (even seed: challenger)
-create or replace function public.nexamon_battle_decide(p_challenger jsonb, p_opponent jsonb, p_seed bigint)
-returns jsonb
-language plpgsql
-immutable
-set search_path = ''
-as $$
-declare
-  v_csum  bigint;
-  v_osum  bigint;
-  v_crank integer;
-  v_orank integer;
-begin
-  select coalesce(sum((x ->> 'value_cents')::bigint), 0), coalesce(max(public.nexamon_rarity_rank(x ->> 'rarity')), -1)
-    into v_csum, v_crank from jsonb_array_elements(coalesce(p_challenger, '[]'::jsonb)) x;
-  select coalesce(sum((x ->> 'value_cents')::bigint), 0), coalesce(max(public.nexamon_rarity_rank(x ->> 'rarity')), -1)
-    into v_osum, v_orank from jsonb_array_elements(coalesce(p_opponent, '[]'::jsonb)) x;
-  return jsonb_build_object(
-    'challenger_cents', v_csum, 'opponent_cents', v_osum,
-    'tie_break', case when v_csum <> v_osum then 'value' when v_crank <> v_orank then 'rarest' else 'coin' end,
-    'winner', case when v_csum <> v_osum then case when v_csum > v_osum then 'challenger' else 'opponent' end
-                   when v_crank <> v_orank then case when v_crank > v_orank then 'challenger' else 'opponent' end
-                   when abs(coalesce(p_seed, 0)) % 2 = 0 then 'challenger' else 'opponent' end);
-end;
-$$;
-
-create or replace function public.challenge_nexamon_battle(p_request_id uuid, p_nickname text, p_set text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  cfg      jsonb := public.nexamon_cfg();
-  v_player uuid;
-  v_other  uuid;
-  v_replay jsonb;
-  v_now    timestamptz := public.game_now();
-  v_price  bigint;
-  v_last   timestamptz;
-  b        public.nexamon_battles;
-begin
-  v_player := public.require_player();
-  perform public.nexamon_require_unlock(v_player);
-  if p_request_id is null or p_nickname is null or p_set is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'challenge_nexamon_battle');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  v_price := (cfg #>> array['sets', p_set, 'packPriceCents'])::bigint;
-  if v_price is null or v_price < 0 or not exists (select 1 from public.nexamon_cards k where k.set_key = p_set and k.in_catalogue) then
-    perform public.api_error('nexamon_unknown');
-  end if;
-  select p.id into v_other from public.profiles p where lower(p.nickname) = lower(p_nickname) and not p.is_deactivated;
-  if v_other is null then
-    perform public.api_error('nexamon_battle_unknown');
-  end if;
-  if v_other = v_player then
-    perform public.api_error('nexamon_battle_self');
-  end if;
-  if not exists (select 1 from public.friendships f
-                  where f.status = 'accepted'
-                    and ((f.requester_id = v_player and f.addressee_id = v_other) or (f.requester_id = v_other and f.addressee_id = v_player))) then
-    perform public.api_error('nexamon_battle_not_friend');
-  end if;
-  if not public.nexamon_unlocked(v_other) then
-    perform public.api_error('nexamon_battle_opponent_locked');
-  end if;
-  if not public.nexamon_on_tab(v_other, v_now) then
-    perform public.api_error('nexamon_battle_not_here');
-  end if;
-  -- one battle at a time: the two players' rows are locked in a fixed order
-  perform 1 from public.profiles p where p.id in (v_player, v_other) order by p.id for update;
-  update public.nexamon_battles set status = 'expired', responded_at = expires_at
-   where status = 'pending' and expires_at <= v_now and (challenger_id in (v_player, v_other) or opponent_id in (v_player, v_other));
-  if public.nexamon_battle_busy(v_player, v_now) or public.nexamon_battle_busy(v_other, v_now) then
-    perform public.api_error('nexamon_battle_busy');
-  end if;
-  select max(x.created_at) into v_last from public.nexamon_battles x where x.challenger_id = v_player;
-  if v_last is not null and v_last > v_now - make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) then
-    perform public.api_error('nexamon_battle_cooldown');
-  end if;
-  if public.nexamon_battles_last_hour(v_player, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6)
-     or public.nexamon_battles_last_hour(v_other, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6) then
-    perform public.api_error('nexamon_battle_limit');
-  end if;
-  if public.lock_player_accounts(v_player) < v_price then
-    perform public.api_error('insufficient_funds');
-  end if;
-  insert into public.nexamon_battles (challenger_id, opponent_id, set_key, price_cents, created_at, expires_at)
-  values (v_player, v_other, p_set, v_price, v_now,
-          v_now + make_interval(secs => coalesce((cfg #>> '{battles,challengeSeconds}')::integer, 60)))
-  returning * into b;
-  perform public.social_notify(v_other, 'nexamon_battle', 'Pack Battle!',
-    (select p.nickname from public.profiles p where p.id = v_player) || ' fordert dich zum Pack Battle heraus: '
-      || coalesce(cfg #>> array['sets', p_set, 'name'], p_set) || ', je ein Pack für ' || public.format_eur(v_price) || '.',
-    jsonb_build_object('battle_id', b.id, 'set', p_set, 'price_cents', v_price),
-    '/nexamon?battle=' || b.id::text, 'nexamon:battle:challenge:' || b.id::text);
-  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
-end;
-$$;
-comment on function public.challenge_nexamon_battle(uuid, text, text) is
-  'RPC (ADR-172): challenges a friend who is on the Collectibles tab to a Pack Battle with one pack of a set; returns '
-  '{battle}. Errors nexamon_locked, invalid_argument, nexamon_unknown, nexamon_battle_unknown, nexamon_battle_self, '
-  'nexamon_battle_not_friend, nexamon_battle_opponent_locked, nexamon_battle_not_here, nexamon_battle_busy, '
-  'nexamon_battle_cooldown, nexamon_battle_limit, insufficient_funds.';
-
--- One side of an accepted battle: pays the pack and opens it in the player's name (is_new, feed, missions)
-create or replace function public.nexamon_battle_pull(b public.nexamon_battles, p_player uuid, p_now timestamptz)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  cfg     jsonb := public.nexamon_cfg();
-  v_cards jsonb;
-  r       record;
-begin
-  if b.price_cents > 0 then
-    perform public.ledger_transfer(public.ledger_player_account(p_player, 'player_cash'), public.ledger_system_account('households'),
-                                   b.price_cents, 'nexamon_pack', 'Pack Battle: ' || coalesce(cfg #>> array['sets', b.set_key, 'name'], b.set_key),
-                                   'nexamon_battle', b.id, 'nexamon:battle:' || b.id::text || ':' || p_player::text, p_player,
-                                   jsonb_build_object('set', b.set_key, 'price_cents', b.price_cents, 'battle_id', b.id));
-  end if;
-  v_cards := public.nexamon_open_pack(b.set_key, p_player, null, b.id, p_now);
-  perform public.mission_event(p_player, 'nexamon_pack', 1, null);
-  for r in select x ->> 'rarity' as rarity from jsonb_array_elements(v_cards) x loop
-    if r.rarity <> 'common' then
-      perform public.mission_event(p_player, 'nexamon_rare', 1, null);
-    end if;
-    if r.rarity in ('ultra', 'prisma', 'legendary') then
-      perform public.mission_event(p_player, 'nexamon_ultra', 1, null);
-    end if;
-  end loop;
-  return v_cards;
-end;
-$$;
-
-create or replace function public.respond_nexamon_battle(p_request_id uuid, p_battle_id uuid, p_accept boolean)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  cfg      jsonb := public.nexamon_cfg();
-  v_player uuid;
-  v_replay jsonb;
-  v_now    timestamptz := public.game_now();
-  b        public.nexamon_battles;
-  v_ccash  bigint;
-  v_ocash  bigint;
-  v_ca     jsonb;
-  v_oa     jsonb;
-  v_csum   bigint;
-  v_osum   bigint;
-  v_seed   bigint;
-  v_dec    jsonb;
-  v_win    uuid;
-  v_lose   uuid;
-  v_tie    text;
-  v_names  text;
-  v_starts timestamptz;
-  v_decide timestamptz;
-begin
-  v_player := public.require_player();
-  perform public.nexamon_require_unlock(v_player);
-  if p_request_id is null or p_battle_id is null or p_accept is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'respond_nexamon_battle');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  select * into b from public.nexamon_battles x where x.id = p_battle_id for update;
-  if b.id is null or v_player not in (b.challenger_id, b.opponent_id) then
-    perform public.api_error('nexamon_battle_unknown');
-  end if;
-  if v_player <> b.opponent_id then
-    perform public.api_error('nexamon_battle_not_yours');
-  end if;
-  if b.status = 'pending' and b.expires_at <= v_now then
-    update public.nexamon_battles set status = 'expired', responded_at = expires_at where id = b.id returning * into b;
-    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
-  end if;
-  if b.status <> 'pending' then
-    perform public.api_error('nexamon_battle_closed');
-  end if;
-
-  if not p_accept then
-    update public.nexamon_battles set status = 'declined', responded_at = v_now where id = b.id returning * into b;
-    perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle abgelehnt',
-      (select p.nickname from public.profiles p where p.id = b.opponent_id) || ' will gerade nicht battlen.',
-      jsonb_build_object('battle_id', b.id), '/nexamon', 'nexamon:battle:declined:' || b.id::text);
-    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
-  end if;
-
-  if public.nexamon_battles_last_hour(v_player, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6)
-     or public.nexamon_battles_last_hour(b.challenger_id, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6) then
-    perform public.api_error('nexamon_battle_limit');
-  end if;
-  perform public.nexamon_sync(v_now);
-  -- both accounts in a fixed order
-  if b.challenger_id < b.opponent_id then
-    v_ccash := public.lock_player_accounts(b.challenger_id);
-    v_ocash := public.lock_player_accounts(b.opponent_id);
-  else
-    v_ocash := public.lock_player_accounts(b.opponent_id);
-    v_ccash := public.lock_player_accounts(b.challenger_id);
-  end if;
-  if v_ocash < b.price_cents then
-    perform public.api_error('insufficient_funds');
-  end if;
-  if v_ccash < b.price_cents or not public.nexamon_unlocked(b.challenger_id) then
-    -- the challenger cannot pay any more: nobody pays, nothing is pulled
-    update public.nexamon_battles
-       set status = 'aborted', responded_at = v_now,
-           abort_reason = case when v_ccash < b.price_cents then 'challenger_funds' else 'challenger_locked' end
-     where id = b.id returning * into b;
-    perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle abgebrochen',
-      'Für das Pack Battle hat dein Geld nicht mehr gereicht. Niemand hat bezahlt.',
-      jsonb_build_object('battle_id', b.id), '/nexamon', 'nexamon:battle:aborted:' || b.id::text);
-    return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
-  end if;
-
-  v_ca := public.nexamon_battle_pull(b, b.challenger_id, v_now);
-  v_oa := public.nexamon_battle_pull(b, b.opponent_id, v_now);
-  update public.nexamon_set_state set player_packs_opened = player_packs_opened + 2 where set_key = b.set_key;
-  v_seed := floor(random() * 2147483647)::bigint;
-  v_dec := public.nexamon_battle_decide(v_ca, v_oa, v_seed);
-  v_csum := (v_dec ->> 'challenger_cents')::bigint;
-  v_osum := (v_dec ->> 'opponent_cents')::bigint;
-  v_tie := v_dec ->> 'tie_break';
-  v_win := case when v_dec ->> 'winner' = 'challenger' then b.challenger_id else b.opponent_id end;
-  v_lose := case when v_win = b.challenger_id then b.opponent_id else b.challenger_id end;
-  -- the winner takes every copy of both packs; listings cannot exist yet
-  update public.nexamon_copies c set owner_id = v_win, acquired_at = v_now
-   where c.id in (select (x ->> 'copy_id')::uuid from jsonb_array_elements(v_ca || v_oa) x) and c.owner_id = v_lose;
-  if to_regprocedure('public.nexamon_bonus_recompute(uuid)') is not null then
-    execute 'select public.nexamon_bonus_recompute($1)' using v_win;
-    execute 'select public.nexamon_bonus_recompute($1)' using v_lose;
-  end if;
-
-  v_starts := v_now + public.nexamon_ms(coalesce((cfg #>> '{battles,startDelayMs}')::numeric, 3000));
-  v_decide := v_starts + public.nexamon_ms(coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400)
-                                           + coalesce((cfg ->> 'packSize')::numeric, 5) * coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800));
-  update public.nexamon_battles
-     set status = 'accepted', responded_at = v_now, accepted_at = v_now, starts_at = v_starts, decide_at = v_decide,
-         ends_at = v_decide + public.nexamon_ms(coalesce((cfg #>> '{battles,outroMs}')::numeric, 8000)),
-         challenger_cards = v_ca, opponent_cards = v_oa, challenger_cents = v_csum, opponent_cents = v_osum,
-         winner_id = v_win, tie_break = v_tie, coin_seed = v_seed
-   where id = b.id returning * into b;
-  insert into public.nexamon_live (player_id, kind, battle_id, set_key, started_at, ends_at)
-  values (b.challenger_id, 'battle', b.id, b.set_key, v_now, b.ends_at)
-  on conflict (battle_id) do nothing;
-
-  v_names := (select p.nickname from public.profiles p where p.id = b.challenger_id) || ' gegen '
-             || (select p.nickname from public.profiles p where p.id = b.opponent_id);
-  perform public.feed_post(v_win, 'nexamon_battle_won',
-                           jsonb_build_object('set', b.set_key, 'other', (select p.nickname from public.profiles p where p.id = v_lose),
-                                              'total_cents', v_csum + v_osum, 'cards', jsonb_array_length(v_ca) + jsonb_array_length(v_oa)),
-                           'nexamon:battle:won:' || b.id::text);
-  if v_csum + v_osum >= coalesce((cfg #>> '{battles,gossipMinCents}')::bigint, 500000) then
-    perform public.feed_post(v_win, 'nexamon_battle_big',
-                             jsonb_build_object('set', b.set_key, 'other', (select p.nickname from public.profiles p where p.id = v_lose),
-                                                'total_cents', v_csum + v_osum),
-                             'nexamon:battle:big:' || b.id::text);
-  end if;
-  perform public.social_notify(b.challenger_id, 'nexamon_battle', 'Pack Battle läuft', v_names || ': die Packs gehen auf!',
-    jsonb_build_object('battle_id', b.id), '/nexamon?battle=' || b.id::text, 'nexamon:battle:accepted:' || b.id::text);
-  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
-end;
-$$;
-comment on function public.respond_nexamon_battle(uuid, uuid, boolean) is
-  'RPC (ADR-172): the challenged friend accepts (both pay one pack, both packs open at once, the higher total value '
-  'takes all copies) or declines a Pack Battle; returns {battle} (pulls only from the shared start). A challenger '
-  'without the money any more ends it as aborted, nobody pays. Errors nexamon_locked, invalid_argument, '
-  'nexamon_battle_unknown, nexamon_battle_not_yours, nexamon_battle_closed, nexamon_battle_limit, insufficient_funds.';
-
-create or replace function public.cancel_nexamon_battle(p_request_id uuid, p_battle_id uuid)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  v_now    timestamptz := public.game_now();
-  b        public.nexamon_battles;
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_battle_id is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'cancel_nexamon_battle');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  select * into b from public.nexamon_battles x where x.id = p_battle_id for update;
-  if b.id is null or v_player not in (b.challenger_id, b.opponent_id) then
-    perform public.api_error('nexamon_battle_unknown');
-  end if;
-  if v_player <> b.challenger_id then
-    perform public.api_error('nexamon_battle_not_yours');
-  end if;
-  if b.status <> 'pending' then
-    perform public.api_error('nexamon_battle_closed');
-  end if;
-  update public.nexamon_battles set status = case when expires_at <= v_now then 'expired' else 'cancelled' end, responded_at = v_now
-   where id = b.id returning * into b;
-  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
-end;
-$$;
-comment on function public.cancel_nexamon_battle(uuid, uuid) is
-  'RPC (ADR-172): the challenger takes an open Pack Battle challenge back; returns {battle}. Errors invalid_argument, '
-  'nexamon_battle_unknown, nexamon_battle_not_yours, nexamon_battle_closed.';
-
-create or replace function public.get_nexamon_battle(p_battle_id uuid)
-returns jsonb
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_now    timestamptz := public.game_now();
-  b        public.nexamon_battles;
-  l        public.nexamon_live;
-begin
-  v_player := public.require_player();
-  perform public.nexamon_require_unlock(v_player);
-  select * into b from public.nexamon_battles x where x.id = p_battle_id;
-  if b.id is null then
-    perform public.api_error('nexamon_battle_unknown');
-  end if;
-  if v_player not in (b.challenger_id, b.opponent_id) then
-    -- spectators: only a battle that is (or was) live
-    select * into l from public.nexamon_live x where x.battle_id = b.id;
-    if l.id is null then
-      perform public.api_error('nexamon_battle_unknown');
-    end if;
-    if l.ends_at > v_now then
-      insert into public.nexamon_live_viewers (live_id, player_id, seen_at) values (l.id, v_player, v_now)
-      on conflict (live_id, player_id) do update set seen_at = excluded.seen_at;
-    end if;
-  end if;
-  return jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now));
-end;
-$$;
-comment on function public.get_nexamon_battle(uuid) is
-  'RPC (ADR-172): a Pack Battle for its players and spectators (counted as viewers): the pulls slot by slot from the '
-  'shared start, totals, the winner from decide_at; returns {battle}. Errors nexamon_locked, nexamon_battle_unknown.';
-
-do $do$
-declare
-  f text;
-begin
-  foreach f in array array['public.challenge_nexamon_battle(uuid, text, text)', 'public.respond_nexamon_battle(uuid, uuid, boolean)',
-                           'public.cancel_nexamon_battle(uuid, uuid)', 'public.get_nexamon_battle(uuid)'] loop
-    execute format('revoke all on function %s from public, anon', f);
-    execute format('grant execute on function %s to authenticated', f);
-  end loop;
-  foreach f in array array['public.nexamon_battle_busy(uuid, timestamptz)', 'public.nexamon_battles_last_hour(uuid, timestamptz)',
-                           'public.nexamon_battle_pull(public.nexamon_battles, uuid, timestamptz)',
-                           'public.nexamon_rarity_rank(text)', 'public.nexamon_battle_decide(jsonb, jsonb, bigint)'] loop
-    execute format('revoke all on function %s from public, anon, authenticated', f);
-  end loop;
-end;
-$do$;
-
--- ===== supabase/updates/20261204006330_nexamon_battle_news.sql =====
--- ===== idempotent copy of migrations/20261204006330_nexamon_battle_news.sql =====
--- (the migration itself is written idempotently; keep both files identical below this line)
--- =============================================================================
--- =============================================================================
--- NEXA · 6330 · Nexamon Pack Battles in the feed and as gossip for NEXA Nachrichten (ADR-172)
--- =============================================================================
--- * feed_item_label(): the kinds nexamon_battle_won (every win, for the friends) and nexamon_battle_big (a win of at
---   least battles.gossipMinCents).
--- * news_show_build(): nexamon_battle_big joins the gossip sources, next to nexamon_pull.
--- Replace-patches anchored on the nexamon_pull kind; a clear error if the anchor is missing.
--- Idempotent: runs unchanged as supabase/updates/20261204006330_nexamon_battle_news.sql.
-
-do $do$
-declare
-  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
-  v_old text := $t$    when 'nexamon_pull' then$t$;
-  v_new text := $t$    when 'nexamon_battle_won' then 'Pack Battle gegen ' || coalesce(p_payload ->> 'other', '?') || ' gewonnen'
-    when 'nexamon_battle_big' then 'Großer Sieg im Pack Battle gegen ' || coalesce(p_payload ->> 'other', '?') || ': '
-      || public.format_eur(coalesce((p_payload ->> 'total_cents')::bigint, 0)) || ' an Karten abgeräumt'
-    when 'nexamon_pull' then$t$;
-begin
-  if position('nexamon_battle_big' in v_def) = 0 then
-    if position(v_old in v_def) = 0 then
-      raise exception 'feed_item_label() has an unexpected shape; add the feed kinds nexamon_battle_won/_big (ADR-172) by hand';
-    end if;
-    execute replace(v_def, v_old, v_new);
-  end if;
-end;
-$do$;
-
-do $do$
-declare
-  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
-  v_old text := $t$'nexamon_pull',$t$;
-  v_new text := $t$'nexamon_pull', 'nexamon_battle_big',$t$;
-begin
-  if position('nexamon_battle_big' in v_def) = 0 then
-    if position(v_old in v_def) = 0 then
-      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_battle_big (ADR-172) to the gossip source by hand';
-    end if;
-    execute replace(v_def, v_old, v_new);
-  end if;
-end;
-$do$;
 
 commit;

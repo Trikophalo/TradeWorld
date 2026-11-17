@@ -1374,3 +1374,26 @@ ihren vollen Anteil.
 **NFT-Takt:** Mit zwölf Sammler-NFTs handeln die Sammler 21 bis 24 Mal je Stunde (vorher 15, mit wachsender
 Beliebtheit bis 44, bis die Tagesgrenze erreicht war). 480 je Tag reichen für 20 je Stunde rund um die Uhr. Ein NFT,
 das ein Spieler behält oder zu teuer anbietet, bekommt etwa alle zwei Stunden neue Angebote (65–90 % des Werts).
+
+## Nachtrag: Karten-Boni, Sammlungen und Black-Label-Hype (ADR-171)
+
+| Wert                  | Schlüssel                                       | Stand                                                                                                                |
+| --------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Bonus-Karten          | `nexamon.bonuses.rarities`, `extraNumbers`      | Ultra, Prisma, Legendary und Rare Nr. 60: 54 von 231                                                                 |
+| Bonus je Seltenheit   | `nexamon.bonuses.rarityBps`                     | Rare 0,5 %, Ultra 0,5 %, Prisma 1 %, Legendary 2,5 %                                                                 |
+| Faktor je Set         | `nexamon.bonuses.setBps`                        | Mystic Energy ×1, Super Apex ×1,25, Prismatic Peak ×1,5                                                              |
+| Slab-Boost            | `nexamon.bonuses.slab`                          | ab Note 9 ×1,5, Black Label ×2                                                                                       |
+| Grenzen je Art        | `nexamon.bonuses.caps`                          | XP 10 %, Missions-XP 15 %, Handels-XP 15 %, Gehalt 10 %, Tresor 15 %, Tagesbonus 20 %, Aufträge 10 %                 |
+| Abnehmender Ertrag    | `kneeShareBps`, `tailBps`                       | ab der halben Grenze zählt nur noch die Hälfte                                                                       |
+| Typ-Sammlung          | `nexamon.bonuses.sets.type`                     | +0,5 % × Set, einmalig 3 Booster-Preise und 300 XP                                                                   |
+| Set komplett          | `nexamon.bonuses.sets.complete`                 | +2 % × Set auf XP, einmalig 20 Booster-Preise und 2.500 XP                                                           |
+| Master-Set            | `nexamon.bonuses.sets.master`, `masterMinGrade` | +1 % × Set auf jede Art, einmalig 75 Booster-Preise und 10.000 XP; Prismas und Legendaries als Slab ab 9             |
+| Hype-Chance je Stunde | `nexamon.blackLabelHype.rarityChanceBps`        | Common 0,05 %, Rare 0,1 %, Ultra 0,25 %, Prisma 0,6 %, Legendary 1,2 %, × (1 + Beliebtheit) × 3 / (2 + Black Labels) |
+| Sprung                | `minJumpBps`, `maxJumpBps`                      | +10 % bis +60 % des Faktors                                                                                          |
+| Höchster Faktor       | `capBps`                                        | ×25 (Basis ×10)                                                                                                      |
+| Abklingen             | `decayBps`                                      | 1 % des Überhangs je Stunde, Halbwertszeit rund 69 h                                                                 |
+| Feed und Klatsch ab   | `bigJumpBps`                                    | +40 %                                                                                                                |
+
+Einordnung: Ein voller Satz aller 54 Karten als Black Label erreicht in fünf Arten die Grenze. Ein normaler Sammler
+mit ein paar Ultras hat 1 bis 2 % auf einzelne Arten; die Grenzen verhindern, dass Wale Gehalt oder Zinsen
+vervielfachen. Ein Master-Set von Mystic Energy bringt einmalig 15.000 € (75 × 200 €), von Prismatic Peak 750.000 €.

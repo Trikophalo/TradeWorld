@@ -21,6 +21,8 @@ import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { isHit } from "../lib";
 import { chanceBps, formatChance, formatDecimal, setContents } from "../view";
+import { nexamonCardBonusDef } from "@/lib/sim/nexamon-bonuses";
+import { BonusTag } from "./bonuses";
 import { ConditionBadge, RarityBadge } from "./badges";
 import { CardThumb } from "./card-face";
 import { TiltPack } from "./pack";
@@ -268,6 +270,12 @@ function SetContents({ set, collection }: { set: NexamonSetKey; collection: Nexa
                       <span className="flex flex-col items-start gap-1">
                         <span className="font-semibold text-fg-1">{card.name}</span>
                         <RarityBadge rarity={card.rarity} short />
+                        {nexamonCardBonusDef(card) && (
+                          <BonusTag
+                            bonus={{ ...nexamonCardBonusDef(card)!, boostedBps: 0, active: false }}
+                            showState={false}
+                          />
+                        )}
                         <span className="nums text-fg-2">
                           {t("contents.value")}{" "}
                           {value !== undefined ? (
@@ -361,6 +369,7 @@ function PullRow({ pull }: { pull: NexamonPull }) {
   const t = useTranslations("nexamon");
   const card = nexamonCard(pull.cardKey);
   if (!card) return null;
+  const bonus = nexamonCardBonusDef(card);
   return (
     <li data-testid="pull-row" data-card={pull.cardKey} data-new={pull.isNew}>
       <Dialog.Close asChild>
@@ -380,6 +389,7 @@ function PullRow({ pull }: { pull: NexamonPull }) {
               <ConditionBadge condition={pull.condition} />
               <span className="nums text-xs text-fg-3">{t("serial", { serial: pull.serial })}</span>
             </span>
+            {bonus && <BonusTag bonus={{ ...bonus, boostedBps: bonus.bps, active: true }} className="mt-1" />}
           </span>
           <span className="shrink-0 nums font-semibold text-fg-1">{formatMoney(pull.valueCents)}</span>
         </Link>

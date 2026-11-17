@@ -869,7 +869,7 @@ select tests.assert(
 -- Q. Missions, notification types, privileges; the config goes back
 -- =============================================================================
 select tests.assert(
-  (select count(*) from public.mission_templates where key like '%nexamon%' and params ->> 'unlock' = 'nexamon' and is_active) = 9
+  (select count(*) from public.mission_templates where key like '%nexamon%' and params ->> 'unlock' = 'nexamon' and is_active) = 12  -- 3 more of 6210 (ADR-171)
   and (select count(*) from public.notification_types where key in ('nexamon_sale', 'nexamon_graded')) = 2
   and not has_function_privilege('authenticated', 'public.nexamon_run_due(timestamptz)', 'execute')
   and not has_function_privilege('authenticated', 'public.nexamon_sell(uuid, uuid, text, text, timestamptz)', 'execute')

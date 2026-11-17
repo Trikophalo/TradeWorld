@@ -23,27 +23,27 @@
     "period": "hour",
     "is_open": true,
     "chance_bps": 0,
-    "ai_check_at": "2026-11-17T00:20:31.005226+00:00",
+    "ai_check_at": "2026-11-16T23:55:09.392969+00:00",
     "price_cents": 1000
   },
   "renting": null,
   "tenants": [
     {
-      "id": "c9f05efe-4413-4ac2-9734-e2986c772d55",
+      "id": "424c852c-fff4-41cc-833f-74038ae2c0be",
       "name": "Mia F.",
       "is_ai": true,
       "period": "hour",
-      "ends_at": "2026-11-19T00:20:31.012847+00:00",
+      "ends_at": "2026-11-18T23:55:09.398661+00:00",
       "notice_by": null,
       "avatar_key": null,
       "paid_cents": 0,
-      "started_at": "2026-11-17T00:20:31.012847+00:00",
+      "started_at": "2026-11-16T23:55:09.398661+00:00",
       "accessories": [],
-      "next_due_at": "2026-11-17T01:20:31.012847+00:00",
+      "next_due_at": "2026-11-17T00:55:09.398661+00:00",
       "price_cents": 1000
     },
     {
-      "id": "cf3a34b6-98b4-4b23-8cd9-70c099ab7d2c",
+      "id": "c87e8b05-ead6-41f5-ad19-d8b44f0b394b",
       "name": "Fixture_Neu",
       "is_ai": false,
       "period": "hour",
@@ -51,9 +51,9 @@
       "notice_by": null,
       "avatar_key": "coder",
       "paid_cents": 1000,
-      "started_at": "2026-11-17T00:20:31.02324+00:00",
+      "started_at": "2026-11-16T23:55:09.408508+00:00",
       "accessories": ["party_hat"],
-      "next_due_at": "2026-11-17T01:20:31.02324+00:00",
+      "next_due_at": "2026-11-17T00:55:09.408508+00:00",
       "price_cents": 1000
     }
   ],

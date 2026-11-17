@@ -116,6 +116,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 - **Pack Battles und Live-Öffnen (ADR-172):** Im Collectibles-Tab stehen deine Freunde als Figuren. Fordere einen zum
   Pack Battle heraus: beide zahlen ein Pack vom gleichen Set, wer mehr Wert zieht, bekommt alle zehn Karten. Über
   „Live“ schaust du anderen beim Öffnen zu und schickst Emojis; abschalten geht in den Einstellungen.
+
+- **Karten-Boni und Sammlungen (ADR-171):** 54 Nexamon-Karten bringen kleine Account-Boni (XP, Gehalt, Tresorzinsen,
+  Tagesbonus, Auftragserlöse), solange du sie besitzt und nicht anbietest; Slabs ab 9 und Black Labels zählen mehr.
+  Typ-Sammlung, Set komplett und Master-Set zahlen einmal Geld und XP und geben einen Dauerbonus. Neuer Tab „Boni“,
+  „Nur gegradete“ in der Sammlung und bei Freunden, und Black Labels können per Hype im Preis springen.
+
 - **Neue Themen in den Nachrichten (ADR-169):** Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt
   samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte Trades, Miete, Outfits, Battles,
   Schläfer. Dazu Nachrufe, Werbung und Horoskope; jede Sendung bringt drei Themen, die nicht direkt wiederkommen.

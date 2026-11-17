@@ -7898,3 +7898,39 @@ halten), `nft_ai_bid_auctions(zeit)` (Gebote der Sammler, aus `nfts_run_due`, R�
 `bid_artwork` (überbotener Sammler: Geld zurück an die Haushalte), `artwork_settle_auction` (Sammler gewinnt,
 `nft_after_sale` mit `buyer_ai`), `accept_auction`, `cancel_auction`, `artwork_json` (`leader` = Name des Sammlers),
 `artworks_wipe_player`.
+
+## Nachtrag: Karten-Boni, Sammlungen und Black-Label-Hype (ADR-171)
+
+Migrationen `20261204006200_nexamon_bonus_enum.sql` (Ledger-Art `nexamon_set_reward`, XP-Quelle `nexamon_set`),
+`20261204006210_nexamon_card_bonuses.sql`, `20261204006220_nexamon_profile_slabs.sql`,
+`20261204006230_nexamon_black_label_hype.sql` (Kopien in `supabase/updates/`). Kartentypen in
+`game_config.nexamon_types` (`{key: type}`, von `pnpm db:config` geschrieben), Regeln in `game_config.nexamon.bonuses`
+und `game_config.nexamon.blackLabelHype`.
+
+**Tabellen (intern, RLS an, keine Rechte für Clients):**
+
+| Tabelle                          | Inhalt                                                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `nexamon_player_bonuses`         | Cache je Spieler: `effective`/`raw` `{art: bps}`, aktive Quellen `[{id, card_key, kind, bps}]`, Sammlungen, `computed_at` |
+| `nexamon_collection_completions` | erste Vollendung je Spieler, Set, Art (`type`/`complete`/`master`) und Typ; gezahlte Belohnung                            |
+| `nexamon_hype_points`            | Black-Label-Faktor einer Karte je Stunde, in der er sich änderte (`jump_bps` > 0 bei einem Sprung)                        |
+
+**Spalten:** `nexamon_cards.bl_factor_bps` (null = Basis `grading.blackLabel.valueBps`), `bl_hype_at` (letzte
+behandelte Stunde), `bl_jump_at` (letzter Sprung).
+
+**Funktionen:** `nexamon_bonus_recompute(player)` (der eine Einstieg; auch für andere Features, die Kopien bewegen),
+`player_nexamon_bonus_bps(player, kind)`, `nexamon_card_bonus_def()`, `nexamon_slab_boost_bps()`, `nexamon_stack_bps()`,
+`nexamon_card_bonus_json(card, viewer)`; verzögerte Constraint-Trigger `nexamon_copies_bonus` und
+`nexamon_listings_bonus`. `player_upgrade_bps()` und `player_xp_bonus_bps()` zählen den Karten-Bonus dazu.
+`nexamon_copy_value_cents(value, condition, grade, card)` bewertet ein Black Label mit dem Faktor der Karte; alle
+Funktionen, die eine Kopie mit ihrer Karte bewerten, rufen diese Form auf. Job `nexamon_hype_run_due(now)` (pg_cron
+`nexa-nexamon-hype`, stündlich).
+
+**RPCs:** neu `get_nexamon_bonuses()` → `{totals: [{kind, raw_bps, effective_bps, cap_bps}], cards: [{card_key, kind,
+bps, boosted_bps, active, best_grade}], collections: [{id, set, kind, type, have, need, complete, missing,
+bonus_kind, bonus_bps, completed_at}], server_time}`. Jede Karte in Antworten (`nexamon_card_json`) trägt zusätzlich
+`bonus` (oder null), `black_label_bps` und `hype_at`; `get_nexamon_card` liefert `hype: [{at, factor_bps, jump_bps}]`;
+`get_player_nexamon` liefert `summary.black_labels`, `slabs` und `badges`.
+
+**Benachrichtigungen:** `nexamon_bonus`, `nexamon_set`, `nexamon_hype`. **Feed:** `nexamon_master_set`, `nexamon_hype`
+(beide auch Klatsch der NEXA Nachrichten).

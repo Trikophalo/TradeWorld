@@ -3186,7 +3186,9 @@
         "mass_quit": "erlebt bei {company} eine Kündigungswelle.",
         "record_dividend": "schüttet bei {company} eine Rekorddividende aus.",
         "board_revolt": "hat im Geschäftsrat von {company} einen Aufstand angezettelt.",
-        "research_done": "feiert bei {company} einen Forschungsdurchbruch."
+        "research_done": "feiert bei {company} einen Forschungsdurchbruch.",
+        "nexamon_master_set": "hat das Master-Set von {name} komplett.",
+        "nexamon_hype": "freut sich: Die Black Labels von {name} sind im Preis gesprungen."
       }
     },
     "notifications": {
@@ -8391,7 +8393,8 @@
       "collection": "Sammlung",
       "market": "Markt",
       "grading": "ASP",
-      "gradingBack": "Karten sind zurück von ASP"
+      "gradingBack": "Karten sind zurück von ASP",
+      "bonuses": "Boni"
     },
     "new": "Neu",
     "serial": "#{serial}",
@@ -8508,7 +8511,8 @@
         "kept": "Nicht zum Verkauf"
       },
       "listedTag": "Im Markt",
-      "listedHint": "{count, plural, one {Steht im Markt für {price}} other {# Kopien im Markt, ab {price}}}"
+      "listedHint": "{count, plural, one {Steht im Markt für {price}} other {# Kopien im Markt, ab {price}}}",
+      "slabsOnly": "Nur gegradete"
     },
     "filter": {
       "set": "Set",
@@ -8753,7 +8757,63 @@
       "emptyTitle": "Noch keine Karte",
       "emptyText": "Kauf dein erstes Booster. Jede Karte, die du nicht verkaufst, bleibt in deiner Sammlung und ist hier für andere zu sehen.",
       "toShop": "Zum Shop",
-      "hint": "Alle Karten, die du besitzt. Andere Spieler sehen sie auf deinem Profil."
+      "hint": "Alle Karten, die du besitzt. Andere Spieler sehen sie auf deinem Profil.",
+      "badges": "Sammlungen",
+      "badge": {
+        "type": "{type} · {set}",
+        "complete": "Set komplett · {set}",
+        "master": "Master-Set · {set}"
+      }
+    },
+    "bonuses": {
+      "tag": "+{bps} {kind}",
+      "active": "aktiv",
+      "inactive": "nicht aktiv: du hast keine Kopie außerhalb des Markts",
+      "kinds": {
+        "xp": "XP",
+        "mission_xp": "Missions-XP",
+        "trade_xp": "Handels-XP",
+        "wage": "Gehalt",
+        "vault": "Tresorzinsen",
+        "daily": "Tagesbonus",
+        "company": "Auftragserlöse"
+      },
+      "kind": {
+        "complete": "Set komplett",
+        "master": "Master-Set"
+      },
+      "typeCollection": "Typ-Sammlung {type}",
+      "everyKind": "+{bps} auf jeden Bonus",
+      "totals": "Deine Karten-Boni",
+      "totalsHint": "Jede Bonus-Karte zählt einmal, solange du sie besitzt und nicht im Markt anbietest. Ein Slab ab 9 bringt das 1,5-Fache, ein Black Label das Doppelte. Viele Boni einer Art zählen ab der Hälfte der Grenze nur noch halb.",
+      "ofCap": "{value} von max. {cap}",
+      "diminished": "Summe {raw}, gedeckelt",
+      "cards": "Aktive Bonus-Karten: {n} von {total}",
+      "noneTitle": "Noch kein Karten-Bonus",
+      "noneText": "Ultra Rares, Prismas, Legendaries und die Rare Nr. 60 jedes Sets bringen Account-Boni. Zieh sie aus Boostern oder kauf sie im Markt.",
+      "masterRule": "Master-Set: alle 77 Karten und jede Prisma und Legendary als eigener Slab ab Note {grade}.",
+      "activeBadge": "Aktiv",
+      "rewardPaid": "Belohnung schon erhalten",
+      "missing": "Fehlt:",
+      "more": "und {n} weitere",
+      "cardTitle": "Account-Bonus",
+      "cardHint": "Solange du eine Kopie besitzt, die nicht im Markt steht. Slab ab 9: x1,5, Black Label: x2.",
+      "missingTag": "Bonus fehlt dir noch"
+    },
+    "hype": {
+      "marker": "Hype",
+      "title": "Black-Label-Hype",
+      "factor": "Black Labels dieser Karte: {factor} Kartenwert",
+      "base": "Basis {factor}. Beliebte, seltene Karten mit wenigen Black Labels springen manchmal im Preis und fallen dann langsam zurück.",
+      "jump": "+{bps}",
+      "history": "Verlauf",
+      "empty": "Noch kein Hype bei dieser Karte."
+    },
+    "slabs": {
+      "summary": "{count, plural, one {# Slab} other {# Slabs}} · {tens, plural, one {eine 10} other {# Zehnen}} · {black, plural, one {ein Black Label} other {# Black Labels}}",
+      "emptyTitle": "Noch kein Slab",
+      "emptyText": "Schick Karten zu ASP. Bewertete Karten erscheinen hier, die beste Note zuerst.",
+      "label": "{name}, {grade}, Wert {value}"
     }
   },
   "hq": {

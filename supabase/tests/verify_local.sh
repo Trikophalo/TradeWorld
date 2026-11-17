@@ -8,7 +8,7 @@
 #   3. apply all migrations, seed.sql, seeds/artworks.sql and seeds/furniture.sql
 #      with ON_ERROR_STOP
 #   4. run the SQL assertions in supabase/tests/[1-4]*.sql, then (older
-#      database mode only) apply update-to-latest.sql, then [5-9]*.sql and a[0-9]*.sql
+#      database mode only) apply update-to-latest.sql, then [5-9]*.sql, a[0-9]*.sql and b[0-9]*.sql
 #   5. stop and delete the cluster
 # Exits non-zero on the first failure.
 #

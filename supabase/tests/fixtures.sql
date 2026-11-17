@@ -1472,6 +1472,13 @@ select public.get_nexamon_collection('mystic_energy');
 select public.crack_nexamon_slab(gen_random_uuid(), :'fx_nx2');
 \o
 reset role;
+-- card bonuses (ADR-171): a prisma so a bonus is active
+select public.nexamon_mint_copy('me-071', :fx_g, null, 'mint', 'pack', null, public.game_now()) is not null as ok \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_nexamon_bonuses.json
+select public.get_nexamon_bonuses();
+\o
+reset role;
 -- Fixture_Heim looks at Fixture_Gmbh's collectibles on their profile
 select tests.login_as('authenticated', :fx_h) is null as ok \gset
 \o :fixture_dir/get_player_nexamon.json

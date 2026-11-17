@@ -50,6 +50,9 @@ const stats = (cardKey: string, valueCents = 1_000): NexamonCardStats => {
     popularityBps: 1_000,
     floorCents: 200,
     capCents: 3_000,
+    bonus: null,
+    blackLabelBps: 100_000,
+    hypeAt: null,
   };
 };
 
@@ -345,6 +348,9 @@ describe("binder: for sale or kept", () => {
     popularityBps: 0,
     floorCents: 20,
     capCents: 300,
+    bonus: null,
+    blackLabelBps: 100_000,
+    hypeAt: null,
   }));
   const [a, b, c] = stats.map((s) => s.cardKey) as [string, string, string];
   // a: one listed and one kept, b: only listed, c: only kept, the fourth card is missing

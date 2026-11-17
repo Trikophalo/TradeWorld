@@ -1,6 +1,6 @@
 {
   "sets": [
-    { "key": "mystic_energy", "cards": 77, "copies": 8, "distinct": 8 },
+    { "key": "mystic_energy", "cards": 77, "copies": 9, "distinct": 9 },
     { "key": "super_apex", "cards": 77, "copies": 0, "distinct": 0 },
     { "key": "prismatic_peak", "cards": 77, "copies": 0, "distinct": 0 }
   ],
@@ -9,49 +9,37 @@
       "set": "mystic_energy",
       "grade": null,
       "copies": 1,
-      "number": 59,
-      "rarity": "rare",
-      "serial": 5,
-      "card_key": "me-059",
-      "condition": "near_mint",
-      "total_cents": 4200,
-      "value_cents": 4200
+      "number": 71,
+      "rarity": "prisma",
+      "serial": 3,
+      "card_key": "me-071",
+      "condition": "mint",
+      "total_cents": 2350000,
+      "value_cents": 2350000
     },
     {
       "set": "mystic_energy",
       "grade": null,
       "copies": 1,
-      "number": 49,
+      "number": 3,
       "rarity": "common",
-      "serial": 8,
-      "card_key": "me-049",
+      "serial": 9,
+      "card_key": "me-003",
       "condition": "near_mint",
-      "total_cents": 880,
-      "value_cents": 880
+      "total_cents": 450,
+      "value_cents": 450
     },
     {
       "set": "mystic_energy",
       "grade": null,
       "copies": 1,
-      "number": 28,
+      "number": 23,
       "rarity": "common",
       "serial": 8,
-      "card_key": "me-028",
-      "condition": "good",
-      "total_cents": 630,
-      "value_cents": 630
-    },
-    {
-      "set": "mystic_energy",
-      "grade": null,
-      "copies": 1,
-      "number": 37,
-      "rarity": "common",
-      "serial": 8,
-      "card_key": "me-037",
+      "card_key": "me-023",
       "condition": "near_mint",
-      "total_cents": 520,
-      "value_cents": 520
+      "total_cents": 330,
+      "value_cents": 330
     },
     {
       "set": "mystic_energy",
@@ -59,7 +47,7 @@
       "copies": 1,
       "number": 26,
       "rarity": "common",
-      "serial": 7,
+      "serial": 8,
       "card_key": "me-026",
       "condition": "near_mint",
       "total_cents": 250,
@@ -69,42 +57,76 @@
       "set": "mystic_energy",
       "grade": null,
       "copies": 1,
-      "number": 30,
+      "number": 17,
       "rarity": "common",
       "serial": 8,
-      "card_key": "me-030",
+      "card_key": "me-017",
       "condition": "near_mint",
-      "total_cents": 240,
-      "value_cents": 240
+      "total_cents": 200,
+      "value_cents": 200
     },
     {
       "set": "mystic_energy",
       "grade": null,
       "copies": 1,
-      "number": 19,
+      "number": 41,
+      "rarity": "common",
+      "serial": 9,
+      "card_key": "me-041",
+      "condition": "mint",
+      "total_cents": 170,
+      "value_cents": 170
+    },
+    {
+      "set": "mystic_energy",
+      "grade": null,
+      "copies": 1,
+      "number": 16,
+      "rarity": "common",
+      "serial": 9,
+      "card_key": "me-016",
+      "condition": "poor",
+      "total_cents": 161,
+      "value_cents": 161
+    },
+    {
+      "set": "mystic_energy",
+      "grade": null,
+      "copies": 1,
+      "number": 9,
+      "rarity": "common",
+      "serial": 9,
+      "card_key": "me-009",
+      "condition": "near_mint",
+      "total_cents": 150,
+      "value_cents": 150
+    },
+    {
+      "set": "mystic_energy",
+      "grade": null,
+      "copies": 1,
+      "number": 31,
       "rarity": "common",
       "serial": 8,
-      "card_key": "me-019",
-      "condition": "mint",
-      "total_cents": 190,
-      "value_cents": 190
-    },
-    {
-      "set": "mystic_energy",
-      "grade": null,
-      "copies": 1,
-      "number": 13,
-      "rarity": "common",
-      "serial": 7,
-      "card_key": "me-013",
+      "card_key": "me-031",
       "condition": "good",
       "total_cents": 144,
       "value_cents": 144
     }
   ],
   "is_me": false,
-  "summary": { "tens": 0, "total": 231, "copies": 8, "graded": 0, "distinct": 8, "value_cents": 7054 },
+  "slabs": [],
+  "badges": [],
+  "summary": {
+    "tens": 0,
+    "total": 231,
+    "copies": 9,
+    "graded": 0,
+    "distinct": 9,
+    "value_cents": 2351855,
+    "black_labels": 0
+  },
   "nickname": "Fixture_Gmbh",
   "unlocked": true,
-  "server_time": "2026-11-17T00:20:31.456642+00:00"
+  "server_time": "2026-11-16T23:56:47.453174+00:00"
 }

@@ -8,6 +8,7 @@ import { COIN } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NexamonCollection } from "@/features/game/nexamon-types";
 import { formatMoney, formatMoneyShort } from "@/lib/format";
@@ -32,6 +33,7 @@ import {
 } from "../view";
 import { SetIcon } from "./badges";
 import { CopyVisual, GradeChip, SelectField, Stat } from "./parts";
+import { SlabList } from "./slab-list";
 
 const BINDER_ALLOWED = {
   set: ["all", ...NEXAMON_SETS],
@@ -41,6 +43,11 @@ const BINDER_ALLOWED = {
   sale: BINDER_SALES,
 } as const;
 
+/** ADR-171: "Nur gegradete" shows only the slabs; remembered with the other filters. */
+type BinderView = { slabs: "off" | "on" };
+const VIEW_DEFAULTS: BinderView = { slabs: "off" };
+const VIEW_ALLOWED = { slabs: ["off", "on"] } as const;
+
 /**
  * The binder (ADR-165): every card of the three sets in number order. Owned cards show their best copy (a slab
  * once graded), missing ones stay grey with their number. Filters narrow it down, a tap opens the card.
@@ -49,6 +56,8 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
   const [filter, patch] = useRememberedFilters<BinderFilter>("binder", DEFAULT_BINDER_FILTER, BINDER_ALLOWED);
+  const [binderView, patchView] = useRememberedFilters<BinderView>("binderView", VIEW_DEFAULTS, VIEW_ALLOWED);
+  const slabsOnly = binderView.slabs === "on";
   const wide = useMediaQuery("(min-width: 1024px)");
   const scale = wide ? 2 : 1;
   const entries = useMemo(
@@ -92,53 +101,78 @@ export function Binder({ collection }: { collection: NexamonCollection | undefin
       </div>
 
       <div className="space-y-3 rounded-lg bg-surface-2 p-3">
-        <Segmented<BinderOwnership>
-          value={filter.ownership}
-          onValueChange={(ownership) => patch({ ownership })}
-          label={t("binder.ownership")}
-          size="sm"
-          block
-          options={BINDER_OWNERSHIPS.map((value) => ({ value, label: t(`binder.own.${value}`) }))}
-        />
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <SelectField<NexamonSetKey | "all">
-            label={t("filter.set")}
-            value={filter.set}
-            onChange={(set) => patch({ set })}
-            testId="binder-set"
-            options={[
-              { value: "all", label: t("filter.allSets") },
-              ...NEXAMON_SETS.map((set) => ({ value: set, label: tc(`sets.${set}`) })),
-            ]}
+        <label className="flex items-center justify-between gap-3 text-sm text-fg-1" data-testid="binder-slabs-only">
+          {t("binder.slabsOnly")}
+          <Switch
+            checked={slabsOnly}
+            onCheckedChange={(on) => patchView({ slabs: on ? "on" : "off" })}
+            label={t("binder.slabsOnly")}
           />
-          <SelectField<NexamonRarity | "all">
-            label={t("filter.rarity")}
-            value={filter.rarity}
-            onChange={(rarity) => patch({ rarity })}
-            testId="binder-rarity"
-            options={[
-              { value: "all", label: t("filter.allRarities") },
-              ...NEXAMON_RARITIES.map((rarity) => ({ value: rarity, label: tc(`rarityShort.${rarity}`) })),
-            ]}
-          />
-          <SelectField<BinderSort>
-            label={t("filter.sort")}
-            value={filter.sort}
-            onChange={(sort) => patch({ sort })}
-            testId="binder-sort"
-            options={BINDER_SORTS.map((sort) => ({ value: sort, label: t(`binder.sort.${sort}`) }))}
-          />
-          <SelectField<BinderSale>
-            label={t("binder.saleLabel")}
-            value={filter.sale}
-            onChange={(sale) => patch({ sale })}
-            testId="binder-sale"
-            options={BINDER_SALES.map((sale) => ({ value: sale, label: t(`binder.sale.${sale}`) }))}
-          />
-        </div>
+        </label>
+        {!slabsOnly && (
+          <>
+            <Segmented<BinderOwnership>
+              value={filter.ownership}
+              onValueChange={(ownership) => patch({ ownership })}
+              label={t("binder.ownership")}
+              size="sm"
+              block
+              options={BINDER_OWNERSHIPS.map((value) => ({ value, label: t(`binder.own.${value}`) }))}
+            />
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <SelectField<NexamonSetKey | "all">
+                label={t("filter.set")}
+                value={filter.set}
+                onChange={(set) => patch({ set })}
+                testId="binder-set"
+                options={[
+                  { value: "all", label: t("filter.allSets") },
+                  ...NEXAMON_SETS.map((set) => ({ value: set, label: tc(`sets.${set}`) })),
+                ]}
+              />
+              <SelectField<NexamonRarity | "all">
+                label={t("filter.rarity")}
+                value={filter.rarity}
+                onChange={(rarity) => patch({ rarity })}
+                testId="binder-rarity"
+                options={[
+                  { value: "all", label: t("filter.allRarities") },
+                  ...NEXAMON_RARITIES.map((rarity) => ({ value: rarity, label: tc(`rarityShort.${rarity}`) })),
+                ]}
+              />
+              <SelectField<BinderSort>
+                label={t("filter.sort")}
+                value={filter.sort}
+                onChange={(sort) => patch({ sort })}
+                testId="binder-sort"
+                options={BINDER_SORTS.map((sort) => ({ value: sort, label: t(`binder.sort.${sort}`) }))}
+              />
+              <SelectField<BinderSale>
+                label={t("binder.saleLabel")}
+                value={filter.sale}
+                onChange={(sale) => patch({ sale })}
+                testId="binder-sale"
+                options={BINDER_SALES.map((sale) => ({ value: sale, label: t(`binder.sale.${sale}`) }))}
+              />
+            </div>
+          </>
+        )}
       </div>
 
-      {entries.length === 0 ? (
+      {slabsOnly ? (
+        <SlabList
+          scale={scale}
+          items={collection.copies
+            .filter((c) => c.state === "graded" && c.grade !== null)
+            .map((c) => ({
+              id: c.id,
+              cardKey: c.cardKey,
+              serial: c.serial,
+              grade: c.grade!,
+              valueCents: c.valueCents,
+            }))}
+        />
+      ) : entries.length === 0 ? (
         <EmptyState
           art={<PixelIcon {...COIN} scale={4} />}
           title={t(totals.copies === 0 ? "binder.emptyTitle" : "binder.noMatchTitle")}

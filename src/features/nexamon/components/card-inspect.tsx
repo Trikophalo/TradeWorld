@@ -9,6 +9,7 @@ import { BALANCE } from "@/config/balance";
 import { DISCLOSURE } from "@/config/disclosure";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Delta } from "@/components/ui/delta";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,7 +19,7 @@ import { useGame } from "@/features/game/store";
 import { PriceChart } from "@/features/market/components/price-chart";
 import { LockedFeature } from "@/features/progression/components/locked-feature";
 import { useDisclosed } from "@/features/progression/components/reveal";
-import { formatInteger, formatMoney } from "@/lib/format";
+import { formatBps, formatInteger, formatMoney } from "@/lib/format";
 import { NEXAMON_BLACK_LABEL_GRADE, nexamonGradeChanceBps } from "@/lib/sim/nexamon";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ import {
 import { ConditionBadge, RarityBadge, SetIcon, TypeIcon } from "./badges";
 import { NexamonCard } from "./card";
 import { CopyActions } from "./copy-actions";
+import { BonusTag } from "./bonuses";
 import { BuySheet, ListingRow, SellerName } from "./listing-row";
 import { CopyQuality, GradeChip, LoadError, Stat } from "./parts";
 import { NexamonSlab } from "./slab";
@@ -183,6 +185,15 @@ function Inspect({ card, details }: { card: CardData; details: NexamonCardDetail
             <span className="nums text-sm text-fg-2">{formatCardNumber(card.number)}</span>
             <TypeIcon type={card.type} label />
           </p>
+          {details?.card.bonus && (
+            <div className="space-y-0.5 rounded-sm bg-gain-soft px-2.5 py-1.5" data-testid="inspect-bonus">
+              <p className="flex flex-wrap items-center gap-x-2 text-sm">
+                <span className="label-pixel text-fg-2">{t("bonuses.cardTitle")}</span>
+                <BonusTag bonus={details.card.bonus} />
+              </p>
+              <p className="text-xs text-pretty text-fg-2">{t("bonuses.cardHint")}</p>
+            </div>
+          )}
         </header>
 
         {!details ? (
@@ -283,6 +294,8 @@ function Inspect({ card, details }: { card: CardData; details: NexamonCardDetail
               <GradedPopulation graded={details.graded} blackLabels={details.blackLabels} />
             </Card>
 
+            <HypeCard details={details} />
+
             <Card padding="lg" data-testid="inspect-sales">
               <CardHeader>
                 <CardTitle>{t("inspect.sales")}</CardTitle>
@@ -306,6 +319,50 @@ function Inspect({ card, details }: { card: CardData; details: NexamonCardDetail
       </div>
       <BuySheet listing={buying} onClose={() => setBuying(null)} />
     </div>
+  );
+}
+
+/** ADR-171: the Black Label factor of this card, a "Hype" marker after a jump and the history. */
+function HypeCard({ details }: { details: NexamonCardDetails }) {
+  const t = useTranslations("nexamon.hype");
+  const base = BALANCE.nexamon.grading.blackLabel.valueBps;
+  const factor = details.card.blackLabelBps;
+  if (details.blackLabels === 0 && factor <= base && details.hype.length === 0) return null;
+  return (
+    <Card padding="lg" data-testid="inspect-hype" data-factor={factor}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {t("title")}
+          {details.card.hypeAt && (
+            <Badge tone="warn" data-testid="hype-marker">
+              {t("marker")}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <p className="nums text-sm text-fg-1">{t("factor", { factor: formatFactor(factor) })}</p>
+      <p className="mt-1 text-xs text-pretty text-fg-3">{t("base", { factor: formatFactor(base) })}</p>
+      {details.hype.length === 0 ? (
+        <p className="mt-2 text-sm text-fg-3">{t("empty")}</p>
+      ) : (
+        <ul className="mt-2 divide-y divide-line-1 text-xs" aria-label={t("history")}>
+          {details.hype
+            .slice(-8)
+            .reverse()
+            .map((h) => (
+              <li key={h.at} className="flex justify-between gap-2 py-1">
+                <span className="nums text-fg-3">{new Date(h.at).toLocaleString("de-DE")}</span>
+                <span className="nums text-fg-1">
+                  {formatFactor(h.factorBps)}
+                  {h.jumpBps > 0 && (
+                    <span className="ml-1.5 text-gain">{t("jump", { bps: formatBps(h.jumpBps) })}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

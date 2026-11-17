@@ -44,6 +44,9 @@ export type Metric =
   | "nexamon_sold"
   | "nexamon_tens"
   | "nexamon_black_labels"
+  | "nexamon_bonus_cards"
+  | "nexamon_type_sets"
+  | "nexamon_full_sets"
   | "listed_invests"
   | "listed_research"
   | "listed_benefits"
@@ -683,6 +686,34 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     metric: "nexamon_black_labels",
     target: 1,
     xp: 3000,
+    requires: "nexamon",
+  },
+  // ADR-171: card bonuses and collections
+  {
+    key: "m_nexamon_first_bonus",
+    kind: "milestone",
+    title: "Dein erster Karten-Bonus",
+    metric: "nexamon_bonus_cards",
+    target: 1,
+    xp: 800,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_type_set",
+    kind: "milestone",
+    title: "Erste Typ-Sammlung",
+    metric: "nexamon_type_sets",
+    target: 1,
+    xp: 2000,
+    requires: "nexamon",
+  },
+  {
+    key: "m_nexamon_first_full_set",
+    kind: "milestone",
+    title: "Ein Set komplett",
+    metric: "nexamon_full_sets",
+    target: 1,
+    xp: 6000,
     requires: "nexamon",
   },
 ];

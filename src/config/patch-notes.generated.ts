@@ -464,6 +464,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-efdf542e",
+        title: "Karten-Boni und Sammlungen",
+        text: "54 Nexamon-Karten bringen kleine Account-Boni (XP, Gehalt, Tresorzinsen, Tagesbonus, Auftragserlöse), solange du sie besitzt und nicht anbietest…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-ed315771",
         title: "Pack Battles und Live-Öffnen",
         text: "Im Collectibles-Tab stehen deine Freunde als Figuren.",

@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useMemo, useState, type ReactNode } from "react";
-import { nexamonCard, type NexamonCard } from "@/config/nexamon";
+import { BALANCE } from "@/config/balance";
+import { nexamonCard, type NexamonCard, type NexamonType } from "@/config/nexamon";
 import { DISCLOSURE } from "@/config/disclosure";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import { usePlayerNexamon } from "../hooks";
 import { profileBinder, tileMoney } from "../view";
 import { RarityBadge, SetIcon } from "./badges";
 import { CopyVisual, LoadError, Stat } from "./parts";
+import { SlabList } from "./slab-list";
 
 /** Cards in the showcase of a profile: two rows on a phone, one on a wide screen. */
 const SHOWCASE_CARDS = 8;
@@ -90,6 +93,7 @@ export function ProfileNexamon({ nickname }: { nickname: string | null }) {
           {summary.graded}
         </Stat>
       </div>
+      {data.badges.length > 0 && <CollectionBadges badges={data.badges} />}
       <div className="space-y-2">
         <p className="label-pixel text-fg-3">{t("showcase")}</p>
         <ul className={GRID} data-testid="profile-nexamon-showcase">
@@ -125,11 +129,12 @@ export function ProfileNexamon({ nickname }: { nickname: string | null }) {
   );
 }
 
-type Show = "owned" | "all";
+type Show = "owned" | "all" | "slabs";
 
 /** The whole binder of a player, set by set, read-only. Asked for only once the sheet opens. */
 function FullCollection({ nickname }: { nickname: string | null }) {
   const t = useTranslations("nexamon.profile");
+  const tb = useTranslations("nexamon.binder");
   const state = usePlayerNexamon(nickname, null);
   const canOpen = useDisclosed("nexamon");
   const [show, setShow] = useState<Show>("owned");
@@ -162,21 +167,64 @@ function FullCollection({ nickname }: { nickname: string | null }) {
         options={[
           { value: "owned", label: t("showOwned") },
           { value: "all", label: t("showAll") },
+          { value: "slabs", label: tb("slabsOnly") },
         ]}
       />
-      {groups.map((group) => (
-        <section key={group.set} className="space-y-2" data-set={group.set}>
-          <h3 className="flex items-center justify-between gap-2">
-            <SetIcon set={group.set} label className="font-pixel text-xs uppercase" />
-            <span className="nums text-xs text-fg-3">{t("setCount", { owned: group.owned, total: group.total })}</span>
-          </h3>
-          <ul className={GRID}>
-            {group.entries.map((entry) => (
-              <Tile key={entry.card.key} card={entry.card} owned={entry.owned} />
-            ))}
-          </ul>
-        </section>
-      ))}
+      {show === "slabs" && (
+        <SlabList
+          linkCards={canOpen}
+          items={state.data.slabs.map((s, i) => ({
+            id: `${s.cardKey}-${s.serial}-${i}`,
+            cardKey: s.cardKey,
+            serial: s.serial,
+            grade: s.grade,
+            valueCents: s.valueCents,
+          }))}
+        />
+      )}
+      {show !== "slabs" &&
+        groups.map((group) => (
+          <section key={group.set} className="space-y-2" data-set={group.set}>
+            <h3 className="flex items-center justify-between gap-2">
+              <SetIcon set={group.set} label className="font-pixel text-xs uppercase" />
+              <span className="nums text-xs text-fg-3">
+                {t("setCount", { owned: group.owned, total: group.total })}
+              </span>
+            </h3>
+            <ul className={GRID}>
+              {group.entries.map((entry) => (
+                <Tile key={entry.card.key} card={entry.card} owned={entry.owned} />
+              ))}
+            </ul>
+          </section>
+        ))}
+    </div>
+  );
+}
+
+/** Completed collections (ADR-171): type collections, full sets and master sets as small badges. */
+function CollectionBadges({ badges }: { badges: { set: string; kind: string; type: string | null }[] }) {
+  const t = useTranslations("nexamon.profile");
+  const tc = useTranslations("nexamonCards");
+  const setName = (set: string) => BALANCE.nexamon.sets[set as keyof typeof BALANCE.nexamon.sets]?.name ?? set;
+  // the bigger badges first
+  const order: Record<string, number> = { master: 0, complete: 1, type: 2 };
+  return (
+    <div className="space-y-1.5" data-testid="profile-nexamon-badges">
+      <p className="label-pixel text-fg-3">{t("badges")}</p>
+      <ul className="flex flex-wrap gap-1.5">
+        {[...badges]
+          .sort((a, b) => (order[a.kind] ?? 3) - (order[b.kind] ?? 3))
+          .map((b) => (
+            <li key={`${b.set}:${b.kind}:${b.type ?? ""}`}>
+              <Badge tone={b.kind === "master" ? "warn" : b.kind === "complete" ? "gain" : "neutral"}>
+                {b.kind === "type"
+                  ? t("badge.type", { type: tc(`types.${b.type as NexamonType}`), set: setName(b.set) })
+                  : t(b.kind === "master" ? "badge.master" : "badge.complete", { set: setName(b.set) })}
+              </Badge>
+            </li>
+          ))}
+      </ul>
     </div>
   );
 }

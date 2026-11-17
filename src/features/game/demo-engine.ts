@@ -49,7 +49,7 @@ import { createRentalsEngine, type DemoRentalsState } from "./demo/rentals";
 import { createFriendEngine, demoFriendCard, type DemoFriend, type DemoFriendCode } from "./demo/friends";
 import { createFriendChatEngine, type DemoChat } from "./demo/friend-chats";
 import { createAccessoryEngine, type DemoWardrobe } from "./demo/accessories";
-import { createNexamonEngine, type DemoNexamonState } from "./demo/nexamon";
+import { createNexamonEngine, demoNexamonBonusBps, type DemoNexamonState } from "./demo/nexamon";
 import { createPackBattleEngine } from "./demo/pack-battle";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
@@ -483,7 +483,12 @@ function requireLevel(key: string): void {
 
 /** XP with the XP upgrades of the source (ADR-134; "*" = only the ones for every source) and the multiplier. */
 function addXp(base: number, source: UpgradeXpSource = "*"): number {
-  const amount = scaledXp(xpWithUpgrades(base, source, p().upgrades ?? {}));
+  // Nexamon card bonuses (ADR-171): xp for every source, mission_xp and trade_xp for theirs
+  const card =
+    demoNexamonBonusBps(p().nexamon, "xp") +
+    (source === "mission" ? demoNexamonBonusBps(p().nexamon, "mission_xp") : 0) +
+    (source === "trade" ? demoNexamonBonusBps(p().nexamon, "trade_xp") : 0);
+  const amount = scaledXp(xpWithUpgrades(Math.round((base * (10_000 + card)) / 10_000), source, p().upgrades ?? {}));
   const before = levelFromTotalXp(p().xpTotal);
   p().xpTotal += amount;
   const after = levelFromTotalXp(p().xpTotal);
@@ -1402,6 +1407,9 @@ const nexamon = createNexamonEngine({
   feed: feedPost,
   notify: (typeKey, title, body, link) => socialRef?.notify(typeKey, title, body, link),
   track: (metric, by = 1) => bump(metric, by),
+  xp: (amount) => {
+    addXp(amount);
+  },
   idempotent,
   now: () => Date.now(),
   random: Math.random,
@@ -2157,7 +2165,13 @@ export const demoEngine: GameEngine = {
         const claimed = Math.floor(hours * vt.rate);
         if (claimed < economy.vaultMinClaimCents) throw new GameError("nothing_to_claim");
         // vault_interest (ADR-134): on top of the claim, from the treasury
-        const interest = Number(bonusCents(BigInt(claimed), upgradeEffects(pl.upgrades ?? {}).vaultInterestBps));
+        // plus the Nexamon card bonus "vault" (ADR-171)
+        const interest = Number(
+          bonusCents(
+            BigInt(claimed),
+            upgradeEffects(pl.upgrades ?? {}).vaultInterestBps + demoNexamonBonusBps(pl.nexamon, "vault"),
+          ),
+        );
         const received = income(claimed + interest);
         socialRef?.inflow(received);
         pl.vaultClaimedAt = now;

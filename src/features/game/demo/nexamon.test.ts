@@ -386,6 +386,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
         valueCents: copies.reduce((sum, c) => sum + c.valueCents, 0),
         graded: 0,
         tens: 0,
+        blackLabels: 0,
       });
       // the same rolls twice: every card is owned twice
       expect(own.cards).toHaveLength(5);
@@ -459,5 +460,75 @@ describe("Nexamon in the demo (ADR-165)", () => {
       expect(bruno.cards).toEqual([]);
       expect(await key(engine.playerNexamon("Niemand"))).toBe("player_not_found");
     });
+  });
+});
+
+describe("Nexamon card bonuses and Black Label hype in the demo (ADR-171)", () => {
+  const give = (world: ReturnType<typeof setup>["world"], cardKey: string, grade: number | null = null) => {
+    const s = world.nexamon!;
+    const id = `t-${s.nextId++}`;
+    s.copies.push({
+      id,
+      cardKey,
+      serial: 1,
+      condition: "mint",
+      grade,
+      gradingUntil: null,
+      gradedAt: null,
+      acquiredAt: world.now,
+      listing: null,
+    });
+    return id;
+  };
+
+  it("activates a card bonus while owned and not listed, with notifications", async () => {
+    const { world, engine } = setup();
+    await engine.nexamon();
+    const water = NEXAMON_CARDS.find((c) => c.set === "mystic_energy" && c.rarity === "prisma" && c.type === "water")!;
+    const copy = give(world, water.key);
+    let b = await engine.nexamonBonuses();
+    expect(b.totals.find((t) => t.kind === "vault")!.effectiveBps).toBe(100);
+    expect(b.cards.find((c) => c.cardKey === water.key)!.active).toBe(true);
+    expect(world.tracked.nexamon_bonus_cards).toBe(1);
+    expect((await engine.nexamonCard(water.key)).card.bonus).toMatchObject({ kind: "vault", bps: 100, active: true });
+    await engine.listNexamonCard("l1", copy, 100_000);
+    b = await engine.nexamonBonuses();
+    expect(b.totals.find((t) => t.kind === "vault")!.effectiveBps).toBe(0);
+    expect(world.notes).toContain("nexamon_bonus");
+  });
+
+  it("rewards a type collection once and lists what is missing", async () => {
+    const { world, engine } = setup();
+    await engine.nexamon();
+    const cards = NEXAMON_CARDS.filter((c) => c.set === "super_apex" && c.type === "dragon");
+    for (const c of cards.slice(1)) give(world, c.key);
+    let b = await engine.nexamonBonuses();
+    expect(b.collections.find((c) => c.id === "col:super_apex:type:dragon")!.missing).toEqual([cards[0]!.key]);
+    const cash = world.cash;
+    give(world, cards[0]!.key);
+    b = await engine.nexamonBonuses();
+    expect(b.collections.find((c) => c.id === "col:super_apex:type:dragon")!.complete).toBe(true);
+    expect(world.cash).toBe(cash + 3 * cfg.sets.super_apex.packPriceCents);
+    await engine.nexamonBonuses();
+    expect(world.cash).toBe(cash + 3 * cfg.sets.super_apex.packPriceCents);
+    expect(world.tracked.nexamon_type_sets).toBe(1);
+    expect((await engine.playerNexamon(null)).badges).toHaveLength(1);
+  });
+
+  it("lets the Black Labels of a card jump, the copy value follows", async () => {
+    const { world, engine } = setup();
+    await engine.nexamon();
+    const legend = NEXAMON_CARDS.find((c) => c.rarity === "legendary")!;
+    give(world, legend.key, 11);
+    await engine.nexamonCard(legend.key);
+    // the last hour handled lies an hour back: one step, with a jump (rolls 0, 0)
+    world.nexamon!.hype![legend.key]!.at -= HOUR;
+    world.rolls.push(0, 0);
+    const d = await engine.nexamonCard(legend.key);
+    expect(d.card.blackLabelBps).toBe(110_000);
+    expect(d.hype.at(-1)!.jumpBps).toBe(1_000);
+    expect(d.copies[0]!.valueCents).toBe(Math.round((d.card.valueCents * 110_000) / 10_000));
+    expect(world.notes).toContain("nexamon_hype");
+    expect((await engine.playerNexamon(null)).slabs[0]).toMatchObject({ cardKey: legend.key, grade: 11 });
   });
 });

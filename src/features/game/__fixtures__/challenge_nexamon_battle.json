@@ -1,6 +1,6 @@
 {
   "battle": {
-    "id": "6b952bb2-bc68-4688-a376-5a8e8e036c90",
+    "id": "df82407f-4039-4e8b-980d-fe8acadc2f3c",
     "me": "challenger",
     "set": "mystic_energy",
     "status": "pending",
@@ -17,11 +17,11 @@
     "starts_at": null,
     "tie_break": null,
     "challenger": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
-    "created_at": "2026-11-17T00:20:31.864648+00:00",
-    "expires_at": "2026-11-17T00:21:31.864648+00:00",
+    "created_at": "2026-11-17T00:04:03.918688+00:00",
+    "expires_at": "2026-11-17T00:05:03.918688+00:00",
     "accepted_at": null,
     "price_cents": 20000,
-    "server_time": "2026-11-17T00:20:31.864648+00:00",
+    "server_time": "2026-11-17T00:04:03.918688+00:00",
     "abort_reason": null,
     "opponent_cards": [],
     "opponent_cents": 0,

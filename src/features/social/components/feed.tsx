@@ -67,6 +67,8 @@ const ICONS: Record<string, PixelArt> = {
   nexamon_black_label: UI_ICONS.nexamon,
   nexamon_battle_won: UI_ICONS.nexamon,
   nexamon_battle_big: UI_ICONS.nexamon,
+  nexamon_master_set: UI_ICONS.nexamon,
+  nexamon_hype: UI_ICONS.nexamon,
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -153,6 +155,10 @@ function useFeedText() {
       case "nexamon_battle_won":
       case "nexamon_battle_big":
         return t(item.kind, { other: str(p.other), value: formatMoney(n(p.total_cents)) });
+      case "nexamon_master_set":
+        return t("nexamon_master_set", { name: str(p.name) });
+      case "nexamon_hype":
+        return t("nexamon_hype", { name: nexamonCard(str(p.card_key))?.name ?? str(p.name) });
       case "nexamon_pull":
         return t("nexamon_pull", { name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key), serial: n(p.serial) });
       case "tax_penalty":

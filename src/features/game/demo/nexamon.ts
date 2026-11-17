@@ -28,9 +28,21 @@ import {
   nexamonValueAfterSale,
   nexamonValueBounds,
 } from "@/lib/sim/nexamon";
+import { divRoundHalfEven } from "@/lib/sim/money";
+import {
+  nexamonBonusCatalogue,
+  nexamonBonusSummary,
+  nexamonBoostedBps,
+  nexamonCollectionReward,
+  nexamonHypeBaseBps,
+  nexamonHypeChanceBps,
+  nexamonHypeStep,
+  type NexamonBonusKind,
+} from "@/lib/sim/nexamon-bonuses";
 import { createRng } from "@/lib/sim/rng";
 import { unlockLevel } from "@/lib/sim/progression";
 import type {
+  NexamonBonuses,
   NexamonCardStats,
   NexamonCopy,
   NexamonEngine,
@@ -109,7 +121,24 @@ export interface DemoNexamonState {
   tickAt: number;
   createdAt: number;
   nextId: number;
+  /** ADR-171: active bonus source ids, effective bps per kind, first completions (id -> time). */
+  bonusActive?: string[];
+  bonusEffective?: Partial<Record<NexamonBonusKind, number>>;
+  completions?: Record<string, number>;
+  /** ADR-171: Black Label hype per card: factor, last hour handled, last jump, history [time, factor, jump]. */
+  hype?: Record<string, { bps: number; at: number; jumpAt: number | null; points: [number, number, number][] }>;
 }
+
+/** The effective card bonus of a kind in the demo (ADR-171), for the XP and money paths of the demo engine. */
+export function demoNexamonBonusBps(state: DemoNexamonState | undefined, kind: NexamonBonusKind): number {
+  return state?.bonusEffective?.[kind] ?? 0;
+}
+
+const BONUS_CARDS = NEXAMON_CARDS.map(({ key, set, number, rarity, type }) => ({ key, set, number, rarity, type }));
+const BONUS_DEFS = new Map(Object.entries(nexamonBonusCatalogue(BONUS_CARDS)));
+const MAX_HYPE_POINTS = 60;
+const collectionId = (c: { set: string; kind: string; type: string | null }) =>
+  `col:${c.set}:${c.kind}${c.type ? `:${c.type}` : ""}`;
 
 export interface NexamonHost {
   state(): DemoNexamonState | undefined;
@@ -125,9 +154,19 @@ export interface NexamonHost {
   notify(typeKey: string, title: string, body: string | null, link: string | null): void;
   track(
     metric:
-      "nexamon_packs" | "nexamon_rares" | "nexamon_ultras" | "nexamon_sold" | "nexamon_tens" | "nexamon_black_labels",
+      | "nexamon_packs"
+      | "nexamon_rares"
+      | "nexamon_ultras"
+      | "nexamon_sold"
+      | "nexamon_tens"
+      | "nexamon_black_labels"
+      | "nexamon_bonus_cards"
+      | "nexamon_type_sets"
+      | "nexamon_full_sets",
     by?: number,
   ): void;
+  /** XP for a first collection completion (ADR-171); optional in tests. */
+  xp?(amount: number): void;
   idempotent<T>(requestId: string, run: () => T): T;
   now(): number;
   random(): number;
@@ -261,8 +300,101 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     if (!card) throw new GameError("nexamon_unknown");
     return card;
   };
+  const blBps = (s: DemoNexamonState, key: string) => s.hype?.[key]?.bps ?? nexamonHypeBaseBps();
   const copyValue = (s: DemoNexamonState, c: { cardKey: string; condition: NexamonCondition; grade: number | null }) =>
-    nexamonCopyValueCents(s.cards[c.cardKey]!.valueE4, c.condition, c.grade);
+    nexamonIsBlackLabel(c.grade)
+      ? Number(divRoundHalfEven(BigInt(s.cards[c.cardKey]!.valueE4) * BigInt(blBps(s, c.cardKey)), BigInt(1_000_000)))
+      : nexamonCopyValueCents(s.cards[c.cardKey]!.valueE4, c.condition, c.grade);
+
+  const ownedCopies = (s: DemoNexamonState) =>
+    s.copies.map((c) => ({ cardKey: c.cardKey, grade: c.grade, listed: c.listing !== null }));
+
+  /** ADR-171: recomputes the card bonuses (the server's nexamon_bonus_recompute) and rewards first completions. */
+  function bonusRefresh(s: DemoNexamonState) {
+    const summary = nexamonBonusSummary(BONUS_CARDS, ownedCopies(s));
+    const active = [
+      ...new Set(summary.sources.map((x) => (x.cardKey ? `card:${x.cardKey}` : collectionId(x.collection!)))),
+    ];
+    const before = s.bonusActive;
+    s.bonusActive = active;
+    s.bonusEffective = Object.fromEntries(summary.totals.map((t) => [t.kind, t.effectiveBps]));
+    const cardsOf = (list: string[]) => list.filter((id) => id.startsWith("card:"));
+    const names = (list: string[]) => list.map((id) => nexamonCard(id.slice(5))?.name ?? id.slice(5)).join(", ");
+    const on = cardsOf(active).filter((id) => !before?.includes(id));
+    const off = cardsOf(before ?? []).filter((id) => !active.includes(id));
+    if (on.length > 0) {
+      if (before)
+        host.notify("nexamon_bonus", "Karten-Bonus aktiv", `Jetzt aktiv: ${names(on)}.`, "/nexamon?tab=bonuses");
+      host.track("nexamon_bonus_cards", on.length);
+    }
+    if (off.length > 0)
+      host.notify("nexamon_bonus", "Karten-Bonus weg", `Kein Bonus mehr von: ${names(off)}.`, "/nexamon?tab=bonuses");
+    const done = (s.completions ??= {});
+    for (const c of summary.collections) {
+      const id = collectionId(c);
+      if (!c.complete || done[id] !== undefined) continue;
+      done[id] = host.now();
+      const reward = nexamonCollectionReward(c.kind, c.set);
+      if (reward.cents > 0) host.earn(reward.cents);
+      host.xp?.(reward.xp);
+      const title =
+        c.kind === "master" ? "Master-Set!" : c.kind === "complete" ? "Set komplett!" : "Typ-Sammlung komplett";
+      host.notify(
+        "nexamon_set",
+        title,
+        `${cfg.sets[c.set].name}: Belohnung ${reward.cents / 100} € und ${reward.xp} XP.`,
+        "/nexamon?tab=bonuses",
+      );
+      if (c.kind === "type") host.track("nexamon_type_sets");
+      if (c.kind === "complete") host.track("nexamon_full_sets");
+      if (c.kind === "master") host.feed("nexamon_master_set", { set: c.set, name: cfg.sets[c.set].name });
+    }
+  }
+
+  /** ADR-171: Black Label hype of the cards the player holds Black Labels of, once per hour (nexamon_hype_run_due). */
+  function hypeTick(s: DemoNexamonState, now: number) {
+    const hour = Math.floor(now / HOUR) * HOUR;
+    const keys = new Set([
+      ...s.copies.filter((c) => nexamonIsBlackLabel(c.grade)).map((c) => c.cardKey),
+      ...Object.keys(s.hype ?? {}),
+    ]);
+    for (const key of keys) {
+      const h = ((s.hype ??= {})[key] ??= { bps: nexamonHypeBaseBps(), at: hour, jumpAt: null, points: [] });
+      const steps = Math.min(48, Math.floor((hour - h.at) / HOUR));
+      if (steps < 1) continue;
+      const card = info(key);
+      const bls = s.copies.filter((c) => c.cardKey === key && nexamonIsBlackLabel(c.grade)).length;
+      const chance = nexamonHypeChanceBps(
+        card.rarity,
+        nexamonPopularityBps(card.rarity, s.cards[key]!.population),
+        bls,
+      );
+      let jump = 0;
+      const start = h.bps;
+      for (let i = 0; i < steps; i++) {
+        const step = nexamonHypeStep(h.bps, chance, host.random(), host.random());
+        h.bps = step.factorBps;
+        jump = Math.max(jump, step.jumpBps);
+      }
+      h.at = hour;
+      if (h.bps !== start) {
+        h.points.push([hour, h.bps, jump]);
+        if (h.points.length > MAX_HYPE_POINTS) h.points.splice(0, h.points.length - MAX_HYPE_POINTS);
+      }
+      if (jump > 0) {
+        h.jumpAt = now;
+        host.notify(
+          "nexamon_hype",
+          "Black-Label-Hype!",
+          `Die Black Labels von ${card.name} sind um ${jump / 100} % gestiegen.`,
+          `/nexamon/${key}`,
+        );
+        if (jump >= cfg.blackLabelHype.bigJumpBps)
+          host.feed("nexamon_hype", { card_key: key, name: card.name, jump_bps: jump, factor_bps: h.bps });
+      }
+      if (h.bps <= nexamonHypeBaseBps() && bls === 0) delete s.hype![key];
+    }
+  }
   const aiListed = (card: DemoCard, rarity: NexamonRarity) => card.ai.slice(0, cfg.ai.listedPerCard[rarity]);
 
   function bounds(s: DemoNexamonState, key: string, now: number, extraTrades = 0) {
@@ -451,6 +583,9 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         if (next !== state.valueE4) setValue(s, card.key, next, at);
       }
     }
+    // 5. Black Label hype, and the bonuses after AI purchases and gradings (ADR-171)
+    hypeTick(s, now);
+    bonusRefresh(s);
     return s;
   }
 
@@ -493,6 +628,29 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
       popularityBps: nexamonPopularityBps(card.rarity, state.population),
       floorCents: nexamonCentsFromE4(limits.floorE4),
       capCents: nexamonCentsFromE4(limits.capE4),
+      bonus: cardBonus(s, key),
+      blackLabelBps: blBps(s, key),
+      hypeAt: hypeAt(s, key),
+    };
+  }
+
+  function hypeAt(s: DemoNexamonState, key: string): string | null {
+    const h = s.hype?.[key];
+    return h && h.bps > nexamonHypeBaseBps() && h.jumpAt !== null ? iso(h.jumpAt) : null;
+  }
+
+  function cardBonus(s: DemoNexamonState, key: string) {
+    const base = BONUS_DEFS.get(key);
+    if (!base) return null;
+    const own = s.copies.filter((c) => c.cardKey === key && c.listing === null);
+    const grades = own.map((c) => c.grade).filter((g): g is number => g !== null);
+    const bestGrade = grades.length > 0 ? Math.max(...grades) : null;
+    return {
+      kind: base.kind,
+      bps: base.bps,
+      boostedBps: nexamonBoostedBps(base.bps, bestGrade),
+      active: own.length > 0,
+      bestGrade,
     };
   }
 
@@ -554,7 +712,12 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     Promise.resolve().then(() => {
       requireUnlock();
       if (!requestId) throw new GameError("invalid_argument");
-      return host.idempotent(requestId, () => run(tick(), host.now()));
+      return host.idempotent(requestId, () => {
+        const s = tick();
+        const result = run(s, host.now());
+        bonusRefresh(s);
+        return result;
+      });
     });
 
   return {
@@ -692,6 +855,9 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         ],
         graded: cfg.grading.grades.map((g) => mine.filter((c) => c.grade === g).length),
         blackLabels: mine.filter((c) => nexamonIsBlackLabel(c.grade)).length,
+        hype: (s.hype?.[cardKey]?.points ?? [])
+          .slice(-cfg.blackLabelHype.historyPoints)
+          .map(([at, factorBps, jumpBps]) => ({ at: iso(at), factorBps, jumpBps })),
         listings: listings(s)
           .filter((l) => l.cardKey === cardKey)
           .sort((a, b) => a.priceCents - b.priceCents)
@@ -794,7 +960,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         if (better > 0)
           Object.assign(entry, { serial: c.serial, condition: c.condition, grade: c.grade, valueCents: value });
       }
-      const order = (c: PlayerNexamonCard) => NEXAMON_SETS.indexOf(c.set) * 1_000 + c.number;
+      const order = (c: { set: NexamonSetKey; number: number }) => NEXAMON_SETS.indexOf(c.set) * 1_000 + c.number;
       const cards = [...byCard.values()].sort((a, b) => b.valueCents - a.valueCents || order(a) - order(b));
       const cap = Math.min(500, Math.max(1, Math.floor(limit ?? 500)));
       const result: PlayerNexamon = {
@@ -808,6 +974,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           valueCents: cards.reduce((sum, c) => sum + c.totalCents, 0),
           graded: copies.filter((c) => c.grade !== null).length,
           tens: copies.filter((c) => (c.grade ?? 0) >= 10).length,
+          blackLabels: copies.filter((c) => nexamonIsBlackLabel(c.grade)).length,
         },
         sets: NEXAMON_SETS.map((set) => ({
           key: set,
@@ -816,6 +983,38 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           copies: cards.filter((c) => c.set === set).reduce((sum, c) => sum + c.copies, 0),
         })),
         cards: cards.slice(0, cap),
+        slabs: copies
+          .filter((c): c is typeof c & { grade: number } => c.grade !== null)
+          .map((c) => {
+            const card = info(c.cardKey);
+            return {
+              cardKey: c.cardKey,
+              set: card.set,
+              number: card.number,
+              rarity: card.rarity,
+              serial: c.serial,
+              condition: c.condition,
+              grade: c.grade,
+              valueCents: copyValue(s, c),
+            };
+          })
+          .sort(
+            (a, b) => b.grade - a.grade || b.valueCents - a.valueCents || order(a) - order(b) || a.serial - b.serial,
+          )
+          .slice(0, 500),
+        badges: own
+          ? Object.entries(s.completions ?? {})
+              .sort((a, b) => a[1] - b[1])
+              .map(([id, at]) => {
+                const [, set, kind, type] = id.split(":");
+                return {
+                  set: set as NexamonSetKey,
+                  kind: kind as "type" | "complete" | "master",
+                  type: type ?? null,
+                  at: iso(at),
+                };
+              })
+          : [],
         serverTime: iso(host.now()),
       };
       return result;
@@ -1011,6 +1210,37 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
       host.track("nexamon_packs");
       host.setState(s);
       return { mine: mine.pulls, theirs: theirs.pulls, won };
+    },
+
+    async nexamonBonuses(): Promise<NexamonBonuses> {
+      requireUnlock();
+      const s = tick();
+      const summary = nexamonBonusSummary(BONUS_CARDS, ownedCopies(s));
+      return {
+        totals: summary.totals.map((t) => ({ ...t })),
+        cards: BONUS_CARDS.filter((c) => BONUS_DEFS.has(c.key)).map((c) => ({
+          cardKey: c.key,
+          ...cardBonus(s, c.key)!,
+        })),
+        collections: summary.collections.map((c) => {
+          const id = collectionId(c);
+          const at = s.completions?.[id];
+          return {
+            id,
+            set: c.set,
+            kind: c.kind,
+            type: c.type,
+            have: c.have,
+            need: c.need,
+            complete: c.complete,
+            missing: [...c.missing],
+            bonusKind: c.bonusKind,
+            bonusBps: c.bonusBps,
+            completedAt: at === undefined ? null : iso(at),
+          };
+        }),
+        serverTime: iso(host.now()),
+      };
     },
   };
 }

@@ -1,8 +1,8 @@
 {
-  "now": "2026-11-17T00:20:30.948451+00:00",
+  "now": "2026-11-16T23:55:09.344392+00:00",
   "chat": [
     {
-      "at": "2026-11-17T00:20:30.944475+00:00",
+      "at": "2026-11-16T23:55:09.338476+00:00",
       "id": 223,
       "bot": false,
       "body": "Was für eine Sendung 💀📉",
@@ -11,110 +11,113 @@
     }
   ],
   "show": {
-    "id": 9,
+    "id": 11,
     "writer": "mini",
-    "airs_at": "2026-11-17T00:00:00+00:00",
+    "airs_at": "2026-11-16T23:00:00+00:00",
     "segments": [
       {
         "kind": "gossip",
         "mood": "shocked",
-        "text": "Ich fasse es nicht, aber es stimmt. Hugo_Heim meldet: Level 10 erreicht. Glückwunsch, und jetzt bloß nichts anfassen.",
-        "figure": { "nickname": "Hugo_Heim", "avatar_key": "rookie", "accessories": [] },
+        "text": "Bitte festhalten: Level 5 erreicht, und zwar bei Kampa_Bert. Genieß es, nächste Woche lachen wir wieder über dich.",
+        "figure": { "nickname": "Kampa_Bert", "avatar_key": "rookie", "accessories": [] },
         "effects": [],
-        "headline": "Na so was: Hugo_Heim"
+        "headline": "Applaus für Kampa_Bert"
       },
       {
-        "kind": "corp",
+        "kind": "cards",
         "mood": "shocked",
-        "text": "Bei Topicwerk landet 87 % des Gewinns direkt in der Tasche von Topic_Anna. Die Aktionäre bekommen den Rest und einen feuchten Händedruck. Auf dem Chefparkplatz steht jetzt ein zweiter Chefparkplatz.",
-        "figure": { "nickname": "Topic_Anna", "avatar_key": "rookie", "accessories": [] },
+        "text": "Am Kartenmarkt dreht Irrwisch durch: plus 90 %, jetzt 171 €. Angeblich hat ein Sammler geniest, und der Markt hat es als Kaufsignal gedeutet.",
         "effects": [],
-        "headline": "Topic_Anna bedient sich bei Topicwerk"
+        "headline": "Alle wollen Irrwisch"
       },
       {
-        "kind": "hype",
-        "mood": "proud",
-        "text": "Sogar die Steuerprüfung kam privat vorbei, um einzukaufen. Plötzlich will jeder „Neue Schrauben“. Kai_Kopie tut so, als sei das alles geplant gewesen. Wir tun so, als würden wir das glauben.",
-        "figure": { "nickname": "Kai_Kopie", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "gain", "label": "Bekanntheit +10,9 %" }],
-        "headline": "Gleich Werk geht viral"
+        "kind": "scandal",
+        "mood": "angry",
+        "text": "Peinlich für Alma_Auszahlung: Im Lager wurde ein Praktikant gefunden, der seit drei Wochen vermisst war. Er hatte niemandem gefehlt. „Kabel für alle“ klang auf dem Papier besser. Das Image von Auszahl Werk ist im Eimer.",
+        "figure": { "nickname": "Alma_Auszahlung", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −19,9 %" }],
+        "headline": "Kunden fliehen vor Auszahl Werk"
       },
       {
         "kind": "nft",
-        "mood": "confused",
-        "text": "Kunstmarkt, oder was man dafür hält: „Abendrot über der Börse“ von einem Unbekannten ging für 9.876.543 € an Vera Vermeer. Kunst ist, wenn einer zahlt. Glückwunsch an alle Beteiligten.",
+        "mood": "shocked",
+        "text": "Aus der Welt der bunten Kästchen: Vera Vermeer hat sich „Abendrot über der Börse“ von einem Unbekannten für 9.876.543 € gegönnt. Immerhin kann man es nicht fallen lassen.",
         "effects": [],
-        "headline": "9.876.543 € für ein paar Pixel"
+        "headline": "„Abendrot über der Börse“ wechselt den Besitzer"
+      },
+      {
+        "kind": "tax",
+        "mood": "shocked",
+        "text": "Keine Bücher, kein Problem: Oberamtsrat Griesgram hat den Gewinn von Listwerk einfach geschätzt. Lisa_Listed darf zahlen und staunen. Griesgram soll dabei gesummt haben. Das Lied ist nicht bekannt, es klang nach Moll.",
+        "figure": { "nickname": "Lisa_Listed", "avatar_key": "rookie", "accessories": [] },
+        "effects": [],
+        "headline": "Griesgram würfelt die Steuer von Listwerk"
+      },
+      {
+        "kind": "winner",
+        "mood": "proud",
+        "text": "Und nun zu jemandem, der es kann: Fixture_Neu hat heute 1.137.653 € gemacht, 11376,5 % im Plus. Insider vermuten eine Glaskugel im Keller.",
+        "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
+        "effects": [],
+        "headline": "Fixture_Neu sahnt ab: plus 1.137.653 €"
       },
       {
         "kind": "gossip",
-        "mood": "angry",
-        "text": "Billig rein, teuer raus: Topic_Dirk zeigt bei Knappwerk, wie es geht, und nimmt 888.000 € mit. Genieß es. Der Markt holt sich so etwas erfahrungsgemäß mit Zinsen zurück.",
+        "mood": "laughing",
+        "text": "Liebes Tagebuch, schreibt Klatsch_Pech heute vermutlich: Rug Pull bei Mondcoin. Die Verwandtschaft tut ab heute so, als kenne sie dich nicht. Wir legen etwas Schmerzensgeld bei.",
+        "figure": { "nickname": "Klatsch_Pech", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "gain", "label": "+100 € Schmerzensgeld" }],
+        "headline": "Das Tagebuch von Klatsch_Pech"
+      },
+      {
+        "kind": "gossip",
+        "mood": "laughing",
+        "text": "Wählerisch: Topic_Dirk tauscht die Missionen 3-mal aus, bis endlich etwas Bequemes dabei ist. Das ist kein Spielen mehr, das ist Speisekartenlesen ohne Bestellung.",
         "figure": {
           "nickname": "Topic_Dirk",
           "avatar_key": "rookie",
           "accessories": ["beanie", "paper_crown", "party_hat", "traffic_cone"]
         },
         "effects": [],
-        "headline": "888.000 € Plus in einem Handel"
-      },
-      {
-        "kind": "winner",
-        "mood": "shocked",
-        "text": "Fixture_Neu ist heute um 1.067.110 € reicher, 10671,1 % rauf. Insider vermuten eine Glaskugel im Keller.",
-        "figure": { "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
-        "effects": [],
-        "headline": "Glückspilz des Tages: Fixture_Neu"
-      },
-      {
-        "kind": "gossip",
-        "mood": "proud",
-        "text": "Ich fasse es nicht, aber es stimmt. Clara_Fremd meldet: Neuer Job bei SolarFuchs. Die Konkurrenz darf sich gern ein Beispiel nehmen, ihr Luschen.",
-        "figure": { "nickname": "Clara_Fremd", "avatar_key": "rookie", "accessories": [] },
-        "effects": [],
-        "headline": "Na so was: Clara_Fremd"
-      },
-      {
-        "kind": "ramble",
-        "mood": "confused",
-        "text": "Forscher der Universität Hinterdupfing melden: Im Schnitt wird ein Geheimtipp 400-mal weitergegeben, bevor er jemanden erreicht, der ihn glaubt. Weitere Forschung ist nötig, sagen die Forscher, die dafür bezahlt werden.",
-        "effects": [],
-        "headline": "Die Wissenschaft hat festgestellt"
+        "headline": "Topic_Dirk sucht die leichteste Mission"
       },
       {
         "kind": "scandal",
-        "mood": "shocked",
-        "text": "Ausgerechnet Zielscheibe, die Firma mit dem Motto „Plastikgabeln“: Ein Werbespot wurde versehentlich mit dem Ton einer Karaoke-Nacht veröffentlicht. Die Kunden laufen davon.",
-        "figure": { "nickname": "Kampa_Firma", "avatar_key": "rookie", "accessories": [] },
-        "effects": [{ "tone": "loss", "label": "Bekanntheit −13,8 %" }],
-        "headline": "Skandal bei Zielscheibe"
+        "mood": "angry",
+        "text": "Berts Bude wollte heute groß rauskommen. Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben. Bert_Bruch erklärte, das gehöre zum Konzept. Die Kundschaft erklärte, sie sei dann mal weg.",
+        "figure": { "nickname": "Bert_Bruch", "avatar_key": "rookie", "accessories": [] },
+        "effects": [{ "tone": "loss", "label": "Bekanntheit −18 %" }],
+        "headline": "Berts Bude blamiert sich bis auf die Knochen"
       },
       {
         "kind": "ramble",
         "mood": "shocked",
-        "text": "Völlig anderes Thema: Friedrich Merz soll das Sparschwein geschlachtet und alles in Nordbrise Offshore gesteckt haben. Dementiert wurde es noch nicht, vermutlich weil niemand gefragt hat. Der Kurs macht 8 % nach oben.",
-        "effects": [{ "tone": "gain", "label": "WND +8 %" }],
-        "headline": "Friedrich Merz steigt bei Nordbrise Offshore ein"
+        "text": "Völlig anderes Thema: Robert Habeck soll das Sparschwein geschlachtet und alles in Wackelwerk gesteckt haben. Ich habe es auf einer Raststätte gehört, zwischen Kaffee und Reue. Der Kurs macht 4,3 % nach oben.",
+        "effects": [{ "tone": "gain", "label": "WAC +4,3 %" }],
+        "headline": "Robert Habeck steigt bei Wackelwerk ein"
       },
       {
         "kind": "sector",
-        "mood": "proud",
-        "text": "Die ganze Branche Einzelhandel steigt um 9,1 %. Ein Influencer hat das Wort im Vorbeigehen erwähnt, mehr war nicht nötig. So funktioniert Wirtschaft, liebe Kinder.",
-        "effects": [{ "tone": "gain", "label": "Einzelhandel +9,1 %" }],
-        "headline": "Die Branche Einzelhandel dreht durch"
+        "mood": "angry",
+        "text": "Schlechte Nachrichten für Pharma: Ein Minister hat die Branche versehentlich mit etwas Verbotenem verwechselt. Die Kurse geben um 5,3 % nach.",
+        "effects": [{ "tone": "loss", "label": "Pharma −5,3 %" }],
+        "headline": "Katerstimmung in Pharma"
       },
       {
         "kind": "tip",
         "mood": "smug",
-        "text": "Ein Vögelchen hat mir gezwitschert: Gipfelwerk dürfte in der kommenden Stunde nach oben gehen. Das Vögelchen lag bisher meistens richtig. Meistens.",
-        "effects": [{ "tone": "neutral", "label": "GIP ↑ Tipp" }],
-        "headline": "Vom Flurfunk: Gipfelwerk"
+        "text": "Ein Vögelchen hat mir gezwitschert: Fundgrube Discount dürfte in der kommenden Stunde nach unten gehen. Meine Quelle ist seriös, sie trägt immerhin eine Krawatte.",
+        "effects": [{ "tone": "neutral", "label": "FGD ↓ Tipp" }],
+        "headline": "Vom Flurfunk: Fundgrube Discount"
       }
     ],
-    "started_at": "2026-11-17T00:20:30.948451+00:00"
+    "started_at": "2026-11-16T23:55:09.344392+00:00"
   },
-  "viewers": 1,
-  "audience": [{ "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] }],
+  "viewers": 2,
+  "audience": [
+    { "me": true, "friend": false, "nickname": "Fixture_Neu", "avatar_key": "coder", "accessories": [] },
+    { "me": false, "friend": false, "nickname": "Bg_Clara", "avatar_key": "rookie", "accessories": [] }
+  ],
   "upcoming": null,
-  "next_airs_at": "2026-11-17T01:00:00+00:00"
+  "next_airs_at": "2026-11-17T00:00:00+00:00"
 }

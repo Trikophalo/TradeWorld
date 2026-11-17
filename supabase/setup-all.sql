@@ -71506,6 +71506,1140 @@ $t$ || v_a);
 end;
 $do$;
 
+-- ===== supabase/migrations/20261204006200_nexamon_bonus_enum.sql =====
+-- =============================================================================
+-- NEXA · 6200 · Enum values for the Nexamon card bonuses (ADR-171)
+-- =============================================================================
+-- A new enum value cannot be used in the transaction that adds it (SQLSTATE 55P04), so the values get their own file
+-- before 20261204006210_nexamon_card_bonuses.sql, which uses them only inside PL/pgSQL bodies.
+--   ledger_tx_kind 'nexamon_set_reward'  households -> player cash (first completion of a Nexamon collection)
+--   xp_source      'nexamon_set'         XP of the first completion of a Nexamon collection
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+alter type public.ledger_tx_kind add value if not exists 'nexamon_set_reward';
+alter type public.xp_source add value if not exists 'nexamon_set';
+
+-- ===== supabase/migrations/20261204006210_nexamon_card_bonuses.sql =====
+-- =============================================================================
+-- NEXA · 6210 · Nexamon: card bonuses and collections (ADR-171)
+-- =============================================================================
+-- Rule (game_config.nexamon.bonuses; src/config/nexamon-rules.ts; port of src/lib/sim/nexamon-bonuses.ts):
+--   * a card of bonuses.rarities (ultra, prisma, legendary), or a rare numbered bonuses.extraNumbers, gives
+--     rarityBps[rarity] x setBps[set] / 10 000 bps of the kind typeKind[type] (the card type comes from
+--     game_config.nexamon_types) while the player owns a copy that is NOT listed; the best such copy boosts it
+--     (slab of slab.minGrade or better x gradeBps, Black Label x blackLabelBps)
+--   * collections per set: "type" (every card of a type), "complete" (all 77), "master" (all 77 and every prisma and
+--     legendary as an own unlisted slab of grade masterMinGrade or better); while complete they add sets.<kind>.bps x
+--     setBps (type: to the type's kind, complete: to sets.complete.kind, master: to every kind)
+--   * per kind: raw = sum; effective = raw up to the knee (kneeShareBps of the cap), above it tailBps of the rest,
+--     at most caps[kind]
+--   * the first completion of a collection pays rewardPacks pack prices of the set from the households (as far as
+--     they have it; ledger kind nexamon_set_reward) and rewardXp XP (source nexamon_set), once per player
+-- Model:
+--   nexamon_player_bonuses           cache per player: effective and raw bps per kind, the active sources, the
+--                                    collections; written only by nexamon_bonus_recompute()
+--   nexamon_collection_completions   first completion of a collection per player (the reward is paid once)
+--   nexamon_bonus_recompute(player)  THE entry point: recomputes the cache, notifies (nexamon_bonus) when bonuses
+--                                    come or go, rewards first completions (notification nexamon_set, mission events
+--                                    nexamon_bonus_card, nexamon_type_collection, nexamon_set_complete,
+--                                    nexamon_master_set, feed kind nexamon_master_set). Every code path that moves a
+--                                    copy calls it through the deferred triggers below (pack, buy, sell, list,
+--                                    unlist, grading, crack, AI buys, wipes); other features that move copies (pack
+--                                    battles) get it for free, or may call it directly.
+--   triggers nexamon_copies_bonus / nexamon_listings_bonus: deferred constraint triggers, run at commit once per
+--                                    player and transaction, so a sale shows the final state only
+-- Applied where the upgrades already apply (ADR-134), as one more source:
+--   player_upgrade_bps(): wage_bonus + wage, vault_interest + vault, daily_bonus + daily, task_pay + company
+--                         (accrue_job_salary, claim_vault, claim_daily_reward, company_task_resolve)
+--   player_xp_bonus_bps(): + xp for every source, + mission_xp for 'mission', + trade_xp for 'trade' (grant_xp)
+-- RPC get_nexamon_bonuses(); nexamon_card_json() gets `bonus` {kind, bps, boosted_bps, active} (null: no bonus).
+-- Mission templates m_nexamon_first_bonus, m_nexamon_first_type_set, m_nexamon_first_full_set.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Tables (internal)
+-- ---------------------------------------------------------------------------
+create table if not exists public.nexamon_player_bonuses (
+  player_id   uuid primary key references public.profiles (id) on delete cascade,
+  effective   jsonb not null default '{}'::jsonb,
+  raw         jsonb not null default '{}'::jsonb,
+  sources     jsonb not null default '[]'::jsonb,
+  collections jsonb not null default '[]'::jsonb,
+  computed_at timestamptz not null default now()
+);
+alter table public.nexamon_player_bonuses enable row level security;
+revoke all on public.nexamon_player_bonuses from public, anon, authenticated;
+grant all on public.nexamon_player_bonuses to service_role;
+comment on table public.nexamon_player_bonuses is
+  'Nexamon card bonuses per player (ADR-171): effective {kind: bps} after stacking and cap, raw {kind: bps}, the '
+  'active sources [{id, card_key, kind, bps}] and the collections. Cache, written by nexamon_bonus_recompute().';
+
+create table if not exists public.nexamon_collection_completions (
+  player_id    uuid not null references public.profiles (id) on delete cascade,
+  set_key      text not null,
+  kind         text not null check (kind in ('type', 'complete', 'master')),
+  type_key     text not null default '',
+  first_at     timestamptz not null default now(),
+  reward_cents bigint not null default 0 check (reward_cents >= 0),
+  reward_xp    integer not null default 0 check (reward_xp >= 0),
+  primary key (player_id, set_key, kind, type_key)
+);
+alter table public.nexamon_collection_completions enable row level security;
+revoke all on public.nexamon_collection_completions from public, anon, authenticated;
+grant all on public.nexamon_collection_completions to service_role;
+comment on table public.nexamon_collection_completions is
+  'First completion of a Nexamon collection per player (ADR-171): type (type_key = the type), complete or master; '
+  'the one-time reward paid then. Badges on the profile. Internal.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_bonus', 'social', 'Karten-Bonus', 'Ein Bonus deiner Nexamon-Karten ist aktiv geworden oder weggefallen.',
+        'notif_bell', true, false, false, 301),
+       ('nexamon_set', 'social', 'Sammlung komplett', 'Du hast eine Nexamon-Sammlung vervollständigt.', 'notif_bell',
+        true, true, false, 302)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. Rules (port of src/lib/sim/nexamon-bonuses.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_types()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select g.value from public.game_config g where g.key = 'nexamon_types'), '{}'::jsonb);
+$$;
+
+-- nexamonCardBonusDef: {kind, bps} of a raw copy, or null
+create or replace function public.nexamon_card_bonus_def(p_rarity text, p_set text, p_number integer, p_type text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with b as (select public.nexamon_cfg() -> 'bonuses' as v)
+  select case when b.v is null or p_type is null then null
+              when not (coalesce(b.v -> 'rarities', '[]'::jsonb) ? p_rarity
+                        or (p_rarity = 'rare' and coalesce(b.v -> 'extraNumbers', '[]'::jsonb) @> to_jsonb(p_number))) then null
+              when b.v #>> array['typeKind', p_type] is null then null
+              when coalesce((b.v #>> array['rarityBps', p_rarity])::bigint, 0)
+                   * coalesce((b.v #>> array['setBps', p_set])::bigint, 10000) / 10000 <= 0 then null
+              else jsonb_build_object('kind', b.v #>> array['typeKind', p_type],
+                                      'bps', (coalesce((b.v #>> array['rarityBps', p_rarity])::bigint, 0)
+                                              * coalesce((b.v #>> array['setBps', p_set])::bigint, 10000) / 10000)::integer)
+         end
+    from b;
+$$;
+
+-- nexamonSlabBoostBps
+create or replace function public.nexamon_slab_boost_bps(p_grade double precision)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with s as (select public.nexamon_cfg() #> '{bonuses,slab}' as v)
+  select case when p_grade >= 10.75 then coalesce((s.v ->> 'blackLabelBps')::integer, 10000)
+              when p_grade >= coalesce((s.v ->> 'minGrade')::double precision, 9) then coalesce((s.v ->> 'gradeBps')::integer, 10000)
+              else 10000 end
+    from s;
+$$;
+
+-- nexamonStackBps
+create or replace function public.nexamon_stack_bps(p_raw bigint, p_kind text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with b as (select public.nexamon_cfg() -> 'bonuses' as v),
+       c as (select coalesce((b.v #>> array['caps', p_kind])::bigint, 0) as cap,
+                    coalesce((b.v ->> 'kneeShareBps')::bigint, 5000) as knee_share,
+                    coalesce((b.v ->> 'tailBps')::bigint, 5000) as tail
+               from b),
+       k as (select c.cap, c.tail, c.cap * c.knee_share / 10000 as knee, greatest(0, coalesce(p_raw, 0)) as raw from c)
+  select least(k.cap, case when k.raw <= k.knee then k.raw else k.knee + (k.raw - k.knee) * k.tail / 10000 end)::integer
+    from k;
+$$;
+
+-- "0,5 %" for 50 bps
+create or replace function public.nexamon_bps_text(p_bps integer)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select replace(trim(trailing '.' from trim(trailing '0' from to_char(coalesce(p_bps, 0) / 100.0, 'FM999990.00'))), '.', ',') || ' %';
+$$;
+
+create or replace function public.nexamon_bonus_kind_text(p_kind text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_kind when 'xp' then 'XP' when 'mission_xp' then 'Missions-XP' when 'trade_xp' then 'Handels-XP'
+                     when 'wage' then 'Gehalt' when 'vault' then 'Tresorzinsen' when 'daily' then 'Tagesbonus'
+                     when 'company' then 'Auftragserlöse' else coalesce(p_kind, '?') end;
+$$;
+
+-- the bonus of one card for a viewer: {kind, bps, boosted_bps, active, best_grade} (live, not from the cache)
+create or replace function public.nexamon_card_bonus_json(p_card text, p_viewer uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with d as (
+    select public.nexamon_card_bonus_def(k.rarity, k.set_key, k.number, public.nexamon_types() ->> k.card_key) as def
+      from public.nexamon_cards k where k.card_key = p_card
+  ), o as (
+    select count(*) as n, max(c.grade) as best
+      from public.nexamon_copies c
+     where c.card_key = p_card and c.owner_id = p_viewer and p_viewer is not null
+       and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+  )
+  select case when d.def is null then null
+              else d.def || jsonb_build_object(
+                     'boosted_bps', ((d.def ->> 'bps')::bigint * public.nexamon_slab_boost_bps(o.best) / 10000)::integer,
+                     'active', o.n > 0, 'best_grade', o.best) end
+    from d, o;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. The cache: nexamon_bonus_recompute(player)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_bonus_recompute(p_player uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg       jsonb := public.nexamon_cfg();
+  b         jsonb := public.nexamon_cfg() -> 'bonuses';
+  v_types   jsonb := public.nexamon_types();
+  v_now     timestamptz := public.game_now();
+  v_cards   jsonb;
+  v_cols    jsonb;
+  v_sources jsonb;
+  v_raw     jsonb := '{}'::jsonb;
+  v_eff     jsonb := '{}'::jsonb;
+  v_prev    jsonb;
+  v_on      jsonb;
+  v_off     jsonb;
+  v_kind    text;
+  v_sum     bigint;
+  v_names   jsonb := coalesce((select g.value from public.game_config g where g.key = 'nexamon_names'), '{}'::jsonb);
+  v_text    text;
+  v_cents   bigint;
+  v_xp      integer;
+  v_hh      bigint;
+  v_key     text;
+  v_ok      text;
+  r         record;
+begin
+  if p_player is null or not exists (select 1 from public.profiles p where p.id = p_player) then
+    return null;
+  end if;
+  if b is null then
+    delete from public.nexamon_player_bonuses where player_id = p_player;
+    return null;
+  end if;
+
+  -- every catalogue card with the player's best unlisted copy
+  if to_regclass('pg_temp.nx_bonus_own') is null then
+    create temporary table nx_bonus_own (
+      card_key text, set_key text, number integer, rarity text, type text, owned boolean, best double precision
+    ) on commit drop;
+  end if;
+  truncate pg_temp.nx_bonus_own;
+  insert into pg_temp.nx_bonus_own
+  select k.card_key, k.set_key, k.number, k.rarity, v_types ->> k.card_key, o.card_key is not null, o.best
+    from public.nexamon_cards k
+    left join (select c.card_key, max(c.grade) as best
+                 from public.nexamon_copies c
+                where c.owner_id = p_player
+                  and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+                group by c.card_key) o on o.card_key = k.card_key
+   where k.in_catalogue;
+
+  -- card sources
+  select coalesce(jsonb_agg(jsonb_build_object('id', 'card:' || x.card_key, 'card_key', x.card_key, 'kind', x.def ->> 'kind',
+                                               'bps', ((x.def ->> 'bps')::bigint * public.nexamon_slab_boost_bps(x.best) / 10000)::integer)
+                            order by x.set_key, x.number), '[]'::jsonb)
+    into v_cards
+    from (select o.*, public.nexamon_card_bonus_def(o.rarity, o.set_key, o.number, o.type) as def
+            from pg_temp.nx_bonus_own o where o.owned) x
+   where x.def is not null;
+
+  -- collections (nexamonCollections)
+  with t as (
+    select o.set_key, o.type, count(*) as need, count(*) filter (where o.owned) as have,
+           coalesce(jsonb_agg(o.card_key order by o.number) filter (where not o.owned), '[]'::jsonb) as missing
+      from pg_temp.nx_bonus_own o where o.type is not null group by o.set_key, o.type
+  ), s as (
+    select o.set_key, count(*) as need, count(*) filter (where o.owned) as have,
+           coalesce(jsonb_agg(o.card_key order by o.number) filter (where not o.owned), '[]'::jsonb) as missing,
+           count(*) filter (where coalesce(b #> '{sets,masterRarities}', '[]'::jsonb) ? o.rarity) as top,
+           count(*) filter (where coalesce(b #> '{sets,masterRarities}', '[]'::jsonb) ? o.rarity and o.owned
+                              and o.best >= coalesce((b #>> '{sets,masterMinGrade}')::double precision, 9)) as top_have,
+           coalesce(jsonb_agg(o.card_key order by o.number)
+                      filter (where not o.owned
+                                 or (coalesce(b #> '{sets,masterRarities}', '[]'::jsonb) ? o.rarity
+                                     and not coalesce(o.best >= coalesce((b #>> '{sets,masterMinGrade}')::double precision, 9), false))),
+                    '[]'::jsonb) as master_missing
+      from pg_temp.nx_bonus_own o group by o.set_key
+  ), cols as (
+    select t.set_key, 'type' as kind, t.type, t.have, t.need, t.missing, b #>> array['typeKind', t.type] as bonus_kind,
+           (coalesce((b #>> '{sets,type,bps}')::bigint, 0) * coalesce((b #>> array['setBps', t.set_key])::bigint, 10000) / 10000)::integer as bonus_bps
+      from t
+    union all
+    select s.set_key, 'complete', null, s.have, s.need, s.missing, b #>> '{sets,complete,kind}',
+           (coalesce((b #>> '{sets,complete,bps}')::bigint, 0) * coalesce((b #>> array['setBps', s.set_key])::bigint, 10000) / 10000)::integer
+      from s
+    union all
+    select s.set_key, 'master', null, s.have + s.top_have, s.need + s.top, s.master_missing, null,
+           (coalesce((b #>> '{sets,master,bps}')::bigint, 0) * coalesce((b #>> array['setBps', s.set_key])::bigint, 10000) / 10000)::integer
+      from s
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', 'col:' || c.set_key || ':' || c.kind || coalesce(':' || c.type, ''), 'set', c.set_key, 'kind', c.kind,
+           'type', c.type, 'have', c.have, 'need', c.need, 'complete', c.have = c.need, 'missing', c.missing,
+           'bonus_kind', c.bonus_kind, 'bonus_bps', c.bonus_bps)
+           order by c.set_key, case c.kind when 'type' then 0 when 'complete' then 1 else 2 end, c.type), '[]'::jsonb)
+    into v_cols
+    from cols c;
+
+  -- collection sources: type and complete to one kind, master to every kind
+  select v_cards || coalesce(jsonb_agg(jsonb_build_object('id', c ->> 'id', 'card_key', null, 'kind', k.kind,
+                                                          'bps', (c ->> 'bonus_bps')::integer)), '[]'::jsonb)
+    into v_sources
+    from jsonb_array_elements(v_cols) c
+    cross join lateral (select x as kind from jsonb_array_elements_text(
+                          case when c ->> 'bonus_kind' is null then coalesce(b -> 'kinds', '[]'::jsonb)
+                               else jsonb_build_array(c ->> 'bonus_kind') end) x) k
+   where (c ->> 'complete')::boolean and (c ->> 'bonus_bps')::integer > 0;
+
+  for v_kind in select jsonb_array_elements_text(coalesce(b -> 'kinds', '[]'::jsonb)) loop
+    select coalesce(sum((s ->> 'bps')::bigint), 0) into v_sum from jsonb_array_elements(v_sources) s where s ->> 'kind' = v_kind;
+    v_raw := v_raw || jsonb_build_object(v_kind, v_sum);
+    v_eff := v_eff || jsonb_build_object(v_kind, public.nexamon_stack_bps(v_sum, v_kind));
+  end loop;
+
+  -- what came and what went (by source id, collections once)
+  select p.sources into v_prev from public.nexamon_player_bonuses p where p.player_id = p_player for update;
+  select coalesce(jsonb_agg(distinct x), '[]'::jsonb) into v_on
+    from (select s ->> 'id' as x from jsonb_array_elements(v_sources) s) n
+   where not exists (select 1 from jsonb_array_elements(coalesce(v_prev, '[]'::jsonb)) p where p ->> 'id' = n.x);
+  select coalesce(jsonb_agg(distinct x), '[]'::jsonb) into v_off
+    from (select p ->> 'id' as x from jsonb_array_elements(coalesce(v_prev, '[]'::jsonb)) p) o
+   where not exists (select 1 from jsonb_array_elements(v_sources) s where s ->> 'id' = o.x);
+
+  insert into public.nexamon_player_bonuses as t (player_id, effective, raw, sources, collections, computed_at)
+  values (p_player, v_eff, v_raw, v_sources, v_cols, v_now)
+  on conflict (player_id) do update
+     set effective = excluded.effective, raw = excluded.raw, sources = excluded.sources,
+         collections = excluded.collections, computed_at = excluded.computed_at;
+
+  -- notifications: cards that start or stop giving a bonus (collections get their own below)
+  if v_prev is not null then
+    select string_agg(coalesce(v_names ->> substr(x, 6), substr(x, 6)) || ' (+'
+                      || public.nexamon_bps_text((select (s ->> 'bps')::integer from jsonb_array_elements(v_sources) s where s ->> 'id' = x))
+                      || ' ' || public.nexamon_bonus_kind_text((select s ->> 'kind' from jsonb_array_elements(v_sources) s where s ->> 'id' = x)) || ')',
+                      ', ' order by x)
+      into v_text
+      from jsonb_array_elements_text(v_on) x where x like 'card:%';
+    if v_text is not null then
+      perform public.social_notify(p_player, 'nexamon_bonus', 'Karten-Bonus aktiv', 'Jetzt aktiv: ' || v_text || '.',
+                                   jsonb_build_object('on', v_on), '/nexamon?tab=bonuses',
+                                   'nexamon_bonus:on:' || p_player::text || ':' || txid_current()::text);
+      perform public.mission_event(p_player, 'nexamon_bonus_card',
+                                   (select count(*) from jsonb_array_elements_text(v_on) x where x like 'card:%'), null);
+    end if;
+    select string_agg(coalesce(v_names ->> substr(x, 6), substr(x, 6)), ', ' order by x)
+      into v_text
+      from jsonb_array_elements_text(v_off) x where x like 'card:%';
+    if v_text is not null then
+      perform public.social_notify(p_player, 'nexamon_bonus', 'Karten-Bonus weg',
+                                   'Kein Bonus mehr von: ' || v_text || '. Verkaufte und angebotene Karten zählen nicht.',
+                                   jsonb_build_object('off', v_off), '/nexamon?tab=bonuses',
+                                   'nexamon_bonus:off:' || p_player::text || ':' || txid_current()::text);
+    end if;
+  elsif jsonb_array_length(v_cards) > 0 then
+    perform public.mission_event(p_player, 'nexamon_bonus_card', jsonb_array_length(v_cards), null);
+  end if;
+
+  -- first completions: reward once
+  for r in select c ->> 'set' as set_key, c ->> 'kind' as kind, coalesce(c ->> 'type', '') as type_key
+             from jsonb_array_elements(v_cols) c where (c ->> 'complete')::boolean loop
+    v_cents := coalesce((b #>> array['sets', r.kind, 'rewardPacks'])::bigint, 0)
+               * coalesce((cfg #>> array['sets', r.set_key, 'packPriceCents'])::bigint, 0);
+    v_xp := coalesce((b #>> array['sets', r.kind, 'rewardXp'])::integer, 0);
+    insert into public.nexamon_collection_completions (player_id, set_key, kind, type_key, first_at, reward_cents, reward_xp)
+    values (p_player, r.set_key, r.kind, r.type_key, v_now, 0, 0)
+    on conflict do nothing
+    returning kind into v_ok;
+    continue when v_ok is null;
+    v_ok := null;
+    v_key := 'nexamon_set:' || p_player::text || ':' || r.set_key || ':' || r.kind || ':' || r.type_key;
+    if v_cents > 0 then
+      perform public.lock_player_accounts(p_player);
+      select a.balance_cents into v_hh from public.ledger_accounts a where a.system_key = 'households' for update;
+      v_cents := least(v_cents, greatest(0, coalesce(v_hh, 0)));
+      if v_cents > 0 then
+        perform public.ledger_transfer(public.ledger_system_account('households'), public.ledger_player_account(p_player, 'player_cash'),
+                                       v_cents, 'nexamon_set_reward', 'Nexamon-Sammlung komplett', 'nexamon_set', null, v_key, p_player,
+                                       jsonb_build_object('set', r.set_key, 'kind', r.kind, 'type', nullif(r.type_key, '')));
+        perform public.loan_withhold(p_player, v_cents, v_key);
+      end if;
+    end if;
+    v_xp := coalesce(public.grant_xp(p_player, 'nexamon_set', v_xp, v_key, 'nexamon_set', null), 0);
+    update public.nexamon_collection_completions
+       set reward_cents = v_cents, reward_xp = v_xp
+     where player_id = p_player and set_key = r.set_key and kind = r.kind and type_key = r.type_key;
+    v_text := coalesce(cfg #>> array['sets', r.set_key, 'name'], r.set_key);
+    perform public.social_notify(p_player, 'nexamon_set',
+      case r.kind when 'master' then 'Master-Set!' when 'complete' then 'Set komplett!' else 'Typ-Sammlung komplett' end,
+      case r.kind when 'master' then 'Du hast das Master-Set von ' || v_text || ': alle Karten und jede Prisma und Legendary im Slab.'
+                  when 'complete' then 'Du hast alle Karten von ' || v_text || '.'
+                  else 'Alle Karten vom Typ ' || r.type_key || ' aus ' || v_text || ' sind in deiner Sammlung.' end
+        || ' Belohnung: ' || (v_cents / 100)::text || ' € und ' || v_xp::text || ' XP, dazu ein Bonus, solange sie komplett bleibt.',
+      jsonb_build_object('set', r.set_key, 'kind', r.kind, 'type', nullif(r.type_key, ''), 'cents', v_cents, 'xp', v_xp),
+      '/nexamon?tab=bonuses', v_key);
+    perform public.mission_event(p_player,
+      case r.kind when 'master' then 'nexamon_master_set' when 'complete' then 'nexamon_set_complete' else 'nexamon_type_collection' end,
+      1, null);
+    if r.kind = 'master' then
+      perform public.feed_post(p_player, 'nexamon_master_set', jsonb_build_object('set', r.set_key, 'name', v_text), v_key);
+    end if;
+  end loop;
+
+  return jsonb_build_object('effective', v_eff, 'raw', v_raw, 'sources', v_sources, 'collections', v_cols);
+end;
+$$;
+comment on function public.nexamon_bonus_recompute(uuid) is
+  'Internal (ADR-171): recomputes a player''s Nexamon card bonuses (cache nexamon_player_bonuses), notifies about '
+  'bonuses that come or go and rewards first completions of collections once. Call it after moving copies outside '
+  'the usual RPCs; the deferred triggers on nexamon_copies and nexamon_listings already do.';
+
+-- effective bonus of a kind (0 without cache or config)
+create or replace function public.player_nexamon_bonus_bps(p_player uuid, p_kind text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select (b.effective ->> p_kind)::integer from public.nexamon_player_bonuses b where b.player_id = p_player), 0);
+$$;
+comment on function public.player_nexamon_bonus_bps(uuid, text) is
+  'Internal (ADR-171): a player''s effective Nexamon card bonus of a kind in bps (after stacking and cap).';
+
+-- ---------------------------------------------------------------------------
+-- D. Deferred triggers: once per player and transaction, at commit
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_bonus_touch(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_done text := coalesce(current_setting('nexa.nx_bonus_done', true), '');
+  v_tx   text := txid_current()::text;
+begin
+  if p_player is null then
+    return;
+  end if;
+  if split_part(v_done, '|', 1) = v_tx and position(p_player::text in v_done) > 0 then
+    return;
+  end if;
+  if split_part(v_done, '|', 1) <> v_tx then
+    v_done := v_tx;
+  end if;
+  perform set_config('nexa.nx_bonus_done', v_done || '|' || p_player::text, true);
+  perform public.nexamon_bonus_recompute(p_player);
+end;
+$$;
+
+create or replace function public.nexamon_copies_bonus_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op in ('UPDATE', 'DELETE') then
+    perform public.nexamon_bonus_touch(old.owner_id);
+  end if;
+  if tg_op in ('INSERT', 'UPDATE') then
+    perform public.nexamon_bonus_touch(new.owner_id);
+  end if;
+  return null;
+end;
+$$;
+
+create or replace function public.nexamon_listings_bonus_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op = 'DELETE' then
+    perform public.nexamon_bonus_touch(old.seller_id);
+  else
+    perform public.nexamon_bonus_touch(new.seller_id);
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists nexamon_copies_bonus on public.nexamon_copies;
+create constraint trigger nexamon_copies_bonus after insert or update of owner_id, grade, card_key or delete on public.nexamon_copies
+  deferrable initially deferred for each row execute function public.nexamon_copies_bonus_trigger();
+drop trigger if exists nexamon_listings_bonus on public.nexamon_listings;
+create constraint trigger nexamon_listings_bonus after insert or delete on public.nexamon_listings
+  deferrable initially deferred for each row execute function public.nexamon_listings_bonus_trigger();
+
+-- ---------------------------------------------------------------------------
+-- E. Applied where the upgrades apply (latest definitions: 20261204000700_more_upgrades.sql)
+-- ---------------------------------------------------------------------------
+create or replace function public.player_upgrade_bps(p_player uuid, p_key text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_player is null then 0
+              else least(10000, greatest(0, round(public.player_upgrade_level(p_player, p_key)
+                                                  * coalesce(public.cfg_num(public.upgrade_cfg(p_key), '{perLevel}', 0), 0)))
+                                + case p_key when 'wage_bonus' then public.player_nexamon_bonus_bps(p_player, 'wage')
+                                             when 'vault_interest' then public.player_nexamon_bonus_bps(p_player, 'vault')
+                                             when 'daily_bonus' then public.player_nexamon_bonus_bps(p_player, 'daily')
+                                             when 'task_pay' then public.player_nexamon_bonus_bps(p_player, 'company')
+                                             else 0 end)::integer end;
+$$;
+comment on function public.player_upgrade_bps(uuid, text) is
+  'Internal (ADR-134, ADR-171): level x perLevel of a player''s upgrade in bps plus the Nexamon card bonus of the '
+  'matching kind (wage_bonus: wage, vault_interest: vault, daily_bonus: daily, task_pay: company), 0..10 000; 0 for no player.';
+
+create or replace function public.player_xp_bonus_bps(p_player uuid, p_source text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (coalesce(sum(least(10000, greatest(0, round(least(u.level, public.cfg_num(c.cfg, '{maxLevel}', 0))
+                                                        * public.cfg_num(c.cfg, '{perLevel}', 0))))), 0)
+          + public.player_nexamon_bonus_bps(p_player, 'xp')
+          + case p_source when 'mission' then public.player_nexamon_bonus_bps(p_player, 'mission_xp')
+                          when 'trade' then public.player_nexamon_bonus_bps(p_player, 'trade_xp')
+                          else 0 end)::integer
+    from public.player_upgrades u
+   cross join lateral (select public.upgrade_cfg(u.key) as cfg) c
+   where u.player_id = p_player and u.level > 0 and c.cfg is not null
+     and jsonb_typeof(c.cfg -> 'xpSources') = 'array'
+     and (c.cfg -> 'xpSources' ? p_source or c.cfg -> 'xpSources' ? '*');
+$$;
+comment on function public.player_xp_bonus_bps(uuid, text) is
+  'Internal (ADR-134, ADR-171, xpBonusBps): extra XP of a source in bps from the XP upgrades of a player plus the '
+  'Nexamon card bonuses xp (every source), mission_xp (mission) and trade_xp (trade).';
+
+-- ---------------------------------------------------------------------------
+-- F. Card JSON with the bonus (latest definition: 20261204005210_nexamon.sql)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_card_json(p_card text, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'card_key', k.card_key, 'set', k.set_key, 'number', k.number, 'rarity', k.rarity,
+           'value_cents', public.div_round_half_even(k.value_e4, 100),
+           'start_cents', public.div_round_half_even(k.start_e4, 100),
+           'change_bps', case when k.day_ref_on = (p_now at time zone 'Europe/Berlin')::date and k.day_ref_e4 > 0
+                              then public.div_round_half_even((k.value_e4 - k.day_ref_e4)::numeric * 10000, k.day_ref_e4) else 0 end,
+           'population', k.population,
+           'listed', (select count(*) from public.nexamon_listings l where l.card_key = k.card_key),
+           'owned', (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.owner_id = p_viewer),
+           'popularity_bps', public.nexamon_popularity_bps(k.rarity, k.population),
+           'floor_cents', public.div_round_half_even(b.floor_e4, 100),
+           'cap_cents', public.div_round_half_even(b.cap_e4, 100),
+           'bonus', public.nexamon_card_bonus_json(k.card_key, p_viewer))
+    from public.nexamon_cards k,
+         lateral public.nexamon_bounds(k.start_e4, k.first_pulled_at, k.counted_trades, p_now) b
+   where k.card_key = p_card;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. RPC get_nexamon_bonuses()
+-- ---------------------------------------------------------------------------
+create or replace function public.get_nexamon_bonuses()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  b        jsonb := public.nexamon_cfg() -> 'bonuses';
+  v_player uuid := public.require_player();
+  v_now    timestamptz := public.game_now();
+  v_state  jsonb;
+begin
+  perform public.nexamon_require_unlock(v_player);
+  perform public.nexamon_sync(v_now);
+  perform public.nexamon_finish_gradings(v_player, v_now);
+  v_state := coalesce(public.nexamon_bonus_recompute(v_player), '{}'::jsonb);
+  return jsonb_build_object(
+    'totals', (select coalesce(jsonb_agg(jsonb_build_object(
+                        'kind', k, 'raw_bps', coalesce((v_state #>> array['raw', k])::integer, 0),
+                        'effective_bps', coalesce((v_state #>> array['effective', k])::integer, 0),
+                        'cap_bps', coalesce((b #>> array['caps', k])::integer, 0)) order by o), '[]'::jsonb)
+                 from jsonb_array_elements_text(coalesce(b -> 'kinds', '[]'::jsonb)) with ordinality x(k, o)),
+    'cards', (select coalesce(jsonb_agg(jsonb_build_object('card_key', k.card_key) || j.v order by k.set_key, k.number), '[]'::jsonb)
+                from public.nexamon_cards k
+               cross join lateral (select public.nexamon_card_bonus_json(k.card_key, v_player) as v) j
+               where k.in_catalogue and j.v is not null),
+    'collections', (select coalesce(jsonb_agg(c || jsonb_build_object('completed_at', x.first_at) order by o), '[]'::jsonb)
+                      from jsonb_array_elements(coalesce(v_state -> 'collections', '[]'::jsonb)) with ordinality e(c, o)
+                      left join public.nexamon_collection_completions x
+                        on x.player_id = v_player and x.set_key = c ->> 'set' and x.kind = c ->> 'kind'
+                       and x.type_key = coalesce(c ->> 'type', '')),
+    'server_time', v_now);
+end;
+$$;
+comment on function public.get_nexamon_bonuses() is
+  'RPC (ADR-171): the caller''s Nexamon card bonuses: totals [{kind, raw_bps, effective_bps, cap_bps}], cards [{card_key, '
+  'kind, bps, boosted_bps, active, best_grade}] (every card that gives a bonus), collections [{id, set, kind, type, '
+  'have, need, complete, missing, bonus_kind, bonus_bps, completed_at}], server_time; error nexamon_locked.';
+revoke all on function public.get_nexamon_bonuses() from public, anon;
+grant execute on function public.get_nexamon_bonuses() to authenticated, service_role;
+
+do $do$
+begin
+  revoke all on function public.nexamon_bonus_recompute(uuid) from public, anon, authenticated;
+  revoke all on function public.nexamon_bonus_touch(uuid) from public, anon, authenticated;
+  revoke all on function public.player_nexamon_bonus_bps(uuid, text) from public, anon, authenticated;
+  revoke all on function public.nexamon_card_bonus_json(text, uuid) from public, anon, authenticated;
+  revoke all on function public.nexamon_card_bonus_def(text, text, integer, text) from public, anon, authenticated;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- H. Feed and NEXA Nachrichten: a master set is news
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_master_set' then 'Master-Set von ' || coalesce(p_payload ->> 'name', 'Nexamon') || ' komplett'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_master_set' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kind nexamon_master_set (ADR-171) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_master_set',$t$;
+begin
+  if position('nexamon_master_set' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_master_set (ADR-171) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- I. Missions
+-- ---------------------------------------------------------------------------
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  ('m_nexamon_first_bonus', 'milestone', 'Dein erster Karten-Bonus', 'Besitz eine Nexamon-Karte, die einen Account-Bonus bringt.', 'mission_art', 'nexamon_bonus_card', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 800, 800, 10, 171, false, 40, 1),
+  ('m_nexamon_first_type_set', 'milestone', 'Erste Typ-Sammlung', 'Sammle alle Karten eines Typs aus einem Set.', 'mission_art', 'nexamon_type_collection', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 2000, 2000, 10, 172, false, 30, 1),
+  ('m_nexamon_first_full_set', 'milestone', 'Ein Set komplett', 'Sammle alle 77 Karten eines Sets.', 'mission_art', 'nexamon_set_complete', 'count', '{"unlock":"nexamon"}'::jsonb, 1, 1, 6000, 6000, 10, 173, false, 20, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+
+-- ===== supabase/migrations/20261204006220_nexamon_profile_slabs.sql =====
+-- =============================================================================
+-- NEXA · 6220 · Nexamon: slabs and collection badges on the profile (ADR-171)
+-- =============================================================================
+-- get_player_nexamon() (latest definition: 20261204005800_nexamon_profile.sql) also returns
+--   summary.black_labels   slabs with the Black Label
+--   slabs                  every graded copy (not the ones at ASP): card, serial, grade, value, sorted by grade, then
+--                          value (at most 500), for the "Nur gegradete" view of a collection
+--   badges                 first completions of collections (nexamon_collection_completions): set, kind, type, at
+-- Read only (STABLE). Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+create or replace function public.get_player_nexamon(p_nickname text default null, p_limit integer default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg        jsonb := public.nexamon_cfg();
+  v_player   uuid := public.require_player();
+  v_target   uuid;
+  v_nick     text;
+  v_unlocked boolean;
+  v_limit    integer := least(greatest(coalesce(p_limit, 500), 1), 500);
+  v_summary  jsonb;
+  v_sets     jsonb;
+  v_cards    jsonb;
+  v_slabs    jsonb;
+  v_badges   jsonb;
+begin
+  if p_nickname is null then
+    v_target := v_player;
+  else
+    select p.id into v_target from public.profiles p where lower(p.nickname) = lower(btrim(p_nickname));
+  end if;
+  select p.nickname into v_nick from public.profiles p where p.id = v_target;
+  if v_nick is null then
+    perform public.api_error('player_not_found');
+  end if;
+  v_unlocked := public.nexamon_unlocked(v_target);
+
+  with own as (
+    select c.card_key, c.serial, c.condition, c.grade, k.set_key, k.number, k.rarity,
+           public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade) as value_cents
+      from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+     where c.owner_id = v_target and v_unlocked
+  ), per_card as (
+    -- the best copy of every card: the most valuable, then the higher grade, then the lower serial
+    select distinct on (o.card_key)
+           o.card_key, o.set_key, o.number, o.rarity, o.serial, o.condition, o.grade, o.value_cents,
+           count(*) over (partition by o.card_key) as copies,
+           (sum(o.value_cents) over (partition by o.card_key))::bigint as total_cents
+      from own o
+     order by o.card_key, o.value_cents desc, o.grade desc nulls last, o.serial
+  )
+  select jsonb_build_object(
+           'copies', (select count(*) from own),
+           'distinct', (select count(*) from per_card),
+           'total', (select count(*) from public.nexamon_cards k where k.in_catalogue),
+           'value_cents', (select coalesce(sum(o.value_cents), 0)::bigint from own o),
+           'graded', (select count(*) from own o where o.grade is not null),
+           'tens', (select count(*) from own o where o.grade >= 10),
+           'black_labels', (select count(*) from own o where o.grade >= 10.75)),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'key', s.set_key, 'cards', s.cards,
+                   'distinct', (select count(*) from per_card p where p.set_key = s.set_key),
+                   'copies', (select count(*) from own o where o.set_key = s.set_key))
+                   order by (cfg #>> array['sets', s.set_key, 'packPriceCents'])::bigint nulls last, s.set_key), '[]'::jsonb)
+            from (select k.set_key, count(*) as cards from public.nexamon_cards k where k.in_catalogue group by k.set_key) s),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'card_key', x.card_key, 'set', x.set_key, 'number', x.number, 'rarity', x.rarity, 'copies', x.copies,
+                   'serial', x.serial, 'condition', x.condition, 'grade', x.grade, 'value_cents', x.value_cents,
+                   'total_cents', x.total_cents)
+                   order by x.value_cents desc, x.set_key, x.number), '[]'::jsonb)
+            from (select p.* from per_card p order by p.value_cents desc, p.set_key, p.number limit v_limit) x),
+         (select coalesce(jsonb_agg(jsonb_build_object(
+                   'card_key', x.card_key, 'set', x.set_key, 'number', x.number, 'rarity', x.rarity, 'serial', x.serial,
+                   'condition', x.condition, 'grade', x.grade, 'value_cents', x.value_cents)
+                   order by x.grade desc, x.value_cents desc, x.set_key, x.number, x.serial), '[]'::jsonb)
+            from (select o.* from own o where o.grade is not null
+                   order by o.grade desc, o.value_cents desc, o.set_key, o.number, o.serial limit 500) x)
+    into v_summary, v_sets, v_cards, v_slabs;
+
+  select coalesce(jsonb_agg(jsonb_build_object('set', x.set_key, 'kind', x.kind, 'type', nullif(x.type_key, ''), 'at', x.first_at)
+                            order by x.first_at, x.set_key, x.kind, x.type_key), '[]'::jsonb)
+    into v_badges
+    from public.nexamon_collection_completions x
+   where x.player_id = v_target and v_unlocked;
+
+  return jsonb_build_object(
+    'nickname', v_nick, 'is_me', v_target = v_player, 'unlocked', v_unlocked,
+    'summary', v_summary, 'sets', v_sets, 'cards', v_cards, 'slabs', v_slabs, 'badges', v_badges,
+    'server_time', public.game_now());
+end;
+$$;
+comment on function public.get_player_nexamon(text, integer) is
+  'RPC: the Nexamon collection of a player by nickname (null = the caller) for their profile (ADR-165, ADR-171): '
+  '{nickname, is_me, unlocked, summary: {copies, distinct, total, value_cents, graded, tens, black_labels}, sets: '
+  '[{key, cards, distinct, copies}], cards: [{card_key, set, number, rarity, copies, serial, condition, grade, '
+  'value_cents, total_cents}] (best copy per card, most valuable first, at most p_limit, 1..500), slabs: [{card_key, '
+  'set, number, rarity, serial, condition, grade, value_cents}] (by grade, then value, at most 500), badges: [{set, '
+  'kind, type, at}], server_time}. Empty for a player below the Nexamon level; error player_not_found.';
+
+revoke all on function public.get_player_nexamon(text, integer) from public, anon;
+grant execute on function public.get_player_nexamon(text, integer) to authenticated, service_role;
+
+-- ===== supabase/migrations/20261204006230_nexamon_black_label_hype.sql =====
+-- =============================================================================
+-- NEXA · 6230 · Nexamon: Black Label hype (ADR-171)
+-- =============================================================================
+-- Rule (game_config.nexamon.blackLabelHype; src/config/nexamon-rules.ts; port of nexamonHypeChanceBps,
+-- nexamonHypeJumpBps, nexamonHypeAfterJump, nexamonHypeDecay, nexamonHypeStep in src/lib/sim/nexamon-bonuses.ts):
+--   the Black Labels of a card are worth its market value x its own factor (start grading.blackLabel.valueBps, 10x).
+--   Once per hour per card with a Black Label: first the decay (the factor loses decayBps of what it lies above the
+--   base, at least 1 bps), then with chance rarityChanceBps[rarity] x (1 + popularity) x blRef / (blRef + Black Labels
+--   - 1) a jump of minJumpBps..maxJumpBps of the factor, at most capBps.
+-- Model:
+--   nexamon_cards.bl_factor_bps (null = the base), bl_hype_at (the last hour handled), bl_jump_at (the last jump)
+--   nexamon_hype_points: the factor per hour it changed (history on the card page)
+--   nexamon_black_label_bps(card), nexamon_copy_value_cents(value, condition, grade, card): a Black Label at the card's
+--   factor; every current function that values a copy with the card at hand (copy and listing JSON, AI asks and
+--   buys, collection and profile value, net worth, news) is patched to the 4-argument form below (regexp on
+--   pg_get_functiondef, idempotent)
+--   nexamon_hype_run_due(now): job nexa-nexamon-hype (pg_cron, every hour at minute 7); a jump notifies the owners
+--   of the card's Black Labels (nexamon_hype); a jump of bigJumpBps or more is a feed item nexamon_hype (friends,
+--   gossip for NEXA Nachrichten)
+--   nexamon_card_json(): black_label_bps, hype_at (last jump while the factor is above the base)
+--   get_nexamon_card(): hype [{at, factor_bps}] (the last historyPoints points)
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+alter table public.nexamon_cards add column if not exists bl_factor_bps integer;
+alter table public.nexamon_cards add column if not exists bl_hype_at timestamptz;
+alter table public.nexamon_cards add column if not exists bl_jump_at timestamptz;
+comment on column public.nexamon_cards.bl_factor_bps is
+  'Black Label hype (ADR-171): value factor of this card''s Black Labels in bps; null = grading.blackLabel.valueBps.';
+
+create table if not exists public.nexamon_hype_points (
+  card_key   text not null references public.nexamon_cards (card_key) on delete cascade,
+  at         timestamptz not null,
+  factor_bps integer not null check (factor_bps > 0),
+  jump_bps   integer not null default 0 check (jump_bps >= 0),
+  primary key (card_key, at)
+);
+alter table public.nexamon_hype_points enable row level security;
+revoke all on public.nexamon_hype_points from public, anon, authenticated;
+grant all on public.nexamon_hype_points to service_role;
+comment on table public.nexamon_hype_points is
+  'Black Label factor of a card per hour it changed (ADR-171), jump_bps > 0 for a jump. Internal.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('nexamon_hype', 'social', 'Black-Label-Hype', 'Die Black Labels einer deiner Nexamon-Karten sind im Preis gesprungen.',
+        'notif_bell', true, true, false, 303)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- A. Rules
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_hype_base_bps()
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((public.nexamon_cfg() #>> '{grading,blackLabel,valueBps}')::integer, 100000);
+$$;
+
+create or replace function public.nexamon_black_label_bps(p_card text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select k.bl_factor_bps from public.nexamon_cards k where k.card_key = p_card), public.nexamon_hype_base_bps());
+$$;
+
+-- the copy's value with the card's own Black Label factor
+create or replace function public.nexamon_copy_value_cents(p_value_e4 bigint, p_condition text, p_grade double precision, p_card text)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_grade >= 10.75 and p_card is not null
+              then public.div_round_half_even(p_value_e4::numeric * public.nexamon_black_label_bps(p_card), 1000000)
+              else public.nexamon_copy_value_cents(p_value_e4, p_condition, p_grade) end;
+$$;
+
+-- nexamonHypeChanceBps
+create or replace function public.nexamon_hype_chance_bps(p_rarity text, p_popularity integer, p_black_labels bigint)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with h as (select public.nexamon_cfg() -> 'blackLabelHype' as v)
+  select case when coalesce(p_black_labels, 0) <= 0 or h.v is null then 0
+              else (coalesce((h.v #>> array['rarityChanceBps', p_rarity])::bigint, 0)
+                    * (10000 + least(10000, greatest(0, coalesce(p_popularity, 0))))
+                    * coalesce((h.v ->> 'blRef')::bigint, 3)
+                    / (10000 * (coalesce((h.v ->> 'blRef')::bigint, 3) + greatest(0, p_black_labels - 1))))::integer end
+    from h;
+$$;
+
+-- nexamonHypeStep: decay, then the roll -> (factor, jump)
+create or replace function public.nexamon_hype_step(p_factor integer, p_chance integer, p_u double precision, p_u2 double precision,
+                                                    out factor_bps integer, out jump_bps integer)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  h      jsonb := public.nexamon_cfg() -> 'blackLabelHype';
+  v_base integer := public.nexamon_hype_base_bps();
+  v_min  integer := coalesce((h ->> 'minJumpBps')::integer, 1000);
+  v_max  integer := coalesce((h ->> 'maxJumpBps')::integer, 6000);
+  v_u2   double precision := least(greatest(coalesce(p_u2, 0), 0), 0.999999999);
+begin
+  factor_bps := coalesce(p_factor, v_base);
+  if factor_bps <= v_base then
+    factor_bps := v_base;
+  else
+    factor_bps := factor_bps - greatest(1, ceil((factor_bps - v_base)::numeric * coalesce((h ->> 'decayBps')::integer, 100) / 10000))::integer;
+  end if;
+  jump_bps := 0;
+  if p_u * 10000 < coalesce(p_chance, 0) then
+    jump_bps := v_min + floor(v_u2 * (v_max - v_min + 1))::integer;
+    factor_bps := least(coalesce((h ->> 'capBps')::integer, 250000), factor_bps + (factor_bps::bigint * jump_bps / 10000)::integer);
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- B. Every function that values a copy with its card at hand uses the card's Black Label factor
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  r     record;
+  v_def text;
+  v_new text;
+begin
+  for r in select p.oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public'
+              and p.prosrc ~ 'nexamon_copy_value_cents\((k|r)\.value_e4, [a-z0-9_]+\.condition, [a-z0-9_]+\.grade\)|nexamon_copy_value_cents\(v_new, c\.condition, c\.grade\)'
+  loop
+    v_def := pg_get_functiondef(r.oid);
+    v_new := regexp_replace(v_def, 'nexamon_copy_value_cents\((k|r)\.value_e4, ([a-z0-9_]+)\.condition, ([a-z0-9_]+)\.grade\)',
+                            'nexamon_copy_value_cents(\1.value_e4, \2.condition, \3.grade, \1.card_key)', 'g');
+    v_new := replace(v_new, 'nexamon_copy_value_cents(v_new, c.condition, c.grade)', 'nexamon_copy_value_cents(v_new, c.condition, c.grade, p_card)');
+    if v_new <> v_def then
+      execute v_new;
+    end if;
+  end loop;
+  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'nexamon_copy_json'
+                and position('k.card_key)' in p.prosrc) = 0) then
+    raise exception 'nexamon_copy_json() has an unexpected shape; value Black Labels with nexamon_copy_value_cents(..., card) (ADR-171) by hand';
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- C. The job
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_hype_run_due(p_now timestamptz default null)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  h        jsonb := public.nexamon_cfg() -> 'blackLabelHype';
+  v_now    timestamptz := coalesce(p_now, public.game_now());
+  v_hour   timestamptz := date_trunc('hour', coalesce(p_now, public.game_now()));
+  v_base   integer := public.nexamon_hype_base_bps();
+  v_names  jsonb := coalesce((select g.value from public.game_config g where g.key = 'nexamon_names'), '{}'::jsonb);
+  v_steps  integer;
+  v_factor integer;
+  v_jump   integer;
+  v_best   integer;
+  v_chance integer;
+  v_n      integer := 0;
+  s        record;
+  r        record;
+  o        record;
+begin
+  if h is null then
+    return 0;
+  end if;
+  for r in select k.card_key, k.rarity, k.population, k.bl_factor_bps, k.bl_hype_at,
+                  (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.grade >= 10.75) as bls
+             from public.nexamon_cards k
+            where (k.bl_hype_at is null or k.bl_hype_at < v_hour)
+              and (k.bl_factor_bps is not null
+                   or exists (select 1 from public.nexamon_copies c where c.card_key = k.card_key and c.grade >= 10.75))
+            order by k.bl_hype_at nulls first, k.card_key
+            limit 500
+            for update of k skip locked loop
+    -- at most two days are caught up on
+    v_steps := least(48, greatest(1, coalesce(floor(extract(epoch from (v_hour - r.bl_hype_at)) / 3600)::integer, 1)));
+    v_factor := coalesce(r.bl_factor_bps, v_base);
+    v_best := 0;
+    v_chance := public.nexamon_hype_chance_bps(r.rarity, public.nexamon_popularity_bps(r.rarity, r.population), r.bls);
+    for i in 1..v_steps loop
+      select * into s from public.nexamon_hype_step(v_factor, v_chance, random(), random());
+      v_factor := s.factor_bps;
+      v_best := greatest(v_best, s.jump_bps);
+    end loop;
+    update public.nexamon_cards
+       set bl_factor_bps = case when v_factor <= v_base then null else v_factor end, bl_hype_at = v_hour,
+           bl_jump_at = case when v_best > 0 then v_now else bl_jump_at end
+     where card_key = r.card_key;
+    if v_factor <> coalesce(r.bl_factor_bps, v_base) then
+      insert into public.nexamon_hype_points (card_key, at, factor_bps, jump_bps)
+      values (r.card_key, v_hour, v_factor, v_best)
+      on conflict (card_key, at) do update set factor_bps = excluded.factor_bps,
+                                               jump_bps = greatest(public.nexamon_hype_points.jump_bps, excluded.jump_bps);
+    end if;
+    if v_best > 0 then
+      v_n := v_n + 1;
+      for o in select distinct c.owner_id from public.nexamon_copies c
+                where c.card_key = r.card_key and c.grade >= 10.75 and c.owner_id is not null loop
+        perform public.social_notify(o.owner_id, 'nexamon_hype', 'Black-Label-Hype!',
+          'Die Black Labels von ' || coalesce(v_names ->> r.card_key, r.card_key) || ' sind um '
+            || public.nexamon_bps_text(v_best) || ' gestiegen: jetzt das '
+            || replace(trim(trailing '.' from trim(trailing '0' from to_char(v_factor / 10000.0, 'FM9990.0'))), '.', ',')
+            || '-Fache der Karte.',
+          jsonb_build_object('card_key', r.card_key, 'jump_bps', v_best, 'factor_bps', v_factor),
+          '/nexamon/' || r.card_key, 'nexamon_hype:' || r.card_key || ':' || to_char(v_hour at time zone 'UTC', 'YYYYMMDDHH24'));
+        if v_best >= coalesce((h ->> 'bigJumpBps')::integer, 4000) then
+          perform public.feed_post(o.owner_id, 'nexamon_hype',
+                                   jsonb_build_object('card_key', r.card_key, 'name', v_names ->> r.card_key,
+                                                      'jump_bps', v_best, 'factor_bps', v_factor),
+                                   'nexamon:hype:' || o.owner_id::text || ':' || r.card_key || ':'
+                                     || to_char(v_hour at time zone 'UTC', 'YYYYMMDDHH24'));
+        end if;
+      end loop;
+    end if;
+  end loop;
+  return v_n;
+end;
+$$;
+comment on function public.nexamon_hype_run_due(timestamptz) is
+  'Internal, cron every hour (ADR-171): Black Label hype of every card with a Black Label: decay toward the base, '
+  'a random jump scaled by rarity, popularity and few Black Labels; notifies owners, feed item for a big jump. '
+  'Returns the number of jumps.';
+
+do $do$
+begin
+  revoke all on function public.nexamon_hype_run_due(timestamptz) from public, anon, authenticated;
+  revoke all on function public.nexamon_hype_step(integer, integer, double precision, double precision) from public, anon, authenticated;
+  revoke all on function public.nexamon_copy_value_cents(bigint, text, double precision, text) from public, anon, authenticated;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-nexamon-hype';
+    perform cron.schedule('nexa-nexamon-hype', '7 * * * *', 'select public.nexamon_hype_run_due()');
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- D. Card JSON and card page (latest card JSON: 20261204006210_nexamon_card_bonuses.sql)
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_card_json(p_card text, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'card_key', k.card_key, 'set', k.set_key, 'number', k.number, 'rarity', k.rarity,
+           'value_cents', public.div_round_half_even(k.value_e4, 100),
+           'start_cents', public.div_round_half_even(k.start_e4, 100),
+           'change_bps', case when k.day_ref_on = (p_now at time zone 'Europe/Berlin')::date and k.day_ref_e4 > 0
+                              then public.div_round_half_even((k.value_e4 - k.day_ref_e4)::numeric * 10000, k.day_ref_e4) else 0 end,
+           'population', k.population,
+           'listed', (select count(*) from public.nexamon_listings l where l.card_key = k.card_key),
+           'owned', (select count(*) from public.nexamon_copies c where c.card_key = k.card_key and c.owner_id = p_viewer),
+           'popularity_bps', public.nexamon_popularity_bps(k.rarity, k.population),
+           'floor_cents', public.div_round_half_even(b.floor_e4, 100),
+           'cap_cents', public.div_round_half_even(b.cap_e4, 100),
+           'bonus', public.nexamon_card_bonus_json(k.card_key, p_viewer),
+           'black_label_bps', coalesce(k.bl_factor_bps, public.nexamon_hype_base_bps()),
+           'hype_at', case when k.bl_factor_bps is not null then k.bl_jump_at end)
+    from public.nexamon_cards k,
+         lateral public.nexamon_bounds(k.start_e4, k.first_pulled_at, k.counted_trades, p_now) b
+   where k.card_key = p_card;
+$$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.get_nexamon_card(text)'::regprocedure);
+  v_old text := $t$    'server_time', v_now);$t$;
+  v_new text := $t$    'hype', (select coalesce(jsonb_agg(jsonb_build_object('at', x.at, 'factor_bps', x.factor_bps, 'jump_bps', x.jump_bps)
+                                       order by x.at), '[]'::jsonb)
+               from (select h.at, h.factor_bps, h.jump_bps from public.nexamon_hype_points h where h.card_key = k.card_key
+                      order by h.at desc limit coalesce((cfg #>> '{blackLabelHype,historyPoints}')::integer, 30)) x),
+    'server_time', v_now);$t$;
+begin
+  if position('nexamon_hype_points' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'get_nexamon_card() has an unexpected shape; add the Black Label hype history (ADR-171) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- E. Feed and NEXA Nachrichten: a big jump is news
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.feed_item_label(text, jsonb)'::regprocedure);
+  v_old text := $t$    when 'nexamon_pull' then$t$;
+  v_new text := $t$    when 'nexamon_hype' then 'Black-Label-Hype: ' || coalesce(p_payload ->> 'name', 'eine Nexamon-Karte') || ' springt im Preis'
+    when 'nexamon_pull' then$t$;
+begin
+  if position('nexamon_hype' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'feed_item_label() has an unexpected shape; add the feed kind nexamon_hype (ADR-171) by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.news_show_build(timestamptz)'::regprocedure);
+  v_old text := $t$'nexamon_pull',$t$;
+  v_new text := $t$'nexamon_pull', 'nexamon_hype',$t$;
+begin
+  if position('nexamon_hype' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'news_show_build() has an unexpected shape; add the feed kind nexamon_hype (ADR-171) to the gossip source by hand';
+    end if;
+    execute replace(v_def, v_old, v_new);
+  end if;
+end;
+$do$;
+
 -- ===== supabase/migrations/20261204006300_nexamon_battles_schema.sql =====
 -- =============================================================================
 -- NEXA · 6300 · Nexamon Pack Battles and live openings: error keys, notifications, tables (ADR-172)
@@ -73204,7 +74338,7 @@ insert into public.game_config (key, value, description) values
   ('nfts', '{"royaltyBps":1000,"mintXp":100,"minAskCents":10000,"minOfferCents":10000,"chat":{"maxLength":200,"perMinute":6,"history":60,"offerHours":24},"ai":{"floorCents":100000,"likeBps":400,"maxLikes":40,"creatorSaleBps":300,"maxCreatorSales":10,"ageBpsPerDay":100,"maxAgeDays":30,"buyChanceBps":2500,"listedOfferChanceBps":1500,"unlistedOfferChanceBps":400,"maxOpenAiOffers":3,"lowballMinBps":6500,"lowballMaxBps":9000,"maxBuysPerDay":100,"maxBuysPerHour":6,"maxMessagesPerRun":10,"budgetCentsPerDay":30000000,"offerHours":2,"auction":{"bidChanceBps":1000,"maxBidsPerRun":3},"resaleMarkupBps":12500,"acceptBps":10500,"demand":{"offerBps":600,"maxOffers":6,"saleBps":500,"maxSales":6,"days":7},"trade":{"chanceBps":250,"likeWeightBps":1500,"offerWeightBps":4000,"saleWeightBps":2500,"maxChanceBps":4000,"minHoldMinutes":10,"perRun":6,"perHour":24,"perDay":480,"tasteMinBps":8500,"tasteMaxBps":12500,"reversionBps":5000},"collectors":["Vera Vermeer","Konrad Kollektor","Pixel-Paula","Baron von Bit","Mia Mosaik","Otto Original","Gräfin Glitzer","Sammler Sam"],"lines":{"offer":["Schönes Stück. Mehr ist es mir aber nicht wert.","Für meine Sammlung würde ich so viel zahlen.","Mein Angebot. Überleg es dir nicht zu lange.","Hübsch! Wäre das ein fairer Preis?","Ich biete das. Nimm es, solange ich gute Laune habe.","Mein Hund hat draufgebellt. Das heißt bei uns: kaufen.","Ich habe keine Ahnung, was das sein soll. Ich nehme es.","Meine Mutter sagt, ich soll aufhören, Pixel zu kaufen. Hier mein Angebot.","Ich wollte eigentlich Brot kaufen. Jetzt bin ich hier.","Das hängt später über meinem Klo. Ehrenplatz.","Mehr habe ich nicht, den Rest hat mein Wellensittich verzockt.","Ist das Kunst oder ist dein Bildschirm kaputt? Egal, Angebot steht.","Ich biete das und lege ein halbes Käsebrot drauf.","Mein Horoskop sagt: heute teuer einkaufen. Bitte sehr.","Ich habe das Bild meinem Zahnarzt gezeigt. Er hat geweint. Ich biete.","Angebot! Bitte schnell, mein Akku hat noch drei Prozent.","Ich sammle nur Dinge, die ich nicht verstehe. Passt perfekt.","Dafür verkaufe ich mein Fahrrad. Na gut, den Sattel.","Wusstest du, dass Otter Händchen halten? Jedenfalls: mein Angebot.","Ich habe gewürfelt. Das ist der Preis. Die Würfel lügen nicht.","Mein Steuerberater ist ohnmächtig geworden, also muss es gut sein.","Das erinnert mich an meinen Ex. Ich will es trotzdem.","Ich zahle in Spielgeld, weil ich nichts anderes habe.","Letztes Angebot. Also das erste. Aber auch das letzte. Vielleicht.","Ich kaufe das nur, damit Baron von Bit es nicht bekommt.","So viel für so wenige Pixel? Ich liebe es.","Meine Wand ist leer und mein Kopf auch. Nimm mein Geld.","Ich habe eine Lasagne im Ofen, bitte entscheide dich fix.","Das sieht aus wie mein Kontostand: wild. Angebot.","Ich habe mich verklickt, aber jetzt ziehe ich es durch."],"buy":["Gekauft! Das kommt in meine Sammlung.","Zu diesem Preis konnte ich nicht widerstehen.","Ein fairer Preis. Danke!","Gekauft. Fragt mich nicht, warum.","Meins! Jetzt muss ich nur noch herausfinden, was es ist.","Gekauft, bevor mein Verstand wach wird.","Das kommt neben den Toaster. Da ist das Licht am besten.","Ich habe es. Meine Erben werden mich hassen.","Zack, gekauft. Miete wird überbewertet.","Endlich etwas, das ich meiner Katze vererben kann.","Gekauft! Ich schreibe es als Arbeitskleidung ab.","Schnäppchen. Sagt jedenfalls die Stimme in meinem Kühlschrank.","Ich wollte nur gucken. Tja.","Gekauft. Der Pizzabote kann warten."],"accept":["Abgemacht! Viel Freude damit.","Einverstanden, es gehört dir.","Deal. Bitte nicht in der Sonne lagern.","Nimm es, bevor ich es mir anders überlege.","Verkauft! Ich brauche das Geld für Gartenzwerge.","Na gut. Aber du musst es jeden Tag anschauen. Versprich es.","Einverstanden. Es hat mich nachts sowieso angestarrt.","Deal! Grüß deine Oma von mir.","Okay, okay. Du verhandelst wie mein Schwager.","Abgemacht. Der Rahmen kostet extra. Es gibt keinen Rahmen."],"trade":["Endlich gehört es mir! Das wollte ich schon lange.","Ich musste es einfach haben.","Gekauft von einer Kollegin. Jetzt steht es zum Verkauf, wer bietet mehr?","Ein Schnäppchen unter Sammlern.","Das Stück ist gefragt. Ich habe zugeschlagen.","Ich habe es Otto Original abgeluchst. Er weint jetzt in sein Müsli.","Getauscht gegen ein Geheimnis und etwas Bargeld.","Gekauft beim Sammlerstammtisch. Es gab Mettbrötchen.","Ich weiß nicht, wem ich es abgekauft habe. Er trug einen Umhang.","Meins. Die anderen Sammler können sich gehackt legen.","Frisch erworben und schon wieder im Angebot. So bin ich.","Ich habe es im Tausch gegen meinen guten Ruf bekommen.","Sammler Sam wollte es auch. Sammler Sam war zu langsam.","Gekauft, dreimal angeschaut, gelangweilt. Wer will?","Das hing eben noch bei Gräfin Glitzer. Jetzt nicht mehr. Ha!"],"decline":["Nein danke, darunter verkaufe ich nicht.","Netter Versuch. Biete mehr.","Das ist zu wenig für dieses Stück.","Dafür bekommst du bei mir höchstens ein Foto vom Bild.","Hahaha. Nein.","Für den Preis male ich dir ein Strichmännchen. Ein schlechtes.","Mein Goldfisch bietet mehr, und der hat kein Konto.","Zu wenig. Ich habe schließlich eine Yacht aus Pappe zu unterhalten.","Nein. Und meine Katze sagt auch nein.","Bei dem Angebot ist mir kurz schwarz vor Augen geworden.","Ich frage kurz meinen Anwalt. Er lacht noch.","Leg eine Null dran, dann reden wir. Hinten, nicht vorne.","Das ist kein Angebot, das ist eine Beleidigung mit Komma.","Nö. Aber danke, dass du an mich gedacht hast.","Ich verkaufe nicht unter Wert. Außer montags. Heute ist nicht Montag. Glaube ich."]}}}'::jsonb, 'Defaults from src/config/balance.ts, section "nfts"'),
   ('accessories', '{"slots":["back","body","face","head","hand","pet"],"feedRarities":["legendary","mythic"],"items":[{"key":"party_hat","name":"Partyhütchen","description":"Jeder Tag ist ein Feiertag, wenn das Depot grün ist.","slot":"head","rarity":"common","priceCents":75000,"minLevel":1,"set":"holidays"},{"key":"paper_crown","name":"Pappkrone","description":"Vom Burgerladen. Fühlt sich trotzdem königlich an.","slot":"head","rarity":"common","priceCents":135000,"minLevel":1},{"key":"beanie","name":"Bommelmütze","description":"Hält warm, wenn der Markt eiskalt ist.","slot":"head","rarity":"common","priceCents":180000,"minLevel":1},{"key":"traffic_cone","name":"Leitkegel","description":"Vom Heimweg mitgenommen. Niemand fragt nach.","slot":"head","rarity":"common","priceCents":240000,"minLevel":1,"set":"absurd"},{"key":"propeller_cap","name":"Propellermütze","description":"Dreht sich bei jedem Kursanstieg ein bisschen schneller.","slot":"head","rarity":"rare","priceCents":1250000,"minLevel":2,"set":"absurd"},{"key":"chef_hat","name":"Kochmütze","description":"Für alle, die ihr Depot nach Gefühl würzen.","slot":"head","rarity":"rare","priceCents":1500000,"minLevel":2,"set":"chef"},{"key":"bunny_ears","name":"Hasenohren","description":"Hört Gerüchte schon, bevor sie in den Nachrichten sind.","slot":"head","rarity":"rare","priceCents":2000000,"minLevel":3,"set":"zoo"},{"key":"cowboy_hat","name":"Cowboyhut","description":"Yeehaw! Der Wilde Westen heißt jetzt Börse.","slot":"head","rarity":"rare","priceCents":3250000,"minLevel":3},{"key":"pirate_hat","name":"Piratenhut","description":"Arrr! Für Leute, die Dividenden lieber entern.","slot":"head","rarity":"epic","priceCents":24500000,"minLevel":5,"set":"pirate"},{"key":"viking_helmet","name":"Wikingerhelm","description":"Plündert keine Dörfer, nur Short-Positionen.","slot":"head","rarity":"epic","priceCents":42000000,"minLevel":6,"set":"knight"},{"key":"top_hat","name":"Zylinder","description":"Ab hier redet man nur noch über Rendite und Pferde.","slot":"head","rarity":"epic","priceCents":105000000,"minLevel":10,"set":"royal"},{"key":"halo","name":"Heiligenschein","description":"Garantiert nie Insiderhandel betrieben. Ehrlich.","slot":"head","rarity":"legendary","priceCents":750000000,"minLevel":15},{"key":"crown","name":"Goldkrone","description":"Massives Pixelgold mit echten Fake-Diamanten.","slot":"head","rarity":"legendary","priceCents":5000000000,"minLevel":25,"set":"royal"},{"key":"clown_nose","name":"Clownsnase","description":"Macht jeden Verlust ein bisschen lustiger. Hupt nicht.","slot":"face","rarity":"common","priceCents":75000,"minLevel":1,"set":"absurd"},{"key":"sunglasses","name":"Sonnenbrille","description":"Die Zukunft ist so hell, man braucht eine.","slot":"face","rarity":"common","priceCents":105000,"minLevel":1,"set":"rock"},{"key":"fake_moustache","name":"Falscher Schnurrbart","description":"Perfekte Tarnung. Niemand erkennt dich. Wirklich niemand.","slot":"face","rarity":"common","priceCents":120000,"minLevel":1,"set":"absurd"},{"key":"heart_glasses","name":"Herzchenbrille","description":"Verliebt in jede Aktie, die man gerade gekauft hat.","slot":"face","rarity":"rare","priceCents":900000,"minLevel":2},{"key":"glasses_3d","name":"3D-Brille","description":"Endlich sieht man den Kurs auch in die Tiefe fallen.","slot":"face","rarity":"rare","priceCents":1100000,"minLevel":3},{"key":"monocle","name":"Monokel","description":"Ein Auge auf den Markt, das andere auf den Butler.","slot":"face","rarity":"epic","priceCents":31500000,"minLevel":7,"set":"royal"},{"key":"vr_goggles","name":"VR-Brille","description":"Lebt halb im Metaversum, halb im Minus.","slot":"face","rarity":"epic","priceCents":84000000,"minLevel":8},{"key":"deal_shades","name":"Pixel-Sonnenbrille","description":"Fällt aus dem Nichts ins Gesicht. Deal with it.","slot":"face","rarity":"epic","priceCents":56000000,"minLevel":6,"set":"rock"},{"key":"laser_eyes","name":"Laseraugen","description":"Nur echt mit mindestens einem Coin, der zum Mond fliegt.","slot":"face","rarity":"legendary","priceCents":2500000000,"minLevel":20},{"key":"bathrobe","name":"Bademantel","description":"Homeoffice-Uniform. Trading geht auch im Liegen.","slot":"body","rarity":"common","priceCents":150000,"minLevel":1,"set":"office"},{"key":"tracksuit","name":"Trainingsanzug","description":"Raschelt bei jeder Bewegung. Sehr sportlich, nie gejoggt.","slot":"body","rarity":"common","priceCents":210000,"minLevel":1,"set":"sports"},{"key":"hawaiian_shirt","name":"Hawaiihemd","description":"Urlaubsmodus an, Depot läuft trotzdem.","slot":"body","rarity":"common","priceCents":270000,"minLevel":2},{"key":"banana_costume","name":"Bananenkostüm","description":"Krumm, gelb und immer ein Hingucker. Nicht ausrutschen.","slot":"body","rarity":"rare","priceCents":2500000,"minLevel":2,"set":"absurd"},{"key":"hotdog_costume","name":"Hotdog-Kostüm","description":"Mit extra Senf. Riecht zum Glück nur nach Stoff.","slot":"body","rarity":"rare","priceCents":3750000,"minLevel":3,"set":"absurd"},{"key":"tuxedo","name":"Smoking","description":"Für Börsengänge, Galas und das Abendessen zu Hause.","slot":"body","rarity":"rare","priceCents":6000000,"minLevel":4,"set":"royal"},{"key":"shark_costume","name":"Haikostüm","description":"Für echte Finanzhaie. Beißt nur bei Leerverkäufen.","slot":"body","rarity":"epic","priceCents":28000000,"minLevel":5,"set":"zoo"},{"key":"dino_onesie","name":"Dino-Onesie","description":"Rawr! Uralte Anlagestrategie, extrem kuschelig.","slot":"body","rarity":"epic","priceCents":38500000,"minLevel":6,"set":"zoo"},{"key":"astronaut_suit","name":"Raumanzug","description":"Wer zum Mond will, muss sich passend anziehen.","slot":"body","rarity":"epic","priceCents":140000000,"minLevel":12,"set":"space"},{"key":"gold_suit","name":"Goldanzug","description":"Glänzt so sehr, dass die Konkurrenz eine Sonnenbrille braucht.","slot":"body","rarity":"legendary","priceCents":3000000000,"minLevel":20,"set":"royal"},{"key":"balloon","name":"Luftballon","description":"Steigt wie deine Lieblingsaktie. Platzt hoffentlich nicht.","slot":"hand","rarity":"common","priceCents":45000,"minLevel":1,"set":"holidays"},{"key":"baguette","name":"Baguette","description":"Knusprig, französisch, als Zeigestab bestens geeignet.","slot":"hand","rarity":"common","priceCents":60000,"minLevel":1,"set":"chef"},{"key":"rubber_chicken","name":"Gummihuhn","description":"Quietscht bei jedem Verlust. Also oft.","slot":"hand","rarity":"common","priceCents":90000,"minLevel":1,"set":"absurd"},{"key":"ice_cream","name":"Eistüte","description":"Drei Kugeln: Gewinn, Verlust und Pistazie.","slot":"hand","rarity":"common","priceCents":75000,"minLevel":1,"set":"chef"},{"key":"foam_finger","name":"Schaumstoffhand","description":"Nummer eins! Zumindest in der eigenen Wochenliga.","slot":"hand","rarity":"rare","priceCents":750000,"minLevel":2,"set":"sports"},{"key":"megaphone","name":"Megafon","description":"KAUFEN! VERKAUFEN! Hauptsache laut.","slot":"hand","rarity":"rare","priceCents":1750000,"minLevel":3,"set":"office"},{"key":"money_bag","name":"Geldsack","description":"Mit Dollarzeichen drauf, damit es auch jeder versteht.","slot":"hand","rarity":"rare","priceCents":4999900,"minLevel":4,"set":"office"},{"key":"laser_sword","name":"Laserschwert","description":"Schneidet Gebühren und Spreads in der Mitte durch.","slot":"hand","rarity":"epic","priceCents":49000000,"minLevel":8,"set":"space"},{"key":"golden_toilet_brush","name":"Goldene Klobürste","description":"Wahrer Reichtum zeigt sich im Badezimmer.","slot":"hand","rarity":"legendary","priceCents":1500000000,"minLevel":18,"set":"absurd"},{"key":"rubber_duck","name":"Quietscheente","description":"Hört zu, wenn du deine Trades erklärst. Urteilt nie.","slot":"pet","rarity":"common","priceCents":120000,"minLevel":1,"set":"zoo"},{"key":"hamster","name":"Hamster","description":"Hamstert alles, besonders Dividenden.","slot":"pet","rarity":"rare","priceCents":600000,"minLevel":2,"set":"zoo"},{"key":"parrot","name":"Papagei","description":"Plappert jeden Börsentipp nach. Auch die schlechten.","slot":"pet","rarity":"rare","priceCents":4000000,"minLevel":4,"set":"pirate"},{"key":"pug","name":"Mops","description":"Schnauft beim Laden der Kurse. Bester Freund an der Börse.","slot":"pet","rarity":"epic","priceCents":21000000,"minLevel":5,"set":"zoo"},{"key":"mini_dragon","name":"Minidrache","description":"Bewacht deinen Goldschatz und röstet Marshmallows.","slot":"pet","rarity":"legendary","priceCents":4000000000,"minLevel":22,"set":"wizard"},{"key":"superhero_cape","name":"Superheldenumhang","description":"Rettet Depots, aber leider nur die eigenen.","slot":"back","rarity":"rare","priceCents":2250000,"minLevel":2},{"key":"butterfly_wings","name":"Schmetterlingsflügel","description":"Ein Flügelschlag hier, ein Kurssturz in Tokio.","slot":"back","rarity":"rare","priceCents":4500000,"minLevel":3,"set":"zoo"},{"key":"bat_wings","name":"Fledermausflügel","description":"Für Nachteulen, die nachbörslich handeln.","slot":"back","rarity":"epic","priceCents":52500000,"minLevel":7,"set":"holidays"},{"key":"angel_wings","name":"Engelsflügel","description":"Himmlische Renditen, garantiert ohne Garantie.","slot":"back","rarity":"epic","priceCents":175000000,"minLevel":12},{"key":"jetpack","name":"Jetpack","description":"To the moon! Tank voll, Sicherheitsgurt optional.","slot":"back","rarity":"legendary","priceCents":1000000000,"minLevel":15,"set":"space"},{"key":"toilet_paper_crown","name":"Klopapierkrone","description":"Krisensicher angelegt. Hält drei Lockdowns und einen Crash.","slot":"head","rarity":"common","priceCents":99000,"minLevel":1,"set":"absurd"},{"key":"tinfoil_hat","name":"Aluhut","description":"Schirmt Kursmanipulation ab. Und WLAN. Und Vernunft.","slot":"head","rarity":"common","priceCents":150000,"minLevel":1,"set":"absurd"},{"key":"santa_hat","name":"Weihnachtsmütze","description":"Ho ho ho! Die Jahresendrallye kommt bestimmt.","slot":"head","rarity":"common","priceCents":165000,"minLevel":1,"set":"holidays"},{"key":"cat_ears","name":"Katzenohren","description":"In deiner Haarfarbe. Hören Dividenden schon von Weitem schnurren.","slot":"head","rarity":"common","priceCents":195000,"minLevel":1,"set":"zoo"},{"key":"tie_headband","name":"Krawatte als Stirnband","description":"Nach der Weihnachtsfeier der Investmentbank. Nicht fragen.","slot":"head","rarity":"common","priceCents":225000,"minLevel":2,"set":"office"},{"key":"alien_antennae","name":"Alien-Fühler","description":"Empfangen Börsentipps aus einer fernen Galaxie. Meist falsche.","slot":"head","rarity":"common","priceCents":260000,"minLevel":2,"set":"space"},{"key":"frog_hat","name":"Froschmütze","description":"Quak! Springt von Aktie zu Aktie und landet meist im Teich.","slot":"head","rarity":"rare","priceCents":1800000,"minLevel":2,"set":"zoo"},{"key":"reindeer_antlers","name":"Rentiergeweih","description":"Zieht den Schlitten voller Gewinne. Rudolph ist neidisch.","slot":"head","rarity":"rare","priceCents":2400000,"minLevel":3,"set":"holidays"},{"key":"sombrero","name":"Sombrero","description":"Spendet Schatten für den ganzen Handelsraum. Olé!","slot":"head","rarity":"rare","priceCents":2900000,"minLevel":3},{"key":"jester_hat","name":"Narrenkappe","description":"Für alle, die zum Höchstkurs gekauft haben. Klingelt beim Verkaufen.","slot":"head","rarity":"rare","priceCents":3600000,"minLevel":4,"set":"absurd"},{"key":"graduation_cap","name":"Doktorhut","description":"Dr. rer. pol. in Kaffeesatzlesen. Mit Auszeichnung.","slot":"head","rarity":"rare","priceCents":4500000,"minLevel":4,"set":"office"},{"key":"pumpkin_head","name":"Kürbiskopf","description":"Gruselig wie ein Depot im Oktober.","slot":"head","rarity":"epic","priceCents":33000000,"minLevel":7,"set":"holidays"},{"key":"knight_helmet","name":"Ritterhelm","description":"Schützt vor Gegenwind, Kritik und Margin Calls.","slot":"head","rarity":"epic","priceCents":68000000,"minLevel":9,"set":"knight"},{"key":"wizard_hat","name":"Zauberhut","description":"Zaubert Gewinne herbei. Behauptet zumindest der Prospekt.","slot":"head","rarity":"epic","priceCents":90000000,"minLevel":10,"set":"wizard"},{"key":"unicorn_horn","name":"Einhorn-Horn","description":"Für Gründer mit Milliardenbewertung und ohne Umsatz.","slot":"head","rarity":"epic","priceCents":125000000,"minLevel":12,"set":"zoo"},{"key":"disco_ball","name":"Discokugel","description":"Die Party geht weiter, solange der Kurs steigt.","slot":"head","rarity":"legendary","priceCents":1900000000,"minLevel":19,"set":"absurd"},{"key":"money_cloud","name":"Geldregenwolke","description":"Der Wetterbericht für Superreiche: Es regnet Scheine.","slot":"head","rarity":"mythic","priceCents":75000000000,"minLevel":40,"set":"royal"},{"key":"bubblegum","name":"Kaugummiblase","description":"Wie eine Spekulationsblase, nur leckerer. Platzt auch.","slot":"face","rarity":"common","priceCents":65000,"minLevel":1,"set":"absurd"},{"key":"eye_patch","name":"Augenklappe","description":"Ein Auge auf den Markt reicht völlig, sagt der Kapitän.","slot":"face","rarity":"common","priceCents":85000,"minLevel":1,"set":"pirate"},{"key":"facepaint","name":"Fan-Schminke","description":"In den Farben des Teams mit der besten Rendite. Wechselt wöchentlich.","slot":"face","rarity":"common","priceCents":95000,"minLevel":1,"set":"sports"},{"key":"nerd_glasses","name":"Hornbrille","description":"Mit Klebeband geflickt. Hat schon jede Tabellenkalkulation gesehen.","slot":"face","rarity":"common","priceCents":110000,"minLevel":1,"set":"office"},{"key":"snorkel_mask","name":"Taucherbrille","description":"Bestens gerüstet für den nächsten Kurstaucher.","slot":"face","rarity":"rare","priceCents":1400000,"minLevel":2},{"key":"star_glasses","name":"Sternchenbrille","description":"Rockstar-Look für alle, die den Depotauszug nicht sehen wollen.","slot":"face","rarity":"rare","priceCents":2200000,"minLevel":3,"set":"rock"},{"key":"hero_mask","name":"Superheldenmaske","description":"Geheime Identität: Kleinanleger. Superkraft: Durchhalten.","slot":"face","rarity":"rare","priceCents":3900000,"minLevel":4},{"key":"wizard_beard","name":"Zauberbart","description":"Hundert Jahre Börsenerfahrung. Oder zwei Wochen sehr viel Stress.","slot":"face","rarity":"epic","priceCents":64000000,"minLevel":10,"set":"wizard"},{"key":"diamond_grill","name":"Diamant-Grillz","description":"Ein Lächeln wie ein Tresor: glänzend, hart und sehr teuer.","slot":"face","rarity":"legendary","priceCents":2100000000,"minLevel":21,"set":"royal"},{"key":"diamond_monocle","name":"Diamantmonokel","description":"Sieht alles. Besonders gern das eigene Spiegelbild.","slot":"face","rarity":"mythic","priceCents":25000000000,"minLevel":35,"set":"royal"},{"key":"barrel","name":"Pleite-Fass","description":"Das Outfit nach dem Margin Call. Hosenträger gibt es gratis dazu.","slot":"body","rarity":"common","priceCents":49000,"minLevel":1,"set":"office"},{"key":"chef_apron","name":"Kochschürze","description":"Hier werden keine Bilanzen gekocht. Nur Nudeln.","slot":"body","rarity":"common","priceCents":125000,"minLevel":1,"set":"chef"},{"key":"duck_float","name":"Entchen-Schwimmring","description":"Hält dich über Wasser, wenn das Depot absäuft.","slot":"body","rarity":"common","priceCents":145000,"minLevel":1,"set":"absurd"},{"key":"jersey","name":"Trikot Nr. 1","description":"Die Nummer eins im Depot-Derby. Steht ja drauf.","slot":"body","rarity":"common","priceCents":240000,"minLevel":2,"set":"sports"},{"key":"xmas_sweater","name":"Weihnachtspulli","description":"Hässlich, kratzig und trotzdem jedes Jahr wieder dabei.","slot":"body","rarity":"rare","priceCents":1900000,"minLevel":2,"set":"holidays"},{"key":"leather_jacket","name":"Lederjacke","description":"Rock ''n'' Roll im Depot: laut, wild und sehr volatil.","slot":"body","rarity":"rare","priceCents":5500000,"minLevel":4,"set":"rock"},{"key":"pirate_coat","name":"Piratenmantel","description":"Mit Goldknöpfen aus erbeuteten Dividenden.","slot":"body","rarity":"rare","priceCents":6500000,"minLevel":5,"set":"pirate"},{"key":"garden_gnome","name":"Gartenzwergkostüm","description":"Steht stoisch im Vorgarten und wartet auf die Erholung.","slot":"body","rarity":"rare","priceCents":7700000,"minLevel":5,"set":"absurd"},{"key":"pinstripe_suit","name":"Nadelstreifenanzug","description":"Riecht nach Bonus, Espresso und Überstunden.","slot":"body","rarity":"epic","priceCents":72000000,"minLevel":8,"set":"office"},{"key":"knight_armor","name":"Ritterrüstung","description":"Panzert gegen Kursstürze. Rostet leider bei Regen.","slot":"body","rarity":"epic","priceCents":115000000,"minLevel":11,"set":"knight"},{"key":"wizard_robe","name":"Zaubermantel","description":"Mit Sternen bestickt und Geheimtaschen für Geheimformeln.","slot":"body","rarity":"epic","priceCents":150000000,"minLevel":12,"set":"wizard"},{"key":"ermine_robe","name":"Königsmantel","description":"Hermelin, Samt und Gold. Untertanen sind nicht im Preis enthalten.","slot":"body","rarity":"mythic","priceCents":60000000000,"minLevel":45,"set":"royal"},{"key":"sparkler","name":"Wunderkerze","description":"Funkelt kurz und hell. Wie mancher Börsengang.","slot":"hand","rarity":"common","priceCents":50000,"minLevel":1,"set":"holidays"},{"key":"candy_cane","name":"Zuckerstange","description":"Rot-weiß gestreift wie ein Chart an einem nervösen Tag.","slot":"hand","rarity":"common","priceCents":55000,"minLevel":1,"set":"holidays"},{"key":"frying_pan","name":"Bratpfanne","description":"Mit Spiegelei. Frühstück und Selbstverteidigung in einem.","slot":"hand","rarity":"common","priceCents":70000,"minLevel":1,"set":"chef"},{"key":"coffee_mug","name":"Kaffeebecher","description":"Treibstoff für den Börsenstart um neun. Und den um zehn.","slot":"hand","rarity":"common","priceCents":80000,"minLevel":1,"set":"office"},{"key":"plunger","name":"Pümpel","description":"Für verstopfte Orderbücher und andere Notfälle.","slot":"hand","rarity":"common","priceCents":99900,"minLevel":1,"set":"absurd"},{"key":"tennis_racket","name":"Tennisschläger","description":"Schlägt jeden Aufschlag zurück. Nur keine Gebühren.","slot":"hand","rarity":"common","priceCents":200000,"minLevel":2,"set":"sports"},{"key":"shopping_cart","name":"Einkaufswagen","description":"Randvoll mit Klopapier. Die sicherste Anlage überhaupt.","slot":"hand","rarity":"rare","priceCents":1600000,"minLevel":2,"set":"absurd"},{"key":"magic_wand","name":"Zauberstab","description":"Ein Schwung, und das Minus ist weg. Leider nur im Traum.","slot":"hand","rarity":"rare","priceCents":2700000,"minLevel":3,"set":"wizard"},{"key":"cutlass","name":"Säbel","description":"Entert jede Hauptversammlung. Arrr!","slot":"hand","rarity":"rare","priceCents":4200000,"minLevel":4,"set":"pirate"},{"key":"ray_gun","name":"Strahlenpistole","description":"Pew, pew! Schießt Kurse in die Umlaufbahn.","slot":"hand","rarity":"rare","priceCents":4800000,"minLevel":4,"set":"space"},{"key":"electric_guitar","name":"E-Gitarre","description":"Spielt im Plus nur Dur. Im Minus Blues.","slot":"hand","rarity":"epic","priceCents":47000000,"minLevel":8,"set":"rock"},{"key":"broadsword","name":"Ritterschwert","description":"Für epische Duelle in der Börsenliga.","slot":"hand","rarity":"epic","priceCents":60000000,"minLevel":9,"set":"knight"},{"key":"trophy","name":"Goldpokal","description":"Für den ersten Platz. Selbst gekauft zählt auch.","slot":"hand","rarity":"epic","priceCents":99000000,"minLevel":11,"set":"sports"},{"key":"briefcase_money","name":"Geldkoffer","description":"Prall gefüllt und ganz sicher nicht aus dunklen Geschäften. Fast.","slot":"hand","rarity":"legendary","priceCents":1250000000,"minLevel":17,"set":"office"},{"key":"sceptre","name":"Zepter","description":"Wer das hält, bestimmt den Leitzins. Zumindest auf dem Platz.","slot":"hand","rarity":"mythic","priceCents":40000000000,"minLevel":38,"set":"royal"},{"key":"pet_rock","name":"Haustierstein","description":"Frisst nichts, bellt nicht und schwankt nie im Kurs.","slot":"pet","rarity":"common","priceCents":49900,"minLevel":1,"set":"absurd"},{"key":"snail","name":"Turbo-Schnecke","description":"Schneller als jede Überweisung am Wochenende.","slot":"pet","rarity":"common","priceCents":135000,"minLevel":1,"set":"zoo"},{"key":"cat","name":"Katze","description":"Läuft über die Tastatur und kauft dabei zufällig Aktien.","slot":"pet","rarity":"common","priceCents":280000,"minLevel":2,"set":"zoo"},{"key":"goldfish","name":"Goldfisch im Glas","description":"Vergisst jeden Verlust nach drei Sekunden. Ein Vorbild.","slot":"pet","rarity":"rare","priceCents":1200000,"minLevel":2,"set":"zoo"},{"key":"lobster","name":"Hummer","description":"Kneift bei schlechten Trades. Also ziemlich oft.","slot":"pet","rarity":"rare","priceCents":2600000,"minLevel":3,"set":"chef"},{"key":"ghost","name":"Gespenst","description":"Der Geist vergangener Verluste. Buh!","slot":"pet","rarity":"rare","priceCents":3100000,"minLevel":3,"set":"holidays"},{"key":"owl","name":"Eule","description":"Weise Anlagetipps, aber nur nach Mitternacht.","slot":"pet","rarity":"rare","priceCents":3400000,"minLevel":4,"set":"wizard"},{"key":"penguin","name":"Pinguin","description":"Trägt immer Frack. Perfekt für die Hauptversammlung.","slot":"pet","rarity":"rare","priceCents":5000000,"minLevel":4,"set":"zoo"},{"key":"bear","name":"Bärenmarkt-Bär","description":"Kuschelig, aber jeder Kurs fällt, wenn er brummt.","slot":"pet","rarity":"epic","priceCents":25000000,"minLevel":6,"set":"office"},{"key":"robo_dog","name":"Robohund","description":"Holt die Zeitung, liest sie und handelt sofort.","slot":"pet","rarity":"epic","priceCents":88000000,"minLevel":10,"set":"space"},{"key":"ufo","name":"Mini-UFO","description":"Entführt Kühe. Und manchmal Aktien in ungeahnte Höhen.","slot":"pet","rarity":"legendary","priceCents":3500000000,"minLevel":24,"set":"space"},{"key":"golden_bull","name":"Goldener Bulle","description":"Das Wappentier der Hausse. Massiv vergoldet, schnaubt Optimismus.","slot":"pet","rarity":"mythic","priceCents":90000000000,"minLevel":50,"set":"royal"},{"key":"school_bag","name":"Schulranzen","description":"Für den ersten Schultag an der Börse. Pausenbrot inklusive.","slot":"back","rarity":"common","priceCents":115000,"minLevel":1},{"key":"bee_wings","name":"Bienenflügel","description":"Fleißig wie eine Biene. Summt beim Sparen.","slot":"back","rarity":"common","priceCents":185000,"minLevel":2,"set":"zoo"},{"key":"turtle_shell","name":"Schildkrötenpanzer","description":"Langsam, aber sicher: die Strategie für Geduldige.","slot":"back","rarity":"rare","priceCents":2300000,"minLevel":3,"set":"zoo"},{"key":"surfboard","name":"Surfbrett","description":"Reitet jede Welle. Auch die nach unten.","slot":"back","rarity":"rare","priceCents":3000000,"minLevel":3},{"key":"knight_shield","name":"Ritterschild","description":"Hält Anrufe von Anlageberatern zuverlässig ab.","slot":"back","rarity":"rare","priceCents":5200000,"minLevel":5,"set":"knight"},{"key":"peacock_tail","name":"Pfauenrad","description":"Schlägt ein Rad, sobald der Kontostand stimmt.","slot":"back","rarity":"epic","priceCents":160000000,"minLevel":13,"set":"royal"},{"key":"dragon_wings","name":"Drachenflügel","description":"Für Flüge über den eigenen Goldschatz. Feuer inklusive.","slot":"back","rarity":"legendary","priceCents":7500000000,"minLevel":26,"set":"wizard"},{"key":"phoenix_wings","name":"Phönixflügel","description":"Steigt aus der Asche jedes Crashs wieder auf.","slot":"back","rarity":"mythic","priceCents":15000000000,"minLevel":42,"set":"royal"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "accessories"'),
   ('battles', '{"lobby":{"minLevel":2,"minPlayers":3,"maxPlayers":10,"perHour":1,"countdownSeconds":30,"idleSeconds":15,"introMs":6000,"recentSeconds":120},"demo":{"countdownSeconds":6,"botsMin":3,"botsMax":5},"weights":{"floor":12,"bulls":12,"coins":12,"sumo":12,"potato":12,"pump":10,"quiz":12,"estimate":8,"bell":10,"bear":12,"dash":12,"margin":12,"elevator":10,"laser":12,"rodeo":10,"vault":8,"ticker":10,"higher":10,"auction":8},"net":{"tickMs":50,"graceMs":1000,"aheadTicks":10,"disconnectTicks":80,"sendEveryMs":250,"checkEveryMs":1000},"arena":{"w":11,"h":9,"stepTicks":4,"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,4],[7,4]]},"games":{"floor":{"maxTicks":1400,"firstWave":60,"waveEvery":50,"waveEveryMin":18,"waveEveryStep":2,"crackStart":3,"crackMax":9,"crackGrowEvery":2,"warnTicks":24,"stompTicks":50,"endgameTiles":8},"bulls":{"maxTicks":1300,"hearts":3,"firstSpawn":40,"spawnEvery":50,"spawnEveryMin":14,"spawnEveryStep":2,"countGrowEvery":5,"countMax":4,"warnTicks":26,"ticksPerTile":2,"stunTicks":16,"invulnTicks":40},"coins":{"durationTicks":900,"firstDrop":20,"dropEvery":6,"dropEveryMin":3,"fallTicks":16,"lifeTicks":80,"bearPct":12,"goldPct":8,"goldValue":3,"bearStunTicks":30,"bearLoss":2,"jackpotTicks":200,"jackpotGoldPct":25},"sumo":{"maxTicks":1500,"firstShrink":300,"shrinkEvery":220,"warnTicks":40,"stunTicks":0,"recoverTicks":7,"powerCooldown":40,"cornerCut":8,"spawns":[[2,2],[8,6],[8,2],[2,6],[5,1],[5,7],[2,4],[8,4],[4,3],[6,5]]},"potato":{"maxTicks":1800,"firstRound":40,"pauseTicks":40,"holderStepTicks":3,"passBackTicks":20,"receiverStunTicks":8,"fuseBaseSeconds":13,"fuseMinSeconds":4,"fuseJitterSeconds":4,"walls":[[2,2],[8,2],[2,6],[8,6],[5,4]]},"pump":{"durationTicks":600,"greenMin":40,"greenJitter":60,"yellowTicks":12,"redMin":20,"redJitter":20,"goldEvery":4,"goldTicks":20,"goldValue":3,"bustFreezeTicks":20,"bustLossBps":2500},"bear":{"maxTicks":1600,"bearTicks":[60,380,740,1100],"stepStart":7,"stepMin":4,"speedEvery":280,"eatTicks":30,"den":[5,4],"pillars":[[3,3],[7,3],[3,5],[7,5]],"spawns":[[1,1],[9,7],[9,1],[1,7],[5,1],[5,7],[1,4],[9,4],[3,1],[7,7]]},"dash":{"maxTicks":1200,"target":15,"firstCoin":20,"coinsPerPlayers":4,"coinsMax":3,"spawnDelay":24,"goldEvery":5,"goldValue":2,"tackleStun":24,"tackleCool":40},"margin":{"maxTicks":1800,"firstRound":30,"showTicks":100,"showMin":44,"showStep":8,"pauseTicks":34,"warmupRounds":3},"elevator":{"maxTicks":1600,"firstRise":60,"riseStart":30,"riseMin":9,"riseStep":1,"riseStepEvery":2,"barrierEvery":3,"gapStart":4,"gapMin":1,"gapShrinkEvery":12},"laser":{"maxTicks":1400,"hearts":3,"firstSpawn":50,"spawnEvery":64,"spawnEveryMin":26,"spawnEveryStep":2,"countGrowEvery":4,"countMax":3,"staggerTicks":20,"warnTicks":24,"ticksPerTile":2,"gapPct":35,"jumpTicks":8,"jumpCool":6,"invulnTicks":16},"rodeo":{"maxTicks":1400,"grip":3,"firstCue":40,"windowStart":26,"windowMin":9,"windowStep":1,"gapMin":8,"gapJitter":18},"quiz":{"rounds":7,"answerMs":8000,"revealMs":3000,"hearts":2,"basePoints":500,"speedPoints":500},"estimate":{"rounds":4,"answerMs":12000,"revealMs":4000,"bullseyeBps":100,"bullseyeBonus":2,"lastRoundFactor":2,"stockRounds":1},"bell":{"maxRounds":9,"readyMs":1000,"waitMinMs":1500,"waitMaxMs":4500,"windowMs":2000,"resultMs":2500,"smallGroup":5,"heartsSmall":2,"heartsLarge":1},"vault":{"rounds":3,"answerMs":24000,"revealMs":4000,"digits":3,"symbols":6,"maxTries":8,"basePoints":400,"speedPoints":600,"tryBonus":25},"ticker":{"rounds":8,"answerMs":6000,"revealMs":2500,"options":6,"basePoints":200,"speedPoints":800,"wrongPoints":300},"higher":{"rounds":10,"answerMs":5000,"revealMs":2500,"smallGroup":5,"heartsSmall":3,"heartsLarge":2,"history":14,"trendPct":65,"moveMinBps":80,"moveMaxBps":450,"basePoints":100,"speedPoints":100},"auction":{"rounds":6,"answerMs":10000,"revealMs":3500,"budget":1000}},"prizes":{"weights":{"xp":30,"money":30,"skin":20,"nft":20},"xpBase":1000,"xpPerPlayer":150,"moneyBaseCents":300000,"moneyPerPlayerCents":75000,"dailyPrizeCap":3},"accessories":[{"key":"battle_crown","name":"Battle-Krone","description":"Gewonnen, nicht gekauft. Samt, Gold und ein Rubin so groß wie dein Ego.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"laurel_wreath","name":"Lorbeerkranz","description":"Wie bei den alten Griechen, nur mit mehr Aktien.","slot":"head","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"champion_belt","name":"Champion-Gürtel","description":"Schwergewichtsmeister im Kurssturz-Springen.","slot":"body","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"victory_cape","name":"Siegerumhang","description":"Flattert dramatisch, auch wenn kein Wind weht.","slot":"back","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"star_shades","name":"Siegerbrille","description":"Wer gewinnt, muss die Blicke der Verlierer nicht sehen.","slot":"face","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"golden_joystick","name":"Goldener Joystick","description":"WASD in purem Gold. Nicht zum Zocken, zum Angeben.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"winner_trophy","name":"Siegerpokal","description":"Glänzt. Wiegt. Wird jeden Abend poliert.","slot":"hand","rarity":"legendary","exclusive":true,"minLevel":1},{"key":"mini_bull","name":"Mini-Bulle","description":"Ein Bulle, der dich nicht über den Haufen rennt. Meistens.","slot":"pet","rarity":"legendary","exclusive":true,"minLevel":1}],"doodle":{"lobby":["Na, ihr Sofa-Börsianer? Wer traut sich in die Arena?","Ich brauche drei Mutige. Oder drei Ahnungslose. Geht beides.","Kommt rein, kommt rein! Hier gewinnt nur einer, die anderen weinen live.","Meine Mutter würde sofort mitmachen. Und gewinnen.","Ein Preis, ein Sieger, null Mitleid. Willkommen im Battle!"],"countdown":["Gleich geht''s los! Letzte Chance, noch feige wegzurennen.","Die Arena wird gewischt. Gleich fließen Tränen.","Ich habe Popcorn. Ihr habt keine Chance."],"intro":{"floor":"Der Kurs stürzt, der Boden auch! Bleibt in Bewegung, sonst geht''s abwärts!","bulls":"Die Bullen sind los! Wer stehen bleibt, wird zum Teppich.","coins":"Es regnet Geld! Vorsicht vor den Bären, die beißen.","sumo":"Rempeln erlaubt, Weinen auch. Wer rausfliegt, fliegt raus!","potato":"Wer die Giftaktie hält, wenn es knallt, ist raus. Weitergeben!","pump":"Pumpt die Aktie! Aber wehe, ihr tippt im Crash.","quiz":"Quizzeit! Zwei Herzen, null Ahnung. Zeigt, was ihr wisst!","estimate":"Schätzt mal! Wer am nächsten dran ist, kriegt die Punkte.","bell":"Wenn die Glocke läutet, drückt ihr. Vorher drücken? Raus!","bear":"Die Bären haben Hunger! Lauft, und zwar weg von ihnen, nicht hin.","dash":"Dividende für alle! Also für den Schnellsten. Rempeln ist ausdrücklich erwünscht.","margin":"Margin Call! Wer beim Gong nicht im Grünen steht, wird glattgestellt.","elevator":"Diese Aktie kennt nur eine Richtung: nach oben. Wer unten bleibt, bleibt unten.","laser":"Die Laserschranke! Springt im richtigen Moment, sonst gibt''s gegrillte Börsianer.","rodeo":"Haltet euch fest! Der Bulle bockt, und er hat heute richtig schlechte Laune.","vault":"Der Tresor der Zentralbank! Knackt den Code, bevor die Polizei kommt. War ein Witz. Oder?","ticker":"Kürzel-Alarm! Wer das richtige Tickersymbol zuerst erwischt, ist der Börsenprofi.","higher":"Höher oder tiefer? Mein Schnurrbart sagt höher. Mein Schnurrbart lag noch nie richtig.","auction":"Wer bietet mehr? Spielgeld weg, Punkte her! Nur nicht alles für eine Gummiente ausgeben."},"win":["{name} gewinnt! Ich habe es immer gewusst. Also seit gerade eben.","Applaus für {name}! Die anderen dürfen jetzt heimlich weinen.","{name} räumt ab! Das schreibe ich mir auf die Krawatte.","Was für ein Battle! {name} ist der Champion des Tages.","{name} siegt, die Börse bebt, mein Schnurrbart zittert!"],"out":["Und weg ist {name}! Tschüss, war nett.","{name} fliegt raus. Ich habe nichts gesehen. Doch, alles.","Autsch, {name}! Das gibt einen blauen Fleck im Depot."],"chat":{"start":"🏟️ BATTLE! {count} Zuschauer kämpfen jetzt in „{game}“ um {prize}. Viel Glück, ihr Pfeifen!","win":"🏆 {name} gewinnt „{game}“ und kassiert {prize}! Glückwunsch, du Glückspilz."}},"names":{"floor":"Kurssturz","bulls":"Bullenreiten","coins":"Geldregen","sumo":"Sumo am Parkett","potato":"Giftaktie","pump":"Aktie pumpen","quiz":"Börsenquiz","estimate":"Schätz den Kurs","bell":"Die Glocke","bear":"Bärenjagd","dash":"Dividenden-Dash","margin":"Margin Call","elevator":"Fahrstuhl zum Mond","laser":"Laserschranke","rodeo":"Bullen-Rodeo","vault":"Tresorknacker","ticker":"Ticker-Tippen","higher":"Mehr oder Weniger","auction":"Wer bietet mehr?"},"demoBots":[{"nickname":"Bärbel Bärenmarkt","avatarKey":"seller","accessories":["cowboy_hat"]},{"nickname":"Kalle Kursrakete","avatarKey":"punk","accessories":["sunglasses","superhero_cape"]},{"nickname":"Dividenden-Dieter","avatarKey":"analyst","accessories":["top_hat"]},{"nickname":"Moni Moneymaker","avatarKey":"scientist","accessories":["party_hat","balloon"]},{"nickname":"Börsen-Bernd","avatarKey":"rookie","accessories":["beanie","hamster"]},{"nickname":"Lisa Leerverkauf","avatarKey":"finn_fan","accessories":["bunny_ears"]},{"nickname":"Hedge-Horst","avatarKey":"rookie","accessories":["viking_helmet","pug"]},{"nickname":"Penny Stock","avatarKey":"seller","accessories":["heart_glasses"]},{"nickname":"Ralf Rendite","avatarKey":"analyst","accessories":["chef_hat","baguette"]}],"quiz":[{"q":"Wie viel Startkapital bekommt man bei NEXA?","a":"10.000 €","wrong":["1.000 €","50.000 €","100.000 €"]},{"q":"Wer moderiert die NEXA Nachrichten?","a":"Mr. Doodle Dangle","wrong":["Finn","Mira","Dr. Dax"]},{"q":"Wann laufen die NEXA Nachrichten?","a":"Zu jeder vollen Stunde","wrong":["Einmal am Tag","Nur sonntags","Alle 5 Minuten"]},{"q":"Was ist ein Bullenmarkt?","a":"Steigende Kurse","wrong":["Fallende Kurse","Ein Viehmarkt","Ein Markt ohne Händler"]},{"q":"Was ist ein Bärenmarkt?","a":"Fallende Kurse","wrong":["Steigende Kurse","Ein Zoo","Ein Honigmarkt"]},{"q":"Was ist eine Dividende?","a":"Gewinnanteil für Aktionäre","wrong":["Eine Gebühr","Ein Kredit","Eine Steuer"]},{"q":"Was ist ein IPO?","a":"Ein Börsengang","wrong":["Eine Insolvenz","Ein Aktiensplit","Eine Fusion"]},{"q":"Was bedeutet Leerverkauf?","a":"Auf fallende Kurse wetten","wrong":["Alles verkaufen","Ohne Gebühr kaufen","Eine leere Order"]},{"q":"Was ist eine Anleihe?","a":"Ein Schuldpapier mit Zinsen","wrong":["Ein Firmenanteil","Eine Kryptowährung","Ein Sparbuch"]},{"q":"Was misst ein Aktienindex?","a":"Die Entwicklung vieler Aktien","wrong":["Den Goldpreis","Die Inflation","Nur eine Aktie"]},{"q":"Was ist eine Limit-Order?","a":"Kauf oder Verkauf zu einem Wunschpreis","wrong":["Ein Kauf ohne Geld","Eine Order mit Zeitlimit","Ein Verbot zu handeln"]},{"q":"Was ist ein Stop-Loss?","a":"Automatischer Verkauf bei Verlust","wrong":["Ein Handelsverbot","Eine Gewinnsteuer","Ein Börsenfeiertag"]},{"q":"Was ist Market Cap?","a":"Börsenwert einer Firma","wrong":["Die Kappe des Händlers","Der Tageshöchstkurs","Die Anzahl der Mitarbeiter"]},{"q":"Was passiert bei einem Aktiensplit?","a":"Mehr Aktien zum kleineren Preis","wrong":["Die Firma teilt sich","Die Aktie wird gelöscht","Der Kurs verdoppelt sich"]},{"q":"Was ist Volatilität?","a":"Wie stark ein Kurs schwankt","wrong":["Wie alt eine Firma ist","Ein Börsenfeiertag","Die Höhe der Dividende"]},{"q":"Welches Tier steht für steigende Kurse?","a":"Bulle","wrong":["Bär","Hase","Schildkröte"]},{"q":"Was ist ein NFT bei NEXA?","a":"Ein einzigartiges Pixel-Kunstwerk","wrong":["Eine Aktie","Eine Kreditkarte","Ein Firmenlogo"]},{"q":"Wie viele Spieler braucht ein News-Battle mindestens?","a":"3","wrong":["1","2","5"]},{"q":"Wie viele Spieler passen höchstens in ein News-Battle?","a":"10","wrong":["4","8","20"]},{"q":"Was bekommt der Sieger eines News-Battles?","a":"XP, Geld, einen Skin oder ein NFT","wrong":["Nur ein Lob","Eine echte Aktie","Einen Kredit"]},{"q":"Was ist ein Rug Pull?","a":"Die Macher hauen mit dem Geld ab","wrong":["Ein Teppichverkauf","Ein Kurssprung","Eine Gratis-Aktie"]},{"q":"Was ist Inflation?","a":"Steigende Preise, sinkende Kaufkraft","wrong":["Sinkende Preise","Ein Luftballon","Eine Börsenregel"]},{"q":"Was heißt „Buy the Dip“?","a":"Nach einem Kursrutsch kaufen","wrong":["Chips kaufen","Alles verkaufen","Nur Anleihen kaufen"]},{"q":"Was ist ein Portfolio?","a":"Alle eigenen Anlagen zusammen","wrong":["Eine Aktentasche","Ein Börsenticker","Ein Kredit"]},{"q":"Was ist ein Ticker?","a":"Das Kürzel einer Aktie","wrong":["Eine Uhr","Ein Händler","Eine Gebühr"]},{"q":"Wie heißt die Hauptstadt von Australien?","a":"Canberra","wrong":["Sydney","Melbourne","Perth"]},{"q":"Wie viele Beine hat eine Spinne?","a":"8","wrong":["6","10","12"]},{"q":"Welcher Planet ist der Sonne am nächsten?","a":"Merkur","wrong":["Venus","Mars","Erde"]},{"q":"Wie viele Minuten hat ein Tag?","a":"1.440","wrong":["1.200","2.400","960"]},{"q":"Welche Farbe entsteht aus Blau und Gelb?","a":"Grün","wrong":["Lila","Orange","Braun"]},{"q":"Was ist das größte Säugetier der Welt?","a":"Blauwal","wrong":["Elefant","Giraffe","Pottwal"]},{"q":"Wie viele Seiten hat ein Würfel?","a":"6","wrong":["4","8","12"]},{"q":"In welchem Land steht der Eiffelturm?","a":"Frankreich","wrong":["Italien","Belgien","Spanien"]},{"q":"Was ist H₂O?","a":"Wasser","wrong":["Wasserstoff","Sauerstoff","Salz"]},{"q":"Wie viele Spieler hat eine Fußballmannschaft auf dem Feld?","a":"11","wrong":["9","10","12"]},{"q":"Welches Tier legt Eier und ist ein Säugetier?","a":"Schnabeltier","wrong":["Pinguin","Delfin","Fledermaus"]},{"q":"Wie viele Kontinente gibt es?","a":"7","wrong":["5","6","8"]},{"q":"Wer hat die Glühbirne bekannt gemacht?","a":"Thomas Edison","wrong":["Albert Einstein","Isaac Newton","Nikola Tesla"]},{"q":"Was ist die Wurzel aus 144?","a":"12","wrong":["14","11","16"]},{"q":"Welche Sprache hat die meisten Muttersprachler?","a":"Chinesisch (Mandarin)","wrong":["Englisch","Spanisch","Hindi"]},{"q":"Wie heißt der längste Fluss Europas?","a":"Wolga","wrong":["Donau","Rhein","Elbe"]},{"q":"Was zeigt ein grüner Kurs bei NEXA?","a":"Der Kurs ist gestiegen","wrong":["Der Kurs ist gefallen","Die Börse ist zu","Ein Fehler"]},{"q":"Was kostet es, eine Order bei NEXA aufzugeben?","a":"Eine kleine Gebühr","wrong":["Nichts, niemals","Die Hälfte des Werts","Ein Level"]},{"q":"Was passiert, wenn eine Firma insolvent ist?","a":"Sie kann ihre Schulden nicht zahlen","wrong":["Sie geht an die Börse","Sie zahlt Dividende","Sie wird verdoppelt"]},{"q":"Wie viele Zähne hat ein erwachsener Mensch normalerweise?","a":"32","wrong":["28","30","36"]},{"q":"Welches Gas atmen Pflanzen ein?","a":"Kohlendioxid","wrong":["Sauerstoff","Stickstoff","Helium"]}],"tickers":[{"ticker":"BULL","name":"Bullen & Söhne AG"},{"ticker":"BAER","name":"Bärenbräu Holding"},{"ticker":"MOND","name":"Mondfahrt Raketen"},{"ticker":"GOLD","name":"Goldgrube Minen"},{"ticker":"PIZZ","name":"Pizza Pronto Gruppe"},{"ticker":"KAFE","name":"Kaffeekanne Kontor"},{"ticker":"NXA","name":"NEXA Börse"},{"ticker":"ROBO","name":"Robo Rasenmäher"},{"ticker":"DUCK","name":"Gummiente International"},{"ticker":"SOFA","name":"Sofa-Börsianer e. V."},{"ticker":"ZUGI","name":"Zugspitz Seilbahnen"},{"ticker":"KRAK","name":"Krakenkabel Telekom"}],"auctionItems":[{"name":"Goldbarren aus dem Tresor","points":300,"icon":"gold_bar"},{"name":"Signierte Bullen-Statue","points":250,"icon":"bull"},{"name":"Mondticket erster Klasse","points":220,"icon":"moon"},{"name":"Koffer voller Aktien","points":200,"icon":"briefcase"},{"name":"Glücksmünze von Mr. Doodle Dangle","points":180,"icon":"coin"},{"name":"Edelstein des Vorstands","points":160,"icon":"gem"},{"name":"Geheimer Insider-Tipp (ganz legal)","points":140,"icon":"key"},{"name":"Geschenkbox mit Überraschung","points":120,"icon":"gift"},{"name":"Ausgestopfter Bärenmarkt-Bär","points":100,"icon":"bear"},{"name":"Vergilbte Zeitung von 1929","points":80,"icon":"newspaper"},{"name":"Wecker für Frühaufsteher","points":60,"icon":"alarm_clock"},{"name":"Herz eines Börsianers","points":50,"icon":"heart"}],"estimate":[{"q":"Wie hoch ist der Eiffelturm (mit Antenne) in Metern?","value":330,"unit":"m"},{"q":"Wie viele Knochen hat ein erwachsener Mensch?","value":206,"unit":"Knochen"},{"q":"Wie viele Tasten hat ein Klavier?","value":88,"unit":"Tasten"},{"q":"Wie viele Länder gibt es in der EU?","value":27,"unit":"Länder"},{"q":"Wie schnell fährt ein ICE höchstens (km/h)?","value":300,"unit":"km/h"},{"q":"Wie viele Herzschläge hat ein Mensch in Ruhe pro Minute (etwa)?","value":70,"unit":"Schläge"},{"q":"Wie tief ist der Marianengraben in Metern (etwa)?","value":11000,"unit":"m"},{"q":"Wie viele Einwohner hat Berlin (in Tausend, etwa)?","value":3850,"unit":"Tsd."},{"q":"Wie viel wiegt ein erwachsener Afrikanischer Elefant in kg (etwa)?","value":6000,"unit":"kg"},{"q":"Wie lang ist die Chinesische Mauer in km (etwa)?","value":21000,"unit":"km"},{"q":"Wie viele Stunden hat ein Jahr (kein Schaltjahr)?","value":8760,"unit":"Stunden"},{"q":"Wie hoch ist die Zugspitze in Metern?","value":2962,"unit":"m"},{"q":"Wie viele Felder hat ein Schachbrett?","value":64,"unit":"Felder"},{"q":"Wie viele Kilometer ist der Mond von der Erde entfernt (in Tausend, etwa)?","value":384,"unit":"Tsd. km"},{"q":"Wie viele Liter Blut hat ein erwachsener Mensch (etwa)?","value":5,"unit":"Liter"},{"q":"Wie viele Kalorien hat eine Tafel Vollmilchschokolade (100 g, etwa)?","value":535,"unit":"kcal"},{"q":"Wie viele Spiele hat eine Bundesliga-Saison pro Team?","value":34,"unit":"Spiele"},{"q":"Wie viele Sekunden hat ein Tag?","value":86400,"unit":"Sekunden"},{"q":"Wie alt wurde Johann Wolfgang von Goethe?","value":82,"unit":"Jahre"},{"q":"Wie viele Stockwerke hat der Burj Khalifa (etwa)?","value":163,"unit":"Stockwerke"},{"q":"Wie viele Zähne hat ein Hai im Leben (etwa, in Tausend)?","value":30,"unit":"Tsd."},{"q":"Wie heiß ist die Oberfläche der Sonne in °C (etwa)?","value":5500,"unit":"°C"},{"q":"Wie viele Kaffeebohnen braucht ein Espresso (etwa)?","value":50,"unit":"Bohnen"},{"q":"Wie viele Wörter spricht ein Mensch am Tag (etwa, in Tausend)?","value":16,"unit":"Tsd."}]}'::jsonb, 'Defaults from src/config/balance.ts, section "battles"'),
-  ('nexamon', '{"packSize":5,"sets":{"mystic_energy":{"name":"Nexamon: Mystic Energy","packPriceCents":20000},"super_apex":{"name":"Nexamon: Super Apex","packPriceCents":100000},"prismatic_peak":{"name":"Nexamon: Prismatic Peak","packPriceCents":1000000}},"packs":{"perMinute":20},"odds":{"denominator":3600,"slot4":{"legendary":0,"prisma":0,"ultra":150,"rare":900},"slot5":{"legendary":4,"prisma":45,"ultra":150,"rare":900}},"conditions":{"order":["poor","good","near_mint","mint"],"weightBps":{"poor":200,"good":1800,"near_mint":5000,"mint":3000},"valueBps":{"poor":7000,"good":9000,"near_mint":10000,"mint":10000}},"grading":{"feeBps":4000,"minFeeCents":100,"minutes":60,"maxOpen":10,"grades":[1,2,3,4,5,6,7,8,8.5,9,9.5,10],"gradeWeightsBps":{"poor":[800,1200,1500,2000,2000,1500,700,200,50,30,15,5],"good":[0,0,0,750,1200,2000,2500,1700,1000,600,200,50],"near_mint":[0,0,0,0,0,500,1200,2200,2400,2400,950,350],"mint":[0,0,0,0,0,0,500,1200,1800,3000,2000,1500]},"valueBps":[3000,4000,5000,6000,7000,8000,9000,12000,14000,17000,23000,40000],"blackLabel":{"chanceBps":{"near_mint":100,"mint":500},"valueBps":100000}},"market":{"feeBps":500,"minPriceCents":10,"maxPriceCents":100000000000,"maxListings":30,"actionsPerMinute":30,"pageSize":24,"recentSales":20,"historyDays":60},"value":{"floorBps":2000,"capBaseBps":30000,"capPerDayBps":200,"capPerTradeBps":50,"capMaxBps":200000,"dayMaxRiseBps":1500,"dayMaxFallBps":2000,"trade":{"bandBps":2500,"weightBps":2000,"maxStepBps":200,"pairHours":24,"perPlayerDay":3,"minPopularityBps":2500},"aiBuyBumpBps":50,"popularity":{"rarityBps":{"common":500,"rare":1500,"ultra":4000,"prisma":7000,"legendary":9000},"scarceBonusBps":3000,"popRef":{"common":2000,"rare":800,"ultra":150,"prisma":30,"legendary":4}},"pressure":{"everyMinutes":60,"upStepBps":30,"downStepBps":30,"want":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":1},"buyWeightMilli":500,"buyDays":7,"maxBuys":10,"perRun":80}},"ai":{"sellers":["Karten-Kalle","Booster-Berta","Holo-Hanna","Sammel-Sven"],"askBps":11000,"seedCopies":{"common":6,"rare":4,"ultra":2,"prisma":1,"legendary":0},"seedPrismaCards":2,"listedPerCard":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":0},"legendaryListChanceBps":20,"packsPerHour":{"mystic_energy":4,"super_apex":2,"prismatic_peak":1},"maxPacksPerRun":5,"buyChanceBps":3000,"atMaxChanceBps":2000,"premiumBps":{"poor":0,"good":300,"near_mint":800,"mint":1200},"gradePremiumBps":[0,0,0,0,0,0,0,500,700,1000,1200,1500],"blackLabelPremiumBps":2000,"buysPerCardWindow":{"common":6,"rare":6,"ultra":4,"prisma":3,"legendary":2},"buyWindowDays":1,"maxBuysPerRun":100,"dailyBudgetPacks":300},"quickSell":{"rarities":["common","rare"],"bps":5000,"maxPerCall":50,"dropBps":25},"feedRarities":["legendary"],"presence":{"pingSeconds":15,"presenceSeconds":60,"maxPlayers":24},"battles":{"challengeSeconds":60,"perHour":6,"cooldownSeconds":20,"startDelayMs":3000,"tearMs":2400,"slotMs":1800,"leadMs":800,"outroMs":8000,"gossipMinCents":500000},"live":{"staleMs":10000,"fallbackSlotMs":2500,"lingerMs":8000,"maxMs":120000,"viewerSeconds":10,"reactions":["🔥","😱","👏","💎","😂"],"reactionsPerMinute":30,"maxSessions":12}}'::jsonb, 'Defaults from src/config/balance.ts, section "nexamon"'),
+  ('nexamon', '{"packSize":5,"sets":{"mystic_energy":{"name":"Nexamon: Mystic Energy","packPriceCents":20000},"super_apex":{"name":"Nexamon: Super Apex","packPriceCents":100000},"prismatic_peak":{"name":"Nexamon: Prismatic Peak","packPriceCents":1000000}},"packs":{"perMinute":20},"odds":{"denominator":3600,"slot4":{"legendary":0,"prisma":0,"ultra":150,"rare":900},"slot5":{"legendary":4,"prisma":45,"ultra":150,"rare":900}},"conditions":{"order":["poor","good","near_mint","mint"],"weightBps":{"poor":200,"good":1800,"near_mint":5000,"mint":3000},"valueBps":{"poor":7000,"good":9000,"near_mint":10000,"mint":10000}},"grading":{"feeBps":4000,"minFeeCents":100,"minutes":60,"maxOpen":10,"grades":[1,2,3,4,5,6,7,8,8.5,9,9.5,10],"gradeWeightsBps":{"poor":[800,1200,1500,2000,2000,1500,700,200,50,30,15,5],"good":[0,0,0,750,1200,2000,2500,1700,1000,600,200,50],"near_mint":[0,0,0,0,0,500,1200,2200,2400,2400,950,350],"mint":[0,0,0,0,0,0,500,1200,1800,3000,2000,1500]},"valueBps":[3000,4000,5000,6000,7000,8000,9000,12000,14000,17000,23000,40000],"blackLabel":{"chanceBps":{"near_mint":100,"mint":500},"valueBps":100000}},"market":{"feeBps":500,"minPriceCents":10,"maxPriceCents":100000000000,"maxListings":30,"actionsPerMinute":30,"pageSize":24,"recentSales":20,"historyDays":60},"value":{"floorBps":2000,"capBaseBps":30000,"capPerDayBps":200,"capPerTradeBps":50,"capMaxBps":200000,"dayMaxRiseBps":1500,"dayMaxFallBps":2000,"trade":{"bandBps":2500,"weightBps":2000,"maxStepBps":200,"pairHours":24,"perPlayerDay":3,"minPopularityBps":2500},"aiBuyBumpBps":50,"popularity":{"rarityBps":{"common":500,"rare":1500,"ultra":4000,"prisma":7000,"legendary":9000},"scarceBonusBps":3000,"popRef":{"common":2000,"rare":800,"ultra":150,"prisma":30,"legendary":4}},"pressure":{"everyMinutes":60,"upStepBps":30,"downStepBps":30,"want":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":1},"buyWeightMilli":500,"buyDays":7,"maxBuys":10,"perRun":80}},"ai":{"sellers":["Karten-Kalle","Booster-Berta","Holo-Hanna","Sammel-Sven"],"askBps":11000,"seedCopies":{"common":6,"rare":4,"ultra":2,"prisma":1,"legendary":0},"seedPrismaCards":2,"listedPerCard":{"common":4,"rare":3,"ultra":2,"prisma":1,"legendary":0},"legendaryListChanceBps":20,"packsPerHour":{"mystic_energy":4,"super_apex":2,"prismatic_peak":1},"maxPacksPerRun":5,"buyChanceBps":3000,"atMaxChanceBps":2000,"premiumBps":{"poor":0,"good":300,"near_mint":800,"mint":1200},"gradePremiumBps":[0,0,0,0,0,0,0,500,700,1000,1200,1500],"blackLabelPremiumBps":2000,"buysPerCardWindow":{"common":6,"rare":6,"ultra":4,"prisma":3,"legendary":2},"buyWindowDays":1,"maxBuysPerRun":100,"dailyBudgetPacks":300},"quickSell":{"rarities":["common","rare"],"bps":5000,"maxPerCall":50,"dropBps":25},"feedRarities":["legendary"],"presence":{"pingSeconds":15,"presenceSeconds":60,"maxPlayers":24},"battles":{"challengeSeconds":60,"perHour":6,"cooldownSeconds":20,"startDelayMs":3000,"tearMs":2400,"slotMs":1800,"leadMs":800,"outroMs":8000,"gossipMinCents":500000},"live":{"staleMs":10000,"fallbackSlotMs":2500,"lingerMs":8000,"maxMs":120000,"viewerSeconds":10,"reactions":["🔥","😱","👏","💎","😂"],"reactionsPerMinute":30,"maxSessions":12},"bonuses":{"kinds":["xp","mission_xp","trade_xp","wage","vault","daily","company"],"typeKind":{"fire":"company","dragon":"company","water":"vault","grass":"daily","electric":"trade_xp","psychic":"mission_xp","fairy":"mission_xp","rock":"wage","steel":"wage","dark":"xp"},"rarities":["ultra","prisma","legendary"],"extraNumbers":[60],"rarityBps":{"common":25,"rare":50,"ultra":50,"prisma":100,"legendary":250},"setBps":{"mystic_energy":10000,"super_apex":12500,"prismatic_peak":15000},"slab":{"minGrade":9,"gradeBps":15000,"blackLabelBps":20000},"caps":{"xp":1000,"mission_xp":1500,"trade_xp":1500,"wage":1000,"vault":1500,"daily":2000,"company":1000},"kneeShareBps":5000,"tailBps":5000,"sets":{"type":{"bps":50,"rewardPacks":3,"rewardXp":300},"complete":{"kind":"xp","bps":200,"rewardPacks":20,"rewardXp":2500},"master":{"bps":100,"rewardPacks":75,"rewardXp":10000},"masterMinGrade":9,"masterRarities":["prisma","legendary"]}},"blackLabelHype":{"rarityChanceBps":{"common":5,"rare":10,"ultra":25,"prisma":60,"legendary":120},"blRef":3,"minJumpBps":1000,"maxJumpBps":6000,"capBps":250000,"decayBps":100,"bigJumpBps":4000,"historyPoints":30}}'::jsonb, 'Defaults from src/config/balance.ts, section "nexamon"'),
   ('listed', '{"refRevenue":{"windowHours":24,"minCents":20000},"satisfaction":{"start":60,"base":50,"adjustPerHour":0.15,"green":60,"red":35,"benefitsMax":40,"wages":{"unpaidMaxLoss":25,"moodMaxLoss":10},"workload":{"overFrom":0.95,"overFull":1.5,"overMaxLoss":12,"underBelow":0.35,"underLoss":4},"crisis":{"perSeverity":4,"scandal":6,"scandals":["quality_scandal","data_breach","tax_audit"]},"layoffs":{"perHead":3,"max":15,"decayPerHour":0.08},"greedMaxLoss":10,"success":{"profitHour":3,"lossHour":-3},"effect":{"lowCapacityMaxLoss":0.3,"lowQualityMaxLoss":0.15,"highCapacityMaxGain":0.06,"highFull":90},"quits":{"everyRedHours":3,"notifyEveryHours":24,"massQuitFrom":3}},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"windowHours":24,"minProfitShareOfRevenue":0.05,"greed":{"freeRatioBps":3000,"fullRatioBps":10000,"maxLoss":35,"feedBelow":35},"reinvest":{"fullRatioBps":5000,"maxGain":12},"dividend":{"fullRatioBps":2000,"maxGain":12,"streakPerDay":1,"streakMax":6},"penalty":{"lateFee":3,"estimate":6,"enforcement":8},"scandalLoss":5,"demandMaxEffect":0.2,"priceMaxEffect":0.25},"dividends":{"perDay":1,"maxShareOfFreeCashBps":5000,"minTotalCents":10000,"historyLimit":20},"board":{"minShareBps":2000,"voteHours":12,"quorumBps":3000,"maxOpen":2,"cooldownHours":6,"maxDays":7,"earmarkMaxShareOfCashBps":8000,"payoutCapStepBps":500,"aiVote":{"reputationBelow":40,"kinds":["payout_cap","withdraw_ban","dividend"]},"kinds":["earmark","release","dividend","payout_cap","withdraw_ban","price_level","debt"],"purposes":["research","products","expansion","benefits","marketing"],"historyLimit":20},"taxes":{"rateBps":1500,"minRateBps":800,"reminderAfterHours":30,"lateFeeAfterHours":42,"estimateAfterHours":60,"lateFee":{"minCents":5000,"revenueBps":50},"estimate":{"marginBps":2500,"surchargeBps":2500},"payWithinHours":24,"latePaymentBps":500,"enforceAfterHours":48,"enforcementBps":1000,"check":{"receipts":3,"discountBps":500},"advisor":{"minWageCentsPerHour":4000,"revenueBps":100,"discountBps":800},"auditArchetype":"tax_audit","receipts":[{"key":"customer_invoice","category":"revenue"},{"key":"online_shop_payout","category":"revenue"},{"key":"raw_material","category":"goods"},{"key":"packaging","category":"goods"},{"key":"payslip","category":"wages"},{"key":"overtime","category":"wages"},{"key":"office_rent","category":"fixed"},{"key":"electricity","category":"fixed"},{"key":"lab_equipment","category":"research"},{"key":"prototype","category":"research"},{"key":"fruit_basket","category":"benefit"},{"key":"team_dinner","category":"benefit"}],"receiptCategories":["revenue","goods","wages","fixed","research","benefit"],"historyLimit":30},"historyHours":72,"accountingPageSize":50,"items":[{"key":"r_quality_1","kind":"research","branch":"quality","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"qualityBps":300}},{"key":"r_quality_2","kind":"research","branch":"quality","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_quality_1"],"effects":{"qualityBps":500}},{"key":"r_quality_3","kind":"research","branch":"quality","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_quality_2"],"effects":{"qualityBps":800}},{"key":"r_quality_4","kind":"research","branch":"quality","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_quality_3","r_efficiency_2"],"effects":{"qualityBps":1200,"demandBps":400}},{"key":"r_efficiency_1","kind":"research","branch":"efficiency","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"marginBps":200}},{"key":"r_efficiency_2","kind":"research","branch":"efficiency","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_efficiency_1"],"effects":{"marginBps":300}},{"key":"r_efficiency_3","kind":"research","branch":"efficiency","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_efficiency_2"],"effects":{"marginBps":500}},{"key":"r_efficiency_4","kind":"research","branch":"efficiency","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_efficiency_3","r_automation_2"],"effects":{"marginBps":800,"capacityBps":500}},{"key":"r_brand_1","kind":"research","branch":"brand","tier":1,"purpose":"marketing","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"awarenessBps":200}},{"key":"r_brand_2","kind":"research","branch":"brand","tier":2,"purpose":"marketing","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_brand_1"],"effects":{"awarenessBps":300}},{"key":"r_brand_3","kind":"research","branch":"brand","tier":3,"purpose":"marketing","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_brand_2"],"effects":{"awarenessBps":500}},{"key":"r_brand_4","kind":"research","branch":"brand","tier":4,"purpose":"marketing","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_brand_3","r_quality_2"],"effects":{"awarenessBps":500,"demandBps":800}},{"key":"r_automation_1","kind":"research","branch":"automation","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":500}},{"key":"r_automation_2","kind":"research","branch":"automation","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_automation_1"],"effects":{"capacityBps":800}},{"key":"r_automation_3","kind":"research","branch":"automation","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_automation_2"],"effects":{"capacityBps":1200}},{"key":"r_automation_4","kind":"research","branch":"automation","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_automation_3","r_efficiency_2"],"effects":{"capacityBps":2000,"marginBps":300}},{"key":"r_logistics_1","kind":"research","branch":"logistics","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":300,"marginBps":100}},{"key":"r_logistics_2","kind":"research","branch":"logistics","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_logistics_1"],"effects":{"marketBps":500}},{"key":"r_logistics_3","kind":"research","branch":"logistics","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_logistics_2"],"effects":{"fixedCostBps":-500}},{"key":"r_logistics_4","kind":"research","branch":"logistics","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_logistics_3","r_automation_2"],"effects":{"marketBps":1000,"marginBps":200}},{"key":"r_sustainability_1","kind":"research","branch":"sustainability","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"reputation":2}},{"key":"r_sustainability_2","kind":"research","branch":"sustainability","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_sustainability_1"],"effects":{"reputation":3,"marginBps":100}},{"key":"r_sustainability_3","kind":"research","branch":"sustainability","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_sustainability_2"],"effects":{"reputation":3,"satisfaction":3}},{"key":"r_sustainability_4","kind":"research","branch":"sustainability","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_sustainability_3","r_brand_2"],"effects":{"reputation":5,"demandBps":500}},{"key":"r_finance_1","kind":"research","branch":"finance","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"taxRateBps":-100}},{"key":"r_finance_2","kind":"research","branch":"finance","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_finance_1"],"effects":{"fixedCostBps":-300}},{"key":"r_finance_3","kind":"research","branch":"finance","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_finance_2"],"effects":{"taxRateBps":-150}},{"key":"r_finance_4","kind":"research","branch":"finance","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_finance_3","r_logistics_2"],"effects":{"taxRateBps":-150,"marginBps":300}},{"key":"p_second","kind":"product","purpose":"products","costHours":12,"minCostCents":300000,"hours":2,"upkeepBps":150,"effects":{"demandBps":800}},{"key":"p_budget","kind":"product","purpose":"products","costHours":16,"minCostCents":400000,"hours":3,"requires":["r_efficiency_1"],"upkeepBps":200,"effects":{"demandBps":1200,"qualityBps":-200}},{"key":"p_premium","kind":"product","purpose":"products","costHours":30,"minCostCents":1000000,"hours":6,"requires":["r_quality_2"],"upkeepBps":300,"effects":{"demandBps":1000,"qualityBps":400}},{"key":"p_subscription","kind":"product","purpose":"products","costHours":36,"minCostCents":1500000,"hours":8,"requires":["r_brand_1","p_second"],"upkeepBps":350,"effects":{"demandBps":1800}},{"key":"p_merch","kind":"product","purpose":"products","costHours":8,"minCostCents":200000,"hours":2,"requires":["r_brand_2"],"upkeepBps":100,"effects":{"demandBps":400,"awarenessBps":200}},{"key":"p_enterprise","kind":"product","purpose":"products","costHours":80,"minCostCents":6000000,"hours":16,"requires":["r_quality_3","p_premium"],"upkeepBps":500,"effects":{"demandBps":3000}},{"key":"g_south","kind":"region","purpose":"expansion","costHours":20,"minCostCents":600000,"hours":4,"upkeepBps":200,"effects":{"marketBps":1000}},{"key":"g_dach","kind":"region","purpose":"expansion","costHours":40,"minCostCents":2000000,"hours":8,"requires":["g_south"],"upkeepBps":300,"effects":{"marketBps":1500}},{"key":"g_europe","kind":"region","purpose":"expansion","costHours":80,"minCostCents":6000000,"hours":12,"requires":["g_dach","l_export"],"upkeepBps":400,"effects":{"marketBps":2500}},{"key":"g_america","kind":"region","purpose":"expansion","costHours":140,"minCostCents":15000000,"hours":24,"requires":["g_europe","r_logistics_2"],"upkeepBps":500,"effects":{"marketBps":3500}},{"key":"g_asia","kind":"region","purpose":"expansion","costHours":200,"minCostCents":30000000,"hours":36,"requires":["g_america","r_logistics_4"],"upkeepBps":600,"effects":{"marketBps":5000}},{"key":"m_machines","kind":"machine","purpose":"expansion","costHours":10,"minCostCents":300000,"hours":2,"maxLevel":5,"costGrowth":1.6,"upkeepBps":50,"effects":{"capacityBps":400}},{"key":"m_datacenter","kind":"machine","purpose":"expansion","costHours":14,"minCostCents":500000,"hours":3,"maxLevel":3,"costGrowth":1.8,"upkeepBps":60,"effects":{"marginBps":150,"capacityBps":200}},{"key":"m_showroom","kind":"machine","purpose":"marketing","costHours":12,"minCostCents":400000,"hours":3,"maxLevel":3,"costGrowth":1.7,"upkeepBps":60,"effects":{"awarenessBps":200,"demandBps":150}},{"key":"a_kleinhirn","kind":"acquisition","purpose":"expansion","costHours":90,"minCostCents":8000000,"hours":6,"requires":["r_automation_2"],"upkeepBps":200,"effects":{"capacityBps":1000,"qualityBps":300}},{"key":"a_datenkrake","kind":"acquisition","purpose":"expansion","costHours":110,"minCostCents":10000000,"hours":6,"requires":["r_brand_2"],"upkeepBps":250,"effects":{"demandBps":1500}},{"key":"a_robobutze","kind":"acquisition","purpose":"expansion","costHours":130,"minCostCents":12000000,"hours":8,"requires":["r_efficiency_3"],"upkeepBps":200,"effects":{"marginBps":600,"capacityBps":500}},{"key":"l_patent","kind":"licence","purpose":"research","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":100,"effects":{"qualityBps":500}},{"key":"l_brand","kind":"licence","purpose":"marketing","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":120,"effects":{"demandBps":600}},{"key":"l_export","kind":"licence","purpose":"expansion","costHours":15,"minCostCents":500000,"hours":2,"upkeepBps":50,"effects":{}},{"key":"b_obstkorb","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":5000,"hours":0,"upkeepPerHeadCents":40,"effects":{"satisfaction":3}},{"key":"b_kaffee","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":8000,"hours":0,"upkeepPerHeadCents":50,"effects":{"satisfaction":3}},{"key":"b_tischkicker","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":60000,"hours":0,"upkeepPerHeadCents":10,"effects":{"satisfaction":2}},{"key":"b_hundebuero","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":10000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_massagesessel","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":150000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_jobrad","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":20000,"hours":0,"upkeepPerHeadCents":120,"effects":{"satisfaction":3}},{"key":"b_fitness","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":30000,"hours":0,"upkeepPerHeadCents":150,"effects":{"satisfaction":4}},{"key":"b_homeoffice","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":50000,"hours":0,"upkeepPerHeadCents":100,"effects":{"satisfaction":5}},{"key":"b_weiterbildung","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":40000,"hours":0,"upkeepPerHeadCents":250,"effects":{"satisfaction":4,"qualityBps":200}},{"key":"b_feelgood","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":100000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":5}},{"key":"b_betriebsrente","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":80000,"hours":0,"upkeepPerHeadCents":400,"effects":{"satisfaction":6}},{"key":"b_kita","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":500000,"hours":0,"upkeepPerHeadCents":500,"effects":{"satisfaction":7}},{"key":"b_bonus","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":0,"hours":0,"upkeepPerHeadCents":900,"effects":{"satisfaction":8,"capacityBps":300}},{"key":"b_viertagewoche","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":200000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":10,"capacityBps":-600}},{"key":"x_pizza","kind":"action","purpose":"benefits","costHours":0,"minCostCents":5000,"costPerHeadCents":1500,"hours":0,"cooldownHours":6,"boost":3,"effects":{}},{"key":"x_teamevent","kind":"action","purpose":"benefits","costHours":0,"minCostCents":30000,"costPerHeadCents":6000,"hours":0,"cooldownHours":24,"boost":8,"effects":{}},{"key":"x_firmenfeier","kind":"action","purpose":"benefits","costHours":0,"minCostCents":100000,"costPerHeadCents":12000,"hours":0,"cooldownHours":72,"boost":12,"effects":{}},{"key":"x_sonderbonus","kind":"action","purpose":"benefits","costHours":0,"minCostCents":0,"costPerHeadCents":50000,"hours":0,"cooldownHours":48,"boost":15,"effects":{}}]}'::jsonb, 'Defaults from src/config/balance.ts, section "listed"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
@@ -73216,6 +74350,7 @@ insert into public.game_config (key, value, description) values
   ('rentals', '{"places":{"flat":1,"apartment":2,"house":3,"villa":4,"luxury_villa":6},"baseRentCentsPerHour":{"flat":3000,"apartment":6000,"house":15000,"villa":40000,"luxury_villa":100000},"fairMinShareBps":2000,"minPriceCents":100,"maxPriceCentsPerHour":10000000,"periods":["hour","day"],"minHours":24,"noticeHours":12,"ai":{"minWohnwert":25,"chanceBps":6000,"maxPriceFactorBps":20000,"checkEveryMinutes":60,"stayMinHours":24,"stayMaxHours":120,"names":["Anja K.","Ben S.","Carla M.","Deniz Y.","Elif A.","Finn H.","Greta W.","Hannes B.","Ida L.","Jonas P.","Kira T.","Luca R.","Mia F.","Nils O.","Olga V.","Paul D.","Rosa N.","Sami E.","Tilda G.","Udo Z.","Vera C.","Willi J.","Yara I.","Zoe Q."]},"tenantXpPerHour":5,"maxTenanciesAsTenant":1,"feedMinTier":"villa","paymentsKeepDays":30,"marketLimit":30,"wohnwert":{"valueTargetBps":2000,"points":{"value":30,"variety":20,"fill":20,"layers":10,"style":10,"floor":10},"varietyTarget":7,"fill":{"idealMinBps":3000,"idealMaxBps":5500,"zeroAtBps":8500},"styleMinPieces":6,"floorPoints":{"laminate":0,"carpet":3,"tiles":4,"parquet":6,"stone":7,"marble":9,"gold":10}}}'::jsonb, 'Defaults from src/config/balance.ts, section "rentals"'),
   ('livingBonus', '{"centsPerHour":{"flat":2000,"apartment":5000,"house":12000,"villa":30000,"luxury_villa":80000},"xpPerHour":{"flat":3,"apartment":4,"house":6,"villa":8,"luxury_villa":10},"minShareBps":4000,"tenantShareBps":5000,"activeDays":3,"paymentsKeepDays":30}'::jsonb, 'Defaults from src/config/balance.ts, section "livingBonus"'),
   ('nexamon_cards', '[{"key":"me-001","set":"mystic_energy","number":1,"rarity":"common","startPriceCents":420},{"key":"me-002","set":"mystic_energy","number":2,"rarity":"common","startPriceCents":260},{"key":"me-003","set":"mystic_energy","number":3,"rarity":"common","startPriceCents":450},{"key":"me-004","set":"mystic_energy","number":4,"rarity":"common","startPriceCents":240},{"key":"me-005","set":"mystic_energy","number":5,"rarity":"common","startPriceCents":480},{"key":"me-006","set":"mystic_energy","number":6,"rarity":"common","startPriceCents":250},{"key":"me-007","set":"mystic_energy","number":7,"rarity":"common","startPriceCents":180},{"key":"me-008","set":"mystic_energy","number":8,"rarity":"common","startPriceCents":210},{"key":"me-009","set":"mystic_energy","number":9,"rarity":"common","startPriceCents":150},{"key":"me-010","set":"mystic_energy","number":10,"rarity":"common","startPriceCents":230},{"key":"me-011","set":"mystic_energy","number":11,"rarity":"common","startPriceCents":130},{"key":"me-012","set":"mystic_energy","number":12,"rarity":"common","startPriceCents":220},{"key":"me-013","set":"mystic_energy","number":13,"rarity":"common","startPriceCents":160},{"key":"me-014","set":"mystic_energy","number":14,"rarity":"common","startPriceCents":270},{"key":"me-015","set":"mystic_energy","number":15,"rarity":"common","startPriceCents":140},{"key":"me-016","set":"mystic_energy","number":16,"rarity":"common","startPriceCents":230},{"key":"me-017","set":"mystic_energy","number":17,"rarity":"common","startPriceCents":200},{"key":"me-018","set":"mystic_energy","number":18,"rarity":"common","startPriceCents":260},{"key":"me-019","set":"mystic_energy","number":19,"rarity":"common","startPriceCents":190},{"key":"me-020","set":"mystic_energy","number":20,"rarity":"common","startPriceCents":280},{"key":"me-021","set":"mystic_energy","number":21,"rarity":"common","startPriceCents":170},{"key":"me-022","set":"mystic_energy","number":22,"rarity":"common","startPriceCents":240},{"key":"me-023","set":"mystic_energy","number":23,"rarity":"common","startPriceCents":330},{"key":"me-024","set":"mystic_energy","number":24,"rarity":"common","startPriceCents":290},{"key":"me-025","set":"mystic_energy","number":25,"rarity":"common","startPriceCents":150},{"key":"me-026","set":"mystic_energy","number":26,"rarity":"common","startPriceCents":250},{"key":"me-027","set":"mystic_energy","number":27,"rarity":"common","startPriceCents":950},{"key":"me-028","set":"mystic_energy","number":28,"rarity":"common","startPriceCents":700},{"key":"me-029","set":"mystic_energy","number":29,"rarity":"common","startPriceCents":140},{"key":"me-030","set":"mystic_energy","number":30,"rarity":"common","startPriceCents":240},{"key":"me-031","set":"mystic_energy","number":31,"rarity":"common","startPriceCents":160},{"key":"me-032","set":"mystic_energy","number":32,"rarity":"common","startPriceCents":300},{"key":"me-033","set":"mystic_energy","number":33,"rarity":"common","startPriceCents":120},{"key":"me-034","set":"mystic_energy","number":34,"rarity":"common","startPriceCents":210},{"key":"me-035","set":"mystic_energy","number":35,"rarity":"common","startPriceCents":130},{"key":"me-036","set":"mystic_energy","number":36,"rarity":"common","startPriceCents":220},{"key":"me-037","set":"mystic_energy","number":37,"rarity":"common","startPriceCents":520},{"key":"me-038","set":"mystic_energy","number":38,"rarity":"common","startPriceCents":280},{"key":"me-039","set":"mystic_energy","number":39,"rarity":"common","startPriceCents":380},{"key":"me-040","set":"mystic_energy","number":40,"rarity":"common","startPriceCents":310},{"key":"me-041","set":"mystic_energy","number":41,"rarity":"common","startPriceCents":170},{"key":"me-042","set":"mystic_energy","number":42,"rarity":"common","startPriceCents":250},{"key":"me-043","set":"mystic_energy","number":43,"rarity":"common","startPriceCents":180},{"key":"me-044","set":"mystic_energy","number":44,"rarity":"common","startPriceCents":340},{"key":"me-045","set":"mystic_energy","number":45,"rarity":"common","startPriceCents":620},{"key":"me-046","set":"mystic_energy","number":46,"rarity":"common","startPriceCents":580},{"key":"me-047","set":"mystic_energy","number":47,"rarity":"common","startPriceCents":560},{"key":"me-048","set":"mystic_energy","number":48,"rarity":"common","startPriceCents":110},{"key":"me-049","set":"mystic_energy","number":49,"rarity":"common","startPriceCents":880},{"key":"me-050","set":"mystic_energy","number":50,"rarity":"common","startPriceCents":640},{"key":"me-051","set":"mystic_energy","number":51,"rarity":"rare","startPriceCents":1400},{"key":"me-052","set":"mystic_energy","number":52,"rarity":"rare","startPriceCents":1900},{"key":"me-053","set":"mystic_energy","number":53,"rarity":"rare","startPriceCents":1700},{"key":"me-054","set":"mystic_energy","number":54,"rarity":"rare","startPriceCents":2600},{"key":"me-055","set":"mystic_energy","number":55,"rarity":"rare","startPriceCents":2200},{"key":"me-056","set":"mystic_energy","number":56,"rarity":"rare","startPriceCents":1200},{"key":"me-057","set":"mystic_energy","number":57,"rarity":"rare","startPriceCents":3200},{"key":"me-058","set":"mystic_energy","number":58,"rarity":"rare","startPriceCents":900},{"key":"me-059","set":"mystic_energy","number":59,"rarity":"rare","startPriceCents":4200},{"key":"me-060","set":"mystic_energy","number":60,"rarity":"rare","startPriceCents":7400},{"key":"me-061","set":"mystic_energy","number":61,"rarity":"ultra","startPriceCents":198000},{"key":"me-062","set":"mystic_energy","number":62,"rarity":"ultra","startPriceCents":128000},{"key":"me-063","set":"mystic_energy","number":63,"rarity":"ultra","startPriceCents":112000},{"key":"me-064","set":"mystic_energy","number":64,"rarity":"ultra","startPriceCents":64000},{"key":"me-065","set":"mystic_energy","number":65,"rarity":"ultra","startPriceCents":86000},{"key":"me-066","set":"mystic_energy","number":66,"rarity":"ultra","startPriceCents":74000},{"key":"me-067","set":"mystic_energy","number":67,"rarity":"ultra","startPriceCents":42000},{"key":"me-068","set":"mystic_energy","number":68,"rarity":"ultra","startPriceCents":28000},{"key":"me-069","set":"mystic_energy","number":69,"rarity":"ultra","startPriceCents":152000},{"key":"me-070","set":"mystic_energy","number":70,"rarity":"ultra","startPriceCents":236000},{"key":"me-071","set":"mystic_energy","number":71,"rarity":"prisma","startPriceCents":2350000},{"key":"me-072","set":"mystic_energy","number":72,"rarity":"prisma","startPriceCents":980000},{"key":"me-073","set":"mystic_energy","number":73,"rarity":"prisma","startPriceCents":1450000},{"key":"me-074","set":"mystic_energy","number":74,"rarity":"prisma","startPriceCents":720000},{"key":"me-075","set":"mystic_energy","number":75,"rarity":"prisma","startPriceCents":1850000},{"key":"me-076","set":"mystic_energy","number":76,"rarity":"legendary","startPriceCents":17500000},{"key":"me-077","set":"mystic_energy","number":77,"rarity":"legendary","startPriceCents":14800000},{"key":"sa-001","set":"super_apex","number":1,"rarity":"common","startPriceCents":600},{"key":"sa-002","set":"super_apex","number":2,"rarity":"common","startPriceCents":1400},{"key":"sa-003","set":"super_apex","number":3,"rarity":"common","startPriceCents":2800},{"key":"sa-004","set":"super_apex","number":4,"rarity":"common","startPriceCents":4200},{"key":"sa-005","set":"super_apex","number":5,"rarity":"common","startPriceCents":500},{"key":"sa-006","set":"super_apex","number":6,"rarity":"common","startPriceCents":1600},{"key":"sa-007","set":"super_apex","number":7,"rarity":"common","startPriceCents":800},{"key":"sa-008","set":"super_apex","number":8,"rarity":"common","startPriceCents":2200},{"key":"sa-009","set":"super_apex","number":9,"rarity":"common","startPriceCents":900},{"key":"sa-010","set":"super_apex","number":10,"rarity":"common","startPriceCents":2000},{"key":"sa-011","set":"super_apex","number":11,"rarity":"common","startPriceCents":500},{"key":"sa-012","set":"super_apex","number":12,"rarity":"common","startPriceCents":1200},{"key":"sa-013","set":"super_apex","number":13,"rarity":"common","startPriceCents":1100},{"key":"sa-014","set":"super_apex","number":14,"rarity":"common","startPriceCents":3200},{"key":"sa-015","set":"super_apex","number":15,"rarity":"common","startPriceCents":700},{"key":"sa-016","set":"super_apex","number":16,"rarity":"common","startPriceCents":1800},{"key":"sa-017","set":"super_apex","number":17,"rarity":"common","startPriceCents":600},{"key":"sa-018","set":"super_apex","number":18,"rarity":"common","startPriceCents":2400},{"key":"sa-019","set":"super_apex","number":19,"rarity":"common","startPriceCents":800},{"key":"sa-020","set":"super_apex","number":20,"rarity":"common","startPriceCents":2600},{"key":"sa-021","set":"super_apex","number":21,"rarity":"common","startPriceCents":3000},{"key":"sa-022","set":"super_apex","number":22,"rarity":"common","startPriceCents":4500},{"key":"sa-023","set":"super_apex","number":23,"rarity":"common","startPriceCents":500},{"key":"sa-024","set":"super_apex","number":24,"rarity":"common","startPriceCents":1300},{"key":"sa-025","set":"super_apex","number":25,"rarity":"common","startPriceCents":2600},{"key":"sa-026","set":"super_apex","number":26,"rarity":"common","startPriceCents":4800},{"key":"sa-027","set":"super_apex","number":27,"rarity":"common","startPriceCents":2200},{"key":"sa-028","set":"super_apex","number":28,"rarity":"common","startPriceCents":3800},{"key":"sa-029","set":"super_apex","number":29,"rarity":"common","startPriceCents":500},{"key":"sa-030","set":"super_apex","number":30,"rarity":"common","startPriceCents":1100},{"key":"sa-031","set":"super_apex","number":31,"rarity":"common","startPriceCents":500},{"key":"sa-032","set":"super_apex","number":32,"rarity":"common","startPriceCents":1500},{"key":"sa-033","set":"super_apex","number":33,"rarity":"common","startPriceCents":500},{"key":"sa-034","set":"super_apex","number":34,"rarity":"common","startPriceCents":1700},{"key":"sa-035","set":"super_apex","number":35,"rarity":"common","startPriceCents":500},{"key":"sa-036","set":"super_apex","number":36,"rarity":"common","startPriceCents":1400},{"key":"sa-037","set":"super_apex","number":37,"rarity":"common","startPriceCents":700},{"key":"sa-038","set":"super_apex","number":38,"rarity":"common","startPriceCents":2100},{"key":"sa-039","set":"super_apex","number":39,"rarity":"common","startPriceCents":600},{"key":"sa-040","set":"super_apex","number":40,"rarity":"common","startPriceCents":1900},{"key":"sa-041","set":"super_apex","number":41,"rarity":"common","startPriceCents":500},{"key":"sa-042","set":"super_apex","number":42,"rarity":"common","startPriceCents":1200},{"key":"sa-043","set":"super_apex","number":43,"rarity":"common","startPriceCents":500},{"key":"sa-044","set":"super_apex","number":44,"rarity":"common","startPriceCents":1300},{"key":"sa-045","set":"super_apex","number":45,"rarity":"common","startPriceCents":600},{"key":"sa-046","set":"super_apex","number":46,"rarity":"common","startPriceCents":1800},{"key":"sa-047","set":"super_apex","number":47,"rarity":"common","startPriceCents":900},{"key":"sa-048","set":"super_apex","number":48,"rarity":"common","startPriceCents":2300},{"key":"sa-049","set":"super_apex","number":49,"rarity":"common","startPriceCents":700},{"key":"sa-050","set":"super_apex","number":50,"rarity":"common","startPriceCents":2000},{"key":"sa-051","set":"super_apex","number":51,"rarity":"rare","startPriceCents":22000},{"key":"sa-052","set":"super_apex","number":52,"rarity":"rare","startPriceCents":9500},{"key":"sa-053","set":"super_apex","number":53,"rarity":"rare","startPriceCents":34000},{"key":"sa-054","set":"super_apex","number":54,"rarity":"rare","startPriceCents":6000},{"key":"sa-055","set":"super_apex","number":55,"rarity":"rare","startPriceCents":39000},{"key":"sa-056","set":"super_apex","number":56,"rarity":"rare","startPriceCents":7500},{"key":"sa-057","set":"super_apex","number":57,"rarity":"rare","startPriceCents":4800},{"key":"sa-058","set":"super_apex","number":58,"rarity":"rare","startPriceCents":13000},{"key":"sa-059","set":"super_apex","number":59,"rarity":"rare","startPriceCents":11000},{"key":"sa-060","set":"super_apex","number":60,"rarity":"rare","startPriceCents":18000},{"key":"sa-061","set":"super_apex","number":61,"rarity":"ultra","startPriceCents":560000},{"key":"sa-062","set":"super_apex","number":62,"rarity":"ultra","startPriceCents":740000},{"key":"sa-063","set":"super_apex","number":63,"rarity":"ultra","startPriceCents":390000},{"key":"sa-064","set":"super_apex","number":64,"rarity":"ultra","startPriceCents":980000},{"key":"sa-065","set":"super_apex","number":65,"rarity":"ultra","startPriceCents":1220000},{"key":"sa-066","set":"super_apex","number":66,"rarity":"ultra","startPriceCents":88000},{"key":"sa-067","set":"super_apex","number":67,"rarity":"ultra","startPriceCents":125000},{"key":"sa-068","set":"super_apex","number":68,"rarity":"ultra","startPriceCents":290000},{"key":"sa-069","set":"super_apex","number":69,"rarity":"ultra","startPriceCents":220000},{"key":"sa-070","set":"super_apex","number":70,"rarity":"ultra","startPriceCents":165000},{"key":"sa-071","set":"super_apex","number":71,"rarity":"prisma","startPriceCents":9800000},{"key":"sa-072","set":"super_apex","number":72,"rarity":"prisma","startPriceCents":4100000},{"key":"sa-073","set":"super_apex","number":73,"rarity":"prisma","startPriceCents":6400000},{"key":"sa-074","set":"super_apex","number":74,"rarity":"prisma","startPriceCents":12200000},{"key":"sa-075","set":"super_apex","number":75,"rarity":"prisma","startPriceCents":2750000},{"key":"sa-076","set":"super_apex","number":76,"rarity":"legendary","startPriceCents":78000000},{"key":"sa-077","set":"super_apex","number":77,"rarity":"legendary","startPriceCents":89000000},{"key":"pp-001","set":"prismatic_peak","number":1,"rarity":"common","startPriceCents":4500},{"key":"pp-002","set":"prismatic_peak","number":2,"rarity":"common","startPriceCents":8250},{"key":"pp-003","set":"prismatic_peak","number":3,"rarity":"common","startPriceCents":14250},{"key":"pp-004","set":"prismatic_peak","number":4,"rarity":"common","startPriceCents":21000},{"key":"pp-005","set":"prismatic_peak","number":5,"rarity":"common","startPriceCents":4500},{"key":"pp-006","set":"prismatic_peak","number":6,"rarity":"common","startPriceCents":9000},{"key":"pp-007","set":"prismatic_peak","number":7,"rarity":"common","startPriceCents":16500},{"key":"pp-008","set":"prismatic_peak","number":8,"rarity":"common","startPriceCents":24000},{"key":"pp-009","set":"prismatic_peak","number":9,"rarity":"common","startPriceCents":5250},{"key":"pp-010","set":"prismatic_peak","number":10,"rarity":"common","startPriceCents":9750},{"key":"pp-011","set":"prismatic_peak","number":11,"rarity":"common","startPriceCents":12750},{"key":"pp-012","set":"prismatic_peak","number":12,"rarity":"common","startPriceCents":19500},{"key":"pp-013","set":"prismatic_peak","number":13,"rarity":"common","startPriceCents":6000},{"key":"pp-014","set":"prismatic_peak","number":14,"rarity":"common","startPriceCents":10500},{"key":"pp-015","set":"prismatic_peak","number":15,"rarity":"common","startPriceCents":11250},{"key":"pp-016","set":"prismatic_peak","number":16,"rarity":"common","startPriceCents":18000},{"key":"pp-017","set":"prismatic_peak","number":17,"rarity":"common","startPriceCents":4500},{"key":"pp-018","set":"prismatic_peak","number":18,"rarity":"common","startPriceCents":9000},{"key":"pp-019","set":"prismatic_peak","number":19,"rarity":"common","startPriceCents":3750},{"key":"pp-020","set":"prismatic_peak","number":20,"rarity":"common","startPriceCents":7500},{"key":"pp-021","set":"prismatic_peak","number":21,"rarity":"common","startPriceCents":3750},{"key":"pp-022","set":"prismatic_peak","number":22,"rarity":"common","startPriceCents":6750},{"key":"pp-023","set":"prismatic_peak","number":23,"rarity":"common","startPriceCents":6750},{"key":"pp-024","set":"prismatic_peak","number":24,"rarity":"common","startPriceCents":12000},{"key":"pp-025","set":"prismatic_peak","number":25,"rarity":"common","startPriceCents":8250},{"key":"pp-026","set":"prismatic_peak","number":26,"rarity":"common","startPriceCents":11250},{"key":"pp-027","set":"prismatic_peak","number":27,"rarity":"common","startPriceCents":3750},{"key":"pp-028","set":"prismatic_peak","number":28,"rarity":"common","startPriceCents":7500},{"key":"pp-029","set":"prismatic_peak","number":29,"rarity":"common","startPriceCents":6000},{"key":"pp-030","set":"prismatic_peak","number":30,"rarity":"common","startPriceCents":10500},{"key":"pp-031","set":"prismatic_peak","number":31,"rarity":"common","startPriceCents":3750},{"key":"pp-032","set":"prismatic_peak","number":32,"rarity":"common","startPriceCents":8250},{"key":"pp-033","set":"prismatic_peak","number":33,"rarity":"common","startPriceCents":4500},{"key":"pp-034","set":"prismatic_peak","number":34,"rarity":"common","startPriceCents":9000},{"key":"pp-035","set":"prismatic_peak","number":35,"rarity":"common","startPriceCents":5250},{"key":"pp-036","set":"prismatic_peak","number":36,"rarity":"common","startPriceCents":9750},{"key":"pp-037","set":"prismatic_peak","number":37,"rarity":"common","startPriceCents":4500},{"key":"pp-038","set":"prismatic_peak","number":38,"rarity":"common","startPriceCents":9000},{"key":"pp-039","set":"prismatic_peak","number":39,"rarity":"common","startPriceCents":6750},{"key":"pp-040","set":"prismatic_peak","number":40,"rarity":"common","startPriceCents":10500},{"key":"pp-041","set":"prismatic_peak","number":41,"rarity":"common","startPriceCents":13500},{"key":"pp-042","set":"prismatic_peak","number":42,"rarity":"common","startPriceCents":22500},{"key":"pp-043","set":"prismatic_peak","number":43,"rarity":"common","startPriceCents":5250},{"key":"pp-044","set":"prismatic_peak","number":44,"rarity":"common","startPriceCents":9750},{"key":"pp-045","set":"prismatic_peak","number":45,"rarity":"common","startPriceCents":7500},{"key":"pp-046","set":"prismatic_peak","number":46,"rarity":"common","startPriceCents":12750},{"key":"pp-047","set":"prismatic_peak","number":47,"rarity":"common","startPriceCents":15000},{"key":"pp-048","set":"prismatic_peak","number":48,"rarity":"common","startPriceCents":32250},{"key":"pp-049","set":"prismatic_peak","number":49,"rarity":"common","startPriceCents":18750},{"key":"pp-050","set":"prismatic_peak","number":50,"rarity":"common","startPriceCents":36000},{"key":"pp-051","set":"prismatic_peak","number":51,"rarity":"rare","startPriceCents":97500},{"key":"pp-052","set":"prismatic_peak","number":52,"rarity":"rare","startPriceCents":81000},{"key":"pp-053","set":"prismatic_peak","number":53,"rarity":"rare","startPriceCents":123000},{"key":"pp-054","set":"prismatic_peak","number":54,"rarity":"rare","startPriceCents":72000},{"key":"pp-055","set":"prismatic_peak","number":55,"rarity":"rare","startPriceCents":46500},{"key":"pp-056","set":"prismatic_peak","number":56,"rarity":"rare","startPriceCents":63000},{"key":"pp-057","set":"prismatic_peak","number":57,"rarity":"rare","startPriceCents":172500},{"key":"pp-058","set":"prismatic_peak","number":58,"rarity":"rare","startPriceCents":105000},{"key":"pp-059","set":"prismatic_peak","number":59,"rarity":"rare","startPriceCents":217500},{"key":"pp-060","set":"prismatic_peak","number":60,"rarity":"rare","startPriceCents":285000},{"key":"pp-061","set":"prismatic_peak","number":61,"rarity":"ultra","startPriceCents":5700000},{"key":"pp-062","set":"prismatic_peak","number":62,"rarity":"ultra","startPriceCents":6900000},{"key":"pp-063","set":"prismatic_peak","number":63,"rarity":"ultra","startPriceCents":3150000},{"key":"pp-064","set":"prismatic_peak","number":64,"rarity":"ultra","startPriceCents":1425000},{"key":"pp-065","set":"prismatic_peak","number":65,"rarity":"ultra","startPriceCents":2175000},{"key":"pp-066","set":"prismatic_peak","number":66,"rarity":"ultra","startPriceCents":1170000},{"key":"pp-067","set":"prismatic_peak","number":67,"rarity":"ultra","startPriceCents":4350000},{"key":"pp-068","set":"prismatic_peak","number":68,"rarity":"ultra","startPriceCents":8700000},{"key":"pp-069","set":"prismatic_peak","number":69,"rarity":"ultra","startPriceCents":1800000},{"key":"pp-070","set":"prismatic_peak","number":70,"rarity":"ultra","startPriceCents":840000},{"key":"pp-071","set":"prismatic_peak","number":71,"rarity":"prisma","startPriceCents":84000000},{"key":"pp-072","set":"prismatic_peak","number":72,"rarity":"prisma","startPriceCents":43500000},{"key":"pp-073","set":"prismatic_peak","number":73,"rarity":"prisma","startPriceCents":61500000},{"key":"pp-074","set":"prismatic_peak","number":74,"rarity":"prisma","startPriceCents":27750000},{"key":"pp-075","set":"prismatic_peak","number":75,"rarity":"prisma","startPriceCents":21000000},{"key":"pp-076","set":"prismatic_peak","number":76,"rarity":"legendary","startPriceCents":652500000},{"key":"pp-077","set":"prismatic_peak","number":77,"rarity":"legendary","startPriceCents":540000000}]'::jsonb, 'Nexamon catalogue from src/config/nexamon (ADR-165)'),
+  ('nexamon_types', '{"me-001":"fire","me-002":"fire","me-003":"water","me-004":"water","me-005":"grass","me-006":"grass","me-007":"grass","me-008":"grass","me-009":"fire","me-010":"fire","me-011":"electric","me-012":"electric","me-013":"rock","me-014":"rock","me-015":"water","me-016":"water","me-017":"fairy","me-018":"fairy","me-019":"psychic","me-020":"psychic","me-021":"dark","me-022":"dark","me-023":"dark","me-024":"dark","me-025":"steel","me-026":"steel","me-027":"dragon","me-028":"dragon","me-029":"fire","me-030":"fire","me-031":"water","me-032":"water","me-033":"grass","me-034":"grass","me-035":"grass","me-036":"grass","me-037":"electric","me-038":"electric","me-039":"psychic","me-040":"psychic","me-041":"fairy","me-042":"fairy","me-043":"rock","me-044":"rock","me-045":"steel","me-046":"fire","me-047":"dark","me-048":"grass","me-049":"fairy","me-050":"dragon","me-051":"grass","me-052":"fire","me-053":"electric","me-054":"fairy","me-055":"dark","me-056":"steel","me-057":"grass","me-058":"water","me-059":"dark","me-060":"electric","me-061":"fire","me-062":"water","me-063":"grass","me-064":"rock","me-065":"psychic","me-066":"electric","me-067":"fire","me-068":"fairy","me-069":"steel","me-070":"dark","me-071":"dragon","me-072":"water","me-073":"psychic","me-074":"grass","me-075":"fire","me-076":"fairy","me-077":"water","sa-001":"fire","sa-002":"fire","sa-003":"fire","sa-004":"fire","sa-005":"electric","sa-006":"electric","sa-007":"steel","sa-008":"steel","sa-009":"water","sa-010":"water","sa-011":"rock","sa-012":"rock","sa-013":"electric","sa-014":"electric","sa-015":"rock","sa-016":"rock","sa-017":"water","sa-018":"water","sa-019":"dark","sa-020":"dark","sa-021":"dragon","sa-022":"dragon","sa-023":"grass","sa-024":"grass","sa-025":"rock","sa-026":"rock","sa-027":"dark","sa-028":"dark","sa-029":"grass","sa-030":"grass","sa-031":"steel","sa-032":"steel","sa-033":"dark","sa-034":"dark","sa-035":"dark","sa-036":"dark","sa-037":"water","sa-038":"water","sa-039":"grass","sa-040":"grass","sa-041":"dark","sa-042":"dark","sa-043":"electric","sa-044":"electric","sa-045":"rock","sa-046":"rock","sa-047":"psychic","sa-048":"psychic","sa-049":"fairy","sa-050":"fairy","sa-051":"fire","sa-052":"rock","sa-053":"water","sa-054":"grass","sa-055":"dark","sa-056":"grass","sa-057":"steel","sa-058":"grass","sa-059":"electric","sa-060":"rock","sa-061":"electric","sa-062":"electric","sa-063":"rock","sa-064":"dark","sa-065":"rock","sa-066":"dark","sa-067":"dark","sa-068":"water","sa-069":"dark","sa-070":"psychic","sa-071":"fire","sa-072":"steel","sa-073":"water","sa-074":"dragon","sa-075":"fairy","sa-076":"fire","sa-077":"electric","pp-001":"rock","pp-002":"rock","pp-003":"dragon","pp-004":"dragon","pp-005":"water","pp-006":"water","pp-007":"fairy","pp-008":"fairy","pp-009":"steel","pp-010":"steel","pp-011":"water","pp-012":"water","pp-013":"fire","pp-014":"fire","pp-015":"psychic","pp-016":"psychic","pp-017":"rock","pp-018":"rock","pp-019":"electric","pp-020":"electric","pp-021":"grass","pp-022":"grass","pp-023":"dark","pp-024":"dark","pp-025":"fairy","pp-026":"fairy","pp-027":"steel","pp-028":"steel","pp-029":"fire","pp-030":"fire","pp-031":"grass","pp-032":"grass","pp-033":"electric","pp-034":"electric","pp-035":"psychic","pp-036":"psychic","pp-037":"dark","pp-038":"dark","pp-039":"water","pp-040":"water","pp-041":"dragon","pp-042":"dragon","pp-043":"rock","pp-044":"rock","pp-045":"water","pp-046":"water","pp-047":"steel","pp-048":"steel","pp-049":"fire","pp-050":"fairy","pp-051":"fairy","pp-052":"water","pp-053":"steel","pp-054":"electric","pp-055":"grass","pp-056":"steel","pp-057":"electric","pp-058":"water","pp-059":"water","pp-060":"dark","pp-061":"fairy","pp-062":"fairy","pp-063":"fire","pp-064":"rock","pp-065":"dark","pp-066":"fire","pp-067":"dragon","pp-068":"psychic","pp-069":"steel","pp-070":"grass","pp-071":"dragon","pp-072":"water","pp-073":"psychic","pp-074":"water","pp-075":"rock","pp-076":"dragon","pp-077":"fire"}'::jsonb, 'Nexamon card types for the card bonuses (ADR-171)'),
   ('nexamon_names', '{"me-001":"Glimmkitz","me-002":"Lohbock","me-003":"Tümpli","me-004":"Quellmolch","me-005":"Nüssli","me-006":"Blattschweif","me-007":"Pilzli","me-008":"Schimmerhut","me-009":"Flackri","me-010":"Irrwisch","me-011":"Funzel","me-012":"Blinkäfer","me-013":"Kullerkies","me-014":"Quarzling","me-015":"Platschi","me-016":"Seerosar","me-017":"Tauli","me-018":"Morgentau","me-019":"Runi","me-020":"Runor","me-021":"Schattli","me-022":"Dämmerflug","me-023":"Uhuli","me-024":"Mondkauz","me-025":"Schürfi","me-026":"Schachtmull","me-027":"Wyrmli","me-028":"Auraschuppe","me-029":"Kohlchen","me-030":"Glutbrocken","me-031":"Blubbel","me-032":"Quallux","me-033":"Samfluff","me-034":"Pustewind","me-035":"Wurzli","me-036":"Knorrholz","me-037":"Wölkli","me-038":"Donnerwoll","me-039":"Träumli","me-040":"Schlummerfalter","me-041":"Glöckli","me-042":"Blütenklang","me-043":"Höhlux","me-044":"Geodenschneck","me-045":"Münzli","me-046":"Bullfink","me-047":"Brummbär","me-048":"Harzknubbel","me-049":"Sternschnupp","me-050":"Libellux","me-051":"Leuchtmorchel","me-052":"Lichterloh","me-053":"Voltaris","me-054":"Aurofee","me-055":"Nachtschwinge","me-056":"Bohrbaron","me-057":"Urknorr","me-058":"Teichkönig","me-059":"Nachtorakel","me-060":"Aurolux","me-061":"Brandhorn","me-062":"Flutlurch","me-063":"Wipfelkron","me-064":"Kristallkoloss","me-065":"Orakelith","me-066":"Sturmvlies","me-067":"Vulkanor","me-068":"Klangflora","me-069":"Runenritter","me-070":"Neumondwolf","me-071":"Aurorawyrm","me-072":"Mondqualle","me-073":"Traumschwinge","me-074":"Hainhüter","me-075":"Lohenix","me-076":"Solvenar","me-077":"Nyxomar","sa-001":"Glutz","sa-002":"Magmolch","sa-003":"Glimmtatz","sa-004":"Flammtiger","sa-005":"Zwirbel","sa-006":"Böenfalk","sa-007":"Nietling","sa-008":"Panzork","sa-009":"Abyssel","sa-010":"Schlundra","sa-011":"Stichel","sa-012":"Skorpax","sa-013":"Funkitz","sa-014":"Blitzluchs","sa-015":"Fäustel","sa-016":"Hakenschlag","sa-017":"Flossel","sa-018":"Haifang","sa-019":"Knurrling","sa-020":"Nachtfang","sa-021":"Schuppling","sa-022":"Drakwyrm","sa-023":"Schnappel","sa-024":"Würgranke","sa-025":"Rammkalb","sa-026":"Bullrun","sa-027":"Baissel","sa-028":"Brummbaisse","sa-029":"Zischel","sa-030":"Kobrax","sa-031":"Zwickel","sa-032":"Kraborg","sa-033":"Geierling","sa-034":"Aaskralle","sa-035":"Webbel","sa-036":"Arachnox","sa-037":"Krokel","sa-038":"Sumpfmaul","sa-039":"Sichelino","sa-040":"Mantigor","sa-041":"Flatsch","sa-042":"Vampyrus","sa-043":"Zitterling","sa-044":"Voltaal","sa-045":"Brocki","sa-046":"Geröllo","sa-047":"Starrling","sa-048":"Mentuhu","sa-049":"Summsel","sa-050":"Dornfee","sa-051":"Vulkrag","sa-052":"Dornkaiser","sa-053":"Megalodorn","sa-054":"Dschungor","sa-055":"Krachbär","sa-056":"Hypnatter","sa-057":"Panzerschere","sa-058":"Klingenprinz","sa-059":"Megavoltaal","sa-060":"Obsidion","sa-061":"Orkanyx","sa-062":"Donnerpard","sa-063":"Arenator","sa-064":"Finsterwolf","sa-065":"Haussier","sa-066":"Aasfürst","sa-067":"Netzfürstin","sa-068":"Kaimperator","sa-069":"Nachtgraf","sa-070":"Hypnarch","sa-071":"Solartiger","sa-072":"Stahlkoloss","sa-073":"Leviagor","sa-074":"Infernodrak","sa-075":"Stachelkönigin","sa-076":"Vulkazar","sa-077":"Tempestra","pp-001":"Glimmling","pp-002":"Glimmrock","pp-003":"Prismi","pp-004":"Prismaro","pp-005":"Frostel","pp-006":"Gletschi","pp-007":"Aurofix","pp-008":"Aurovulp","pp-009":"Karatli","pp-010":"Karatank","pp-011":"Wolkini","pp-012":"Nimbowal","pp-013":"Sonnling","pp-014":"Solario","pp-015":"Sternchi","pp-016":"Astrella","pp-017":"Tempelito","pp-018":"Wächtor","pp-019":"Funkfink","pp-020":"Donnerkamm","pp-021":"Edelwinz","pp-022":"Edelblüt","pp-023":"Nachtkauz","pp-024":"Mondeul","pp-025":"Flöckli","pp-026":"Schneehopp","pp-027":"Zickel","pp-028":"Stahlbock","pp-029":"Rubinchen","pp-030":"Rubisaur","pp-031":"Zapfi","pp-032":"Tannrich","pp-033":"Funkelmott","pp-034":"Lumifalter","pp-035":"Orbi","pp-036":"Orakulon","pp-037":"Amefledi","pp-038":"Amethystrix","pp-039":"Rutschi","pp-040":"Eisotto","pp-041":"Schneewurm","pp-042":"Firnwyrm","pp-043":"Geodi","pp-044":"Geodon","pp-045":"Yetini","pp-046":"Yetigant","pp-047":"Murmelgold","pp-048":"Murmelbaron","pp-049":"Lampio","pp-050":"Opalux","pp-051":"Kristallope","pp-052":"Glazioth","pp-053":"Diamantor","pp-054":"Gewittaar","pp-055":"Edelkron","pp-056":"Chrombock","pp-057":"Prismafalter","pp-058":"Yetikhan","pp-059":"Saphirschwan","pp-060":"Mondlux","pp-061":"Polarlux","pp-062":"Aurorux","pp-063":"Heliaros","pp-064":"Gipfelwacht","pp-065":"Eklipseul","pp-066":"Granatox","pp-067":"Lawinor","pp-068":"Kometross","pp-069":"Platinar","pp-070":"Smaragdra","pp-071":"Prismagon","pp-072":"Cumulowal","pp-073":"Novastra","pp-074":"Äonentuga","pp-075":"Brillantitan","pp-076":"Spektradon","pp-077":"Aurelyx"}'::jsonb, 'Nexamon card names for the news show (ADR-169)')
 on conflict (key) do nothing;
 

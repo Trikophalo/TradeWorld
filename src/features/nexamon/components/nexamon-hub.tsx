@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { useNexamonCollection, useNexamonOverview, useRememberedFilters, useRevealedSlabs } from "../hooks";
 import { formatFactor, splitGraded } from "../view";
 import { Binder } from "./binder";
+import { BonusesView } from "./bonuses";
 import { GradingDesk } from "./grading-desk";
 import { Market, type MarketView } from "./market";
 import { NexamonPack } from "./pack";
@@ -27,8 +28,8 @@ import { LoadError } from "./parts";
 import { Shop } from "./shop";
 import { NexamonLobbyStrip } from "../live/lobby";
 
-export type NexamonTab = "shop" | "collection" | "market" | "grading";
-const TABS: readonly NexamonTab[] = ["shop", "collection", "market", "grading"];
+export type NexamonTab = "shop" | "collection" | "market" | "grading" | "bonuses";
+const TABS: readonly NexamonTab[] = ["shop", "collection", "market", "grading", "bonuses"];
 const HUB_DEFAULTS: { tab: NexamonTab } = { tab: "shop" };
 const HUB_ALLOWED = { tab: TABS } as const;
 
@@ -127,6 +128,7 @@ function Hub() {
                   <span className="nums text-accent">{grading}</span>
                 ) : undefined,
             },
+            { value: "bonuses", label: t("tabs.bonuses") },
           ]}
         />
       </div>
@@ -153,6 +155,7 @@ function Hub() {
             />
           )}
           {tab === "grading" && <GradingDesk overview={overview.data} collection={collection.data} />}
+          {tab === "bonuses" && <BonusesView />}
         </>
       )}
     </div>
