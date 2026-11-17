@@ -185,15 +185,35 @@ export function nexamonConditionBps(condition: NexamonCondition, cfg: Config = B
   return cfg.conditions.valueBps[condition] ?? 10_000;
 }
 
-/** Value factor of a copy: the grade's factor in a slab, else the condition's. */
+/**
+ * The slab factor of a grade (ADR-174): a 10 and a 9.5 depend on the card's popularity, from the low end of
+ * `grading.tenFactorRange` / `nineHalfFactorRange` for the least popular card to the high end for the most popular
+ * (linear, rounded down). Without a popularity the fixed `grading.valueBps` counts. Every other grade is fixed.
+ * Both ranges start above the grade below them, so 8 < 8.5 < 9 < 9.5 < 10 holds for every card.
+ */
+export function nexamonGradeFactorBps(
+  grade: number,
+  popularityBps: number | null = null,
+  cfg: Config = BALANCE.nexamon,
+): number {
+  const index = nexamonGradeIndex(grade, cfg);
+  const number = cfg.grading.grades[index]!;
+  const range = number === 10 ? cfg.grading.tenFactorRange : number === 9.5 ? cfg.grading.nineHalfFactorRange : null;
+  if (!range || popularityBps === null) return cfg.grading.valueBps[index]!;
+  const pop = Math.min(10_000, Math.max(0, Math.trunc(popularityBps)));
+  return range[0] + mulDivFloor(range[1] - range[0], pop, 10_000);
+}
+
+/** Value factor of a copy: the grade's factor in a slab (by the card's popularity, if known), else the condition's. */
 export function nexamonCopyFactorBps(
   condition: NexamonCondition,
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
+  popularityBps: number | null = null,
 ): number {
   if (grade !== null) {
     if (nexamonIsBlackLabel(grade)) return cfg.grading.blackLabel.valueBps;
-    return cfg.grading.valueBps[nexamonGradeIndex(grade, cfg)]!;
+    return nexamonGradeFactorBps(grade, popularityBps, cfg);
   }
   return nexamonConditionBps(condition, cfg);
 }
@@ -204,8 +224,9 @@ export function nexamonCopyValueCents(
   condition: NexamonCondition,
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
+  popularityBps: number | null = null,
 ): number {
-  return mulDivRound(valueE4, nexamonCopyFactorBps(condition, grade, cfg), 10_000 * NEXAMON_E4_PER_CENT);
+  return mulDivRound(valueE4, nexamonCopyFactorBps(condition, grade, cfg, popularityBps), 10_000 * NEXAMON_E4_PER_CENT);
 }
 
 /** The AI's asking price for a copy: its value plus 10 %. */

@@ -92,6 +92,13 @@ export const NEXAMON_RULES = {
      */
     valueBps: [3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000, 12_000, 14_000, 17_000, 23_000, 40_000],
     /**
+     * ADR-174: a 10 is worth 2.5x to 4x the card, a 9.5 1.8x to 2.6x, by the card's popularity (0 = low end,
+     * 10 000 = high end). `valueBps` above stays the fallback where the card is not known. The 9.5 range starts above
+     * a 9 (1.7x) and every 10 lies above the 9.5 of the same card, so the ladder stays in order.
+     */
+    tenFactorRange: [25_000, 40_000],
+    nineHalfFactorRange: [18_000, 26_000],
+    /**
      * The Black Label, one tier above a 10 (stored as grade 11, shown as "ASP 10 Black Label"). Only copies in the
      * conditions of `chanceBps` can get it: that share of their gradings, taken out of their chance for a 10 (mint 5 %,
      * near mint 1 %). The slab is worth the card's market value x `valueBps`.

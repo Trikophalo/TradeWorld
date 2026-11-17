@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_CARDS, nexamonCard } from "@/config/nexamon";
-import { nexamonAiAskCents, nexamonGradingFeeCents } from "@/lib/sim/nexamon";
+import { nexamonAiAskCents, nexamonGradeFactorBps, nexamonGradingFeeCents } from "@/lib/sim/nexamon";
 import { createRng } from "@/lib/sim/rng";
 import { GameError } from "../types";
 import { createNexamonEngine, demoOtherCopies, type DemoNexamonState } from "./nexamon";
@@ -260,9 +260,11 @@ describe("Nexamon in the demo (ADR-165)", () => {
     const details = await engine.nexamonCard(ultra.cardKey);
     const slab = details.copies.find((c) => c.id === ultra.copyId)!;
     expect(slab).toMatchObject({ state: "graded", grade: 10, condition: "mint" });
-    // The slab is worth four times the market value, rounded once from the e4 value: the card's value in whole
-    // cents times three can be off by the rounding (at most 1.5 cents).
-    expect(Math.abs(slab.valueCents - details.card.valueCents * 4)).toBeLessThanOrEqual(2);
+    // ADR-174: a 10 is worth 2.5x to 4x by the card's popularity, rounded once from the e4 value
+    const factor = nexamonGradeFactorBps(10, details.card.popularityBps);
+    expect(factor).toBeGreaterThanOrEqual(25_000);
+    expect(factor).toBeLessThanOrEqual(40_000);
+    expect(Math.abs(slab.valueCents - (details.card.valueCents * factor) / 10_000)).toBeLessThanOrEqual(2);
     expect(details.graded[11]).toBe(1);
     expect(await key(engine.gradeNexamonCard("g3", ultra.copyId))).toBe("nexamon_not_raw");
     expect(await key(engine.sellNexamonToAi("q0", [ultra.copyId]))).toBe("nexamon_not_sellable");

@@ -240,11 +240,11 @@ select tests.assert(
                    where l.seller_id = :c and c.acquired_at = (select max(acquired_at) from public.nexamon_copies where owner_id = :c and card_key = 'me-005')),
   'list_nexamon_cards(): three copies at one price, oldest first, idempotent');
 select tests.set_cfg('nexamon', '{market,maxListings}', '4');
+select array_agg(id)::text as cls from public.nexamon_listings where seller_id = :c \gset
 select tests.login_as('authenticated', :c);
 select tests.throws_key($$select public.list_nexamon_cards(gen_random_uuid(), 'me-005', 'mint', null, 2, 500)$$,
   'nexamon_listing_limit', 'list_nexamon_cards(): the listing limit counts every copy');
-select public.unlist_nexamon_cards(gen_random_uuid(),
-  (select array_agg(id) from public.nexamon_listings where seller_id = :c)) as ul \gset
+select public.unlist_nexamon_cards(gen_random_uuid(), :'cls'::uuid[]) as ul \gset
 reset role;
 select tests.set_cfg('nexamon', '{market,maxListings}', '30');
 select tests.assert(jsonb_array_length(:'ul'::jsonb -> 'copies') = 3
@@ -289,11 +289,32 @@ select public.bulk_sell_nexamon(:rqk, :'bk'::uuid[]) as bs2 \gset
 select tests.throws_key(format($$select public.bulk_sell_nexamon(gen_random_uuid(), array[%L]::uuid[])$$, :'c1'),
   'nexamon_not_owner', 'bulk_sell_nexamon(): only own copies');
 reset role;
-select tests.assert(
-  :'bs'::jsonb = :'bs2'::jsonb and (:'bs'::jsonb ->> 'count')::integer = 3
-  and (:'bs'::jsonb ->> 'total_cents')::bigint = :bkpay::bigint and tests.cash(:c) = :cb0::bigint + :bkpay::bigint
+select tests.assert(:'bs'::jsonb = :'bs2'::jsonb and (:'bs'::jsonb ->> 'count')::integer = 3,
+  'bulk_sell_nexamon(): three copies, idempotent ' || :'bs');
+-- every sold copy dips the value a little (dropBps), so a later copy of the same card brings a cent less
+select tests.assert((:'bs'::jsonb ->> 'total_cents')::bigint between :bkpay::bigint - 3 and :bkpay::bigint
+  and tests.cash(:c) = :cb0::bigint + (:'bs'::jsonb ->> 'total_cents')::bigint
   and not exists (select 1 from public.nexamon_copies where owner_id = :c and card_key = 'me-007'),
-  'bulk_sell_nexamon(): three copies at their value minus 35 %, paid at once, idempotent');
+  'bulk_sell_nexamon(): their value minus 35 %, paid at once ' || :bkpay || ' ' || (tests.cash(:c) - :cb0::bigint));
+
+-- =============================================================================
+-- K. A 10 is worth 2.5x to 4x, a 9.5 1.8x to 2.6x, by popularity; the ladder stays in order
+-- =============================================================================
+select tests.assert(
+  public.nexamon_grade_factor_bps(10, 'me-001') between 25000 and 40000
+  and public.nexamon_grade_factor_bps(10, 'cw-088') = 40000
+  and public.nexamon_grade_factor_bps(10, 'me-001') < public.nexamon_grade_factor_bps(10, 'pp-077')
+  and public.nexamon_grade_factor_bps(9.5, 'me-001') between 18000 and 26000
+  and public.nexamon_grade_factor_bps(9, 'me-001') = 17000
+  and public.nexamon_grade_factor_bps(10, null) = 40000
+  and not exists (select 1 from public.nexamon_cards k
+                   where not (public.nexamon_grade_factor_bps(8, k.card_key) < public.nexamon_grade_factor_bps(8.5, k.card_key)
+                          and public.nexamon_grade_factor_bps(8.5, k.card_key) < public.nexamon_grade_factor_bps(9, k.card_key)
+                          and public.nexamon_grade_factor_bps(9, k.card_key) < public.nexamon_grade_factor_bps(9.5, k.card_key)
+                          and public.nexamon_grade_factor_bps(9.5, k.card_key) < public.nexamon_grade_factor_bps(10, k.card_key)))
+  and public.nexamon_copy_value_cents(1000000, 'mint', 10, 'me-001')
+      = public.div_round_half_even(1000000::numeric * public.nexamon_grade_factor_bps(10, 'me-001'), 1000000),
+  'grade 10 and 9.5 by popularity (2.5x-4x, 1.8x-2.6x), the ladder 8 < 8.5 < 9 < 9.5 < 10 for every card');
 
 update public.game_config set value = :'nx_cfg'::jsonb where key = 'nexamon';
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds after Cosmic Winds');

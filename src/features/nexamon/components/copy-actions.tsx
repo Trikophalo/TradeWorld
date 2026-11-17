@@ -387,7 +387,8 @@ function GradeSheet({ copy, card, onClose }: SheetProps) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
   const action = useNexamonAction();
-  const quote = gradingQuote(copy);
+  const popularity = useNexamonCollection().data?.cards.find((c) => c.cardKey === copy.cardKey)?.popularityBps ?? null;
+  const quote = gradingQuote(copy, popularity);
   return (
     <Sheet
       open

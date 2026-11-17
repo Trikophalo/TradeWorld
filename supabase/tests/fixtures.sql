@@ -1476,7 +1476,7 @@ select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') -> 'cards' as
 \o :fixture_dir/list_nexamon_cards.json
 select public.list_nexamon_cards(gen_random_uuid(), :'fx_nb'::jsonb #>> '{0,card_key}', :'fx_nb'::jsonb #>> '{0,condition}', null, 1, 500);
 \o
-select array_agg(l.id)::text as fx_nxls from public.nexamon_listings l where l.seller_id = :'fx_g' and l.card_key = :'fx_nb'::jsonb #>> '{0,card_key}' \gset
+select array_agg(l.id)::text as fx_nxls from public.nexamon_listings l where l.seller_id = :fx_g and l.card_key = :'fx_nb'::jsonb #>> '{0,card_key}' \gset
 \o :fixture_dir/unlist_nexamon_cards.json
 select public.unlist_nexamon_cards(gen_random_uuid(), :'fx_nxls'::uuid[]);
 \o

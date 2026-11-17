@@ -21,7 +21,7 @@ import { playSound, type SoundName } from "@/lib/sound";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
-import { useNexamonRefresh, useRevealedSlabs } from "../hooks";
+import { useNexamonCollection, useNexamonRefresh, useRevealedSlabs } from "../hooks";
 import { formatChance, formatFactor, gradingQueue, revealKey, splitGraded } from "../view";
 import { ConditionBadge } from "./badges";
 import { GradeReveal, GradingPack, gradeTier } from "./grading-reveal";
@@ -368,7 +368,8 @@ function SlabReveal({
   const t = useTranslations("nexamon");
   const grade = copy.grade ?? 1;
   const tier = gradeTier(grade);
-  const factor = nexamonCopyFactorBps(copy.condition, grade);
+  const popularity = useNexamonCollection().data?.cards.find((c) => c.cardKey === copy.cardKey)?.popularityBps ?? null;
+  const factor = nexamonCopyFactorBps(copy.condition, grade, undefined, popularity);
   return (
     <li
       className="flex w-[172px] flex-col items-center gap-2"

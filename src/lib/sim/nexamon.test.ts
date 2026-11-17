@@ -11,6 +11,7 @@ import {
   nexamonIsBulk,
   nexamonOneOfOneHit,
   nexamonPackRule,
+  nexamonGradeFactorBps,
   nexamonTierOdds,
   nexamonTierRarities,
   nexamonTradeOnly,
@@ -256,6 +257,21 @@ describe("Nexamon packs (ADR-165)", () => {
     near(seen.prisma ?? 0, 1 / 50);
     expect(nexamonTierOdds(rule).map((t) => t.perPack)).toEqual([1 / 500, 1 / 50, 1 / 5]);
   }, 60_000);
+
+  it("values a 10 at 2.5x to 4x and a 9.5 at 1.8x to 2.6x by popularity, the ladder always in order (ADR-174)", () => {
+    expect(nexamonGradeFactorBps(10, 0)).toBe(25_000);
+    expect(nexamonGradeFactorBps(10, 10_000)).toBe(40_000);
+    expect(nexamonGradeFactorBps(10, 5_000)).toBe(32_500);
+    expect(nexamonGradeFactorBps(9.5, 0)).toBe(18_000);
+    expect(nexamonGradeFactorBps(9.5, 10_000)).toBe(26_000);
+    expect(nexamonGradeFactorBps(10)).toBe(40_000);
+    expect(nexamonGradeFactorBps(9, 9_000)).toBe(17_000);
+    for (let pop = 0; pop <= 10_000; pop += 250) {
+      const ladder = [8, 8.5, 9, 9.5, 10].map((g) => nexamonGradeFactorBps(g, pop));
+      for (let i = 1; i < ladder.length; i++) expect(ladder[i]!).toBeGreaterThan(ladder[i - 1]!);
+    }
+    expect(nexamonCopyValueCents(1_000_000, "mint", 10, cfg, 0)).toBe(25_000);
+  });
 
   it("keeps the AI away from One of Ones and their value trade-only", () => {
     expect(nexamonAiAllowed("one_of_one")).toBe(false);

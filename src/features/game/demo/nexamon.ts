@@ -303,11 +303,12 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     if (!card) throw new GameError("nexamon_unknown");
     return card;
   };
+  const popOf = (s: DemoNexamonState, key: string) => nexamonPopularityBps(info(key).rarity, s.cards[key]!.population);
   const blBps = (s: DemoNexamonState, key: string) => s.hype?.[key]?.bps ?? nexamonHypeBaseBps();
   const copyValue = (s: DemoNexamonState, c: { cardKey: string; condition: NexamonCondition; grade: number | null }) =>
     nexamonIsBlackLabel(c.grade)
       ? Number(divRoundHalfEven(BigInt(s.cards[c.cardKey]!.valueE4) * BigInt(blBps(s, c.cardKey)), BigInt(1_000_000)))
-      : nexamonCopyValueCents(s.cards[c.cardKey]!.valueE4, c.condition, c.grade);
+      : nexamonCopyValueCents(s.cards[c.cardKey]!.valueE4, c.condition, c.grade, cfg, popOf(s, c.cardKey));
 
   const ownedCopies = (s: DemoNexamonState) =>
     s.copies.map((c) => ({ cardKey: c.cardKey, grade: c.grade, listed: c.listing !== null }));
@@ -460,7 +461,10 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         c.listing &&
         nexamonPriceIsPlausible(
           Math.min(
-            nexamonPricePerCardE4(c.listing.priceCents, nexamonCopyFactorBps(c.condition, c.grade)),
+            nexamonPricePerCardE4(
+              c.listing.priceCents,
+              nexamonCopyFactorBps(c.condition, c.grade, cfg, popOf(s, c.cardKey)),
+            ),
             s.cards[key]!.valueE4,
           ),
           s.cards[key]!.valueE4,
@@ -545,7 +549,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         // the value moves only for a plausible price and a few AI buys per card and window (anti-manipulation)
         const counted = nexamonAiBuyCounts({
           priceCents: price,
-          factorBps: nexamonCopyFactorBps(copy.condition, copy.grade),
+          factorBps: nexamonCopyFactorBps(copy.condition, copy.grade, cfg, popOf(s, copy.cardKey)),
           valueE4: state.valueE4,
           rarity: card.rarity,
           countedInWindow: aiBuys.filter(
@@ -1133,7 +1137,7 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         const input = {
           valueE4: state.valueE4,
           priceCents: listing.priceCents,
-          factorBps: nexamonCopyFactorBps(listing.condition, listing.grade),
+          factorBps: nexamonCopyFactorBps(listing.condition, listing.grade, cfg, popOf(s, listing.cardKey)),
           rarity: listing.rarity,
           population: state.population,
           pairSales: 0,

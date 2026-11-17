@@ -371,7 +371,11 @@ export interface GradingQuote {
 }
 
 /** Fee, duration and the chance table of ASP for a raw copy. */
-export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">): GradingQuote {
+export function gradingQuote(
+  copy: Pick<NexamonCopy, "condition" | "valueCents">,
+  /** The card's popularity: a 10 and a 9.5 are worth more for a popular card (ADR-174). */
+  popularityBps: number | null = null,
+): GradingQuote {
   const rawBps = nexamonConditionBps(copy.condition);
   const chances: GradeChance[] = [];
   let betterBps = 0;
@@ -379,7 +383,7 @@ export function gradingQuote(copy: Pick<NexamonCopy, "condition" | "valueCents">
   for (const grade of [NEXAMON_BLACK_LABEL_GRADE, ...[...cfg.grading.grades].reverse()]) {
     const chance = nexamonGradeChanceBps(copy.condition, grade);
     if (chance <= 0) continue;
-    const factorBps = nexamonCopyFactorBps(copy.condition, grade);
+    const factorBps = nexamonCopyFactorBps(copy.condition, grade, cfg, popularityBps);
     chances.push({ grade, chanceBps: chance, factorBps });
     if (factorBps > rawBps) betterBps += chance;
     expected += chance * factorBps;

@@ -196,7 +196,7 @@ select public.get_nexamon_bonuses() as cb \gset
 select public.get_player_nexamon(null, 5) as cp \gset
 reset role;
 select tests.assert(
-  jsonb_array_length(:'cb'::jsonb -> 'totals') = 7 and jsonb_array_length(:'cb'::jsonb -> 'cards') = 54
+  jsonb_array_length(:'cb'::jsonb -> 'totals') = 7 and jsonb_array_length(:'cb'::jsonb -> 'cards') = 80
   and exists (select 1 from jsonb_array_elements(:'cb'::jsonb -> 'collections') x
                where x ->> 'kind' = 'master' and x ->> 'set' = 'mystic_energy' and (x ->> 'complete')::boolean
                  and x ->> 'completed_at' is not null)
@@ -206,7 +206,7 @@ select tests.assert(
   and jsonb_array_length(:'cp'::jsonb -> 'badges') >= 13
   and jsonb_array_length(:'cp'::jsonb -> 'slabs') = 7 and (:'cp'::jsonb #>> '{summary,black_labels}')::integer = 0
   and (:'cp'::jsonb #>> '{slabs,0,grade}')::double precision = 9,
-  'get_nexamon_bonuses(): totals, the 54 bonus cards, collections with what is missing; profile: badges and slabs');
+  'get_nexamon_bonuses(): totals, the 80 bonus cards, collections with what is missing; profile: badges and slabs');
 
 -- =============================================================================
 -- F. Black Label hype

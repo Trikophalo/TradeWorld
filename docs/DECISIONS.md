@@ -3763,3 +3763,11 @@ auf einmal einstellen, die KI-Angebote wachsen nicht endlos, Bulk lässt sich an
 **Konsequenzen:** Die Datenbank kennt beliebige Seltenheitsnamen (Prüfung nur auf die Länge). Neue Fehler NX270
 (`nexamon_one_of_one_taken`), NX271 (`nexamon_ai_excluded`), NX272 (`nexamon_not_enough`). Migrationen 6500–6540.
 Bulk bringt jetzt 65 % statt 50 % des Werts.
+
+**Nachtrag (Note 10 nach Beliebtheit):** Ein Slab mit 10 ist nicht mehr bei jeder Karte das 4-Fache wert, sondern
+je nach Beliebtheit der Karte (`popularityBps`, Seltenheit und Population) das 2,5- bis 4-Fache
+(`grading.tenFactorRange`), eine 9,5 das 1,8- bis 2,6-Fache (`grading.nineHalfFactorRange`), linear und abgerundet.
+Beide Spannen liegen über der Note darunter, darum gilt 8 < 8,5 < 9 < 9,5 < 10 für jede Karte. Das Black Label bleibt
+beim eigenen Faktor (mit Hype). Server: `nexamon_grade_factor_bps(grade, card)`, genutzt von
+`nexamon_copy_value_cents(..., card)` und vom Verkaufsfaktor; `grading.valueBps` bleibt der Rückfall ohne Karte.
+Kartenseite, Grading-Blatt und Desk zeigen die Faktoren der Karte.

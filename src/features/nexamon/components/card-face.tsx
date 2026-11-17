@@ -127,7 +127,7 @@ export const NexamonCardFace = memo(function NexamonCardFace({
   const attackFit = fitText(card.attack.name, FACE_TEXT.attack, attackRoom);
 
   const from = card.evolvesFrom ? (evolvesFromName ?? nexamonCard(card.evolvesFrom)?.name ?? null) : null;
-  const stage = event ? t("event") : t(`stage.${card.stage}`);
+  const stage = event ? type : t(`stage.${card.stage}`);
   const stageLine = layout.strip || !from ? stage : `${stage} · ${t("evolvesShort", { name: from })}`;
   const stageFit = fitText(stageLine.toUpperCase(), FACE_TEXT.stage, layout.stage?.w ?? 0);
   const stripLine = event
