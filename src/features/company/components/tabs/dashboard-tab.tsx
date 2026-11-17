@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
@@ -11,50 +10,54 @@ import { BALANCE } from "@/config/balance";
 import type { ListedCompany } from "@/features/game/listed-types";
 import { useServerClock } from "@/features/game/server-clock";
 import { engine } from "@/features/game/store";
-import type { CompanyAutopilot, MyCompany } from "@/features/game/types";
+import type { MyCompany } from "@/features/game/types";
 import { Reveal } from "@/features/progression/components/reveal";
-import type { CompanyHealth } from "@/lib/sim/company-health";
+import type { CompanyHealth, HealthFactorKey } from "@/lib/sim/company-health";
 import { formatBps, formatMoney, formatPrice } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import { MiraChat, type MiraOpen } from "../../assistant/mira-chat";
 import { useCompanyEvent } from "../../hooks";
 import { HoursChart, ZoneGauge, ZoneHistoryChart } from "../../listed/charts";
 import { money, Panel, ServerCountdown, signed, Stat } from "../../listed/shared";
-import { companyTodos, type CompanyTodo } from "../../listed/view";
-import { companyPulse } from "../../pulse";
 import { hourlyCloseOverdue } from "../../routes";
 import type { CompanyTarget } from "../../tabs";
-import { useCompanyTasks } from "../../tasks/task-board";
+import { useCompanyAutopilot } from "../autopilot-card";
 import { COMPANY_MOVES_KEY, moveText } from "../company-moves";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
+import { ChartLink, DashLink, FirmSection, SectionNav, useWhere, type NavItem } from "../firm-layout";
 import { HealthPanel, type AskMira } from "../health-panel";
-import { CloseErrorNote, StrengthsCard } from "../strengths-card";
-import { FirmSection, SectionNav, type NavItem } from "../firm-layout";
-import { ReputationCard } from "../reputation-card";
-import { OfficeScene } from "../office-scene";
-import { StaffValueCard } from "../staff-value-card";
-import { InterviewCard } from "../interview-card";
-import { PitchCard } from "../pitch-card";
-import { CompanyNewsCard, SituationCard } from "../situation";
-import { AutopilotCard, useCompanyAutopilot } from "../autopilot-card";
 import { PulseCard } from "../pulse-card";
+import { reputationOf, ReputationCard } from "../reputation-card";
+import { CloseErrorNote } from "../strengths-card";
 
 type Go = (target: CompanyTarget) => void;
 
+/** Where each factor of "Wo es fehlt" is influenced (ADR-187). */
+const FACTOR_TARGET: Record<HealthFactorKey, CompanyTarget> = {
+  awareness: { tab: "controlling", section: "marketing" },
+  capacity: { tab: "controlling", section: "business" },
+  quality: { tab: "controlling", section: "expansion" },
+  image: { tab: "staff", section: "situation" },
+  price: { tab: "controlling", section: "profit" },
+  team: { tab: "staff", section: "staff-team" },
+  cash: { tab: "controlling", section: "money" },
+  momentum: { tab: "staff", section: "staff-tasks" },
+};
+
 /**
- * The first tab of the own company (ADR-167; flat since ADR-183): what is due, then six sections without folding,
- * each with a header that says what it is for and a sticky jump bar: numbers, helpers (autopilot and Mira),
- * diagnosis (strengths and "Wo es fehlt"), reputation and mood, the team's value and the office, the situation.
+ * The first tab of the own company: numbers and charts only (ADR-187). Every number and every chart leads to where
+ * it is influenced ("Beeinflussen in Controlling → Marketing"); the levers, Mira, the autopilot and the to-do list live
+ * on the other tabs. Three sections with a jump bar: the numbers (with what runs against a clock and what is due),
+ * the charts, and strengths and weaknesses in one view.
  */
 export function DashboardTab({
   company,
   listed,
   listedPending,
   health,
-  miraHealth,
   onAsk,
-  onMira,
+  todoCount,
+  urgentCount,
   go,
 }: {
   company: MyCompany;
@@ -62,109 +65,85 @@ export function DashboardTab({
   /** The company is listed, its listed state is still loading. */
   listedPending: boolean;
   health: CompanyHealth;
-  miraHealth: Parameters<typeof MiraChat>[0]["health"];
   onAsk: AskMira;
-  onMira: MiraOpen;
+  /** Open items of the to-do center (Mitarbeiter tab) and how many of them are urgent. */
+  todoCount: number;
+  urgentCount: number;
   go: Go;
 }) {
   const th = useTranslations("hq.dash");
+  const tn = useTranslations("hq.dashNew");
+  const where = useWhere();
   const late = hourlyCloseOverdue(company, useServerClock());
   const autopilot = useCompanyAutopilot();
   const nav: NavItem[] = [
-    { id: "numbers", label: th("numbers.nav"), icon: UI_ICONS.portfolio },
-    { id: "assist", label: th("assist.nav"), icon: UI_ICONS.robot },
-    { id: "diagnosis", label: th("diagnosis.nav"), icon: UI_ICONS.star },
-    { id: "reputation-mood", label: th("reputation.nav"), icon: UI_ICONS.heart },
-    { id: "team-value", label: th("team.nav"), icon: UI_ICONS.profile },
-    { id: "situation", label: th("situation.nav"), icon: UI_ICONS.news },
+    { id: "numbers", label: tn("numbers.nav"), icon: UI_ICONS.portfolio },
+    { id: "charts", label: tn("charts.nav"), icon: UI_ICONS.markets },
+    { id: "diagnosis", label: tn("diagnosis.nav"), icon: UI_ICONS.star },
   ];
+  const link = (target: CompanyTarget) => ({ hint: where(target), onGo: () => go(target) });
+  const showMood = Boolean(listed || listedPending);
   return (
     <div className="space-y-6" data-testid="company-dashboard">
       <CloseErrorNote company={company} />
       <CloseWarningsNote company={company} />
-      <TodoStrip company={company} listed={listed} go={go} autopilot={autopilot.data ?? null} />
       <SectionNav items={nav} label={th("navLabel")} testId="dashboard-nav" />
 
-      <FirmSection id="numbers" icon={UI_ICONS.portfolio} title={th("numbers.title")} description={th("numbers.text")}>
-        <NumbersCard company={company} listed={listed} listedPending={listedPending} />
-        <PulseCard lastHour={autopilot.data?.lastHour} />
-        <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5">
+      <FirmSection id="numbers" icon={UI_ICONS.portfolio} title={tn("numbers.title")} description={tn("numbers.text")}>
+        <KpiGrid
+          company={company}
+          listed={listed}
+          listedPending={listedPending}
+          todoCount={todoCount}
+          urgentCount={urgentCount}
+          go={go}
+        />
+        <TimerChips company={company} listed={listed} go={go} />
+      </FirmSection>
+
+      <FirmSection
+        id="charts"
+        icon={UI_ICONS.markets}
+        title={tn("charts.title")}
+        description={tn("charts.text")}
+        columns={2}
+      >
+        <ChartLink testId="chart-trend" {...link({ tab: "controlling", section: "profit" })}>
+          <TrendCard company={company} />
+        </ChartLink>
+        <ChartLink testId="chart-pulse" {...link({ tab: "controlling", section: "business" })}>
+          <PulseCard lastHour={autopilot.data?.lastHour} />
+        </ChartLink>
+        <ChartLink testId="chart-reputation" {...link({ tab: "controlling", section: "moves" })}>
+          <ReputationCard company={company} listed={listed} />
+        </ChartLink>
+        {showMood && (
+          <ChartLink testId="chart-mood" {...link({ tab: "staff", section: "staff-mood", target: "satisfaction" })}>
+            {listed ? <MoodCard listed={listed} go={go} /> : <Skeleton className="h-64 w-full rounded-lg" />}
+          </ChartLink>
+        )}
+        <ChartLink testId="chart-quarter" {...link({ tab: "controlling", section: "money" })}>
           <div id="quarter" className="scroll-mt-32">
             <QuarterReceipt company={company} />
           </div>
+        </ChartLink>
+        <ChartLink testId="chart-history" {...link({ tab: "controlling", section: "profit" })}>
           <div id="history" className="scroll-mt-32">
             <HistoryCard company={company} />
           </div>
-        </div>
+        </ChartLink>
       </FirmSection>
 
-      <FirmSection
-        id="assist"
-        icon={UI_ICONS.robot}
-        title={th("assist.title")}
-        description={th("assist.text")}
-        columns={2}
-      >
-        <div id="autopilot" className="scroll-mt-32">
-          <AutopilotCard />
-        </div>
-        <div id="mira" className="scroll-mt-32">
-          <MiraChat applications={company.pendingApplications} health={miraHealth} company={company} onOpen={onMira} />
-        </div>
-      </FirmSection>
-
-      <FirmSection id="diagnosis" icon={UI_ICONS.star} title={th("diagnosis.title")} description={th("diagnosis.text")}>
-        {/* The strengths with their reward: what the company is good at, at a glance (ADR-176). */}
-        <div id="strengths" className="scroll-mt-32">
-          <StrengthsCard company={company} />
-        </div>
+      <FirmSection id="diagnosis" icon={UI_ICONS.star} title={tn("diagnosis.title")} description={tn("diagnosis.text")}>
+        {/* One view for "Wo es fehlt" (now) and the strengths (long-term) since ADR-187: each topic once. */}
         <div id="health" className="scroll-mt-32">
-          <HealthPanel health={health} onAsk={onAsk} late={late} />
-        </div>
-      </FirmSection>
-
-      <FirmSection
-        id="reputation-mood"
-        icon={UI_ICONS.heart}
-        title={th("reputation.title")}
-        description={th(listed || listedPending ? "reputation.textListed" : "reputation.text")}
-        columns={listed || listedPending ? 2 : 1}
-      >
-        <ReputationCard company={company} listed={listed} />
-        {listedPending && <Skeleton className="h-64 w-full rounded-lg" />}
-        {listed && <MoodCard listed={listed} go={go} />}
-      </FirmSection>
-
-      <FirmSection
-        id="team-value"
-        icon={UI_ICONS.profile}
-        title={th("team.title")}
-        description={th("team.text")}
-        columns={2}
-      >
-        <StaffValueCard company={company} id="staff-value" />
-        <div className="space-y-4">
-          <TimersCard company={company} listed={listed} go={go} />
-          <OfficeScene company={company} onTeam={() => go({ tab: "staff" })} />
-        </div>
-      </FirmSection>
-
-      <FirmSection
-        id="situation"
-        icon={UI_ICONS.news}
-        title={th("situation.title")}
-        description={th("situation.text")}
-        columns={2}
-      >
-        <div className="space-y-4">
-          <SituationCard />
-          <Reveal feature="companyInterview">
-            <InterviewCard />
-          </Reveal>
-        </div>
-        <div className="space-y-4">
-          <PitchCard kind="event" />
-          <CompanyNewsCard />
+          <HealthPanel
+            health={health}
+            onAsk={onAsk}
+            late={late}
+            strengths={company.strengths}
+            goTo={{ hint: (f) => where(FACTOR_TARGET[f]), go: (f) => go(FACTOR_TARGET[f]) }}
+          />
         </div>
       </FirmSection>
 
@@ -203,204 +182,47 @@ function CloseWarningsNote({ company }: { company: MyCompany }) {
   );
 }
 
-// ------------------------------------------------------------------ what is due
+// ------------------------------------------------------------------ numbers
 
-const TONE = {
-  urgent: "border-loss/50 bg-loss-soft text-loss",
-  warn: "border-warn/50 bg-warn-soft text-warn",
-  normal: "border-accent/40 bg-accent-soft text-accent",
-} as const;
+const pct = (bps: number) => formatBps(bps).replace("+", "");
 
-interface TodoItem {
-  key: string;
-  tone: keyof typeof TONE;
-  label: string;
-  deadline?: string;
-  target: CompanyTarget;
-}
-
-/** Everything that waits for the founder, as one row of chips with direct links. */
-function TodoStrip({
-  company,
-  listed,
+/** One number as a tile that leads to where it is influenced. */
+function KpiTile({
+  target,
+  testId,
   go,
-  autopilot,
-}: {
-  company: MyCompany;
-  listed: ListedCompany | null;
-  go: Go;
-  autopilot: CompanyAutopilot | null;
-}) {
-  const t = useTranslations("hq.todo");
-  const now = useServerClock();
-  const tasks = useCompanyTasks();
-  const event = useCompanyEvent();
-  const openTasks = tasks.data?.tasks.filter((x) => x.status === "open").length ?? 0;
-  const items: TodoItem[] = [];
-
-  const listedLabel = (todo: CompanyTodo): string => {
-    switch (todo.key) {
-      case "books":
-        return t(todo.tone === "normal" ? "books" : "booksLate");
-      case "tax":
-        return t(todo.tone === "urgent" ? "taxLate" : "tax", { amount: money(todo.amountCents ?? 0) });
-      case "board":
-        return t("board", { count: todo.count ?? 0 });
-      case "mood":
-        return t(todo.tone === "urgent" ? "moodRed" : "moodYellow");
-      case "paused":
-        return t("paused", { count: todo.count ?? 0 });
-      case "research":
-        return t("research");
-    }
-  };
-  const SECTION_TARGET: Record<string, CompanyTarget> = {
-    books: { tab: "books", target: "books-duty" },
-    taxes: { tab: "books", target: "taxes" },
-    board: { tab: "board" },
-    satisfaction: { tab: "staff", target: "satisfaction" },
-    growth: { tab: "controlling", section: "growth" },
-    research: { tab: "controlling", section: "research" },
-  };
-  if (listed && now !== null) {
-    for (const todo of companyTodos(listed, now)) {
-      items.push({
-        key: todo.key,
-        tone: todo.tone,
-        label: listedLabel(todo),
-        deadline: todo.deadline,
-        target: SECTION_TARGET[todo.section] ?? { tab: "dashboard" },
-      });
-    }
-  }
-  const e = event.data?.canAct ? event.data.event : null;
-  if (e && e.status === "open") {
-    items.push({
-      key: "event",
-      tone: e.polarity === "crisis" ? "urgent" : "normal",
-      label: t(e.polarity === "crisis" ? "crisis" : "chance"),
-      deadline: e.deadlineAt,
-      target: { tab: "dashboard", section: "situation" },
-    });
-  }
-  if (company.distress) {
-    items.push({
-      key: "distress",
-      tone: "urgent",
-      label: t("distress", { amount: money(company.unpaidCents) }),
-      target: { tab: "controlling", section: "money" },
-    });
-  }
-  if (company.pendingApplications > 0) {
-    items.push({
-      key: "applications",
-      tone: "normal",
-      label: t("applications", { count: company.pendingApplications }),
-      target: { tab: "staff", target: "applications" },
-    });
-  }
-  if (openTasks > 0) {
-    items.push({
-      key: "tasks",
-      tone: "normal",
-      label: t("tasks", { count: openTasks }),
-      target: { tab: "staff", target: "tasks" },
-    });
-  }
-  // ADR-180: what to do next, from the last hour
-  const pulse = companyPulse(autopilot?.lastHour ?? null);
-  if (company.marketingCentsPerQuarter <= 0) {
-    items.push({
-      key: "marketing",
-      tone: "warn",
-      label: t("marketing"),
-      target: { tab: "controlling", section: "marketing" },
-    });
-  }
-  if (pulse.ai === "idle" || pulse.ai === "partly") {
-    items.push({
-      key: "aiIdle",
-      tone: pulse.ai === "idle" ? "warn" : "normal",
-      label: t("aiIdle", { count: pulse.idleAi }),
-      target: { tab: "controlling", section: "marketing" },
-    });
-  }
-  if (pulse.soldOut) {
-    items.push({ key: "soldOut", tone: "normal", label: t("soldOut"), target: { tab: "staff" } });
-  }
-  if (autopilot && !autopilot.on && autopilot.canToggle) {
-    items.push({
-      key: "autopilot",
-      tone: "normal",
-      label: t("autopilot"),
-      target: { tab: "dashboard", target: "autopilot" },
-    });
-  }
-  if (company.listing?.status === "subscription") {
-    items.push({
-      key: "subscription",
-      tone: "normal",
-      label: t("subscription"),
-      target: { tab: "controlling", section: "capital" },
-    });
-  } else if (!company.listing && company.canGoPublic) {
-    items.push({ key: "ipo", tone: "normal", label: t("ipo"), target: { tab: "controlling", section: "capital" } });
-  }
-
+  ...stat
+}: Omit<Parameters<typeof Stat>[0], "testId"> & { target: CompanyTarget; testId: string; go: Go }) {
+  const where = useWhere();
   return (
-    <section
-      id="todo"
-      aria-label={t("title")}
-      className="scroll-mt-24 rounded-lg border border-line-1 bg-surface-1 px-3 py-3"
-      data-testid="company-todo"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="mr-1 label-pixel text-fg-2">{t("title")}</h3>
-        {items.length === 0 && (
-          <p className="text-sm text-gain" data-testid="todo-none">
-            {t("none")}
-          </p>
-        )}
-        {items.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => {
-              haptic("tap");
-              go(item.target);
-            }}
-            data-testid={`todo-${item.key}`}
-            data-tone={item.tone}
-            className={cn(
-              "inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-sm font-medium focus-ring transition duration-fast hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97]",
-              TONE[item.tone],
-            )}
-          >
-            <span className="min-w-0 text-pretty">{item.label}</span>
-            {item.deadline && <ServerCountdown at={item.deadline} className="shrink-0 text-xs opacity-90" />}
-            <span aria-hidden className="shrink-0 font-pixel text-2xs">
-              ›
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
+    <DashLink hint={where(target)} onGo={() => go(target)} testId={`tile-${testId}`}>
+      <Stat
+        {...stat}
+        testId={`stat-${testId}`}
+        className="h-full transition-colors duration-fast group-hover:bg-surface-3"
+      />
+    </DashLink>
   );
 }
 
-// ------------------------------------------------------------------ numbers
-
-/** Cash, the last hour and the trend of the last hours. */
-function NumbersCard({
+/** The key numbers as tiles; each one leads to where it is influenced. */
+function KpiGrid({
   company,
   listed,
   listedPending,
+  todoCount,
+  urgentCount,
+  go,
 }: {
   company: MyCompany;
   listed: ListedCompany | null;
   listedPending: boolean;
+  todoCount: number;
+  urgentCount: number;
+  go: Go;
 }) {
   const t = useTranslations("hq.dashboard");
+  const tn = useTranslations("hq.dashNew");
   const live = company.live;
   const hours = company.hours.slice(-24);
   const last = hours[hours.length - 1];
@@ -409,126 +231,161 @@ function NumbersCard({
   const delta = (now: number, before: number | undefined) =>
     before === undefined ? undefined : t("vsPrevious", { amount: signed(now - before) });
   const listing = company.listing?.status === "listed" ? company.listing : null;
+  const reputation = reputationOf(company, listed);
   return (
-    <Panel
-      title={t("numbersTitle")}
-      aside={
-        last ? (
-          <span className="nums text-xs text-fg-3">
-            {t("lastHourAt", { hour: new Date(last.hourStart).getHours() })}
-          </span>
-        ) : undefined
-      }
-      testId="dashboard-numbers"
+    <div
+      className="grid grid-cols-2 gap-x-2 gap-y-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+      data-testid="dashboard-numbers"
     >
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat
-          label={t("cash")}
-          info={t("info.cash")}
-          testId="stat-cash"
-          hint={
-            listed
-              ? listed.reservedCents > 0
-                ? t("cashFree", { free: money(listed.freeCashCents), reserved: money(listed.reservedCents) })
-                : t("cashAllFree")
-              : company.unpaidCents > 0
-                ? t("unpaid", { amount: money(company.unpaidCents) })
-                : undefined
-          }
-        >
-          {live ? (
-            <LiveMoney cents={company.cashCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
-          ) : (
-            <ShortMoney cents={company.cashCents} />
-          )}
-        </Stat>
-        <Stat
-          label={t("revenueHour")}
-          info={t("info.revenue")}
-          testId="stat-revenue"
-          hint={last && delta(last.revenueCents, prev?.revenueCents)}
-        >
-          {last ? <ShortMoney cents={last.revenueCents} /> : "–"}
-        </Stat>
-        <Stat
-          label={t("costsHour")}
-          info={t("info.costs")}
-          testId="stat-costs"
-          hint={last && delta(costs(last), prev ? costs(prev) : undefined)}
-        >
-          {last ? <ShortMoney cents={costs(last)} /> : "–"}
-        </Stat>
-        <Stat
-          label={t("profitHour")}
-          info={t("info.profit")}
-          testId="stat-profit"
-          tone={last ? (last.profitCents >= 0 ? "gain" : "loss") : undefined}
-          hint={last && delta(last.profitCents, prev?.profitCents)}
-        >
-          {last ? <ShortMoney cents={last.profitCents} /> : "–"}
-        </Stat>
-        {listing && (
-          <>
-            <Stat
-              label={t("sharePrice")}
-              info={t("info.share")}
-              testId="stat-share"
-              hint={
-                listing.ticker ? (
-                  <Link href={`/markets/${listing.ticker}`} className="text-accent focus-ring hover:underline">
-                    {t("toStock", { ticker: listing.ticker })}
-                  </Link>
-                ) : undefined
-              }
-            >
-              {listing.lastPriceE4 !== null ? formatPrice(listing.lastPriceE4) : "–"}
-            </Stat>
-            {listedPending || !listed ? (
-              <>
-                <Skeleton className="h-[68px] rounded-md" />
-                <Skeleton className="h-[68px] rounded-md" />
-                <Skeleton className="h-[68px] rounded-md" />
-              </>
-            ) : (
-              <>
-                <Stat
-                  label={t("reputation")}
-                  testId="stat-reputation"
-                  info={t("info.reputation")}
-                  tone={listed.reputation.value >= 50 ? "gain" : listed.reputation.value < 35 ? "loss" : "warn"}
-                  hint={t("reputationDemand", {
-                    percent: formatBps(Math.round((listed.reputation.demandFactor - 1) * 10_000)),
-                  })}
-                >
-                  {Math.round(listed.reputation.value)}
-                  <span className="text-sm font-normal text-fg-3"> / 100</span>
-                </Stat>
-                <Stat
-                  label={t("upkeep")}
-                  info={t("info.upkeep")}
-                  testId="stat-upkeep"
-                  hint={t("upkeepRef", { amount: money(listed.refRevenueCents) })}
-                >
-                  {t("perHour", { amount: money(listed.upkeepPerHourCents) })}
-                </Stat>
-                <Stat
-                  label={t("taxDue")}
-                  info={t("info.tax")}
-                  testId="stat-tax"
-                  tone={listed.taxes.dueCents > 0 ? "warn" : undefined}
-                  hint={t("taxRate", { percent: formatBps(listed.taxes.rateBps).replace("+", "") })}
-                >
-                  {money(listed.taxes.dueCents)}
-                </Stat>
-              </>
-            )}
-          </>
+      <KpiTile
+        go={go}
+        label={t("cash")}
+        testId="cash"
+        target={{ tab: "controlling", section: "money" }}
+        hint={
+          listed
+            ? listed.reservedCents > 0
+              ? t("cashFree", { free: money(listed.freeCashCents), reserved: money(listed.reservedCents) })
+              : t("cashAllFree")
+            : company.unpaidCents > 0
+              ? t("unpaid", { amount: money(company.unpaidCents) })
+              : undefined
+        }
+      >
+        {live ? (
+          <LiveMoney cents={company.cashCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
+        ) : (
+          <ShortMoney cents={company.cashCents} />
         )}
-      </div>
-      <div>
-        <p className="mb-2 text-sm font-medium text-fg-1">{t("trendTitle", { count: hours.length })}</p>
-        <HoursChart hours={hours} />
-      </div>
+      </KpiTile>
+      <KpiTile
+        go={go}
+        label={t("revenueHour")}
+        testId="revenue"
+        target={{ tab: "controlling", section: "profit" }}
+        hint={last && delta(last.revenueCents, prev?.revenueCents)}
+      >
+        {last ? <ShortMoney cents={last.revenueCents} /> : "–"}
+      </KpiTile>
+      <KpiTile
+        go={go}
+        label={t("costsHour")}
+        testId="costs"
+        target={{ tab: "controlling", section: "business" }}
+        hint={last && delta(costs(last), prev ? costs(prev) : undefined)}
+      >
+        {last ? <ShortMoney cents={costs(last)} /> : "–"}
+      </KpiTile>
+      <KpiTile
+        go={go}
+        label={t("profitHour")}
+        testId="profit"
+        target={{ tab: "controlling", section: "profit" }}
+        tone={last ? (last.profitCents >= 0 ? "gain" : "loss") : undefined}
+        hint={last && delta(last.profitCents, prev?.profitCents)}
+      >
+        {last ? <ShortMoney cents={last.profitCents} /> : "–"}
+      </KpiTile>
+      <KpiTile
+        go={go}
+        label={tn("awareness")}
+        testId="awareness"
+        target={{ tab: "controlling", section: "marketing" }}
+        hint={tn("marketingHint", { amount: money(company.marketingCentsPerQuarter) })}
+      >
+        {pct(company.awarenessBps)}
+      </KpiTile>
+      <KpiTile
+        go={go}
+        label={tn("quality")}
+        testId="quality"
+        target={{ tab: "controlling", section: "expansion" }}
+        tone={company.qualityBps >= 5_000 ? "gain" : undefined}
+      >
+        {pct(company.qualityBps)}
+      </KpiTile>
+      {reputation && (
+        <KpiTile
+          go={go}
+          label={t("reputation")}
+          testId="reputation"
+          target={{ tab: "controlling", section: "moves" }}
+          tone={reputation.value >= 50 ? "gain" : reputation.value < 35 ? "loss" : "warn"}
+          hint={t("reputationDemand", { percent: formatBps(Math.round((reputation.demandFactor - 1) * 10_000)) })}
+        >
+          {Math.round(reputation.value)}
+          <span className="text-sm font-normal text-fg-3"> / 100</span>
+        </KpiTile>
+      )}
+      {listed && (
+        <KpiTile
+          go={go}
+          label={t("satisfaction")}
+          testId="satisfaction"
+          target={{ tab: "staff", section: "staff-mood", target: "satisfaction" }}
+          tone={listed.satisfaction.zone === "green" ? "gain" : listed.satisfaction.zone === "red" ? "loss" : "warn"}
+        >
+          {Math.round(listed.satisfaction.value)}
+          <span className="text-sm font-normal text-fg-3"> / 100</span>
+        </KpiTile>
+      )}
+      {listing && (
+        <KpiTile
+          go={go}
+          label={t("sharePrice")}
+          testId="share"
+          target={{ tab: "controlling", section: "capital" }}
+          hint={listing.ticker ?? undefined}
+        >
+          {listing.lastPriceE4 !== null ? formatPrice(listing.lastPriceE4) : "–"}
+        </KpiTile>
+      )}
+      {listing && listedPending && <Skeleton className="h-[68px] rounded-md" />}
+      {listed && (
+        <>
+          <KpiTile
+            go={go}
+            label={t("upkeep")}
+            testId="upkeep"
+            target={{ tab: "controlling", section: "growth" }}
+            hint={t("upkeepRef", { amount: money(listed.refRevenueCents) })}
+          >
+            {t("perHour", { amount: money(listed.upkeepPerHourCents) })}
+          </KpiTile>
+          <KpiTile
+            go={go}
+            label={t("taxDue")}
+            testId="tax"
+            target={{ tab: "books", target: "taxes" }}
+            tone={listed.taxes.dueCents > 0 ? "warn" : undefined}
+            hint={t("taxRate", { percent: pct(listed.taxes.rateBps) })}
+          >
+            {money(listed.taxes.dueCents)}
+          </KpiTile>
+        </>
+      )}
+      <KpiTile
+        go={go}
+        label={tn("todo")}
+        testId="todo"
+        target={{ tab: "staff", section: "todo" }}
+        tone={urgentCount > 0 ? "loss" : todoCount > 0 ? "warn" : "gain"}
+        hint={urgentCount > 0 ? tn("urgent", { count: urgentCount }) : undefined}
+      >
+        {todoCount}
+      </KpiTile>
+    </div>
+  );
+}
+
+/** Revenue and profit of the last 24 hours as a chart, today in one line. */
+function TrendCard({ company }: { company: MyCompany }) {
+  const t = useTranslations("hq.dashboard");
+  const hours = company.hours.slice(-24);
+  const live = company.live;
+  return (
+    <Panel title={t("trendTitle", { count: hours.length })} info={t("info.profit")} testId="dashboard-trend">
+      <HoursChart hours={hours} />
       {live && (
         <p className="nums text-xs text-fg-3" data-testid="dashboard-today">
           {t("today", {
@@ -538,6 +395,105 @@ function NumbersCard({
         </p>
       )}
     </Panel>
+  );
+}
+
+// ------------------------------------------------------------------ timers
+
+/**
+ * Everything that runs against a clock as small status chips: campaign, business moves, the current event, research
+ * and building. Each chip leads to its place.
+ */
+function TimerChips({ company, listed, go }: { company: MyCompany; listed: ListedCompany | null; go: Go }) {
+  const t = useTranslations("hq.timers");
+  const tc = useTranslations("campaigns");
+  const tm = useTranslations("companyMoves");
+  const ti = useTranslations("listed.items");
+  const where = useWhere();
+  const now = useServerClock();
+  const moves = useQuery({
+    queryKey: COMPANY_MOVES_KEY,
+    queryFn: () => engine.companyMoves(),
+    refetchInterval: 20_000,
+  });
+  const event = useCompanyEvent();
+  const rows: { key: string; label: string; at: string; target: CompanyTarget }[] = [];
+  const running = (at: string | null | undefined): at is string =>
+    typeof at === "string" && now !== null && Date.parse(at) > now;
+
+  const c = company.campaign;
+  if (c && running(c.endsAt)) {
+    rows.push({
+      key: "campaign",
+      label: tc("stripTitle", { kind: tc(`kinds.${c.kind}.name`) }),
+      at: c.endsAt,
+      target: { tab: "controlling", section: "marketing", target: "campaign" },
+    });
+  }
+  for (const m of moves.data?.running ?? []) {
+    if (!running(m.endsAt)) continue;
+    rows.push({
+      key: `move-${m.id}`,
+      label: t("move", { name: moveText(tm, m.key, "name") }),
+      at: m.endsAt,
+      target: { tab: "controlling", section: "moves" },
+    });
+  }
+  const e = event.data?.event;
+  const step = e?.steps.find((s) => s.status === "running");
+  if (step && running(step.endsAt)) {
+    rows.push({
+      key: "event-step",
+      label: t("eventStep"),
+      at: step.endsAt,
+      target: { tab: "staff", section: "situation" },
+    });
+  } else if (e && e.status === "open" && running(e.deadlineAt)) {
+    rows.push({
+      key: "event",
+      label: t("eventDeadline"),
+      at: e.deadlineAt,
+      target: { tab: "staff", section: "situation" },
+    });
+  }
+  for (const item of listed?.items ?? []) {
+    if (!running(item.readyAt)) continue;
+    const nameKey = `${item.key}.name` as Parameters<typeof ti>[0];
+    rows.push({
+      key: `item-${item.key}`,
+      label: t(item.kind === "research" ? "research" : "building", { name: ti.has(nameKey) ? ti(nameKey) : item.key }),
+      at: item.readyAt,
+      target: { tab: "controlling", section: item.kind === "research" ? "research" : "growth" },
+    });
+  }
+  rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" data-testid="dashboard-timers" aria-label={t("title")}>
+      <span className="mr-1 label-pixel text-fg-3">{t("title")}</span>
+      {rows.length === 0 ? (
+        <span className="text-xs text-fg-3" data-testid="timers-none">
+          {t("noneShort")}
+        </span>
+      ) : (
+        rows.map((row) => (
+          <button
+            key={row.key}
+            type="button"
+            title={where(row.target)}
+            onClick={() => {
+              haptic("tap");
+              go(row.target);
+            }}
+            data-testid={`timer-${row.key}`}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-line-1 bg-surface-2 px-2.5 py-1 text-xs focus-ring transition duration-fast hover:border-accent hover:bg-surface-3 active:scale-95"
+          >
+            <span className="min-w-0 truncate text-fg-1">{row.label}</span>
+            <ServerCountdown at={row.at} className="shrink-0 font-semibold text-accent" />
+          </button>
+        ))
+      )}
+    </div>
   );
 }
 
@@ -629,102 +585,6 @@ function MoodCard({ listed, go }: { listed: ListedCompany; go: Go }) {
           { key: "reputation", label: t("reputation"), pick: (p) => p.reputation, tone: "info" },
         ]}
       />
-    </Panel>
-  );
-}
-
-// ------------------------------------------------------------------ timers
-
-/** Everything that is running against a clock: campaign, business moves, the current event, research and building. */
-function TimersCard({ company, listed, go }: { company: MyCompany; listed: ListedCompany | null; go: Go }) {
-  const t = useTranslations("hq.timers");
-  const tc = useTranslations("campaigns");
-  const tm = useTranslations("companyMoves");
-  const ti = useTranslations("listed.items");
-  const now = useServerClock();
-  const moves = useQuery({
-    queryKey: COMPANY_MOVES_KEY,
-    queryFn: () => engine.companyMoves(),
-    refetchInterval: 20_000,
-  });
-  const event = useCompanyEvent();
-  const rows: { key: string; label: string; at: string; target: CompanyTarget }[] = [];
-  const running = (at: string | null | undefined): at is string =>
-    typeof at === "string" && now !== null && Date.parse(at) > now;
-
-  const c = company.campaign;
-  if (c && running(c.endsAt)) {
-    rows.push({
-      key: "campaign",
-      label: tc("stripTitle", { kind: tc(`kinds.${c.kind}.name`) }),
-      at: c.endsAt,
-      target: { tab: "controlling", section: "marketing", target: "campaign" },
-    });
-  }
-  for (const m of moves.data?.running ?? []) {
-    if (!running(m.endsAt)) continue;
-    rows.push({
-      key: `move-${m.id}`,
-      label: t("move", { name: moveText(tm, m.key, "name") }),
-      at: m.endsAt,
-      target: { tab: "controlling", section: "moves" },
-    });
-  }
-  const e = event.data?.event;
-  const step = e?.steps.find((s) => s.status === "running");
-  if (step && running(step.endsAt)) {
-    rows.push({
-      key: "event-step",
-      label: t("eventStep"),
-      at: step.endsAt,
-      target: { tab: "dashboard", section: "situation" },
-    });
-  } else if (e && e.status === "open" && running(e.deadlineAt)) {
-    rows.push({
-      key: "event",
-      label: t("eventDeadline"),
-      at: e.deadlineAt,
-      target: { tab: "dashboard", section: "situation" },
-    });
-  }
-  for (const item of listed?.items ?? []) {
-    if (!running(item.readyAt)) continue;
-    const nameKey = `${item.key}.name` as Parameters<typeof ti>[0];
-    rows.push({
-      key: `item-${item.key}`,
-      label: t(item.kind === "research" ? "research" : "building", { name: ti.has(nameKey) ? ti(nameKey) : item.key }),
-      at: item.readyAt,
-      target: { tab: "controlling", section: item.kind === "research" ? "research" : "growth" },
-    });
-  }
-  rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-
-  return (
-    <Panel title={t("title")} testId="dashboard-timers">
-      {rows.length === 0 ? (
-        <p className="text-sm text-pretty text-fg-3" data-testid="timers-none">
-          {t("none")}
-        </p>
-      ) : (
-        <ul className="space-y-1.5">
-          {rows.map((row) => (
-            <li key={row.key}>
-              <button
-                type="button"
-                onClick={() => {
-                  haptic("tap");
-                  go(row.target);
-                }}
-                data-testid={`timer-${row.key}`}
-                className="flex w-full items-center justify-between gap-3 rounded-md bg-surface-2 px-3 py-2 text-left text-sm focus-ring transition duration-fast hover:bg-surface-3 active:scale-[0.98]"
-              >
-                <span className="min-w-0 truncate text-fg-1">{row.label}</span>
-                <ServerCountdown at={row.at} className="shrink-0 font-semibold text-accent" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </Panel>
   );
 }

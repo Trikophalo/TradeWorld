@@ -1,7 +1,7 @@
 /*
  * The tabs of the own company page (ADR-167, UI): Dashboard, Controlling, Mitarbeiter, Buchhaltung, Geschäftsrat.
- * Pure: maps the old tabs and sections (Mira, overview, tasks, team, chat; ADR-071/138) and Mira's "open" actions
- * to the new places, and builds the links notifications and the dashboard use.
+ * Pure: maps the old tabs and sections (Mira, overview, tasks, team, chat; ADR-071/138; the ids before ADR-187) and
+ * Mira's "open" actions to the new places, and builds the links notifications and the dashboard use.
  */
 export const COMPANY_TABS = ["dashboard", "controlling", "staff", "books", "board"] as const;
 export type CompanyTab = (typeof COMPANY_TABS)[number];
@@ -11,81 +11,149 @@ export const LISTED_TABS: readonly CompanyTab[] = ["books", "board"];
 
 export interface CompanyTarget {
   tab: CompanyTab;
-  /** Section to scroll to (id without the `section-` prefix; nothing folds since ADR-183). */
+  /**
+   * Section to scroll to (id without the `section-` prefix). Since ADR-187 it may be a pane of a merged card: the
+   * card then switches to that pane first.
+   */
   section?: string;
   /** Element id to scroll to; defaults to the section. */
   target?: string;
+}
+
+/**
+ * The merged cards of the tabs (ADR-187): a card groups the sections that belong together and shows one of them at a
+ * time (segmented control). `panes` are the section ids inside, in order; a link to a pane opens the card on it.
+ */
+export const COMPANY_GROUPS = {
+  // Dashboard
+  numbers: { tab: "dashboard", panes: [] },
+  charts: { tab: "dashboard", panes: [] },
+  diagnosis: { tab: "dashboard", panes: [] },
+  // Controlling
+  "group-offer": { tab: "controlling", panes: ["profit", "business"] },
+  "group-marketing": { tab: "controlling", panes: ["marketing", "moves"] },
+  "group-money": { tab: "controlling", panes: ["money", "capital", "dividends"] },
+  "group-growth": { tab: "controlling", panes: ["expansion", "research", "growth"] },
+  "group-brand": { tab: "controlling", panes: [] },
+  // Mitarbeiter
+  todo: { tab: "staff", panes: [] },
+  "staff-tasks": { tab: "staff", panes: [] },
+  situation: { tab: "staff", panes: [] },
+  "group-team": { tab: "staff", panes: ["staff-team", "staff-mood", "staff-value"] },
+} as const satisfies Record<string, { tab: CompanyTab; panes: readonly string[] }>;
+export type CompanyGroup = keyof typeof COMPANY_GROUPS;
+
+/** The merged card a section belongs to (itself when it is a card), or null. */
+export function groupOf(section: string | null | undefined): CompanyGroup | null {
+  if (!section) return null;
+  if (section in COMPANY_GROUPS) return section as CompanyGroup;
+  for (const [id, g] of Object.entries(COMPANY_GROUPS)) {
+    if ((g.panes as readonly string[]).includes(section)) return id as CompanyGroup;
+  }
+  return null;
 }
 
 /** Old tab names (before the restructuring) and what they are now. */
 const TAB_ALIASES: Record<string, CompanyTarget> = {
   mira: { tab: "dashboard", target: "mira" },
   overview: { tab: "controlling" },
-  tasks: { tab: "staff", target: "tasks" },
-  team: { tab: "staff" },
+  tasks: { tab: "staff", section: "staff-tasks", target: "tasks" },
+  team: { tab: "staff", section: "staff-team" },
   chat: { tab: "staff", target: "chat" },
   accounting: { tab: "books" },
   taxes: { tab: "books", target: "taxes" },
 };
 
-/** Sections by name: the old overview sections, Mira's sections and the new ones. */
+/**
+ * Sections by name: the old overview sections, Mira's sections, the ids before ADR-187 and the new ones. `section` is
+ * the pane or card that holds the place (a merged card opens on that pane), `target` the element to scroll to.
+ */
 const SECTIONS = {
-  // Dashboard
-  mira: { tab: "dashboard", target: "mira" },
-  health: { tab: "dashboard", target: "health" },
-  details: { tab: "dashboard", target: "health" },
-  diagnosis: { tab: "dashboard", section: "diagnosis" },
-  autopilot: { tab: "dashboard", target: "autopilot" },
-  "staff-value": { tab: "dashboard", target: "staff-value" },
-  strengths: { tab: "dashboard", target: "strengths" },
-  todo: { tab: "dashboard", target: "todo" },
-  situation: { tab: "dashboard", section: "situation" },
-  history: { tab: "dashboard", target: "history" },
+  // Dashboard: numbers and charts only (ADR-187)
   numbers: { tab: "dashboard", section: "numbers" },
-  quarter: { tab: "dashboard", target: "quarter" },
-  reputation: { tab: "dashboard", target: "reputation" },
-  mood: { tab: "dashboard", target: "mood" },
-  timers: { tab: "dashboard", section: "team-value" },
-  // Controlling
+  timers: { tab: "dashboard", section: "numbers" },
+  charts: { tab: "dashboard", section: "charts" },
+  history: { tab: "dashboard", section: "charts", target: "history" },
+  quarter: { tab: "dashboard", section: "charts", target: "quarter" },
+  reputation: { tab: "dashboard", section: "charts", target: "reputation" },
+  "reputation-mood": { tab: "dashboard", section: "charts", target: "reputation" },
+  mood: { tab: "dashboard", section: "charts", target: "mood" },
+  diagnosis: { tab: "dashboard", section: "diagnosis" },
+  health: { tab: "dashboard", section: "diagnosis", target: "health" },
+  details: { tab: "dashboard", section: "diagnosis", target: "health" },
+  strengths: { tab: "dashboard", section: "diagnosis", target: "health" },
+  // Mira is a panel on every tab (ADR-187); the link opens it.
+  mira: { tab: "dashboard", target: "mira" },
+  assist: { tab: "dashboard", target: "mira" },
+  // Mitarbeiter: the to-do center, tasks, the situation, the team card and the chat
+  todo: { tab: "staff", section: "todo" },
+  autopilot: { tab: "staff", section: "todo", target: "autopilot" },
+  "staff-tasks": { tab: "staff", section: "staff-tasks" },
+  tasks: { tab: "staff", section: "staff-tasks", target: "tasks" },
+  situation: { tab: "staff", section: "situation" },
+  event: { tab: "staff", section: "situation" },
+  "group-team": { tab: "staff", section: "group-team" },
+  "staff-team": { tab: "staff", section: "staff-team" },
+  team: { tab: "staff", section: "staff-team" },
+  applications: { tab: "staff", section: "staff-team", target: "applications" },
+  training: { tab: "staff", section: "staff-team", target: "training" },
+  "staff-mood": { tab: "staff", section: "staff-mood" },
+  staff: { tab: "staff", section: "staff-mood", target: "satisfaction" },
+  satisfaction: { tab: "staff", section: "staff-mood", target: "satisfaction" },
+  benefits: { tab: "staff", section: "staff-mood", target: "benefits" },
+  "staff-value": { tab: "staff", section: "staff-value" },
+  "team-value": { tab: "staff", section: "staff-value" },
+  "staff-chat": { tab: "staff", target: "chat" },
+  chat: { tab: "staff", target: "chat" },
+  // Controlling: Angebot & Produktion
+  "group-offer": { tab: "controlling", section: "group-offer" },
+  "group-sell": { tab: "controlling", section: "group-offer" },
+  "group-run": { tab: "controlling", section: "group-offer" },
   profit: { tab: "controlling", section: "profit" },
   strategy: { tab: "controlling", section: "profit" },
   business: { tab: "controlling", section: "business" },
+  // Marketing
+  "group-marketing": { tab: "controlling", section: "group-marketing" },
   marketing: { tab: "controlling", section: "marketing" },
   campaign: { tab: "controlling", section: "marketing", target: "campaign" },
   boss: { tab: "controlling", section: "marketing", target: "company-controls" },
   "company-controls": { tab: "controlling", section: "marketing", target: "company-controls" },
   moves: { tab: "controlling", section: "moves" },
-  expansion: { tab: "controlling", section: "expansion" },
+  // Geld
+  "group-money": { tab: "controlling", section: "group-money" },
   money: { tab: "controlling", section: "money" },
   capital: { tab: "controlling", section: "capital" },
-  brand: { tab: "controlling", section: "brand" },
+  dividends: { tab: "controlling", section: "dividends" },
+  // Wachstum
+  "group-growth": { tab: "controlling", section: "group-growth" },
+  "group-listed": { tab: "controlling", section: "research" },
+  expansion: { tab: "controlling", section: "expansion" },
   research: { tab: "controlling", section: "research" },
   growth: { tab: "controlling", section: "growth" },
-  dividends: { tab: "controlling", section: "dividends" },
-  close: { tab: "controlling", section: "company" },
-  // Mitarbeiter
-  team: { tab: "staff" },
-  staff: { tab: "staff", target: "satisfaction" },
-  satisfaction: { tab: "staff", target: "satisfaction" },
-  benefits: { tab: "staff", target: "benefits" },
-  training: { tab: "staff", target: "training" },
-  tasks: { tab: "staff", target: "tasks" },
-  chat: { tab: "staff", target: "chat" },
+  // Marke & Firma
+  "group-brand": { tab: "controlling", section: "group-brand" },
+  brand: { tab: "controlling", section: "group-brand", target: "brand" },
+  close: { tab: "controlling", section: "group-brand", target: "section-company" },
+  company: { tab: "controlling", section: "group-brand", target: "section-company" },
   // Buchhaltung
   books: { tab: "books", target: "books-duty" },
   "books-duty": { tab: "books", target: "books-duty" },
+  "books-due": { tab: "books", target: "books-duty" },
   taxes: { tab: "books", target: "taxes" },
   accounting: { tab: "books", target: "accounting" },
+  "books-ledger": { tab: "books", target: "accounting" },
   advisor: { tab: "books", target: "advisor" },
   // Geschäftsrat
   board: { tab: "board" },
   // ADR-185: more of Mira's places
-  applications: { tab: "staff", target: "applications" },
-  interview: { tab: "dashboard", section: "situation" },
+  interview: { tab: "staff", section: "situation", target: "interview" },
 } as const satisfies Record<string, CompanyTarget>;
 
 export type CompanySection = keyof typeof SECTIONS;
 export const COMPANY_SECTIONS = Object.keys(SECTIONS) as CompanySection[];
+
+/** Every section name a link may carry (for tests). */
+export const KNOWN_SECTIONS: readonly string[] = COMPANY_SECTIONS;
 
 export function isCompanySection(value: string | null | undefined): value is CompanySection {
   return typeof value === "string" && Object.hasOwn(SECTIONS, value);
@@ -96,7 +164,7 @@ export function sectionTarget(section: CompanySection): CompanyTarget {
   return SECTIONS[section];
 }
 
-/** Sections of the other tabs that render only for a listed company. */
+/** Sections that render only for a listed company. */
 const LISTED_SECTIONS = new Set<CompanySection>([
   "research",
   "growth",
@@ -105,6 +173,7 @@ const LISTED_SECTIONS = new Set<CompanySection>([
   "staff",
   "satisfaction",
   "benefits",
+  "staff-mood",
 ]);
 
 /**
@@ -135,14 +204,29 @@ export function resolveCompanyTarget(tab?: string | null, section?: string | nul
   return { tab: "dashboard" };
 }
 
-/** The link to a place on the own company page. */
+/**
+ * The link to a place on the own company page. The most precise known name goes into the URL: the pane when the
+ * element alone would not open the right pane (e.g. `brand`), otherwise the element.
+ */
 export function companyHref(target: CompanyTarget): string {
   const params = new URLSearchParams();
   if (target.tab !== "dashboard") params.set("tab", target.tab);
-  const section = target.target ?? target.section;
+  const section = linkName(target);
   if (section) params.set("section", section);
   const query = params.toString();
   return query ? `/company?${query}` : "/company";
+}
+
+/** The name for `?section=`: the element if it resolves back to the same place, else the section. */
+function linkName(target: CompanyTarget): string | undefined {
+  if (!target.target && !target.section) return undefined;
+  const same = (v: CompanyTarget) => v.tab === target.tab && v.section === target.section && v.target === target.target;
+  for (const name of [target.target, target.section]) {
+    if (isCompanySection(name) && same(SECTIONS[name])) return name;
+  }
+  // A known place under another name (e.g. `section-brand` is reached by `brand`).
+  const named = Object.entries(SECTIONS).find(([, v]) => same(v))?.[0];
+  return named ?? target.target ?? target.section;
 }
 
 /** Notification types of listed companies (ADR-167) whose server link is the bare company page. */
@@ -162,4 +246,14 @@ export function notificationHref(typeKey: string, link: string | null): string |
   if (link !== "/company") return link;
   const section = NOTIFICATION_SECTIONS[typeKey];
   return section ? companyHref(resolveCompanyTarget(null, section)) : link;
+}
+
+/** The place a section is influenced at, for the dashboard's "Beeinflussen in …" hints: tab and merged card. */
+export function placeOf(target: CompanyTarget): { tab: CompanyTab; group: CompanyGroup | null; pane: string | null } {
+  const group = groupOf(target.section);
+  const pane =
+    group && target.section && (COMPANY_GROUPS[group].panes as readonly string[]).includes(target.section)
+      ? target.section
+      : null;
+  return { tab: target.tab, group, pane };
 }

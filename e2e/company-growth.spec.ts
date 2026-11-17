@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { showDashboard, showOverview, showStaff, unfoldCompany } from "./company-helpers";
+import { showOverview, showPane, showStaff, unfoldCompany } from "./company-helpers";
 
 /*
  * Profit levers, endless growth and friends in demo mode (ADR-083, ADR-084).
@@ -89,10 +89,13 @@ test("profit coach, price strategy, contract work, IPO from the garage, staff op
   await expect(strategy.getByRole("radio", { name: "Günstig" })).toHaveAttribute("aria-checked", "true");
 
   // A garage cannot expand yet; going public is open from level 9 (ADR-083, ADR-099).
+  await showPane(page, "group-growth", "Wachstum & Ausbau");
   await expect(page.getByTestId("expansion-locked")).toBeVisible();
+  await showPane(page, "group-money", "Kapital & Börse");
   await expect(page.getByTestId("listing").getByRole("button", { name: "Börsengang" })).toBeVisible();
 
   // Automatic CEO payout (ADR-086): set the share, the vault on the start page lists it as an income source.
+  await showPane(page, "group-money", "Kasse & Auszahlung");
   const payout = page.getByTestId("payout");
   await payout.getByRole("slider").focus();
   await page.keyboard.press("End");
@@ -108,7 +111,7 @@ test("profit coach, price strategy, contract work, IPO from the garage, staff op
   }).toPass();
   await expect(sources.locator('[data-source="basic"]')).toContainText("Grundeinkommen");
   await expect(sources.locator('[data-source="ceo"]')).toContainText("100 % vom Gewinn");
-  await page.goto("/company");
+  await page.goto("/company?tab=staff");
 
   // Staff in the office open their profile (ADR-084).
   await page.getByTestId("office-person").first().click();
@@ -144,6 +147,7 @@ test("found a GmbH directly and expand it, step after step", async ({ page }) =>
   await expect(expansion.getByText("Stufe 1")).toBeVisible();
   // The next step costs more (× 1,8) and the office has more places.
   await expect(expansion.getByRole("button", { name: /Auf Stufe 2 ausbauen · 180\.000/ })).toBeVisible();
+  await showPane(page, "group-offer", "Produktion");
   await expect(page.getByText("0 von 30 Plätzen belegt")).toBeVisible();
 });
 
@@ -174,8 +178,8 @@ test("friends page: empty list, add by name, helpful errors", async ({ page }) =
 test("company situation: a crisis or chance, a strategy, a step, the news", async ({ page }) => {
   await preparePlayer(page, "Krisenchefin", 7_000, 2_000_000);
   await found(page, "garage", "Blitzdose", "Energy Drinks mit extra Taurin für Gamer.");
-  // The idea names the product: the Mini-KI writes about it (ADR-091). Events and news live on the dashboard.
-  await showDashboard(page);
+  // The idea names the product: the Mini-KI writes about it (ADR-091). Events and news live on Mitarbeiter (ADR-187).
+  await showStaff(page);
   await expect(page.getByTestId("situation-calm")).toBeVisible();
   await page.getByTestId("demo-trigger-event").click();
   const situation = page.getByTestId("situation");
@@ -211,6 +215,7 @@ test("business moves fit the product, cost company cash and run for minutes (ADR
   await preparePlayer(page, "Zugmeister", 21_000, 2_000_000);
   await found(page, "garage", "Zugwerk");
 
+  await showPane(page, "group-marketing", "Geschäftszüge");
   const card = page.getByTestId("company-moves");
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByText("Geschäftszüge")).toBeVisible();
@@ -288,6 +293,7 @@ test("own business move: write an idea, the Mini-KI judges it (ADR-132)", async 
   await preparePlayer(page, "Ideenreich", 21_000, 2_000_000);
   await found(page, "garage", "Ideenwerk");
 
+  await showPane(page, "group-marketing", "Geschäftszüge");
   const card = page.getByTestId("pitch-move");
   await card.scrollIntoViewIfNeeded();
   await card.getByRole("radio", { name: "Bekanntheit" }).click();
@@ -315,6 +321,7 @@ test("protest campaign: start one against an AI company, it shows in the news ta
 test("a new business move starts, the tier moves stay hidden (ADR-173)", async ({ page }) => {
   await preparePlayer(page, "Zugneuling", 21_000, 2_000_000);
   await found(page, "garage", "Neuzugwerk");
+  await showPane(page, "group-marketing", "Geschäftszüge");
   const card = page.getByTestId("company-moves");
   await card.scrollIntoViewIfNeeded();
   await expect(card.getByTestId("move-tv_commercial")).toHaveCount(0);
@@ -331,7 +338,7 @@ test("a CEO interview: answer it on the dashboard, it airs in the news show (ADR
   await found(page, "garage", "Plauderwerk");
   await page
     .getByTestId("company-tabs")
-    .getByRole("tab", { name: /Dashboard/ })
+    .getByRole("tab", { name: /Mitarbeiter/ })
     .click();
   const card = page.getByTestId("interview-card");
   await card.scrollIntoViewIfNeeded();

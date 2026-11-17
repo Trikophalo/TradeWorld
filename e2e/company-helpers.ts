@@ -48,6 +48,27 @@ export async function showOverview(page: Page) {
   await showTab(page, "Controlling");
 }
 
+/**
+ * Merged cards (ADR-187) show one pane at a time: switches the card `section-<group>` to the pane with that label.
+ * Panes: group-offer (Preise & Strategie, Produktion), group-marketing (Budget & Kampagnen, Geschäftszüge),
+ * group-money (Kasse & Auszahlung, Kapital & Börse, Dividenden), group-growth (Wachstum & Ausbau, Forschung,
+ * Produkte & Märkte), group-team (Team & Plätze, Stimmung, Wert des Teams).
+ */
+export async function showPane(page: Page, group: string, label: string) {
+  const card = page.getByTestId(`firm-section-${group}`);
+  await expect(card).toBeVisible();
+  const option = card.getByRole("radio", { name: label, exact: true });
+  // A card with a single pane (e.g. growth of a private company) has no switch; while data reloads it may show up late.
+  try {
+    await option.waitFor({ timeout: 8_000 });
+  } catch {
+    if ((await card.getByRole("radio").count()) === 0) return;
+    throw new Error(`pane "${label}" not found in ${group}`);
+  }
+  await option.click();
+  await expect(option).toHaveAttribute("aria-checked", "true");
+}
+
 export async function showDashboard(page: Page) {
   await showTab(page, "Dashboard");
 }
@@ -129,6 +150,7 @@ export async function foundListedCompany(page: Page, name = "Pixelwerft") {
   await hold(page, /Gedrückt halten zum Gründen/);
   await expect(page.getByText("Firma gegründet!")).toBeVisible();
   await showOverview(page);
+  await showPane(page, "group-money", "Kapital & Börse");
   const listing = page.getByTestId("listing");
   await listing.getByRole("button", { name: "Börsengang" }).click();
   await page.getByRole("dialog", { name: "Börsengang" }).getByRole("button", { name: "Zeichnung starten" }).click();

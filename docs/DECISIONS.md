@@ -4504,3 +4504,65 @@ seltener). Gemessen mit `taskMix` über den alten Katalog: je Produkt 39–47 % 
 **Folgen.** Die neuen Spiele dauern etwas länger (40–90 s); die Zeitgrenzen stehen in `companyTasks.games`. Wer lieber
 rechnet, bekommt Rechenaufgaben weiter, nur seltener. Neue Spiele brauchen eine Art in `TASK_GAME_KINDS`, sonst schlägt
 der Mix-Test fehl.
+
+## ADR-187: Firma übersichtlicher – Dashboard nur Zahlen, eine Liste „Zu erledigen“, zusammengeführte Karten — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: Die Aufgaben im Unternehmen seien verstreut, man scrolle ewig, vor allem im
+Controlling (am PC rund 13 000 px). Das Dashboard soll nur Zahlen und Grafiken zeigen, ein Klick darauf führt zum
+Hebel. „Stärken der Firma“ und „Wo es fehlt“ zeigten dieselben Namen mit sehr unterschiedlichen Zahlen in zwei
+Netzdiagrammen und wirkten widersprüchlich.
+
+**Entscheidung.** Nur Darstellung, keine Funktion entfernt, keine SQL-Änderung.
+
+- **Dashboard:** Kennzahl-Kacheln, Timer-Chips, Grafiken, „Stärken & Schwächen“. Jede Kachel und Grafik verlinkt über
+  `tabs.ts` auf die Stelle, an der der Wert beeinflusst wird, mit Hinweis „Beeinflussen in Tab → Ort“ (`DashLink`,
+  `ChartLink`, `useWhere`). Autopilot, Mira, Aufgaben, Lage, Interview, Ereignis, Büro und „Was jeder leistet“
+  ziehen um.
+- **Stärken & Schwächen:** `HealthPanel` bekommt optional die Stärken: ein Diagramm (acht Diagnose-Punkte), je Zeile
+  „Jetzt“ und getrennt „Langfristige Stärke x/100“ mit nächster Bonusstufe; Image und Schwung nur als Diagnose. Die
+  Zuordnung ist die bestehende (`STRENGTH_OF`): Menge → Lieferfähigkeit, Preis → Rendite, Kasse → Finanzen. Zahlen
+  kommen unverändert aus der API.
+- **Zu erledigen** (`todo-center.tsx`): alle fälligen Dinge als eine Liste nach Dringlichkeit (Dringend, Bald, Wenn
+  Zeit ist), eine Zeile je Punkt mit Frist und „Öffnen“, oben im Tab Mitarbeiter neben dem Autopiloten. Der
+  Mitarbeiter-Tab zählt die Punkte, die dort erledigt werden; das Dashboard zeigt die Gesamtzahl als Kachel.
+- **Zusammengeführte Karten** (`MergedCard`): eine Karte, ein Kopf, ein Umschalter (Segmented) zwischen Ansichten.
+  Controlling: Angebot & Produktion, Marketing, Geld, Wachstum, Marke & Firma. Mitarbeiter: Team (Team & Plätze,
+  Stimmung, Wert). Jede Ansicht behält ihre alte Abschnitts-ID; ein Link (Adresse oder `announceFocus`) schaltet die
+  Karte vor dem Scrollen um.
+- **Mira** als Panel (Sheet) mit Knopf neben den Tabs auf jedem Tab; `section=mira` öffnet es. Die Logik in
+  `assistant/` bleibt unverändert; das Tour-Ziel `assistant` sitzt am Knopf.
+- **Links:** `tabs.ts` kennt alle alten IDs (auch `group-sell`, `group-run`, `group-listed`, `reputation-mood`,
+  `team-value`, `assist`) und führt sie zur neuen Karte und Ansicht; `tabs.test.ts` prüft, dass jede alte ID auf eine
+  vorhandene Karte desselben Tabs führt und jeder Link zur selben Stelle zurückführt.
+
+**Folgen.** Inhalte einer Karte, die nicht gewählt ist, sind nicht im DOM; E2E-Tests wählen die Ansicht vorher
+(`showPane` in `e2e/company-helpers.ts`). Die Beschreibungen und „i“-Erklärungen aus ADR-183 bleiben.
+
+## ADR-191: Wachstum & Ausbau als ein Weg, aufklappbare Listen — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: „Wachstum“ (die vier Stufen des Produkts, ADR-062/071) und der endlose „Ausbau“
+(ADR-083) standen als zwei Karten untereinander, beide mit „Stufe“; Spieler meldeten Kollisionen beim
+fortlaufenden Ausbauen (Ausbau „zurückgesetzt“ oder blockiert nach einem Stufenwechsel). Außerdem sollen
+„Geschäftszüge“, „Bewerbungen“ und „Was jeder leistet“ auf- und zuklappbar sein.
+
+**Ursache der Kollision.** Plätze einer Spielerfirma sind `maxEmployees(Rechtsform) + employeesPerLevel × Ausbaustufe`
+(`company_max_employees`). `upgrade_company` (neue Rechtsform) und der Abschluss des Börsengangs (`ipo_escrow`)
+schrieben aber den reinen Rechtsform-Wert in die Kopie `companies.max_employees`. Die Ausbaustufe selbst blieb
+erhalten (Markt, Kapazität, Fixkosten und Kosten der nächsten Stufe rechneten richtig weiter), doch alles, was die
+Spalte liest (Firmenprofil, öffentliche Sichten, die Missionen „einstellen“), sah nach dem Wechsel weniger Plätze;
+die Einstellungsprüfung zählte dagegen über die Funktion. Ergebnis: Ausbau „weg“ in der Anzeige, Missionen blockiert,
+widersprüchliche Platzzahlen. Doppelt gezählt wurde nichts; Markt ist Rechtsform × (1 + Bonus × Stufe), jede Stufe
+einmal.
+
+**Entscheidung.**
+
+- Migration 7350 (mit Kopie in `updates/`): Trigger `company_seats_sync` und `company_seats_guard` halten
+  `companies.max_employees` immer gleich `company_max_employees`, egal wer schreibt; bestehende Firmen werden
+  repariert. `company_growth_path(company)` liefert den ganzen Weg (Stufe, Ausbaustufe, Schritt, nächstes Ziel,
+  nächste Kosten, Plätze). SQL-Test `c4_growth_path.sql`. Regeln und Belohnungen beider Systeme unverändert.
+- Oberfläche: eine Karte „Wachstum & Ausbau“ (`growth-expansion.tsx`) mit einem durchgehenden Weg: Stufe 1–4, danach
+  Ausbau 1, 2, … ohne Ende; darunter die offenen Plätze der Stufe und der nächste Ausbau. `progress.ts` zählt beides
+  als einen Schritt (Test daneben). Die Rechtsform steht direkt darunter.
+- `FoldBlock`: Kopf als Knopf mit `aria-expanded`, zugeklappt eine kurze Zusammenfassung (Anzahl), Zustand je
+  Spieler in `localStorage` (nach der Hydration), Einblenden nur über `opacity`/`transform` mit Motion-Tokens. Ein
+  Link auf die Stelle klappt sie für diesen Besuch auf. „Was jeder leistet“ startet ab sechs Personen zugeklappt.

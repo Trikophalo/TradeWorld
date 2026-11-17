@@ -45,6 +45,8 @@ async function foundCompany(page: Page) {
 
 test("Mira briefs the new task and runs the company through the chat", async ({ page }) => {
   await foundCompany(page);
+  // Mira is a panel on every tab since ADR-187: the button next to the tabs opens it.
+  await page.getByTestId("mira-open").click();
   const mira = page.getByTestId("mira");
   await expect(mira).toBeVisible();
   await expect(mira.getByTestId("mira-says").first()).toContainText("Hi, ich bin Mira");
@@ -62,6 +64,8 @@ test("Mira briefs the new task and runs the company through the chat", async ({ 
   await mira.getByTestId("mira-send").click();
   await expect(page.getByTestId("play-sheet")).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("play-sheet")).toBeHidden();
+  if (!(await mira.isVisible())) await page.getByTestId("mira-open").click();
 
   // The plan: no team and no AI yet, so Mira says the task stays with the player.
   await mira.getByTestId("mira-input").fill("Verteil alle Aufgaben");
@@ -83,10 +87,12 @@ test("Mira briefs the new task and runs the company through the chat", async ({ 
   await mira.getByTestId("mira-send").click();
   await expect(mira.getByText(/Pro Stunde kann ich nur einen freien Auftrag umsetzen/)).toBeVisible();
 
-  // Controlling: nothing folds since ADR-183; the jump bar leads to the business moves.
+  // Controlling: the jump bar leads to the marketing card, its switch to the business moves (ADR-187).
+  await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: /Controlling/ }).click();
   await expect(page.getByTestId("treasury")).toBeAttached();
-  await page.getByTestId("controlling-nav").getByTestId("nav-group-sell").click();
+  await page.getByTestId("controlling-nav").getByTestId("nav-group-marketing").click();
+  await page.getByTestId("firm-section-group-marketing").getByRole("radio", { name: "Geschäftszüge" }).click();
   await page.getByTestId("company-moves").scrollIntoViewIfNeeded();
   await expect(page.getByTestId("company-moves")).toBeVisible();
 });

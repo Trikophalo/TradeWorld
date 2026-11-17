@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { foundListedCompany, hold, prepareRichFounder, showTab } from "./company-helpers";
+import { foundListedCompany, hold, prepareRichFounder, showPane, showTab } from "./company-helpers";
 
 /*
  * Firma QA (ADR-183): the flat layout (sections with headers, jump bars, nothing folded), the status line with
@@ -42,17 +42,17 @@ test("private company: flat sections, status line, reputation, diagnosis and sta
   await expect(page.getByText(/Wie Kunden über dich denken/)).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // Dashboard: a jump bar, every section open, no folding control anywhere on the page.
+  // Dashboard (ADR-187): numbers, charts, strengths and weaknesses; no folding control anywhere on the page.
   const dashboard = page.getByTestId("company-dashboard");
   const nav = dashboard.getByTestId("dashboard-nav");
-  for (const id of ["numbers", "assist", "diagnosis", "reputation-mood", "team-value", "situation"]) {
+  for (const id of ["numbers", "charts", "diagnosis"]) {
     await expect(nav.getByTestId(`nav-${id}`)).toBeVisible();
     await expect(dashboard.getByTestId(`firm-section-${id}`)).toBeAttached();
   }
   await expect(page.locator("[data-section][data-state]")).toHaveCount(0);
 
   // A private company has a reputation now, with its drivers and its effect on the demand.
-  await nav.getByTestId("nav-reputation-mood").click();
+  await nav.getByTestId("nav-charts").click();
   const reputation = dashboard.getByTestId("company-reputation");
   await expect(reputation).toBeVisible();
   await expect(reputation.getByTestId("reputation-value")).toContainText("/ 100");
@@ -67,20 +67,25 @@ test("private company: flat sections, status line, reputation, diagnosis and sta
   await expect(health.getByText(/^Misst/).first()).toBeVisible();
   await expect(health.getByTestId("health-weakest")).toContainText(/Was tun:|Alles im grünen Bereich/);
 
-  // "Was jeder leistet": with closed hours the founder brings revenue (before: "bringt 0 €").
-  await nav.getByTestId("nav-team-value").click();
-  const value = dashboard.getByTestId("staff-value");
+  // "Was jeder leistet" (Mitarbeiter, team card): with closed hours the founder brings revenue (before: "bringt 0 €").
+  await showTab(page, "Mitarbeiter");
+  await showPane(page, "group-team", "Wert des Teams");
+  const value = page.getByTestId("staff-value");
   const founder = value.locator('[data-kind="founder"]');
   await expect(founder).toBeVisible();
   await expect(founder).not.toContainText("bringt 0 €");
   await noSidewaysScroll(page);
 
-  // Controlling: every block stands open under its group, with one line of what it does.
+  // Controlling: five merged cards, each pane with one line of what it does (ADR-187).
   await showTab(page, "Controlling");
   const controlling = page.getByTestId("company-controlling");
-  for (const id of ["profit", "marketing", "moves", "business", "expansion", "money", "capital", "brand"]) {
+  for (const id of ["group-offer", "group-marketing", "group-money", "group-growth", "group-brand"]) {
+    await expect(controlling.getByTestId(`firm-section-${id}`)).toBeAttached();
+  }
+  for (const id of ["profit", "marketing", "money", "expansion", "brand"]) {
     await expect(controlling.getByTestId(`section-${id}`)).toBeAttached();
   }
+  await showPane(page, "group-marketing", "Geschäftszüge");
   await expect(controlling.getByTestId("company-moves")).toBeAttached();
   await noSidewaysScroll(page);
 
@@ -88,15 +93,17 @@ test("private company: flat sections, status line, reputation, diagnosis and sta
   await showTab(page, "Mitarbeiter");
   const staff = page.getByTestId("company-staff");
   await expect(staff.getByTestId("staff-nav")).toBeVisible();
-  await expect(staff.getByTestId("firm-section-staff-team")).toBeVisible();
-  await expect(staff.getByTestId("staff-value")).toBeAttached();
+  await expect(staff.getByTestId("firm-section-todo")).toBeVisible();
+  await expect(staff.getByTestId("firm-section-group-team")).toBeAttached();
   await noSidewaysScroll(page);
 
   // Deep links (Mira, notifications) still lead to the place.
   await page.goto("/company?section=health");
   await expect(page.getByTestId("company-health")).toBeInViewport();
   await page.goto("/company?section=staff-value");
-  await expect(page.getByTestId("company-dashboard").getByTestId("staff-value")).toBeInViewport();
+  await expect(page.getByTestId("company-staff").getByTestId("staff-value")).toBeInViewport();
+  await page.goto("/company?tab=controlling&section=dividends");
+  await expect(page.getByTestId("section-money")).toBeVisible();
   await page.goto("/company?section=reputation");
   await expect(page.getByTestId("company-reputation")).toBeInViewport();
 });

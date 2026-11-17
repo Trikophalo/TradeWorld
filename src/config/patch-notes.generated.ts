@@ -578,6 +578,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Bulk verkaufen aufgeräumt",
         text: "Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-f0664984",
+        title: "Firma übersichtlicher",
+        text: "Das Dashboard zeigt nur Zahlen und Grafiken, ein Tipp führt zum passenden Hebel; alles Fällige steht in einer Liste „Zu erledigen“, das Controlling…",
+      },
     ],
   },
   {

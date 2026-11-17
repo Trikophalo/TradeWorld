@@ -35,7 +35,7 @@ import { playSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { useCompanyApplications, useCompanyPostings, useCompanyRefresh, useCompanyTeam, useFloorLooks } from "../hooks";
-import { SubSection } from "./firm-layout";
+import { FoldBlock, SubSection } from "./firm-layout";
 
 type BranchKey = Parameters<ReturnType<typeof useTranslations<"skills.branches">>>[0];
 const TIERS = BALANCE.careers.tiers.map((t) => t.id) as CareerTier[];
@@ -674,6 +674,7 @@ function CounterSheet({ application, onClose }: { application: CompanyApplicatio
 
 export function TeamView({ company, onHire }: { company: MyCompany; onHire: (request: HireRequest) => void }) {
   const t = useTranslations("firm");
+  const tl = useTranslations("hq.folds");
   const team = useCompanyTeam(company.id);
   const [firing, setFiring] = useState<TeamMember | null>(null);
   const general = Math.max(0, company.aiWorkers - company.aiWorkerSkills.length);
@@ -732,9 +733,16 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
           )}
         </Section>
       </SubSection>
-      <Section id="applications" title={t("tabApplications")}>
-        <Applications company={company} />
-      </Section>
+      {/* Folds away with a count (ADR-187); a link to the applications opens it. */}
+      <div id="applications" className="scroll-mt-24">
+        <FoldBlock
+          id="applications"
+          title={t("tabApplications")}
+          summary={tl("openCount", { count: company.pendingApplications })}
+        >
+          <Applications company={company} />
+        </FoldBlock>
+      </div>
       <Section title={t("tabPostings")}>
         <Postings onCreate={() => onHire({})} />
       </Section>

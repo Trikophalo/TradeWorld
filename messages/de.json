@@ -9150,6 +9150,17 @@
       "finance": "Stärke Finanzen",
       "reputation": "wirkt auf den Ruf",
       "tasks": "aus Aufgaben"
+    },
+    "merged": {
+      "title": "Stärken & Schwächen",
+      "intro": "Je Thema zwei verschiedene Werte: „Jetzt“ ist die Diagnose der letzten Stunde und zeigt, wo Gewinn fehlt. „Langfristige Stärke“ wächst nur langsam über viele Stunden und bringt ab 50 Punkten im Schnitt Bonus-Umsatz.",
+      "now": "Jetzt",
+      "longTerm": "Langfristige Stärke {score}/100",
+      "tierShort": "Bonus ab {at} Ø",
+      "overall": "Langfristige Stärke Ø",
+      "bonusNow": "Bonus +{percent} Umsatz",
+      "bonusFrom": "Bonus ab {at}: +{percent}",
+      "bonusNone": "Kein Bonus"
     }
   },
   "friendChat": {
@@ -10002,7 +10013,8 @@
       "eventStep": "Ereignis: Schritt läuft",
       "eventDeadline": "Ereignis: Frist für deine Entscheidung",
       "research": "Forschung: {name}",
-      "building": "Im Aufbau: {name}"
+      "building": "Im Aufbau: {name}",
+      "noneShort": "Nichts läuft gegen die Uhr."
     },
     "teaser": {
       "title": "Das bringt der Börsengang",
@@ -10585,6 +10597,97 @@
       "reputationInfo": "Wie Kunden über dich denken, 50 ist neutral. Ein guter Ruf bringt bis zu 20 % mehr Nachfrage. Details im Dashboard unter „Ruf“.",
       "strengths": "Stärken",
       "strengthsInfo": "Schnitt der sechs Stärken. Ab 50 Punkten gibt es Bonus-Umsatz in jeder Stunde (bis +15 % ab 98)."
+    },
+    "where": {
+      "hint": "Beeinflussen in {tab} → {place}",
+      "hintTab": "Beeinflussen in {tab}",
+      "places": {
+        "numbers": "Kennzahlen",
+        "charts": "Grafiken",
+        "diagnosis": "Stärken & Schwächen",
+        "group-offer": "Angebot & Produktion",
+        "profit": "Preise & Strategie",
+        "business": "Produktion",
+        "group-marketing": "Marketing",
+        "marketing": "Budget & Kampagnen",
+        "moves": "Geschäftszüge",
+        "group-money": "Geld",
+        "money": "Kasse & Auszahlung",
+        "capital": "Kapital & Börse",
+        "dividends": "Dividenden",
+        "group-growth": "Wachstum",
+        "expansion": "Wachstum & Ausbau",
+        "research": "Forschung",
+        "growth": "Produkte & Märkte",
+        "group-brand": "Marke & Firma",
+        "todo": "Zu erledigen",
+        "staff-tasks": "Aufgaben",
+        "situation": "Lage & Ereignisse",
+        "group-team": "Team",
+        "staff-team": "Team & Plätze",
+        "staff-mood": "Stimmung",
+        "staff-value": "Wert des Teams"
+      }
+    },
+    "groupCards": {
+      "group-offer": "Preis, Strategie und was du herstellst: Hier entsteht dein Umsatz.",
+      "group-marketing": "Budget, Kampagnen und Geschäftszüge: So wirst du bekannter und gewinnst Ruf.",
+      "group-money": "Kasse, deine Auszahlung, Kapital und Börse, Dividenden.",
+      "group-growth": "Ausbau und Rechtsform, Forschung, Produkte, Regionen und Maschinen.",
+      "group-brand": "Banner, Logo und das Schließen der Firma.",
+      "todo": "Alles, was auf dich wartet, nach Dringlichkeit. Ein Tipp führt direkt hin.",
+      "situation": "Krisen, Chancen, Interviews und die Nachrichten deiner Firma.",
+      "group-team": "Plätze, Bewerbungen, KI-Kräfte und Schulungen, die Stimmung und was alle bringen."
+    },
+    "todoCenter": {
+      "urgent": "Dringend",
+      "warn": "Bald",
+      "normal": "Wenn Zeit ist",
+      "open": "Öffnen",
+      "interview": "Interview-Anfrage beantworten",
+      "unpaid": "Offene Rechnungen: {amount}"
+    },
+    "dashNew": {
+      "numbers": {
+        "nav": "Kennzahlen",
+        "title": "Kennzahlen",
+        "text": "Die wichtigsten Zahlen auf einen Blick. Tipp auf eine Zahl, um dorthin zu kommen, wo du sie beeinflusst."
+      },
+      "charts": {
+        "nav": "Grafiken",
+        "title": "Grafiken",
+        "text": "Verlauf, letzte Stunde, Ruf, Stimmung und Quartale. Unter jeder Grafik geht es zum passenden Hebel."
+      },
+      "diagnosis": {
+        "nav": "Stärken & Schwächen",
+        "title": "Stärken & Schwächen",
+        "text": "Jedes Thema einmal: wie es gerade steht und wie stark es langfristig ist."
+      },
+      "awareness": "Bekanntheit",
+      "quality": "Qualität",
+      "todo": "Zu erledigen",
+      "urgent": "{count, plural, one {# dringend} other {# dringend}}",
+      "marketingHint": "Werbung {amount}/Quartal"
+    },
+    "miraPanel": {
+      "open": "Mira öffnen",
+      "short": "Mira",
+      "title": "Mira",
+      "text": "Deine Assistentin: Sie erklärt, plant und erledigt Aufgaben für dich."
+    },
+    "folds": {
+      "openCount": "{count, plural, =0 {keine offen} one {# offen} other {# offen}}",
+      "people": "{count, plural, one {# Person} other {# Personen}}",
+      "running": "{count, plural, =0 {keiner läuft} one {# läuft} other {# laufen}}"
+    },
+    "growthPath": {
+      "title": "Wachstum & Ausbau",
+      "text": "Ein Weg nach oben: erst die vier Stufen deines Produkts (Fachleute besetzen), danach geht es ohne Ende mit Ausbaustufen weiter (mehr Markt, Plätze und Kapazität).",
+      "step": "Schritt {step}",
+      "stage": "Stufe {n}",
+      "level": "Ausbau {n}",
+      "pathLabel": "Dein Weg: Stufen und Ausbau",
+      "needsForm": "Ausbauen geht ab der GmbH. Die Rechtsform wechselst du direkt darunter."
     }
   },
   "nexamonLive": {
