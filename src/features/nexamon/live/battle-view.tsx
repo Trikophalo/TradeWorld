@@ -113,7 +113,7 @@ export function BattleView({ battleId, onClose }: BattleViewProps) {
                 </Badge>
               )}
               {b && b.viewers > 0 && (
-                <Badge tone="info" data-testid="battle-viewers">
+                <Badge tone="info" className="hidden sm:inline-flex" data-testid="battle-viewers">
                   {t("viewers", { count: b.viewers })}
                 </Badge>
               )}
@@ -444,7 +444,11 @@ function SeatPanel({
           const pull = packCards[i];
           const card = pull ? nexamonCard(pull.cardKey) : undefined;
           return (
-            <li key={i} className={cn("relative", i > 0 && "-ml-4 sm:ml-1")} style={{ zIndex: i }}>
+            <li
+              key={i}
+              className={cn("relative", i > 0 && (compact ? "-ml-9" : "-ml-4 sm:ml-1"))}
+              style={{ zIndex: i }}
+            >
               {card ? (
                 <motion.div
                   initial={reduced ? { opacity: 0 } : { opacity: 0, y: -12 }}

@@ -839,6 +839,7 @@ create table if not exists public.nexamon_battle_invites (
   player_id uuid not null references public.profiles (id) on delete cascade,
   primary key (battle_id, player_id)
 );
+create index if not exists nexamon_battle_invites_player_idx on public.nexamon_battle_invites (player_id);
 alter table public.nexamon_battle_invites enable row level security;
 revoke all on public.nexamon_battle_invites from public, anon, authenticated;
 grant all on public.nexamon_battle_invites to service_role;

@@ -1,0 +1,48 @@
+{
+  "battle": {
+    "id": "a9d84a31-beda-44ac-9947-9d9c436f40f9",
+    "me": "challenger",
+    "set": "mystic_energy",
+    "mode": "multi",
+    "size": 2,
+    "packs": [
+      { "set": "mystic_energy", "price_cents": 20000 },
+      { "set": "super_apex", "price_cents": 35000 }
+    ],
+    "seats": [
+      {
+        "seat": 0,
+        "cards": [],
+        "cents": 0,
+        "is_me": true,
+        "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] }
+      }
+    ],
+    "status": "pending",
+    "winner": null,
+    "ends_at": null,
+    "live_id": null,
+    "my_seat": 0,
+    "slot_ms": 1800,
+    "tear_ms": 2400,
+    "viewers": 0,
+    "opponent": null,
+    "coin_seed": null,
+    "decide_at": null,
+    "reactions": [],
+    "starts_at": null,
+    "tie_break": null,
+    "challenger": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+    "created_at": "2026-11-17T20:02:03.307065+00:00",
+    "expires_at": "2026-11-17T20:04:03.307065+00:00",
+    "accepted_at": null,
+    "price_cents": 55000,
+    "server_time": "2026-11-17T20:02:03.307065+00:00",
+    "winner_seat": null,
+    "abort_reason": null,
+    "opponent_cards": [],
+    "opponent_cents": 0,
+    "challenger_cards": [],
+    "challenger_cents": 0
+  }
+}
