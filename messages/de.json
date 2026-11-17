@@ -5758,7 +5758,7 @@
       "shelfCell": "Reihe {row}, Platz {col}: {item}",
       "shelfEmpty": "leer",
       "tilesHint": "Schieb die Teile in die Lücke, bis 1 bis 8 der Reihe nach liegen. Antippen oder ziehen.",
-      "tilesMoves": "{count} Züge",
+      "tilesMoves": "{count, plural, one {# Zug} other {# Züge}}",
       "tilesTile": "Teil {n}",
       "tilesGap": "Lücke",
       "binsHintColor": "Zieh jede Kiste in das Regal mit ihrer Farbe. Oder tippe erst die Kiste, dann das Regal.",

@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Mehr schieben, mehr schauen (ADR-186):** Neun neue Firmenaufgaben zum Ziehen und Hinsehen (Schiebepuzzle, Kisten einsortieren, Kabel entwirren, Fehlerteil finden, Nachbauen, Montieren, Rohre drehen, Pakete nach Größe, Fließband); Rechen- und Tippaufgaben kommen nur noch in rund jedem achten Fall.
+
 - **Firma aufgeräumt (ADR-183):** klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter
   dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je Punkt sagt, was zu tun ist.
 - **Ruf für jede Firma:** Qualität, faire Preise, bezahlte Löhne und Kampagnen heben ihn jede Stunde, er bewegt die Nachfrage.

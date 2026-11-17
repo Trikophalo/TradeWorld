@@ -8108,3 +8108,16 @@ drivers, at, history: [{hour_start, value, target}]}` (letzte 48 Stunden) und `c
   `[{step, at, error, failures}]` (letzte 24 Stunden). Jede Stunde in `hours` trägt zusätzlich `demand_cents`,
   `capacity_cents`, `strength_bonus_cents`, `ai_utilization_bps`, `ai_wages_paid_cents`, `player_wages_paid_cents`,
   `reputation`.
+
+## Nachtrag: Schiebe- und Sehaufgaben (ADR-186)
+
+- `company_tasks_game_check` kennt neun weitere Spiele: `tiles`, `bins`, `untangle`, `odd`, `rebuild`, `align`, `pipes`,
+  `sizes`, `conveyor` (Migration 7600).
+- Funktionen (kein Client-Zugriff): `company_task_puzzle_visual`, `company_task_grade_visual`,
+  `company_task_segments_meet`, `company_task_crossings`, `company_task_pipe_mask`, `company_task_pipes_connected`,
+  `company_task_is_int`. Vollständig neu: `company_task_puzzle`, `company_task_grade` (7610), `company_tasks_run_due`
+  (7620, gewichtete Auswahl nach `companyTasks.tasks[].weight`).
+- Rätsel und Antworten: `tiles {size, board}` → `{moves}`, `bins {items, by, kinds}` → `{bins}`,
+  `untangle {grid, edges, points}` → `{points}`, `odd {rounds}` → `{choices}`, `rebuild {size, layout, show_seconds}` →
+  `{layout}`, `align {slots, parts}` → `{at}`, `pipes {size, tiles, turns, from, to}` → `{turns}`, `sizes {sizes}` →
+  `{order}`, `conveyor {items, every_ms, travel_ms}` → `{bins}` (−1 = verpasst). Die RPC-Antworten behalten ihre Form.

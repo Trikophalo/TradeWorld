@@ -543,6 +543,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Firma aufgeräumt",
         text: "klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-a2b5dd64",
+        title: "Mehr schieben, mehr schauen",
+        text: "Neun neue Firmenaufgaben zum Ziehen und Hinsehen (Schiebepuzzle, Kisten einsortieren, Kabel entwirren, Fehlerteil finden, Nachbauen, Montieren…",
+      },
     ],
   },
   {

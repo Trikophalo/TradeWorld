@@ -1112,3 +1112,9 @@ Stärken-Faktor, dann `task_pay`; Fehlschlag Wert × Strafe abzüglich `task_saf
 `pattern`, `shelf`). SQL und TS stimmen in `supabase/tests/b8_company_overhaul.sql` überein (gleiche Zahlen für
 `awarenessHour`, `aiUtilizationBps`, `aiWageDueCents`, Teilpunkte der Spiele). Messwerkzeug:
 `scripts/company-harness.ts`.
+
+`src/lib/sim/company-tasks-visual.ts` (ADR-186): Rätsel und Bewertung der neun Schiebe- und Sehspiele (`tiles`,
+`bins`, `untangle`, `odd`, `rebuild`, `align`, `pipes`, `sizes`, `conveyor`), dazu `segmentsMeet`/`crossings`
+(ganzzahlig), `slideTiles`, `pipesFlow`/`pipesConnected`. `src/lib/sim/company-task-mix.ts`: `pickWeightedTask`
+(Wahrscheinlichkeit Gewicht/Summe, wie `company_tasks_run_due`) und `taskMix` (Anteil je Art). SQL und TS stimmen auf
+den Fällen in `supabase/tests/task_games_visual_cases.inc` überein.
