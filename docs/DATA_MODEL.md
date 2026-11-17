@@ -8108,3 +8108,13 @@ drivers, at, history: [{hour_start, value, target}]}` (letzte 48 Stunden) und `c
   `[{step, at, error, failures}]` (letzte 24 Stunden). Jede Stunde in `hours` trägt zusätzlich `demand_cents`,
   `capacity_cents`, `strength_bonus_cents`, `ai_utilization_bps`, `ai_wages_paid_cents`, `player_wages_paid_cents`,
   `reputation`.
+
+## Nachtrag: Große Nexamon-Züge für alle (ADR-186)
+
+- `nexamon_big_pull_broadcasts` (neu, nur über Funktionen): `player_id` (PK), `tx_id`, `broadcast_at`, `dedupe_key`,
+  `cards` (jsonb). Letzte Rundmeldung je Zieher: Sperre `nexamon.bigPullNotifySeconds`, mehrere große Züge einer
+  Transaktion landen in derselben Nachricht.
+- Trigger `nexamon_big_pull_notify` (AFTER INSERT auf `nexamon_copies`): Kopie eines Spielers aus einem Pack
+  (`source = 'pack'`, `pack_id` gesetzt) mit Wert über `nexamon.bigPullNotifyCents` → Benachrichtigung
+  `nexamon_big_pull` an alle anderen aktiven Spieler (Link `/nexamon/<card_key>`) und Feed-Eintrag `nexamon_big_pull`
+  (nicht für `feedRarities`). One of Ones, KI-Züge und unveröffentlichte Sets nie.

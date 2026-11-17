@@ -384,6 +384,8 @@ describe("grading desk", () => {
 
   it("sends notifications to the tab they belong to", () => {
     expect(nexamonNotificationLink("nexamon_graded", "/nexamon")).toBe("/nexamon?tab=grading");
+    expect(nexamonNotificationLink("nexamon_big_pull", "/nexamon/me_001")).toBe("/nexamon/me_001");
+    expect(nexamonNotificationLink("nexamon_big_pull", null)).toBe("/nexamon");
     expect(nexamonNotificationLink("nexamon_sale", "/nexamon")).toBe("/nexamon?tab=market&view=mine");
     expect(nexamonNotificationLink("friend_request", "/friends")).toBe("/friends");
     expect(nexamonNotificationLink("other", null)).toBeNull();

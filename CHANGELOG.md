@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Große Züge für alle (ADR-186):** Zieht jemand eine Nexamon-Karte mit mehr als 100.000 € Wert, bekommen alle anderen eine Nachricht mit Link zur Karte.
+
 - **Umsätze an der Börse (ADR-184):** Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.
 
 - **Mira kennt jetzt deine Zahlen (ADR-185):** Sie rät nur noch zu Dingen, die gerade gehen, sagt, was sie je Stunde

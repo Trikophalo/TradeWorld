@@ -382,6 +382,13 @@ export const NEXAMON_RULES = {
    */
   feedRarities: ["legendary", "uranium"],
   /**
+   * A pull worth more than this at pull time (copy value incl. condition) is news for everyone (ADR-186): every
+   * other active player gets the notification nexamon_big_pull, the friends the feed item. At most one broadcast
+   * per puller every `bigPullNotifySeconds`; several big pulls of one opening (one call) make one notification.
+   */
+  bigPullNotifyCents: 10_000_000,
+  bigPullNotifySeconds: 60,
+  /**
    * Who is on the Collectibles tab (ADR-172): the page asks every `pingSeconds`; a player counts as there for
    * `presenceSeconds` after the last ask. At most `maxPlayers` figures are shown.
    */

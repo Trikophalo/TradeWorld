@@ -553,6 +553,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Umsätze an der Börse",
         text: "Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-da87bd02",
+        title: "Große Züge für alle",
+        text: "Zieht jemand eine Nexamon-Karte mit mehr als 100.000 € Wert, bekommen alle anderen eine Nachricht mit Link zur Karte.",
+      },
     ],
   },
   {
