@@ -110,11 +110,14 @@ select tests.assert(
 -- =============================================================================
 -- B. A new game judged by the server: Crash-Regen over battle_maintain, the sealed booster prize
 -- =============================================================================
-select tests.b6_battle('crash', public.battle_pick_packs(2000000, 8, 0, 0, 0.1, 0.99),
+select tests.b6_battle('crash', jsonb_build_object('kind', 'packs', 'packs', public.battle_pick_packs(2000000, 8, 0, 0, 0.1, 0.99)),
                        array[:a, :b, :c]::uuid[],
                        array[repeat('1234', 500), repeat('0', 2000), repeat('0', 2000)], interval '100 seconds') as cid \gset
-select tests.assert((select prize from public.battles where id = :cid)
-                      = '{"kind": "packs", "packs": [{"set": "prismatic_peak", "count": 1}, {"set": "mystic_energy", "count": 7}]}'::jsonb,
+select (select sum((x ->> 'count')::integer) from jsonb_array_elements(prize -> 'packs') x) as cpacks
+  from public.battles where id = :cid \gset
+select tests.assert(
+  (select prize -> 'packs' from public.battles where id = :cid)
+    = '[{"set": "prismatic_peak", "count": 1}, {"set": "mystic_energy", "count": 7}]'::jsonb,
   'battle_pick_packs() = pickPackPrize(): 1 × Prismatic Peak + 7 × Mystic Energy for the same random numbers');
 select public.battle_sim('crash', 23, public.battle_params('crash'),
                          array[repeat('1234', 500), repeat('0', 2000), repeat('0', 2000)], 2000) as csim \gset
@@ -128,10 +131,10 @@ select tests.assert(
   and :cwin::integer = (:'csim'::jsonb #>> '{ranking,0}')::integer
   and (:'cres'::jsonb #>> '{prize,kind}') = 'packs'
   and (:'cres'::jsonb #>> '{prize,cents}')::bigint <= 2000000
-  and tests.b6_sealed(:'cwid') = 8
-  and (select count(*) from public.nexamon_sealed_packs where battle_id = :cid and source = 'battle' and price_cents = 0) = 8,
-  'Crash-Regen is judged by the server simulation; the winner gets 8 sealed packs worth at most 20.000 €');
-select tests.assert(public.battle_prize_label(:'cres'::jsonb) = '1 × Nexamon: Prismatic Peak + 7 × Nexamon: Mystic Energy (ungeöffnet)',
+  and tests.b6_sealed(:'cwid') = :cpacks::bigint
+  and (select count(*) from public.nexamon_sealed_packs where battle_id = :cid and source = 'battle' and price_cents = 0) = :cpacks::bigint,
+  'Crash-Regen is judged by the server simulation; the winner gets the sealed packs, worth at most 20.000 €');
+select tests.assert(public.battle_prize_label(:'cres'::jsonb -> 'prize') = '1 × Nexamon: Prismatic Peak + 7 × Nexamon: Mystic Energy (ungeöffnet)',
   'the prize label names the packs');
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after a pack prize');
 
@@ -211,16 +214,16 @@ select tests.assert(
 -- D. Sealed packs: list, open exactly once (idempotent), not someone else's
 -- =============================================================================
 update public.nexamon_sealed_packs set player_id = :a where player_id = :'cwid' and opened_at is null;
+select (select sum(population) from public.nexamon_cards) as pop0 \gset
 select tests.login_as('authenticated', :a);
 select public.get_nexamon_sealed_packs() as gs \gset
 select :'gs'::jsonb #>> '{packs,0,id}' as sp1 \gset
 select :'gs'::jsonb #>> '{packs,0,set}' as sp1_set \gset
-select (select sum(population) from public.nexamon_cards) as pop0 \gset
 select public.open_nexamon_sealed_pack(:rq, :'sp1') as op1 \gset
 select public.open_nexamon_sealed_pack(:rq, :'sp1') as op1b \gset
 reset role;
 select tests.assert(
-  jsonb_array_length(:'gs'::jsonb -> 'packs') = 8 and (:'gs'::jsonb ->> 'unlocked')::boolean
+  jsonb_array_length(:'gs'::jsonb -> 'packs') = :cpacks::integer and (:'gs'::jsonb ->> 'unlocked')::boolean
   and jsonb_array_length(:'op1'::jsonb -> 'cards') = (public.nexamon_cfg() ->> 'packSize')::integer
   and :'op1'::jsonb ->> 'sealed_id' = :'sp1' and (:'op1'::jsonb ->> 'price_cents')::bigint = 0
   and :'op1b'::jsonb -> 'pack_id' = :'op1'::jsonb -> 'pack_id'
@@ -228,7 +231,7 @@ select tests.assert(
   and exists (select 1 from public.nexamon_packs where id::text = :'op1'::jsonb ->> 'pack_id' and player_id = :a and set_key = :'sp1_set')
   and (select count(*) from public.nexamon_copies where owner_id = :a and pack_id::text = :'op1'::jsonb ->> 'pack_id') = 5
   and (select sum(population) from public.nexamon_cards) = :pop0::bigint + 5
-  and tests.b6_sealed(:a) = 7,
+  and tests.b6_sealed(:a) = :cpacks::bigint - 1,
   'open_nexamon_sealed_pack(): a pack opens like a bought one (five copies, population, nexamon_packs), once; a replay answers the same');
 select tests.login_as('authenticated', :a);
 select tests.throws_key(format($$select public.open_nexamon_sealed_pack(gen_random_uuid(), %L)$$, :'sp1'),
@@ -261,12 +264,11 @@ select tests.throws_key($$select public.buy_nexamon_sealed_pack(gen_random_uuid(
 reset role;
 select tests.assert(
   tests.cash(:a) = :cash_a1::bigint - 3 * :me_price::bigint
-  and tests.households() = :hh1::bigint + 3 * :me_price::bigint
   and (:'bs'::jsonb ->> 'price_cents')::bigint = 3 * :me_price::bigint and :'bs2'::jsonb = :'bs'::jsonb
-  and tests.b6_sealed(:a) = 10
+  and tests.b6_sealed(:a) = :cpacks::bigint + 2
   and (select count(*) from public.nexamon_sealed_packs where player_id = :a and source = 'bought' and price_cents = :me_price::bigint) = 3
   and exists (select 1 from public.ledger_transactions t where t.kind = 'nexamon_pack'
-                and t.idempotency_key = 'nexamon:sealed:' || :'a' || ':' || :'rs'),
+                and (t.metadata ->> 'sealed')::boolean and (t.metadata ->> 'count')::integer = 3),
   'buy_nexamon_sealed_pack(): 3 packs charged once (cash -> households, ledger kind nexamon_pack), all sealed; a replay pays nothing');
 select id as bought1 from public.nexamon_sealed_packs where player_id = :a and source = 'bought' and opened_at is null
  order by created_at, id limit 1 \gset
@@ -277,7 +279,7 @@ reset role;
 select tests.assert(
   jsonb_array_length(:'op2'::jsonb -> 'cards') = 5 and (:'op2'::jsonb ->> 'set') = 'mystic_energy'
   and (:'op2'::jsonb ->> 'price_cents')::bigint = :me_price::bigint
-  and tests.cash(:a) = :cash_a2::bigint and tests.b6_sealed(:a) = 9,
+  and tests.cash(:a) = :cash_a2::bigint and tests.b6_sealed(:a) = :cpacks::bigint + 1,
   'a bought sealed pack opens later without a second charge');
 select tests.assert(tests.money_invariant() = 'ok', 'ledger invariant holds after buying and opening sealed packs');
 

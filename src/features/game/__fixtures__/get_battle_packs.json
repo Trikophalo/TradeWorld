@@ -1,0 +1,122 @@
+{
+  "now": "2026-11-17T09:58:08.092148+00:00",
+  "battle": {
+    "id": 35,
+    "kind": null,
+    "seed": null,
+    "prize": {
+      "kind": "packs",
+      "cents": 200000,
+      "packs": [
+        { "set": "super_apex", "name": "Nexamon: Super Apex", "count": 1 },
+        { "set": "mystic_energy", "name": "Nexamon: Mystic Energy", "count": 5 }
+      ]
+    },
+    "joined": false,
+    "params": null,
+    "result": null,
+    "rounds": null,
+    "status": "open",
+    "ends_at": null,
+    "players": [],
+    "opened_at": "2026-11-17T09:58:08.082302+00:00",
+    "started_at": null,
+    "finished_at": null,
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 3,
+    "countdown_ends_at": null
+  },
+  "recent": {
+    "id": 34,
+    "kind": "tiles",
+    "seed": 23,
+    "prize": { "xp": 2900, "kind": "xp" },
+    "joined": false,
+    "params": {
+      "h": 9,
+      "w": 11,
+      "tps": 20,
+      "game": {
+        "idleMax": 30,
+        "breakMin": 14,
+        "maxTicks": 1600,
+        "breakStart": 40,
+        "regrowStart": 140,
+        "breakStepEvery": 80,
+        "regrowGrowEvery": 8
+      },
+      "spawns": [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 4],
+        [7, 4]
+      ],
+      "tickMs": 50,
+      "graceMs": 1000,
+      "stepTicks": 4,
+      "aheadTicks": 10,
+      "checkEveryMs": 1000,
+      "disconnectTicks": 80
+    },
+    "result": {
+      "out": [29, 40, -1],
+      "paid": true,
+      "prize": { "xp": 2900, "kind": "xp" },
+      "score": [0, 10, 10],
+      "capped": false,
+      "ranking": [2, 1, 0],
+      "end_tick": 40,
+      "winner_slot": 2
+    },
+    "rounds": null,
+    "status": "finished",
+    "ends_at": "2026-11-17T09:57:58.316934+00:00",
+    "players": [
+      {
+        "me": false,
+        "left": false,
+        "rank": 3,
+        "slot": 0,
+        "nickname": "B6_Anna",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 2,
+        "slot": 1,
+        "nickname": "B6_Bruno",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 1,
+        "slot": 2,
+        "nickname": "B6_Clara",
+        "avatar_key": "rookie",
+        "accessories": []
+      }
+    ],
+    "opened_at": "2026-11-17T09:57:59.316934+00:00",
+    "started_at": "2026-11-17T09:56:19.316934+00:00",
+    "finished_at": "2026-11-17T09:57:59.320684+00:00",
+    "max_players": 10,
+    "min_players": 3,
+    "prize_wins_left": 3,
+    "countdown_ends_at": null
+  },
+  "viewers": 1,
+  "per_hour": 1000,
+  "next_round_at": "2026-11-17T10:00:00+00:00",
+  "played_this_hour": 11
+}

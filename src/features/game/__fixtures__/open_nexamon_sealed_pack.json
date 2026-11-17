@@ -1,0 +1,65 @@
+{
+  "set": "mystic_energy",
+  "cards": [
+    {
+      "slot": 1,
+      "is_new": true,
+      "rarity": "common",
+      "serial": 9,
+      "copy_id": "8f146518-5d24-4e85-8e4c-c126176d8559",
+      "card_key": "me-029",
+      "condition": "mint",
+      "population": 9,
+      "value_cents": 140
+    },
+    {
+      "slot": 2,
+      "is_new": true,
+      "rarity": "common",
+      "serial": 9,
+      "copy_id": "c223f3e0-36d1-4a33-a00c-8342fe869f67",
+      "card_key": "me-025",
+      "condition": "mint",
+      "population": 9,
+      "value_cents": 150
+    },
+    {
+      "slot": 3,
+      "is_new": false,
+      "rarity": "common",
+      "serial": 10,
+      "copy_id": "2562f5e6-47e4-4075-8bf2-560de15a41eb",
+      "card_key": "me-046",
+      "condition": "poor",
+      "population": 10,
+      "value_cents": 406
+    },
+    {
+      "slot": 4,
+      "is_new": true,
+      "rarity": "common",
+      "serial": 10,
+      "copy_id": "0b4f1682-8818-43ed-93d6-eda74ac2ce64",
+      "card_key": "me-040",
+      "condition": "good",
+      "population": 10,
+      "value_cents": 279
+    },
+    {
+      "slot": 5,
+      "is_new": true,
+      "rarity": "common",
+      "serial": 8,
+      "copy_id": "eae2faf3-79a3-4d30-bc8a-85d49eaf9f9c",
+      "card_key": "me-037",
+      "condition": "near_mint",
+      "population": 8,
+      "value_cents": 520
+    }
+  ],
+  "pack_id": "833d6420-3345-4733-becd-88ffc7f0034f",
+  "sealed_id": "d65940b0-0e89-4959-963d-bfc878f68664",
+  "price_cents": 20000,
+  "sealed_left": 1,
+  "packs_opened": 2
+}

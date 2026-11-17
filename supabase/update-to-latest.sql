@@ -57873,7 +57873,9 @@ $do$;
 alter table public.battles drop constraint if exists battles_kind_check;
 alter table public.battles add constraint battles_kind_check check (kind is null or kind in (
   'floor', 'bulls', 'coins', 'sumo', 'potato', 'pump', 'bear', 'dash', 'margin', 'elevator', 'laser', 'rodeo',
-  'quiz', 'estimate', 'bell', 'vault', 'ticker', 'higher', 'auction'));
+  'quiz', 'estimate', 'bell', 'vault', 'ticker', 'higher', 'auction')) not valid;
+-- (update copy only: "not valid", so a database that already has games of later migrations, e.g. ADR-177, passes;
+-- 20261204006700 replaces the check with the full, validated list)
 
 revoke all on function public.battle_sim_bear(bigint, jsonb, text[], integer) from public, anon, authenticated;
 revoke all on function public.battle_dash_tile(bigint, integer, integer, integer[], integer[]) from public, anon, authenticated;
