@@ -25,6 +25,7 @@ import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { InfoTip } from "./firm-layout";
 import { useCompanyRefresh } from "../hooks";
 import { netProfit } from "./headquarters";
 
@@ -41,19 +42,31 @@ const NEXT_TIER = { garage: "small_business", small_business: "gmbh", gmbh: "ag"
 function Panel({
   title,
   aside,
+  description,
+  info,
   children,
   className,
 }: {
   title: string;
   aside?: ReactNode;
+  /** One line under the title (ADR-183). */
+  description?: ReactNode;
+  /** An "i" with a longer explanation (ADR-183). */
+  info?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <Card padding="lg" className={cn("space-y-4", className)}>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="label-pixel text-fg-2">{title}</p>
-        {aside}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <p className="flex items-center gap-1.5 label-pixel text-fg-2">
+            {title}
+            {info && <InfoTip text={info} label={title} />}
+          </p>
+          {aside}
+        </div>
+        {description && <p className="text-xs text-pretty text-fg-3">{description}</p>}
       </div>
       {children}
     </Card>
@@ -304,7 +317,14 @@ export function MarketingBudgetCard({ company }: { company: MyCompany }) {
   };
 
   return (
-    <Panel title={t("controlsTitle")}>
+    <Panel
+      title={t("controlsTitle")}
+      info={t("marketingInfo")}
+      description={t("marketingHint", {
+        hours: BALANCE.time.quarterHours,
+        perHour: formatMoney(Math.round(marketing / BALANCE.time.quarterHours), { whole: true }),
+      })}
+    >
       <div className="space-y-2" id="company-controls">
         <div className="flex items-baseline justify-between">
           <span className="text-sm text-fg-2">{t("marketingBudget")}</span>

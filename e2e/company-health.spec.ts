@@ -51,14 +51,14 @@ test("the overview shows eight factors and the chart; a factor goes to Mira with
   await showDashboard(page);
   await expect(page.getByTestId("mira").getByText(/Hier verlierst du gerade am meisten:/)).toBeVisible();
 
-  // ADR-180: the full panel sits under "Erweitert"
-  await page.getByTestId("section-details").click();
+  // ADR-183: nothing folds; the full panel stands in the section "Stärken und Diagnose" (jump bar)
+  await page.getByTestId("dashboard-nav").getByTestId("nav-diagnosis").click();
   const panel = page.getByTestId("company-health");
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("health-radar")).toBeVisible();
   await expect(panel.getByTestId("health-factor")).toHaveCount(8);
-  for (const name of ["Bekanntheit", "Menge", "Qualität", "Image", "Preis", "Team", "Kasse", "Schwung"])
-    await expect(panel.getByTestId("health-factor").filter({ hasText: name })).toHaveCount(1);
+  for (const key of ["awareness", "capacity", "quality", "image", "price", "team", "cash", "momentum"])
+    await expect(panel.locator(`[data-testid="health-factor"][data-factor="${key}"]`)).toHaveCount(1);
   await expect(panel.getByTestId("health-weakest")).toContainText("Hier verlierst du am meisten:");
   await expect(panel.getByTestId("health-profit")).toContainText("/h");
 

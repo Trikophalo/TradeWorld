@@ -38,6 +38,7 @@ import {
   type OwnedItem,
 } from "@/lib/sim/listed";
 import type { PriceLevel, StartupHourInput } from "@/lib/sim/startup";
+import { reputationTargetAll, type ReputationDrivers } from "@/lib/sim/company-reputation";
 import type {
   AccountingEntry,
   BoardMotion,
@@ -161,6 +162,8 @@ export interface ListedHost {
 /** One closed hour as the listed part needs it. */
 export interface ListedHourFacts {
   at: number;
+  /** ADR-183: operational reputation drivers of the hour (every company). */
+  reputationDrivers?: ReputationDrivers;
   demandCents: number;
   capacityCents: number;
   revenueCents: number;
@@ -425,7 +428,17 @@ export function createListedEngine(host: ListedHost) {
       dividendStreak: l.dividendStreak,
       scandal: false,
     });
-    l.reputation = stepToward(l.reputation, rt.target, cfg.reputation.adjustPerHour);
+    // ADR-183: the operational drivers of every company come on top of the shareholder target
+    const op = hour.reputationDrivers ?? null;
+    const target = op ? reputationTargetAll(op, rt.target) : rt.target;
+    l.reputation = stepToward(l.reputation, target, cfg.reputation.adjustPerHour);
+    company.reputation = l.reputation;
+    const own = company.hours?.at(-1);
+    if (own && own.at === hour.at) {
+      own.reputation = l.reputation;
+      own.reputationTarget = target;
+      own.reputationDrivers = { ...rt.drivers, ...(op ?? {}) };
+    }
     const pf = reputationEffect(l.reputation).priceFactor;
     if (company.listing?.lastPriceCents)
       company.listing.lastPriceCents = Math.max(1, Math.round((company.listing.lastPriceCents / l.priceFactor) * pf));
@@ -433,8 +446,12 @@ export function createListedEngine(host: ListedHost) {
     if (l.reputation < cfg.reputation.greed.feedBelow && ratio >= cfg.reputation.greed.fullRatioBps * 0.8)
       host.feed("greedy_founder", { company: company.name, ratio_bps: ratio });
 
-    l.drivers = { satisfaction: { ...st.drivers }, reputation: { ...rt.drivers }, payoutRatioBps: ratio };
-    l.targets = { satisfaction: st.target, reputation: rt.target };
+    l.drivers = {
+      satisfaction: { ...st.drivers },
+      reputation: { ...rt.drivers, ...(op ?? {}) },
+      payoutRatioBps: ratio,
+    };
+    l.targets = { satisfaction: st.target, reputation: target };
     const eff = listedHourEffect(fx, l.satisfaction, l.reputation);
     l.history = [
       ...l.history,

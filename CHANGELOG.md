@@ -113,6 +113,11 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Firma aufgeräumt (ADR-183):** klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter
+  dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je Punkt sagt, was zu tun ist.
+- **Ruf für jede Firma:** Qualität, faire Preise, bezahlte Löhne und Kampagnen heben ihn jede Stunde, er bewegt die Nachfrage.
+- **„Was jeder leistet“ stimmt:** Leistung wie in der Abrechnung, Kosten nach gezahlten Löhnen.
+
 - **Slabs bleiben im Umlauf:** Bewertete Karten, die die KI kauft, verschwinden nie; sie behält sie eine Weile (1 bis 72 h)
   und bietet sie dann zum aktuellen Wert wieder am Markt an.
 

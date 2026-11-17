@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
-import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { LiveMoney, ShortMoney } from "@/components/ui/live-money";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BALANCE } from "@/config/balance";
@@ -29,9 +28,10 @@ import type { CompanyTarget } from "../../tabs";
 import { useCompanyTasks } from "../../tasks/task-board";
 import { COMPANY_MOVES_KEY, moveText } from "../company-moves";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
-import { netProfit } from "../headquarters";
 import { HealthPanel, type AskMira } from "../health-panel";
 import { CloseErrorNote, StrengthsCard } from "../strengths-card";
+import { FirmSection, SectionNav, type NavItem } from "../firm-layout";
+import { ReputationCard } from "../reputation-card";
 import { OfficeScene } from "../office-scene";
 import { StaffValueCard } from "../staff-value-card";
 import { InterviewCard } from "../interview-card";
@@ -41,11 +41,11 @@ import { AutopilotCard, useCompanyAutopilot } from "../autopilot-card";
 import { PulseCard } from "../pulse-card";
 
 type Go = (target: CompanyTarget) => void;
-type SectionProps = (id: string) => { id: string; open: boolean; onOpenChange: (open: boolean) => void };
 
 /**
- * The first tab of the own company (ADR-167, UI): what is due, the important numbers and charts, the eight factors,
- * running timers, the office and Mira. Listed companies also see share price, reputation and the team's mood.
+ * The first tab of the own company (ADR-167; flat since ADR-183): what is due, then six sections without folding,
+ * each with a header that says what it is for and a sticky jump bar: numbers, helpers (autopilot and Mira),
+ * diagnosis (strengths and "Wo es fehlt"), reputation and mood, the team's value and the office, the situation.
  */
 export function DashboardTab({
   company,
@@ -56,7 +56,6 @@ export function DashboardTab({
   onAsk,
   onMira,
   go,
-  section,
 }: {
   company: MyCompany;
   listed: ListedCompany | null;
@@ -67,99 +66,139 @@ export function DashboardTab({
   onAsk: AskMira;
   onMira: MiraOpen;
   go: Go;
-  section: SectionProps;
 }) {
-  const ts = useTranslations("firm.sections");
-  const th = useTranslations("hq.dashboard");
+  const th = useTranslations("hq.dash");
   const late = hourlyCloseOverdue(company, useServerClock());
   const autopilot = useCompanyAutopilot();
+  const nav: NavItem[] = [
+    { id: "numbers", label: th("numbers.nav"), icon: UI_ICONS.portfolio },
+    { id: "assist", label: th("assist.nav"), icon: UI_ICONS.robot },
+    { id: "diagnosis", label: th("diagnosis.nav"), icon: UI_ICONS.star },
+    { id: "reputation-mood", label: th("reputation.nav"), icon: UI_ICONS.heart },
+    { id: "team-value", label: th("team.nav"), icon: UI_ICONS.profile },
+    { id: "situation", label: th("situation.nav"), icon: UI_ICONS.news },
+  ];
   return (
-    <div className="space-y-4" data-testid="company-dashboard">
+    <div className="space-y-6" data-testid="company-dashboard">
       <CloseErrorNote company={company} />
-      {/* ADR-180: the simple view first: the key numbers, what to do next, the autopilot, the six strengths. */}
-      <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-5">
-        <div className="space-y-4">
-          <NumbersCard company={company} listed={listed} listedPending={listedPending} />
-          <PulseCard lastHour={autopilot.data?.lastHour} />
-          <TodoStrip company={company} listed={listed} go={go} autopilot={autopilot.data ?? null} />
-        </div>
-        <div className="space-y-4">
-          <div id="autopilot" className="scroll-mt-24">
-            <AutopilotCard />
+      <CloseWarningsNote company={company} />
+      <TodoStrip company={company} listed={listed} go={go} autopilot={autopilot.data ?? null} />
+      <SectionNav items={nav} label={th("navLabel")} testId="dashboard-nav" />
+
+      <FirmSection id="numbers" icon={UI_ICONS.portfolio} title={th("numbers.title")} description={th("numbers.text")}>
+        <NumbersCard company={company} listed={listed} listedPending={listedPending} />
+        <PulseCard lastHour={autopilot.data?.lastHour} />
+        <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5">
+          <div id="quarter" className="scroll-mt-32">
+            <QuarterReceipt company={company} />
           </div>
-          <div id="mira" className="scroll-mt-24">
-            <MiraChat applications={company.pendingApplications} health={miraHealth} onOpen={onMira} />
+          <div id="history" className="scroll-mt-32">
+            <HistoryCard company={company} />
           </div>
         </div>
-      </div>
-      {/* The strengths with their reward: what the company is good at, at a glance (ADR-176). */}
-      <div id="strengths" className="scroll-mt-24">
-        <StrengthsCard company={company} />
-      </div>
-      {listedPending && <Skeleton className="h-64 w-full rounded-lg" />}
-      {listed && <MoodCard listed={listed} go={go} />}
-      {/* Everything else stays one tap away (ADR-180: "Erweitert"). */}
-      <CollapsibleSection
-        {...section("details")}
-        title={th("detailsSection")}
-        summary={th("detailsSummary")}
-        icon={<PixelIcon {...UI_ICONS.briefcase} scale={2} />}
+      </FirmSection>
+
+      <FirmSection
+        id="assist"
+        icon={UI_ICONS.robot}
+        title={th("assist.title")}
+        description={th("assist.text")}
+        columns={2}
       >
+        <div id="autopilot" className="scroll-mt-32">
+          <AutopilotCard />
+        </div>
+        <div id="mira" className="scroll-mt-32">
+          <MiraChat applications={company.pendingApplications} health={miraHealth} onOpen={onMira} />
+        </div>
+      </FirmSection>
+
+      <FirmSection id="diagnosis" icon={UI_ICONS.star} title={th("diagnosis.title")} description={th("diagnosis.text")}>
+        {/* The strengths with their reward: what the company is good at, at a glance (ADR-176). */}
+        <div id="strengths" className="scroll-mt-32">
+          <StrengthsCard company={company} />
+        </div>
+        <div id="health" className="scroll-mt-32">
+          <HealthPanel health={health} onAsk={onAsk} late={late} />
+        </div>
+      </FirmSection>
+
+      <FirmSection
+        id="reputation-mood"
+        icon={UI_ICONS.heart}
+        title={th("reputation.title")}
+        description={th(listed || listedPending ? "reputation.textListed" : "reputation.text")}
+        columns={listed || listedPending ? 2 : 1}
+      >
+        <ReputationCard company={company} listed={listed} />
+        {listedPending && <Skeleton className="h-64 w-full rounded-lg" />}
+        {listed && <MoodCard listed={listed} go={go} />}
+      </FirmSection>
+
+      <FirmSection
+        id="team-value"
+        icon={UI_ICONS.profile}
+        title={th("team.title")}
+        description={th("team.text")}
+        columns={2}
+      >
+        <StaffValueCard company={company} id="staff-value" />
         <div className="space-y-4">
           <TimersCard company={company} listed={listed} go={go} />
-          <div id="health" className="scroll-mt-24">
-            <HealthPanel health={health} onAsk={onAsk} late={late} />
-          </div>
-          <StaffValueCard company={company} id="staff-value" />
           <OfficeScene company={company} onTeam={() => go({ tab: "staff" })} />
         </div>
-      </CollapsibleSection>
-      <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5">
+      </FirmSection>
+
+      <FirmSection
+        id="situation"
+        icon={UI_ICONS.news}
+        title={th("situation.title")}
+        description={th("situation.text")}
+        columns={2}
+      >
         <div className="space-y-4">
-          <CollapsibleSection
-            {...section("situation")}
-            title={ts("situation")}
-            summary={ts("situationSummary")}
-            icon={<PixelIcon {...UI_ICONS.news} scale={2} />}
-          >
-            <SituationCard />
-            <Reveal feature="companyInterview">
-              <InterviewCard />
-            </Reveal>
-            <PitchCard kind="event" />
-            <CompanyNewsCard />
-          </CollapsibleSection>
+          <SituationCard />
+          <Reveal feature="companyInterview">
+            <InterviewCard />
+          </Reveal>
         </div>
         <div className="space-y-4">
-          <CollapsibleSection
-            {...section("numbers")}
-            title={th("numbersSection")}
-            summary={
-              company.lastQuarter
-                ? ts("moneySummary", { amount: money(netProfit(company.lastQuarter)) })
-                : ts("moneyEmpty")
-            }
-            icon={<PixelIcon {...UI_ICONS.portfolio} scale={2} />}
-          >
-            <div id="quarter" className="scroll-mt-24">
-              <QuarterReceipt company={company} />
-            </div>
-          </CollapsibleSection>
-          <CollapsibleSection
-            {...section("history")}
-            title={ts("history")}
-            summary={ts("historySummary")}
-            icon={<PixelIcon {...UI_ICONS.markets} scale={2} />}
-          >
-            <HistoryCard company={company} />
-          </CollapsibleSection>
+          <PitchCard kind="event" />
+          <CompanyNewsCard />
         </div>
-      </div>
+      </FirmSection>
+
       {!company.listing && (
         <Reveal feature="companyListed">
           <ListedTeaser />
         </Reveal>
       )}
+    </div>
+  );
+}
+
+/** Extra steps of the hourly close that failed (ADR-183): the hour was recorded, this part was skipped. */
+function CloseWarningsNote({ company }: { company: MyCompany }) {
+  const t = useTranslations("hq.dash");
+  type StepKey = Parameters<typeof t>[0];
+  const w = company.closeWarnings;
+  if (w.length === 0) return null;
+  return (
+    <div className="rounded-md bg-warn-soft px-3 py-2.5 text-sm text-pretty text-warn" data-testid="close-warnings">
+      <p>
+        {t("warnings", {
+          steps: w
+            .map((x) => (t.has(`steps.${x.step}` as StepKey) ? t(`steps.${x.step}` as StepKey) : x.step))
+            .join(", "),
+        })}
+      </p>
+      <ul className="mt-1 space-y-0.5 font-mono text-xs break-all">
+        {w.map((x) => (
+          <li key={x.step}>
+            {x.step}: {x.error}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -385,6 +424,7 @@ function NumbersCard({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat
           label={t("cash")}
+          info={t("info.cash")}
           testId="stat-cash"
           hint={
             listed
@@ -404,6 +444,7 @@ function NumbersCard({
         </Stat>
         <Stat
           label={t("revenueHour")}
+          info={t("info.revenue")}
           testId="stat-revenue"
           hint={last && delta(last.revenueCents, prev?.revenueCents)}
         >
@@ -411,6 +452,7 @@ function NumbersCard({
         </Stat>
         <Stat
           label={t("costsHour")}
+          info={t("info.costs")}
           testId="stat-costs"
           hint={last && delta(costs(last), prev ? costs(prev) : undefined)}
         >
@@ -418,6 +460,7 @@ function NumbersCard({
         </Stat>
         <Stat
           label={t("profitHour")}
+          info={t("info.profit")}
           testId="stat-profit"
           tone={last ? (last.profitCents >= 0 ? "gain" : "loss") : undefined}
           hint={last && delta(last.profitCents, prev?.profitCents)}
@@ -428,6 +471,7 @@ function NumbersCard({
           <>
             <Stat
               label={t("sharePrice")}
+              info={t("info.share")}
               testId="stat-share"
               hint={
                 listing.ticker ? (
@@ -450,6 +494,7 @@ function NumbersCard({
                 <Stat
                   label={t("reputation")}
                   testId="stat-reputation"
+                  info={t("info.reputation")}
                   tone={listed.reputation.value >= 50 ? "gain" : listed.reputation.value < 35 ? "loss" : "warn"}
                   hint={t("reputationDemand", {
                     percent: formatBps(Math.round((listed.reputation.demandFactor - 1) * 10_000)),
@@ -460,6 +505,7 @@ function NumbersCard({
                 </Stat>
                 <Stat
                   label={t("upkeep")}
+                  info={t("info.upkeep")}
                   testId="stat-upkeep"
                   hint={t("upkeepRef", { amount: money(listed.refRevenueCents) })}
                 >
@@ -467,6 +513,7 @@ function NumbersCard({
                 </Stat>
                 <Stat
                   label={t("taxDue")}
+                  info={t("info.tax")}
                   testId="stat-tax"
                   tone={listed.taxes.dueCents > 0 ? "warn" : undefined}
                   hint={t("taxRate", { percent: formatBps(listed.taxes.rateBps).replace("+", "") })}
@@ -504,7 +551,7 @@ function MoodCard({ listed, go }: { listed: ListedCompany; go: Go }) {
   return (
     <Panel
       title={t("moodTitle")}
-      id="reputation"
+      id="mood"
       testId="dashboard-mood"
       aside={
         <button

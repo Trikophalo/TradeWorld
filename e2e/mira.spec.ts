@@ -83,10 +83,10 @@ test("Mira briefs the new task and runs the company through the chat", async ({ 
   await mira.getByTestId("mira-send").click();
   await expect(mira.getByText(/Pro Stunde kann ich nur einen freien Auftrag umsetzen/)).toBeVisible();
 
-  // Controlling folds into sections; the till is open, the rest opens on a tap.
+  // Controlling: nothing folds since ADR-183; the jump bar leads to the business moves.
   await page.getByRole("tab", { name: /Controlling/ }).click();
-  await expect(page.getByTestId("treasury")).toBeVisible();
-  await expect(page.getByTestId("company-moves")).toHaveCount(0);
-  await page.getByTestId("section-moves").click();
+  await expect(page.getByTestId("treasury")).toBeAttached();
+  await page.getByTestId("controlling-nav").getByTestId("nav-group-sell").click();
+  await page.getByTestId("company-moves").scrollIntoViewIfNeeded();
   await expect(page.getByTestId("company-moves")).toBeVisible();
 });

@@ -6,11 +6,13 @@ import { MIRA, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { BALANCE } from "@/config/balance";
 import { formatMoney } from "@/lib/format";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
 import type { CompanyHealth, HealthFactor, HealthFactorKey, HealthStatus } from "@/lib/sim/company-health";
 import { cn } from "@/lib/utils";
 import { useHealthText } from "../health";
+import { InfoTip } from "./firm-layout";
 
 /*
  * Company health (ADR-162): eight factors as a spider chart and as bars, the weakest one on top with what it costs.
@@ -29,7 +31,23 @@ const TONE: Record<HealthStatus, { text: string; fill: string; bg: string; soft:
 
 export type AskMira = (factor: HealthFactorKey) => void;
 
-/** The full panel at the top of the company overview. */
+/** Which of the six strengths (ADR-176) a factor feeds; image and momentum have their own place. */
+const STRENGTH_OF = {
+  awareness: "awareness",
+  capacity: "delivery",
+  quality: "quality",
+  image: "reputation",
+  price: "margin",
+  team: "team",
+  cash: "finance",
+  momentum: "tasks",
+} as const satisfies Record<HealthFactorKey, string>;
+
+/**
+ * "Wo es fehlt" (ADR-162, reworked in ADR-183): the eight factors of the last hour, their logic unchanged. A clear
+ * chart with values on every axis, the biggest lever with what it is worth, then one row per factor, the costliest
+ * first: what it measures, the reason in numbers, what to do, what it would bring, and Mira.
+ */
 export function HealthPanel({
   health,
   onAsk,
@@ -42,6 +60,12 @@ export function HealthPanel({
 }) {
   const t = useTranslations("companyHealth");
   const weakest = health.factors.find((f) => f.key === health.weakest)!;
+  // What costs most first, then the weakest score; the chart keeps the fixed order.
+  const rows = [...health.factors].sort((a, b) => b.impactCents - a.impactCents || a.score - b.score);
+  const counts = (["critical", "weak", "ok", "good"] as const).map((st) => ({
+    status: st,
+    count: health.factors.filter((f) => f.status === st).length,
+  }));
   return (
     <Card padding="lg" className="space-y-5" data-testid="company-health" data-estimated={health.estimated}>
       <Header health={health} />
@@ -58,16 +82,25 @@ export function HealthPanel({
         </p>
       )}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-6">
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-32">
           <HealthRadar health={health} />
+          <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs" aria-label={t("legend")}>
+            {counts.map((c) => (
+              <li key={c.status} className="inline-flex items-center gap-1.5 text-fg-2">
+                <span aria-hidden className={cn("size-2.5 rounded-pill", TONE[c.status].bg)} />
+                {t(`status.${c.status}`)} <span className="nums text-fg-3">{c.count}</span>
+              </li>
+            ))}
+          </ul>
           <Weakest factor={weakest} onAsk={onAsk} />
         </div>
-        <ol className="grid gap-2 sm:grid-cols-2" aria-label={t("listLabel")}>
-          {health.factors.map((f, i) => (
+        <ol className="space-y-2" aria-label={t("listLabel")}>
+          {rows.map((f, i) => (
             <FactorRow key={f.key} factor={f} weakest={f.key === health.weakest} index={i} onAsk={onAsk} />
           ))}
         </ol>
       </div>
+      <p className="text-xs text-pretty text-fg-3">{t("footnote")}</p>
     </Card>
   );
 }
@@ -124,21 +157,33 @@ export function HealthCompact({
 
 function Header({ health }: { health: CompanyHealth }) {
   const t = useTranslations("companyHealth");
+  const score = health.score;
+  const limits = BALANCE.companyHealth.status;
+  const status: HealthStatus =
+    score >= limits.good ? "good" : score >= limits.ok ? "ok" : score >= limits.weak ? "weak" : "critical";
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 label-pixel text-fg-2">
           <PixelIcon {...UI_ICONS.star} scale={1} />
           {t("title")}
+          <InfoTip text={t("info")} label={t("title")} />
         </p>
         <p className="mt-1 text-sm text-pretty text-fg-3">{t("intro")}</p>
       </div>
-      <div className="text-right">
-        <ProfitNow cents={health.profitPerHourCents} />
-        <p className="nums text-xs text-fg-3">
-          {t("score", { score: health.score })}
-          {health.estimated && <span className="text-info"> · {t("estimatedBadge")}</span>}
-        </p>
+      <div className="flex items-stretch gap-2">
+        <div className="rounded-md bg-surface-2 px-3 py-2 text-right" data-testid="health-score">
+          <p className="text-2xs text-fg-3">{t("scoreLabel")}</p>
+          <p className={cn("nums text-lg font-semibold", TONE[status].text)}>
+            {score}
+            <span className="text-xs font-normal text-fg-3"> / 100</span>
+          </p>
+          <p className="sr-only">{t("score", { score })}</p>
+          {health.estimated && <p className="text-2xs text-info">{t("estimatedBadge")}</p>}
+        </div>
+        <div className="rounded-md bg-surface-2 px-3 py-2 text-right">
+          <ProfitNow cents={health.profitPerHourCents} />
+        </div>
       </div>
     </div>
   );
@@ -148,6 +193,11 @@ function ProfitNow({ cents, small }: { cents: number; small?: boolean }) {
   const t = useTranslations("companyHealth");
   return (
     <span className="block" data-testid="health-profit">
+      {!small && (
+        <span className="block text-2xs text-fg-3" aria-hidden>
+          {t(cents >= 0 ? "profitNow" : "lossNow")}
+        </span>
+      )}
       <span className="sr-only">{t(cents >= 0 ? "profitNow" : "lossNow")}: </span>
       <span
         className={cn(
@@ -158,11 +208,6 @@ function ProfitNow({ cents, small }: { cents: number; small?: boolean }) {
       >
         {t("perHour", { amount: signed(cents) })}
       </span>
-      {!small && (
-        <span className="block text-2xs text-fg-3" aria-hidden>
-          {t(cents >= 0 ? "profitNow" : "lossNow")}
-        </span>
-      )}
     </span>
   );
 }
@@ -185,6 +230,9 @@ function Weakest({ factor, onAsk }: { factor: HealthFactor; onAsk: AskMira }) {
             <span className={cn("font-semibold", TONE[factor.status].text)}>{text.factor(factor.key)}</span>
           </p>
           <p className="text-sm text-pretty text-fg-2">{text.reason(factor)}</p>
+          <p className="text-sm text-pretty text-fg-1">
+            <span className="font-semibold">{t("doThis")}</span> {t(`todo.${factor.key}`)}
+          </p>
           <p className="nums text-xs text-fg-3">
             {factor.impactCents > 0 ? t("weakestGain", { amount: money(factor.impactCents) }) : t("weakestNoGain")}
           </p>
@@ -212,28 +260,39 @@ function FactorRow({
   const t = useTranslations("companyHealth");
   const text = useHealthText();
   const tone = TONE[factor.status];
+  const limits = BALANCE.companyHealth.status;
   return (
     <motion.li
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION.slow, ease: EASE.out, delay: index * STAGGER }}
       className={cn(
-        "flex min-w-0 flex-col gap-1.5 rounded-md border bg-surface-2 px-3 py-2.5",
+        "flex min-w-0 flex-col gap-2 rounded-md border bg-surface-2 px-3 py-3",
         weakest ? "border-line-2 ring-1 ring-line-2" : "border-line-1",
       )}
       data-testid="health-factor"
       data-factor={factor.key}
       data-status={factor.status}
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="min-w-0 truncate text-sm font-semibold text-fg-1">{text.factor(factor.key)}</span>
-        <span className="flex shrink-0 items-baseline gap-1.5">
-          <span className={cn("text-2xs font-medium", tone.text)}>{t(`status.${factor.status}`)}</span>
-          <span className="nums text-sm font-semibold text-fg-1">{factor.score}</span>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-fg-1">{text.factor(factor.key)}</span>
+          <span className="rounded-xs bg-surface-3 px-1.5 py-0.5 text-2xs text-fg-3">
+            {t(`link.${STRENGTH_OF[factor.key]}`)}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className={cn("rounded-pill px-2 py-0.5 text-2xs font-medium", tone.soft, tone.text)}>
+            {t(`status.${factor.status}`)}
+          </span>
+          <span className="nums text-sm font-semibold text-fg-1">
+            {factor.score}
+            <span className="text-xs font-normal text-fg-3">/100</span>
+          </span>
         </span>
       </div>
       <div
-        className="h-1.5 overflow-hidden rounded-pill bg-surface-3"
+        className="relative h-2 overflow-hidden rounded-pill bg-surface-3"
         role="meter"
         aria-valuemin={0}
         aria-valuemax={100}
@@ -246,11 +305,20 @@ function FactorRow({
           animate={{ scaleX: factor.score / 100 }}
           transition={SPRING.smooth}
         />
+        {[limits.weak, limits.ok, limits.good].map((at) => (
+          <span key={at} aria-hidden className="absolute inset-y-0 w-px bg-bg/70" style={{ left: `${at}%` }} />
+        ))}
       </div>
-      <p className="text-xs text-pretty text-fg-2">{text.reason(factor)}</p>
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <span className="nums text-2xs text-fg-3">
-          {factor.impactCents > 0 ? t("impact", { amount: money(factor.impactCents) }) : ""}
+      <p className="text-xs text-pretty text-fg-3">{t(`explain.${factor.key}`)}</p>
+      <p className="text-sm text-pretty text-fg-2">{text.reason(factor)}</p>
+      {factor.status !== "good" && (
+        <p className="text-xs text-pretty text-fg-1">
+          <span className="font-semibold">{t("doThis")}</span> {t(`todo.${factor.key}`)}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <span className={cn("nums text-xs", factor.impactCents > 0 ? "font-semibold text-gain" : "text-fg-3")}>
+          {factor.impactCents > 0 ? t("impact", { amount: money(factor.impactCents) }) : t("noImpact")}
         </span>
         <button
           type="button"
@@ -318,6 +386,19 @@ export function HealthRadar({
           strokeWidth={1}
         />
       ))}
+      {!compact &&
+        [0.5, 1].map((ring) => (
+          <text
+            key={ring}
+            x={CX - 4}
+            y={CY - R * ring + 10}
+            textAnchor="end"
+            className="fill-fg-3 text-2xs"
+            aria-hidden
+          >
+            {ring * 100}
+          </text>
+        ))}
       {health.factors.map((f, i) => {
         const [x, y] = point(i, n, 1);
         return <line key={f.key} x1={CX} y1={CY} x2={x} y2={y} className="stroke-line-1" strokeWidth={1} />;
@@ -368,10 +449,10 @@ export function HealthRadar({
               x={x}
               y={y + dy}
               textAnchor={anchor}
-              className={cn("text-2xs", weakest ? cn("font-semibold", TONE[f.status].fill) : "fill-fg-2")}
+              className={cn("text-2xs", weakest ? "fill-fg-1 font-semibold" : "fill-fg-2")}
             >
               {text.factor(f.key)}
-              <tspan className="fill-fg-3 nums" dx={4}>
+              <tspan className={cn("nums font-semibold", TONE[f.status].fill)} dx={4}>
                 {f.score}
               </tspan>
             </text>

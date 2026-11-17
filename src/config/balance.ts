@@ -975,6 +975,38 @@ export interface BalanceConfig {
       /** Bonus on the hour's revenue from an overall score (floor of the mean): the highest tier reached counts. */
       readonly rewards: readonly { readonly at: number; readonly bps: number }[];
     };
+    /**
+     * Reputation of every player company (ADR-183; before only listed ones had one, ADR-167). Each closed hour the
+     * value moves `adjustPerHour` of the gap to a target: base + quality + delivery + price + wages + bills + crisis
+     * + campaign (listed companies add research, greed, reinvestment, dividends and scandals, listed.reputation).
+     * It moves the demand: x (1 + demandMaxEffect x (value − 50) / 50).
+     */
+    readonly reputation: {
+      readonly start: number;
+      readonly base: number;
+      readonly adjustPerHour: number;
+      readonly demandMaxEffect: number;
+      /** Points at quality 1; between the neutral quality and 1 linear. */
+      readonly qualityMax: number;
+      /** Points lost at quality 0; between 0 and the neutral quality linear (new companies start at 0.25). */
+      readonly qualityMaxLoss: number;
+      /** Quality that counts as neutral. */
+      readonly qualityNeutral: number;
+      /** Points lost when no customer could be served (scaled by the unserved share of the demand). */
+      readonly deliveryMaxLoss: number;
+      /** Premium prices below startups.pricing.premiumMinQuality feel like a rip-off. */
+      readonly premiumLowQualityLoss: number;
+      /** Budget prices feel fair. */
+      readonly budgetGain: number;
+      /** Points lost when no wage was paid (scaled by the unpaid share). */
+      readonly wagesMaxLoss: number;
+      /** Open bills (distress). */
+      readonly billsLoss: number;
+      /** Per severity level (1..3) of an open or running crisis. */
+      readonly crisisPerSeverity: number;
+      /** A running marketing campaign. */
+      readonly campaignGain: number;
+    };
   };
   /** Crises, scandals and a falling share price cut wages (ADR-131). */
   readonly wageMood: {
@@ -2731,6 +2763,22 @@ export const BALANCE = {
         { at: 90, bps: 1_000 },
         { at: 98, bps: 1_500 },
       ],
+    },
+    reputation: {
+      start: 50,
+      base: 50,
+      adjustPerHour: 0.08,
+      demandMaxEffect: 0.2,
+      qualityMax: 10,
+      qualityMaxLoss: 5,
+      qualityNeutral: 0.4,
+      deliveryMaxLoss: 8,
+      premiumLowQualityLoss: 6,
+      budgetGain: 2,
+      wagesMaxLoss: 10,
+      billsLoss: 6,
+      crisisPerSeverity: 3,
+      campaignGain: 3,
     },
   },
   wageMood: {

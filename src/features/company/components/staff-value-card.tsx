@@ -37,8 +37,7 @@ export function StaffValueCard({ company, id }: { company: MyCompany; id?: strin
             aiWorkers: company.aiWorkers,
             aiWageCentsPerHour: company.aiWageCentsPerHour,
             aiProductivityBps: 10_000,
-            teamProductivityBps: company.teamProductivityBps,
-            hourRevenuesCents: company.hours.map((h) => h.revenueCents),
+            hours: company.hours,
             paidHoursPerDay: BALANCE.careers.paidHoursPerDayCap,
           })
         : null,
@@ -63,8 +62,18 @@ export function StaffValueCard({ company, id }: { company: MyCompany; id?: strin
       title={t("title")}
       id={id}
       testId="staff-value"
-      aside={<span className="text-xs text-fg-3">{t("perMonth", { days: MONTH_DAYS })}</span>}
+      aside={
+        <span className="text-xs text-fg-3">
+          {t("perMonth", { days: MONTH_DAYS })}
+          {value.hours > 0 && ` · ${t("basis", { count: value.hours })}`}
+        </span>
+      }
     >
+      {value.aiUtilizationBps !== null && (
+        <p className="text-xs text-fg-3" data-testid="staff-value-ai-use">
+          {t("aiUse", { percent: Math.round(value.aiUtilizationBps / 100) })}
+        </p>
+      )}
       {value.noRevenue && <p className="text-sm text-pretty text-fg-3">{t("noRevenue")}</p>}
       <ul className="space-y-2">
         {value.rows.map((r) => (

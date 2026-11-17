@@ -6,6 +6,8 @@
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
+-- ADR-183: the reputation moves the demand of every company; the exact numbers here assume it stays neutral
+select tests.set_cfg('companyHealth', '{reputation,demandMaxEffect}', '0') is null as rep_neutral \gset
 -- the current company scale (ADR-180), whatever earlier files left behind
 select tests.set_cfg('startups', '{marketFactorByTier}', '{"garage": 10, "small_business": 40, "gmbh": 150, "ag": 400}') is null as ok \gset
 select tests.set_cfg('startups', '{capacityCentsPerProductivity}',

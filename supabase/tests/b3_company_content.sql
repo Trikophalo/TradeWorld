@@ -188,12 +188,12 @@ select tests.throws_key(format($$select public.answer_company_interview(gen_rand
 reset role;
 select tests.assert(
   (:'ans'::jsonb #>> '{interview,status}') = 'answered' and :'ans'::jsonb = :'ans2'::jsonb
-  and (select status = 'answered' and score = 5 and awareness_bps = least(300, 5 * 60) and reputation_delta = 0
+  and (select status = 'answered' and score = 5 and awareness_bps = least(300, 5 * 60) and reputation_delta = 2.5  -- ADR-183: private companies too
               and jsonb_array_length(answers) = 3 and answers -> 1 ->> 'verdict' = 'good'
               and (answers -> 0 ->> 'reaction') <> ''
          from public.company_interviews where id = :'iv'::bigint)
   and (select awareness from public.player_companies where company_id = :'co') between :aw0 + 0.0299 and :aw0 + 0.0301,
-  'answer_company_interview(): judged 2 + 1 + 2, awareness +3 points (capped at maxAwarenessBps), idempotent by request id');
+  'answer_company_interview(): judged 2 + 1 + 2, awareness +3 points (capped at maxAwarenessBps), reputation +2.5 (every company since ADR-183), idempotent by request id');
 
 -- the show: three interview segments with the CEO as subject; aired once
 insert into public.news_shows (airs_at, segments)

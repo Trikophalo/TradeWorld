@@ -1269,6 +1269,7 @@ const listed = createListedEngine({
 const company = createCompanyEngine({
   listed,
   eventModifiers: (c, at) => companyEvents.modifiers(c, at),
+  crisisSeverity: (c) => companyEvents.crisisSeverity(c),
   stakePayout: (c, profit, free) => deals.stakePayout(c, profit, free),
   afterHour: (c, hour) => deals.afterHour(c, hour),
   company: () => p().company ?? null,
@@ -1710,6 +1711,14 @@ const interviews = createInterviewEngine({
   addAwareness: (bps) => {
     const c = p().company;
     if (c) c.awareness = Math.min(1, Math.max(0, c.awareness + bps / 10_000));
+    persist();
+  },
+  addReputation: (points) => {
+    const c = p().company;
+    if (c && points !== 0) {
+      c.reputation = Math.min(100, Math.max(0, (c.reputation ?? BALANCE.companyHealth.reputation.start) + points));
+      if (c.listed) c.listed.reputation = Math.min(100, Math.max(0, c.listed.reputation + points));
+    }
     persist();
   },
   idempotent,

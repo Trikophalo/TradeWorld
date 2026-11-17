@@ -434,6 +434,11 @@ export interface StartupHourInput {
    * benefits, employee satisfaction and reputation as terms of the hour, plus the hour's running costs of all that
    * (they count as fixed costs). Private companies pass nothing.
    */
+  /**
+   * ADR-183: demand factor of the reputation for a private company (1 = neutral); listed companies carry theirs in
+   * `listed.demandFactor`, so this is ignored for them.
+   */
+  readonly reputationDemandFactor?: number;
   readonly listed?: {
     readonly awarenessAdd: number;
     readonly qualityAdd: number;
@@ -500,7 +505,7 @@ export function closeStartupHour(
     (input.event?.demandFactor ?? 1) *
     Math.max(0, input.campaignFactor ?? 1) *
     Math.max(1, input.taskMomentum ?? 1) *
-    (lx?.demandFactor ?? 1);
+    (lx ? lx.demandFactor : Math.max(0, input.reputationDemandFactor ?? 1));
   const capacity =
     (capacityCents(input.productivityBps, input.sector, sc) *
       (1 + sc.stages.capacityBonusPerStage * stage) *

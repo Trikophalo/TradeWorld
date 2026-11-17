@@ -4,6 +4,8 @@
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
+-- ADR-183: the reputation moves the demand of every company; the exact numbers here assume it stays neutral
+select tests.set_cfg('companyHealth', '{reputation,demandMaxEffect}', '0') is null as rep_neutral \gset
 
 \set f '''0b5c5c5c-0000-4000-8000-0000000000f1'''
 \set a '''0b5c5c5c-0000-4000-8000-0000000000a1'''

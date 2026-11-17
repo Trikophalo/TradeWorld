@@ -2439,7 +2439,9 @@
     "planSummary": "{people, plural, one {# Person} other {# Personen}} · {ai, plural, one {# KI-Kraft} other {# KI-Kräfte}} · {free, plural, =0 {kein Platz frei} one {# Platz frei} other {# Plätze frei}} · {postings, plural, =0 {keine Ausschreibung} one {# Ausschreibung} other {# Ausschreibungen}}",
     "planPlayers": "Spieler im Team",
     "planAi": "KI-Kräfte",
-    "planFree": "Freie Plätze"
+    "planFree": "Freie Plätze",
+    "marketingHint": "Ein Quartal sind {hours} Stunden: Jede Stunde gehen {perHour} aus der Kasse an die Werbung. Das macht dich jede Stunde etwas bekannter, doppeltes Budget bringt aber nicht doppelt so viel.",
+    "marketingInfo": "Marketing hebt die Bekanntheit in jeder abgerechneten Stunde. Ohne Budget wächst sie nur durch Mundpropaganda und geht langsam verloren. An der Obergrenze deiner Stufe verpufft jedes weitere Budget."
   },
   "debt": {
     "title": "Schulden",
@@ -8695,6 +8697,42 @@
         "open": "Schwung +{boostPct} % (bis +{maxPct} % möglich). {open, plural, one {Eine Aufgabe wartet} other {# Aufgaben warten}}.",
         "low": "Schwung +{boostPct} % (bis +{maxPct} % möglich): Jede gelöste Aufgabe hebt die Nachfrage."
       }
+    },
+    "info": "Die acht Punkte werden aus der letzten abgerechneten Stunde nachgerechnet. Für jeden Punkt rechnet das Spiel die Stunde noch einmal, als wäre er behoben: Der Unterschied ist das, was er pro Stunde kostet. 80 und mehr ist gut, ab 60 ok, ab 35 schwach, darunter kritisch.",
+    "legend": "Anzahl der Punkte je Zustand",
+    "footnote": "Eine Momentaufnahme der letzten Stunde, keine Prognose. Was langfristig wirkt (Bekanntheit wächst über Stunden, Stärken über Tage), zählt hier nicht mit.",
+    "scoreLabel": "Gesamt",
+    "doThis": "Was tun:",
+    "noImpact": "kostet gerade nichts",
+    "explain": {
+      "awareness": "Misst, ob genug Leute dich kennen, um alles zu verkaufen, was dein Team schafft.",
+      "capacity": "Misst, ob dein Team so viel liefern kann, wie bestellt wird, ohne bezahlten Leerlauf.",
+      "quality": "Misst die Qualität deiner Produkte gegen das Ziel von 70 %.",
+      "image": "Misst, ob eine Krise gerade Nachfrage, Kapazität oder Kosten frisst, oder ob eine Chance wartet.",
+      "price": "Vergleicht den Rohertrag deiner Preisstufe mit der besten der drei Stufen.",
+      "team": "Misst, ob die Löhne voll bezahlt werden und ob die Fähigkeiten für die nächste Stufe da sind.",
+      "cash": "Misst offene Rechnungen und wie lange die Kasse bei Verlust reicht.",
+      "momentum": "Misst den Schwung aus gelösten Firmenaufgaben, der die Nachfrage hebt."
+    },
+    "todo": {
+      "awareness": "Marketing-Budget setzen oder eine Kampagne starten. An der Grenze der Stufe hilft nur die nächste Stufe.",
+      "capacity": "Ausverkauft: KI-Kräfte einstellen. Leerlauf: Auftragsarbeit einschalten oder untätige KI-Kräfte entlassen.",
+      "quality": "Fähigkeiten der nächsten Stufe besetzen, Mitarbeiter schulen, an der Börse Qualität erforschen. Premium erst ab 50 % Qualität.",
+      "image": "Die Krise unter „Lage“ angehen, oder eine offene Chance annehmen.",
+      "price": "Die Preisstufe unter Controlling auf die empfohlene stellen.",
+      "team": "Weniger KI-Kräfte, wenn die Löhne nicht gedeckt sind, oder fehlende Fähigkeiten besetzen.",
+      "cash": "Geld einzahlen, Kosten senken oder Marketing pausieren, bis die Rechnungen bezahlt sind.",
+      "momentum": "Firmenaufgaben lösen oder den Autopiloten einschalten."
+    },
+    "link": {
+      "awareness": "Stärke Bekanntheit",
+      "delivery": "Stärke Lieferfähigkeit",
+      "quality": "Stärke Qualität",
+      "margin": "Stärke Rendite",
+      "team": "Stärke Team",
+      "finance": "Stärke Finanzen",
+      "reputation": "wirkt auf den Ruf",
+      "tasks": "aus Aufgaben"
     }
   },
   "friendChat": {
@@ -9498,7 +9536,17 @@
       "reputationEffects": "Nachfrage {demand} · fairer Kurs {price} · Auszahlungsquote {payout}",
       "cashAllFree": "alles frei verfügbar",
       "detailsSection": "Erweitert",
-      "detailsSummary": "Laufende Timer, die acht Faktoren im Detail, Wert des Teams und das Büro"
+      "detailsSummary": "Laufende Timer, die acht Faktoren im Detail, Wert des Teams und das Büro",
+      "info": {
+        "cash": "Geld in der Firmenkasse. Davon zahlt die Firma Wareneinsatz, Löhne, Fixkosten und Marketing. Es gehört nicht dir: Entnehmen oder Auszahlung unter Controlling, Geld.",
+        "revenue": "Alles, was die letzte abgerechnete Stunde eingenommen hat: Verkäufe, Auftragsarbeit und Stärken-Bonus.",
+        "costs": "Umsatz minus Gewinn: Wareneinsatz, Löhne, KI-Kräfte, Fixkosten, Marketing und laufende Posten der Stunde.",
+        "profit": "Was die letzte Stunde übrig gelassen hat: Umsatz minus alle Kosten. Die CEO-Auszahlung geht erst danach aus der Kasse und zählt hier nicht als Kosten.",
+        "share": "Letzter Kurs deiner Aktie an der Börse.",
+        "reputation": "Wie Kunden und Anleger über die Firma denken, 50 ist neutral. Wirkt auf Nachfrage und fairen Kurs.",
+        "upkeep": "Laufende Kosten aller Produkte, Märkte, Maschinen, Lizenzen und Benefits je Stunde.",
+        "tax": "Körperschaftsteuer aus den letzten Büchern, die noch nicht bezahlt ist."
+      }
     },
     "todo": {
       "title": "Zu erledigen",
@@ -9614,6 +9662,22 @@
         "machine": "Mehrstufig: Jede Stufe bringt Kapazität, Marge oder Bekanntheit und wird teurer.",
         "acquisition": "Einmal teuer, dann für immer deins. Kleine laufende Kosten.",
         "licence": "Günstige Rechte mit kleiner Wirkung. Die Exportlizenz braucht es für Europa."
+      },
+      "sub": {
+        "profit": "Wie teuer du verkaufst und ob freie Kapazität als Auftragsarbeit Geld bringt. Darunter Markt und Gewinn-Coach.",
+        "marketing": "Ein festes Budget macht dich jede Stunde bekannter, Kampagnen geben einen kurzen kräftigen Schub.",
+        "moves": "Einmalige Aktionen mit Risiko: kosten sofort, gelingen mit der angegebenen Chance und bringen Bekanntheit, Qualität oder Geld.",
+        "business": "Was ihr herstellt, wie viel Nachfrage und Kapazität da sind und wo der Engpass liegt.",
+        "expansion": "Fachwissen für die nächste Stufe, Ausbau für mehr Markt und Plätze, dann die nächste Rechtsform.",
+        "money": "Die Firmenkasse ist getrennt von deinem Konto. Einzahlen, entnehmen und wie viel Gewinn dir jede Stunde automatisch ausgezahlt wird.",
+        "capital": "Mit dem Börsengang verkaufst du Anteile gegen frisches Geld. Danach gelten die Regeln der Börse.",
+        "dividends": "Schüttet Geld an alle Aktionäre aus. Hebt den Ruf und den Kurs, höchstens einmal am Tag.",
+        "growth": "Produkte, Märkte, Maschinen, Zukäufe und Lizenzen: kosten einmal und laufend, wirken jede Stunde.",
+        "level": {
+          "budget": "Günstig",
+          "normal": "Normal",
+          "premium": "Premium"
+        }
       }
     },
     "restrictions": {
@@ -9680,7 +9744,30 @@
         "satisfaction": "Zufriedenheit",
         "team": "Team",
         "tasks": "Aufgaben",
-        "chat": "Chat"
+        "chat": "Chat",
+        "value": "Leistung"
+      },
+      "sections": {
+        "mood": {
+          "title": "Zufriedenheit",
+          "text": "Wie es deinem Team geht. Unter 60 sinken Kapazität und Qualität, im roten Bereich kündigen KI-Kräfte."
+        },
+        "team": {
+          "title": "Team und Stellen",
+          "text": "Plätze, Bewerbungen, Stellenanzeigen, KI-Kräfte und Schulungen. Jede Person bringt Kapazität, Spieler auch Fähigkeiten."
+        },
+        "value": {
+          "title": "Was jeder leistet",
+          "text": "Umsatz und Lohnkosten je Person, hochgerechnet auf einen Monat aus den letzten abgerechneten Stunden."
+        },
+        "tasks": {
+          "title": "Firmenaufgaben",
+          "text": "Kurze Minispiele zum Produkt. Gelöste Aufgaben bringen Geld, Bekanntheit und Schwung für die Nachfrage."
+        },
+        "chat": {
+          "title": "Firmenchat",
+          "text": "Für dich und alle, die bei dir arbeiten. Das Spiel meldet hier auch Kündigungen und Neuigkeiten."
+        }
       }
     },
     "books": {
@@ -9721,7 +9808,17 @@
       "tax": "Körperschaftsteuer ({rate})",
       "resultPaid": "{amount} an das Finanzamt gezahlt. Erledigt.",
       "resultDue": "Noch {amount} offen. Fällig bis {time}.",
-      "resultNoTax": "Kein Gewinn, keine Steuer."
+      "resultNoTax": "Kein Gewinn, keine Steuer.",
+      "sections": {
+        "due": {
+          "title": "Bücher und Steuern",
+          "text": "Einmal am Tag die Bücher machen, dann die Körperschaftsteuer zahlen. Wer zu spät ist, zahlt Zuschläge und verliert Ruf."
+        },
+        "ledger": {
+          "title": "Kontobuch",
+          "text": "Jede Buchung der Firmenkasse nach Kategorie und Tag: wohin das Geld geht und woher es kommt."
+        }
+      }
     },
     "tax": {
       "title": "Steuern",
@@ -9884,12 +9981,13 @@
       "proposeHint": "Du stimmst deinem Antrag automatisch zu. Die Abstimmung läuft {hours} Stunden, danach hast du {cooldown} Stunden Pause.",
       "historyTitle": "Frühere Beschlüsse",
       "historyNone": "Noch keine abgeschlossene Abstimmung.",
-      "historyTally": "Ja {yes}, Nein {no}"
+      "historyTally": "Ja {yes}, Nein {no}",
+      "tabText": "Großaktionäre mit mehr als 20 % der Aktien stellen Anträge, alle Aktionäre stimmen nach Aktien ab. Beschlüsse binden auch dich."
     },
     "staffValue": {
       "title": "Was jeder leistet und kostet",
       "perMonth": "je Monat ({days} Tage)",
-      "noRevenue": "Noch keine abgeschlossene Betriebsstunde: Die Leistung zeigt sich ab der ersten Abrechnung.",
+      "noRevenue": "Noch keine abgerechnete Stunde: Die Leistung zeigt sich ab der ersten Abrechnung. Die Kosten unten sind die vollen Lohnsätze.",
       "ai": "KI-Kraft {n}",
       "founder": "Gründer",
       "worth": "Lohnt sich",
@@ -9899,7 +9997,9 @@
       "totalBrings": "Leistung gesamt",
       "totalCosts": "Lohnkosten gesamt",
       "totalNet": "Bleibt",
-      "hint": "Ein Monat sind hier {days} Tage. Leistung: Umsatz der letzten 24 Stunden × {days}, aufgeteilt nach dem Anteil an der Produktivität des Teams. Kosten: Spieler bekommen höchstens {hours} bezahlte Stunden am Tag, KI-Kräfte jede Betriebsstunde. Wareneinsatz und Fixkosten sind nicht abgezogen."
+      "hint": "Ein Monat sind hier {days} Tage, hochgerechnet aus den letzten abgerechneten Stunden. Leistung: Umsatz so verteilt wie in der Abrechnung – erst bedienen Gründer und Spieler (nach ihrer Produktivität), KI-Kräfte nur, was übrig bleibt; freie Kapazität bringt Auftragsarbeit. Kosten: die wirklich gezahlten Löhne (Spieler höchstens {hours} Stunden am Tag, KI-Kräfte nach Auslastung, im Leerlauf ein Viertel). Wareneinsatz und Fixkosten sind nicht abgezogen.",
+      "aiUse": "KI-Kräfte im Schnitt zu {percent} % ausgelastet",
+      "basis": "aus {count, plural, one {# Stunde} other {# Stunden}}"
     },
     "pulse": {
       "title": "Was die letzte Stunde sagt",
@@ -9922,6 +10022,146 @@
       "rules": "Höchstens {perDay} Aufgaben am Tag. Daneben kostet {penalty} % des Werts. Deine Stärken zahlen ×{pay} auf jede gelöste Aufgabe. Je besser die Stimmung, desto sicherer der Erfolg (60 bis 120 %).",
       "onToast": "Autopilot an. Er übernimmt ab jetzt alle Aufgaben.",
       "offToast": "Autopilot aus."
+    },
+    "layout": {
+      "info": "Erklärung: {topic}"
+    },
+    "dash": {
+      "navLabel": "Bereiche des Dashboards",
+      "numbers": {
+        "nav": "Zahlen",
+        "title": "Zahlen",
+        "text": "Kasse, Umsatz, Kosten und Gewinn der letzten Stunde, der Verlauf der letzten 24 Stunden und die Quartale."
+      },
+      "assist": {
+        "nav": "Helfer",
+        "title": "Helfer",
+        "text": "Der Autopilot erledigt Aufgaben für dich, Mira beantwortet Fragen und kann Hebel direkt umstellen."
+      },
+      "diagnosis": {
+        "nav": "Diagnose",
+        "title": "Stärken und Diagnose",
+        "text": "Oben die sechs Stärken, die langsam wachsen und Bonus-Umsatz zahlen. Darunter „Wo es fehlt“: acht Punkte der letzten Stunde mit dem, was du tun kannst."
+      },
+      "reputation": {
+        "nav": "Ruf",
+        "title": "Ruf",
+        "text": "Wie Kunden über deine Firma denken. Ein guter Ruf bringt mehr Nachfrage, ein schlechter kostet Kunden.",
+        "textListed": "Wie Kunden und Anleger über deine Firma denken, und wie es deinem Team geht. Ruf und Stimmung wirken jede Stunde auf Nachfrage, Kapazität und den fairen Aktienkurs."
+      },
+      "team": {
+        "nav": "Team",
+        "title": "Team, Timer und Büro",
+        "text": "Was jede Person bringt und kostet, was gerade gegen die Uhr läuft, und dein Büro mit allen Figuren."
+      },
+      "situation": {
+        "nav": "Lage",
+        "title": "Lage und Nachrichten",
+        "text": "Krisen und Chancen mit Entscheidungen, Interviewanfragen, eigene Ideen und was über deine Firma berichtet wird."
+      },
+      "warnings": "Ein Teil der letzten Stundenabrechnung ist ausgefallen ({steps}). Die Stunde selbst ist verbucht, das Spiel versucht es mit der nächsten Stunde erneut.",
+      "steps": {
+        "reputation": "Ruf",
+        "projects": "fertige Projekte",
+        "quit_notice": "Kündigungsmeldung",
+        "mood_notice": "Stimmungsmeldung",
+        "greed_feed": "Feed-Meldung",
+        "fair_value": "fairer Aktienkurs",
+        "missions": "Missionen",
+        "tax_office": "Finanzamt",
+        "board": "Geschäftsrat"
+      }
+    },
+    "reputation": {
+      "title": "Ruf",
+      "description": "0 bis 100, 50 ist neutral. Jede abgerechnete Stunde rückt der Ruf ein Stück näher an sein Ziel.",
+      "info": "Der Ruf zeigt, wie Kunden über deine Firma denken. Jede Stunde rückt er {rate} % des Abstands zu seinem Ziel vor. Das Ziel ist 50 plus alles, was die Stunde gezeigt hat: Qualität, Lieferfähigkeit, faire Preise, bezahlte Löhne, keine offenen Rechnungen, keine Krise, laufende Kampagnen. An der Börse zählen dazu Forschung, Dividenden, Investitionen und gierige Auszahlungen. Interviews heben oder senken ihn sofort. Bei 100 gibt es 20 % mehr Nachfrage, bei 0 20 % weniger.",
+      "noServer": "Der Ruf kommt mit der nächsten Aktualisierung des Servers.",
+      "heading": {
+        "up": "Steigt gerade Richtung {target}.",
+        "down": "Sinkt gerade Richtung {target}.",
+        "steady": "Bleibt gerade bei {target}."
+      },
+      "demand": "Wirkung auf die Nachfrage",
+      "price": "Wirkung auf den fairen Kurs",
+      "base": "Ausgangswert",
+      "driversTitle": "Was das Ziel in der letzten Stunde bewegt hat (Ausgangswert {base})",
+      "driversWaiting": "Was den Ruf bewegt (ab der nächsten abgerechneten Stunde)",
+      "calm": "Nichts hebt oder drückt gerade: Der Ruf hält sich beim Ausgangswert. Gute Qualität, faire Preise und Kampagnen heben ihn.",
+      "neutral": "Neutral: {list}.",
+      "history": "Ruf der letzten Stunden",
+      "historyEmpty": "Der Verlauf erscheint nach zwei abgerechneten Stunden.",
+      "historyLabel": "Ruf über {hours} Stunden: von {from} auf {to}",
+      "legendValue": "Ruf",
+      "legendTarget": "Ziel",
+      "drivers": {
+        "quality": {
+          "name": "Qualität",
+          "text": "Gute Produkte heben den Ruf, schlechte senken ihn. Forschung, Schulungen und gute Stimmung helfen."
+        },
+        "delivery": {
+          "name": "Lieferfähigkeit",
+          "text": "Kunden, die nichts bekommen, sind enttäuscht. Mehr Leute oder KI-Kräfte einstellen."
+        },
+        "price": {
+          "name": "Preis",
+          "text": "Günstig wirkt fair. Premium ohne gute Qualität wirkt wie Abzocke."
+        },
+        "wages": {
+          "name": "Löhne",
+          "text": "Werden Löhne nicht voll bezahlt, spricht sich das herum. Mehr Umsatz oder weniger Kräfte."
+        },
+        "bills": {
+          "name": "Offene Rechnungen",
+          "text": "Unbezahlte Rechnungen schaden dem Ruf. Geld einzahlen oder Kosten senken."
+        },
+        "crisis": {
+          "name": "Krise",
+          "text": "Eine offene Krise drückt, bis sie gelöst ist. Entscheide unter „Lage“."
+        },
+        "campaign": {
+          "name": "Kampagne",
+          "text": "Eine laufende Werbekampagne zeigt die Firma von ihrer besten Seite."
+        },
+        "items": {
+          "name": "Forschung",
+          "text": "Nachhaltigkeitsforschung hebt den Ruf dauerhaft."
+        },
+        "greed": {
+          "name": "Auszahlungen",
+          "text": "Wer sich mehr als 30 % des Gewinns auszahlt, gilt als gierig. CEO-Auszahlung senken."
+        },
+        "reinvest": {
+          "name": "Investitionen",
+          "text": "Wer Gewinn wieder in die Firma steckt, gewinnt Vertrauen."
+        },
+        "dividends": {
+          "name": "Dividenden",
+          "text": "Ausschüttungen an alle Aktionäre und Tage in Folge mit Dividende heben den Ruf."
+        },
+        "scandal": {
+          "name": "Skandal",
+          "text": "Ein Skandal kostet zusätzlich, bis er vorbei ist."
+        }
+      }
+    },
+    "status": {
+      "status": {
+        "closeError": "Abrechnung hängt",
+        "distress": "Offene Rechnungen",
+        "late": "Abrechnung steht aus",
+        "first": "Erste Stunde läuft",
+        "loss": "Verlust in der letzten Stunde",
+        "profit": "Gewinn in der letzten Stunde"
+      },
+      "awareness": "Bekanntheit",
+      "awarenessInfo": "Anteil der Kundschaft, die deine Firma kennt. Nur wer dich kennt, kauft. Steigt jede Stunde mit Marketing und Mundpropaganda, sinkt ohne Werbung langsam. Jede Stufe hat eine Obergrenze.",
+      "quality": "Qualität",
+      "qualityInfo": "Wie gut deine Produkte sind. Mehr Qualität verkauft mehr, Premium-Preise brauchen mindestens 50 %. Fähigkeiten im Team, Schulungen und Forschung heben sie.",
+      "reputation": "Ruf",
+      "reputationInfo": "Wie Kunden über dich denken, 50 ist neutral. Ein guter Ruf bringt bis zu 20 % mehr Nachfrage. Details im Dashboard unter „Ruf“.",
+      "strengths": "Stärken",
+      "strengthsInfo": "Schnitt der sechs Stärken. Ab 50 Punkten gibt es Bonus-Umsatz in jeder Stunde (bis +15 % ab 98)."
     }
   },
   "nexamonLive": {

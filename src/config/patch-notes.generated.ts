@@ -528,6 +528,21 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Slabs bleiben im Umlauf",
         text: "Bewertete Karten, die die KI kauft, verschwinden nie; sie behält sie eine Weile (1 bis 72 h) und bietet sie dann zum aktuellen Wert wieder am Markt…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-d20be65e",
+        title: "„Was jeder leistet“ stimmt",
+        text: "Leistung wie in der Abrechnung, Kosten nach gezahlten Löhnen.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-c708fd67",
+        title: "Ruf für jede Firma",
+        text: "Qualität, faire Preise, bezahlte Löhne und Kampagnen heben ihn jede Stunde, er bewegt die Nachfrage.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-4c9f5e01",
+        title: "Firma aufgeräumt",
+        text: "klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je…",
+      },
     ],
   },
   {

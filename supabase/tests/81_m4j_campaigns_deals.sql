@@ -3,6 +3,8 @@
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
+-- ADR-183: the reputation moves the demand of every company; the exact numbers here assume it stays neutral
+select tests.set_cfg('companyHealth', '{reputation,demandMaxEffect}', '0') is null as rep_neutral \gset
 
 -- ADR-180 changed the company scale; this file checks the mechanics with the numbers it was written for (the old
 -- scale, awareness that does not move by the hour); the end of the file restores the current values.

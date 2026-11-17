@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Suspense, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page";
-import { ALL_PIXEL_ART, BEAR, BULL, COIN, MIRA } from "@/components/pixel/art";
+import { ALL_PIXEL_ART, BEAR, BULL, COIN, MIRA, UI_ICONS } from "@/components/pixel/art";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DelegatedTaskOverlay } from "@/features/company/components/delegated-task-overlay";
 import { AVATAR_ART } from "@/components/pixel/avatars";
@@ -52,13 +52,15 @@ import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
+import { FirmSection, InfoTip, SectionNav, SubSection } from "@/features/company/components/firm-layout";
+import { ReputationCard } from "@/features/company/components/reputation-card";
 import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
 import { InterviewCard } from "@/features/company/components/interview-card";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AutopilotCard } from "@/features/company/components/autopilot-card";
 import { PulseCard } from "@/features/company/components/pulse-card";
-import type { CompanyAutopilot } from "@/features/game/types";
+import type { CompanyAutopilot, MyCompany } from "@/features/game/types";
 import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
@@ -1089,6 +1091,7 @@ export function Showcase() {
         <CareerLadder job={SAMPLE_JOB} />
         <PayRoutes job={SAMPLE_JOB} />
         <HealthShowcase />
+        <FirmLayoutShowcase />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
         <AutopilotCard preview={SAMPLE_AUTOPILOT} />
@@ -1248,6 +1251,50 @@ function HealthShowcase() {
       <HealthPanel health={health} onAsk={ask} />
       <HealthCompact health={health} onAsk={ask} onShowAll={() => undefined} />
     </>
+  );
+}
+
+/** The flat company page (ADR-183): jump bar, section, block with an "i", and the reputation card. */
+function FirmLayoutShowcase() {
+  const company = {
+    reputation: {
+      value: 57.4,
+      target: 61,
+      demandFactor: 1.0296,
+      drivers: { quality: 5, delivery: -1.2, price: 2, wages: 0, bills: 0, crisis: 0, campaign: 3 },
+      at: "2026-11-17T12:00:00.000Z",
+      history: Array.from({ length: 12 }, (_, i) => ({
+        hourStart: new Date(Date.UTC(2026, 10, 17, i)).toISOString(),
+        value: 50 + i * 0.6,
+        target: 61,
+      })),
+    },
+  } as unknown as MyCompany;
+  return (
+    <div className="space-y-4">
+      <SectionNav
+        items={[
+          { id: "showcase-numbers", label: "Zahlen", icon: UI_ICONS.portfolio },
+          { id: "showcase-rep", label: "Ruf", icon: UI_ICONS.heart, badge: 2 },
+        ]}
+        label="Sprungleiste"
+      />
+      <FirmSection
+        id="showcase-numbers"
+        icon={UI_ICONS.portfolio}
+        title="Zahlen"
+        description="Ein Abschnitt: Symbol, Titel und eine Zeile Zweck, darunter Karten."
+      >
+        <SubSection id="showcase-sub" title="Ein Block" description="Kein Akkordeon: immer offen.">
+          <p className="flex items-center gap-2 text-sm text-fg-2">
+            Kasse <InfoTip text="Geld in der Firmenkasse." label="Kasse" />
+          </p>
+        </SubSection>
+      </FirmSection>
+      <FirmSection id="showcase-rep" icon={UI_ICONS.heart} title="Ruf" description="Die Rufkarte jeder Firma.">
+        <ReputationCard company={company} listed={null} />
+      </FirmSection>
+    </div>
   );
 }
 

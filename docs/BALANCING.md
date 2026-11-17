@@ -1542,3 +1542,24 @@ um 16:00 UTC).
 
 Zum Vergleich mit derselben Rechnung: Mystic Energy 241,7 %, Super Apex 236,0 %, Cosmic Winds 187,0 % (ohne One of
 One), Prismatic Peak 166,9 %. Ohne den Faktor 1,125 läge Titans bei 79,9 %.
+
+## Nachtrag: Ruf für jede Firma (ADR-183)
+
+`companyHealth.reputation` (Code `src/config/balance.ts`, Formeln `src/lib/sim/company-reputation.ts`):
+
+| Wert                            |     Zahl | Bedeutung                                                                 |
+| ------------------------------- | -------: | ------------------------------------------------------------------------- |
+| `start`, `base`                 |       50 | Startwert und Ausgangswert des Ziels (notiert: Aktionärsziel aus ADR-167) |
+| `adjustPerHour`                 |     0,08 | Anteil der Lücke zum Ziel je Stunde                                       |
+| `demandMaxEffect`               |      0,2 | Nachfrage ±20 % bei 100 bzw. 0                                            |
+| `qualityMax` / `qualityMaxLoss` | +10 / −5 | bei Qualität 100 % bzw. 0 %, neutral bei `qualityNeutral` = 40 %          |
+| `deliveryMaxLoss`               |       −8 | × Anteil der Nachfrage, der nicht bedient wurde                           |
+| `budgetGain`                    |       +2 | günstige Preise                                                           |
+| `premiumLowQualityLoss`         |       −6 | Premium unter `startups.pricing.premiumMinQuality`                        |
+| `wagesMaxLoss`                  |      −10 | × unbezahlter Anteil der Löhne                                            |
+| `billsLoss`                     |       −6 | offene Rechnungen                                                         |
+| `crisisPerSeverity`             |       −3 | je Stufe einer offenen oder laufenden Krise                               |
+| `campaignGain`                  |       +3 | laufende Kampagne                                                         |
+
+Beispiele: neue Firma (Qualität 25 %, normale Preise, ruhig) Ziel 48 (−0,8 % Nachfrage); gute Firma (Qualität 70 %,
+günstig, Kampagne) Ziel 60 (+4 %); Firma mit halben Löhnen, offenen Rechnungen und Krise Stufe 2 Ziel etwa 33 (−7 %).

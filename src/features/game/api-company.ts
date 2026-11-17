@@ -237,6 +237,13 @@ const companySchema = z.object({
         supply_fee_income_cents: num.default(0),
         supply_goods_cents: num.default(0),
         stake_payout_cents: num.default(0),
+        demand_cents: nnum.default(null),
+        capacity_cents: nnum.default(null),
+        strength_bonus_cents: num.default(0),
+        ai_utilization_bps: nnum.default(null),
+        ai_wages_paid_cents: nnum.default(null),
+        player_wages_paid_cents: nnum.default(null),
+        reputation: nnum.default(null),
       }),
     )
     .default([]),
@@ -261,6 +268,20 @@ const companySchema = z.object({
     })
     .nullable()
     .default(null),
+  reputation: z
+    .object({
+      value: num,
+      target: num,
+      demand_factor: num,
+      drivers: z.record(z.string(), num).default({}),
+      at: iso.nullable().default(null),
+      history: z.array(z.object({ hour_start: iso, value: num, target: num })).default([]),
+    })
+    .nullable()
+    .default(null),
+  close_warnings: z
+    .array(z.object({ step: z.string().nullable(), at: iso, error: z.string().nullable(), failures: num }))
+    .default([]),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -576,6 +597,29 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
       supplyFeeIncomeCents: h.supply_fee_income_cents,
       supplyGoodsCents: h.supply_goods_cents,
       stakePayoutCents: h.stake_payout_cents,
+      demandCents: h.demand_cents,
+      capacityCents: h.capacity_cents,
+      strengthBonusCents: h.strength_bonus_cents,
+      aiUtilizationBps: h.ai_utilization_bps,
+      aiWagesPaidCents: h.ai_wages_paid_cents,
+      playerWagesPaidCents: h.player_wages_paid_cents,
+      reputation: h.reputation,
+    })),
+    reputation: c.reputation
+      ? {
+          value: c.reputation.value,
+          target: c.reputation.target,
+          demandFactor: c.reputation.demand_factor,
+          drivers: c.reputation.drivers,
+          at: c.reputation.at,
+          history: c.reputation.history.map((x) => ({ hourStart: x.hour_start, value: x.value, target: x.target })),
+        }
+      : null,
+    closeWarnings: c.close_warnings.map((w) => ({
+      step: w.step ?? "",
+      at: w.at,
+      error: w.error ?? "",
+      failures: w.failures,
     })),
     campaign: c.campaign ? toCampaign(c.campaign) : null,
     campaignCosts: c.campaign_costs,
