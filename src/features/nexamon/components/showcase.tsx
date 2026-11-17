@@ -47,7 +47,19 @@ const TYPE_CARDS: NexamonCardData[] = NEXAMON_TYPES.map((type, i) => ({
   key: `demo-type-${type}`,
   number: i + 1,
   type,
-  name: ["Glutling", "Welpix", "Moosel", "Zappit", "Sinnox", "Kiesel", "Nachtua", "Bolzer", "Flimmi", "Drakling"][i]!,
+  name: [
+    "Glutling",
+    "Welpix",
+    "Moosel",
+    "Zappit",
+    "Sinnox",
+    "Kiesel",
+    "Nachtua",
+    "Bolzer",
+    "Flimmi",
+    "Drakling",
+    "Sternling",
+  ][i]!,
   hp: 40 + i * 10,
 }));
 
@@ -311,7 +323,7 @@ export function NexamonShowcase() {
         </Block>
       </div>
 
-      <Block label="Platzhalter ohne Artwork: die zehn Typen (CardThumb, Faktor 2)" testId="nexamon-types">
+      <Block label="Platzhalter ohne Artwork: die elf Typen (CardThumb, Faktor 2)" testId="nexamon-types">
         <div className="flex flex-wrap justify-center gap-2">
           {TYPE_CARDS.map((card) => (
             <CardThumb key={card.key} card={card} scale={2} />
