@@ -1,65 +1,21 @@
 {
-  "now": "2026-11-16T23:55:09.491454+00:00",
+  "now": "2026-11-16T19:43:59.504575+00:00",
   "battle": {
-    "id": 27,
+    "id": 26,
     "kind": null,
     "seed": null,
     "prize": {
-      "kind": "nft",
-      "artwork": {
-        "id": "f92a0360-ef3a-4ee8-ac4c-f11e68566a5e",
-        "title": "Nexa-City bei Nacht",
-        "pixels": {
-          "grid": [
-            "08000000000000004000000000400000",
-            "00000000000080000000000000000000",
-            "00800000000000000000000800000000",
-            "00000000000000800000000044400000",
-            "00080000000000000000000444440000",
-            "00000008000000000000804444444000",
-            "00000000000808000000004444444000",
-            "08000000000000000000004444444000",
-            "00000000000000000000040444440080",
-            "00000000000000000000000044400000",
-            "11181111141111111111111118111111",
-            "11111115555511111111111111111111",
-            "11111115555511111111111814811111",
-            "11116665355511111111111111181111",
-            "11116665555511811811811111111111",
-            "11116365555511111111141118111111",
-            "11116665555511111111111111111555",
-            "11116665353511111111111111111555",
-            "11116665555511111111111111111555",
-            "55516365553511111111111111111555",
-            "55526665555522222255555555555555",
-            "53526365555522222255555555555555",
-            "55526665555522222255535535355555",
-            "55526365353522222255555555555555",
-            "55526665555555555255555555555555",
-            "53526665355555555255555555555555",
-            "55526665555553575255575535355555",
-            "55526365355555555255555555555555",
-            "55526665555555535253535555555575",
-            "55526365553555555255555555555555",
-            "55526665555557555255535555555535",
-            "55526665555555555255555555555555"
-          ],
-          "palette": [
-            "#0b0e1f",
-            "#15193a",
-            "#232a57",
-            "#ffe9a3",
-            "#fff6d8",
-            "#2b2f45",
-            "#3c425e",
-            "#ffcf4d",
-            "#9ad8ff",
-            "#5d6679"
-          ]
-        },
-        "rarity": "common",
-        "serial": 9
-      }
+      "kind": "skin",
+      "accessories": [
+        "battle_crown",
+        "laurel_wreath",
+        "champion_belt",
+        "victory_cape",
+        "star_shades",
+        "golden_joystick",
+        "winner_trophy",
+        "mini_bull"
+      ]
     },
     "joined": false,
     "params": null,
@@ -68,7 +24,7 @@
     "status": "open",
     "ends_at": null,
     "players": [],
-    "opened_at": "2026-11-16T23:55:09.479287+00:00",
+    "opened_at": "2026-11-16T19:43:59.483284+00:00",
     "started_at": null,
     "finished_at": null,
     "max_players": 10,
@@ -77,32 +33,106 @@
     "countdown_ends_at": null
   },
   "recent": {
-    "id": 26,
-    "kind": "quiz",
-    "seed": 4711,
-    "prize": { "xp": 0, "kind": "xp" },
+    "id": 25,
+    "kind": "auction",
+    "seed": 17,
+    "prize": { "xp": 2900, "kind": "xp" },
     "joined": false,
-    "params": {},
-    "result": null,
-    "rounds": null,
+    "params": {
+      "h": 9,
+      "w": 11,
+      "tps": 20,
+      "game": { "budget": 1000, "rounds": 2, "answerMs": 10000, "revealMs": 3500 },
+      "spawns": [
+        [1, 1],
+        [9, 7],
+        [9, 1],
+        [1, 7],
+        [5, 1],
+        [5, 7],
+        [1, 4],
+        [9, 4],
+        [3, 4],
+        [7, 4]
+      ],
+      "tickMs": 50,
+      "graceMs": 1000,
+      "stepTicks": 4,
+      "aheadTicks": 10,
+      "checkEveryMs": 1000,
+      "disconnectTicks": 80
+    },
+    "result": {
+      "out": [-1, -1, -1],
+      "paid": true,
+      "prize": { "xp": 2900, "kind": "xp" },
+      "score": [400, 0, 0],
+      "capped": false,
+      "ranking": [0, 2, 1],
+      "end_tick": null,
+      "winner_slot": 0
+    },
+    "rounds": {
+      "out": [-1, -1, -1],
+      "done": true,
+      "list": [
+        {
+          "icon": "gold_bar",
+          "lost": [],
+          "mine": { "value": null, "choice": null, "pressed": false },
+          "unit": null,
+          "round": 0,
+          "value": null,
+          "budget": null,
+          "budgets": [0, 1000, 1000],
+          "correct": null,
+          "ends_at": "2026-11-16T19:43:29.860353+00:00",
+          "options": null,
+          "results": [
+            { "ms": 2, "slot": 0, "right": true, "value": 400, "points": 300 },
+            { "ms": 1008, "slot": 1, "right": false, "value": 400, "points": 0 }
+          ],
+          "decimals": null,
+          "opens_at": "2026-11-16T19:43:16.360353+00:00",
+          "question": "Goldbarren",
+          "closes_at": "2026-11-16T19:43:26.360353+00:00",
+          "item_points": 300
+        },
+        {
+          "icon": "duck",
+          "lost": [],
+          "mine": { "value": null, "choice": null, "pressed": false },
+          "unit": null,
+          "round": 1,
+          "value": null,
+          "budget": null,
+          "budgets": [0, 1000, 1000],
+          "correct": null,
+          "ends_at": "2026-11-16T19:43:43.360353+00:00",
+          "options": null,
+          "results": [
+            { "ms": 519, "slot": 0, "right": true, "value": 600, "points": 100 },
+            { "ms": 529, "slot": 1, "right": false, "value": 0, "points": 0 }
+          ],
+          "decimals": null,
+          "opens_at": "2026-11-16T19:43:29.860353+00:00",
+          "question": "Gummiente",
+          "closes_at": "2026-11-16T19:43:39.860353+00:00",
+          "item_points": 100
+        }
+      ],
+      "hearts": [1, 1, 1],
+      "points": [400, 0, 0]
+    },
     "status": "finished",
-    "ends_at": null,
+    "ends_at": "2026-11-16T19:46:16.360353+00:00",
     "players": [
       {
         "me": false,
         "left": false,
         "rank": 1,
-        "slot": null,
-        "nickname": "Topic_Anna",
-        "avatar_key": "rookie",
-        "accessories": []
-      },
-      {
-        "me": false,
-        "left": false,
-        "rank": 2,
-        "slot": null,
-        "nickname": "Topic_Bert",
+        "slot": 0,
+        "nickname": "Bg_Anna",
         "avatar_key": "rookie",
         "accessories": []
       },
@@ -110,22 +140,31 @@
         "me": false,
         "left": false,
         "rank": 3,
-        "slot": null,
-        "nickname": "Topic_Cleo",
+        "slot": 1,
+        "nickname": "Bg_Bruno",
+        "avatar_key": "rookie",
+        "accessories": []
+      },
+      {
+        "me": false,
+        "left": false,
+        "rank": 2,
+        "slot": 2,
+        "nickname": "Bg_Clara",
         "avatar_key": "rookie",
         "accessories": []
       }
     ],
-    "opened_at": "2026-11-16T23:54:57.274988+00:00",
-    "started_at": null,
-    "finished_at": "2026-11-16T23:54:57.274988+00:00",
+    "opened_at": "2026-11-16T19:43:44.360353+00:00",
+    "started_at": "2026-11-16T19:43:16.360353+00:00",
+    "finished_at": "2026-11-16T19:43:44.397723+00:00",
     "max_players": 10,
     "min_players": 3,
     "prize_wins_left": 3,
     "countdown_ends_at": null
   },
-  "viewers": 2,
+  "viewers": 18,
   "per_hour": 1000,
-  "next_round_at": "2026-11-17T00:00:00+00:00",
+  "next_round_at": "2026-11-16T20:00:00+00:00",
   "played_this_hour": 5
 }
