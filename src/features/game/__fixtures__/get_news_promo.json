@@ -1,0 +1,16 @@
+{
+  "now": "2026-11-17T20:11:28.695636+00:00",
+  "promo": {
+    "id": 38,
+    "bps": 1000,
+    "set": null,
+    "tax": { "owner": true, "cap_cents": 5000000, "share_bps": 1000, "refund_cents": 28428, "revenue_cents": 284275 },
+    "kind": "tax_return",
+    "text": "Das NEXA-Finanzamt zahlt zurück.",
+    "claimed": false,
+    "ends_at": "2026-11-17T20:25:28.695128+00:00",
+    "headline": "Steuererklärung mit Rückzahlung",
+    "starts_at": "2026-11-17T20:10:28.695128+00:00",
+    "claimed_cents": null
+  }
+}

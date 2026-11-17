@@ -6,6 +6,7 @@ import { NewsFeed } from "@/features/news/news-feed";
 import { ProtestsCard } from "@/features/news/protests";
 import { NewsShow } from "@/features/news/show/news-show";
 import { NewsBattle } from "@/features/news/battle/news-battle";
+import { NewsPromoCard } from "@/features/news/promo/promo-card";
 import { Reveal } from "@/features/progression/components/reveal";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,6 +26,12 @@ export default async function NewsPage() {
       <div className="isolate mx-auto mb-6 max-w-5xl">
         <NewsShow />
       </div>
+      {/* News-Aktionen announced in the show (ADR-193) */}
+      <Reveal feature="newsPromo">
+        <div id="news-promo" className="mx-auto mb-6 max-w-2xl scroll-mt-20">
+          <NewsPromoCard />
+        </div>
+      </Reveal>
       {/* News battles among the viewers (ADR-160) */}
       <Reveal feature="newsBattle">
         <div id="news-battle" className="mx-auto mb-6 max-w-5xl scroll-mt-20">

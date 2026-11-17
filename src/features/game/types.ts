@@ -2360,6 +2360,10 @@ export const GAME_ERROR_KEYS = [
   "issue_proceeds_locked",
   // ADR-177
   "sealed_pack_unknown",
+  // ADR-193
+  "news_promo_inactive",
+  "news_promo_claimed",
+  "news_promo_no_company",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -2436,6 +2440,34 @@ export interface NewsShowState {
   chat: NewsShowChatMessage[];
 }
 
+/** News-Aktionen (ADR-193): a promotion announced in the live show. */
+export type NewsPromoKind = "pack_sale" | "free_nft" | "tax_return";
+export interface NewsPromo {
+  id: number;
+  kind: NewsPromoKind;
+  /** pack_sale: the Nexamon set on sale. */
+  set: NexamonSetKey | null;
+  /** Discount (pack_sale) or share of the revenue (tax_return). */
+  bps: number;
+  startsAt: string;
+  endsAt: string;
+  headline: string;
+  text: string;
+  /** The own free NFT or tax return of this promotion is used. */
+  claimed: boolean;
+  claimedCents: number;
+  tax: { owner: boolean; revenueCents: number; refundCents: number; capCents: number; shareBps: number } | null;
+}
+export interface NewsPromoState {
+  now: string;
+  promo: NewsPromo | null;
+}
+export interface NewsTaxReturnResult {
+  promoId: number;
+  refundCents: number;
+  revenueCents: number;
+}
+
 /** CEO interviews of NEXA Nachrichten (ADR-173). */
 export type InterviewVerdict = "good" | "ok" | "bad" | "none";
 export interface CompanyInterview {
@@ -2468,6 +2500,9 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   answerCompanyInterview(requestId: string, id: number, answers: InterviewAnswer[]): Promise<CompanyInterviewState>;
   declineCompanyInterview(requestId: string, id: number): Promise<CompanyInterviewState>;
   newsShow(): Promise<NewsShowState>;
+  /** The running News-Aktion, if any (ADR-193). */
+  newsPromo(): Promise<NewsPromoState>;
+  fileNewsTaxReturn(requestId: string): Promise<NewsTaxReturnResult>;
   postNewsShowMessage(requestId: string, body: string): Promise<NewsShowChatMessage[]>;
   /** Finn's tours the player has seen (kept on the server, so a private window does not repeat them). */
   seenTours(): Promise<string[]>;

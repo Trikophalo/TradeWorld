@@ -84304,6 +84304,7 @@ create table if not exists public.news_promo_claims (
   created_at   timestamptz not null default now(),
   primary key (promo_id, player_id)
 );
+create index if not exists news_promo_claims_player_idx on public.news_promo_claims (player_id);
 alter table public.news_promo_claims enable row level security;
 drop policy if exists news_promo_claims_own on public.news_promo_claims;
 create policy news_promo_claims_own on public.news_promo_claims for select to authenticated

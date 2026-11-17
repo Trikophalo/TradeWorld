@@ -34,6 +34,7 @@ import { FirmSection, SectionNav, type NavItem } from "../firm-layout";
 import { ReputationCard } from "../reputation-card";
 import { OfficeScene } from "../office-scene";
 import { StaffValueCard } from "../staff-value-card";
+import { TaxPromoCard } from "@/features/news/promo/promo-card";
 import { InterviewCard } from "../interview-card";
 import { PitchCard } from "../pitch-card";
 import { CompanyNewsCard, SituationCard } from "../situation";
@@ -158,6 +159,7 @@ export function DashboardTab({
       >
         <div className="space-y-4">
           <SituationCard />
+          <TaxPromoCard />
           <Reveal feature="companyInterview">
             <InterviewCard />
           </Reveal>

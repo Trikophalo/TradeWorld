@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { SearchDialog } from "@/features/market/components/search-dialog";
 import { GameSync } from "@/features/game/sync";
+import { NewsPromoWatcher } from "@/features/news/promo/promo-watcher";
 import { DailyReward } from "@/features/progression/components/daily-reward";
 import { DelegatedTaskOverlay } from "@/features/company/components/delegated-task-overlay";
 import { LevelUpOverlay } from "@/features/progression/components/level-up-overlay";
@@ -47,6 +48,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
       <LevelUpOverlay />
       <DelegatedTaskOverlay />
       <GameSync />
+      <NewsPromoWatcher />
       <DailyReward />
     </>
   );

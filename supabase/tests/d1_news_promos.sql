@@ -22,7 +22,9 @@ create or replace function tests.np_shift(p_minutes integer) returns void langua
                                 ends_at = ends_at - make_interval(mins => p_minutes) $$;
 grant execute on all functions in schema tests to public;
 
-select tests.assert((value ->> 'chanceBps')::integer = 3400 and (value ->> 'durationMinutes')::integer = 15
+-- 9i switched the draw off for the show tests; the configured chance again (src/config/news-promos.ts)
+update public.game_config set value = jsonb_set(value, '{chanceBps}', '3400') where key = 'newsPromos';
+select tests.assert((value ->> 'durationMinutes')::integer = 15
                     and (value #>> '{packSale,discountBps}')::integer = 2000
                     and (value #>> '{taxReturn,shareBps}')::integer = 1000
                     and (value #>> '{taxReturn,capCents}')::bigint = 5000000,

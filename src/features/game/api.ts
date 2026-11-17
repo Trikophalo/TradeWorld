@@ -17,6 +17,7 @@ import { AWARENESS_RPC_SCHEMAS, liveAwarenessEngine } from "./api-awareness";
 import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
+import { NEWS_PROMO_RPC_SCHEMAS, liveNewsPromoEngine } from "./api-news-promos";
 import { INTERVIEW_RPC_SCHEMAS, liveInterviewEngine } from "./api-interviews";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
@@ -559,6 +560,7 @@ export const RPC_SCHEMAS = {
   track_event: z.object({ ok: z.boolean() }),
   record_security_view: z.object({ counted: z.boolean() }),
   ...CAREER_RPC_SCHEMAS,
+  ...NEWS_PROMO_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
@@ -599,6 +601,7 @@ export const liveEngine: GameEngine = {
   ...liveProtestEngine,
   ...liveTourEngine,
   ...liveNewsShowEngine,
+  ...liveNewsPromoEngine,
   ...liveInterviewEngine,
   ...liveBattleEngine,
   ...liveNexamonEngine,
