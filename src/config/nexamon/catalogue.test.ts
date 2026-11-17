@@ -14,10 +14,14 @@ import {
   nexamonRarityRange,
   nexamonSetSize,
 } from "./index";
+import { BALANCE } from "../balance";
+import { nexamonExpectedPackValue } from "../../lib/sim/nexamon";
+import { TITAN_ART_SIZE, TITAN_PRICE_RANGE, TITAN_VALUE_FACTOR } from "./titans-draft";
+import { YINYANG_ART_SIZE, YINYANG_PRICE_RANGE } from "./yinyang-draft";
 
 describe("Nexamon catalogue (ADR-165, ADR-174)", () => {
   it("has a rarity layout per set: 77 cards in the first three, 90 in Cosmic Winds", () => {
-    expect(NEXAMON_SETS.map(nexamonSetSize)).toEqual([77, 77, 77, 90]);
+    expect(NEXAMON_SETS.map(nexamonSetSize)).toEqual([77, 77, 77, 90, 30, 110]);
     expect(Object.fromEntries(NEXAMON_SET_LAYOUT.cosmic_winds)).toEqual({
       common: 50,
       rare: 15,
@@ -71,6 +75,62 @@ describe("Nexamon catalogue (ADR-165, ADR-174)", () => {
         expect(cards.filter((c) => c.rarity === rarity)).toHaveLength(nexamonRarityCount(set, rarity));
     }
     expect(NEXAMON_CARDS.some((c) => c.set === "cosmic_winds" && nexamonCardKind(c) === "event")).toBe(true);
+  });
+
+  it("has the layouts of Titans Revenge and Yin Yang (ADR-182)", () => {
+    expect(NEXAMON_SET_LAYOUT.titans_revenge).toEqual([
+      ["iron", 15],
+      ["titanium", 7],
+      ["diamond", 4],
+      ["uranium", 4],
+    ]);
+    expect(Object.fromEntries(NEXAMON_SET_LAYOUT.yin_yang)).toEqual(
+      Object.fromEntries([
+        ["common", 54],
+        ["rare", 30],
+        ["ultra", 16],
+        ["prisma", 8],
+        ["legendary", 2],
+      ]),
+    );
+    expect(nexamonRarityRange("titans_revenge", "uranium")).toEqual([27, 30]);
+    expect(nexamonRarityRange("yin_yang", "legendary")).toEqual([109, 110]);
+    expect(nexamonRarityOfNumber(16, "titans_revenge")).toBe("titanium");
+    expect(nexamonRarityOfNumber(101, "yin_yang")).toBe("prisma");
+    expect(NEXAMON_CARDS.find((c) => c.key === "yy-109")?.name).toBe("Yin");
+    expect(NEXAMON_CARDS.find((c) => c.key === "yy-110")?.name).toBe("Yang");
+    const warriors = NEXAMON_CARDS.filter((c) => nexamonCardKind(c) === "warrior");
+    expect(warriors.length).toBeGreaterThan(10);
+    expect(warriors.every((c) => c.set === "yin_yang" && c.hp > 0)).toBe(true);
+  });
+
+  it("takes the ranges of Titans Revenge and Yin Yang from their drafts", () => {
+    for (const rarity of ["iron", "titanium", "diamond", "uranium"] as const)
+      expect(nexamonPriceRange("titans_revenge", rarity)).toEqual(
+        TITAN_PRICE_RANGE[rarity].map((p) => p * TITAN_VALUE_FACTOR),
+      );
+    for (const rarity of ["common", "rare", "ultra", "prisma", "legendary"] as const)
+      expect(nexamonPriceRange("yin_yang", rarity)).toEqual(YINYANG_PRICE_RANGE[rarity]);
+    for (const rarity of ["iron", "titanium", "diamond", "uranium"] as const)
+      expect(NEXAMON_ART_SIZE[rarity]).toEqual(TITAN_ART_SIZE[rarity]);
+    for (const rarity of ["common", "rare", "ultra", "prisma", "legendary"] as const)
+      expect(NEXAMON_ART_SIZE[rarity]).toEqual(YINYANG_ART_SIZE[rarity]);
+  });
+
+  it("gives a Titans Revenge pack about 90 % of its price in start values (ADR-182)", () => {
+    const price = BALANCE.nexamon.sets.titans_revenge.packPriceCents;
+    const titans = nexamonExpectedPackValue(
+      NEXAMON_CARDS.filter((c) => c.set === "titans_revenge"),
+      "titans_revenge",
+    );
+    expect(titans.cents / price).toBeGreaterThan(0.88);
+    expect(titans.cents / price).toBeLessThan(0.92);
+    // Yin Yang stays a winner on average, like the other sets (value factor 10)
+    const yy = nexamonExpectedPackValue(
+      NEXAMON_CARDS.filter((c) => c.set === "yin_yang"),
+      "yin_yang",
+    );
+    expect(yy.cents / BALANCE.nexamon.sets.yin_yang.packPriceCents).toBeGreaterThan(1.5);
   });
 
   it("keeps every start price inside the range of its rarity and set", () => {

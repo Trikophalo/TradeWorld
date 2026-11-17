@@ -83,6 +83,7 @@ const lobbySchema = z.object({
   server_time: iso,
 });
 const liveViewSchema = liveSchema.extend({
+  pack_no: num.default(1),
   progress: num,
   cards: z.array(pullSchema),
   done: z.boolean(),
@@ -210,6 +211,7 @@ export const livePackBattleEngine: PackBattleEngine = {
     const r = await rpc("get_nexamon_live", { p_live_id: liveId }, liveViewSchema);
     return {
       ...toLive(r),
+      packNo: r.pack_no,
       progress: r.progress,
       cards: r.cards.map(toPull),
       done: r.done,

@@ -3,6 +3,8 @@
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
+-- ADR-182: announcements of new sets air in one fixed hour; the show tests must not depend on the clock
+update public.game_config set value = jsonb_set(value, '{announcements}', '[]'::jsonb) where key = 'newsShow';
 
 \set f '''09119119-0000-4000-8000-0000000000f1'''
 \set l '''09119119-0000-4000-8000-0000000000a1'''

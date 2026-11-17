@@ -18,7 +18,7 @@ import {
 } from "./nexamon-bonuses.ts";
 
 const cfg = BALANCE.nexamon;
-/** A tiny set: two fire commons, one fire ultra, one water prisma, one dark legendary. */
+/** A tiny set: two fire commons, one fire ultra, one water prisma, one dark legendary (only fire is a type collection). */
 const CARDS: NexamonBonusCardInput[] = [
   { key: "me-001", set: "mystic_energy", number: 1, rarity: "common", type: "fire" },
   { key: "me-002", set: "mystic_energy", number: 2, rarity: "common", type: "fire" },
@@ -69,7 +69,7 @@ describe("collections and summary", () => {
   it("ignores listed copies and takes the best unlisted grade", () => {
     const s = nexamonBonusSummary(CARDS, [own("me-061", null, true), own("me-076", 9), own("me-076", 11, true)]);
     expect(s.sources.filter((x) => x.cardKey)).toEqual([{ cardKey: "me-076", collection: null, kind: "xp", bps: 375 }]);
-    expect(s.totals.find((t) => t.kind === "xp")).toMatchObject({ rawBps: 425, effectiveBps: 425 });
+    expect(s.totals.find((t) => t.kind === "xp")).toMatchObject({ rawBps: 375, effectiveBps: 375 });
   });
 
   it("knows type collections, the complete set and the master set", () => {
@@ -100,9 +100,9 @@ describe("collections and summary", () => {
     // ultra 50 + fire type 50 + master 100
     expect(company.rawBps).toBe(200);
     const xp = s.totals.find((t) => t.kind === "xp")!;
-    // legendary slab 375 + dark type 50 + complete 200 + master 100
-    expect(xp.rawBps).toBe(725);
-    expect(xp.effectiveBps).toBe(nexamonStackBps(725, "xp"));
+    // legendary slab 375 + complete 200 + master 100 (one dark card is no type collection: minCards 3)
+    expect(xp.rawBps).toBe(675);
+    expect(xp.effectiveBps).toBe(nexamonStackBps(675, "xp"));
   });
 
   it("pays pack prices and XP once per completion", () => {
@@ -110,6 +110,18 @@ describe("collections and summary", () => {
       cents: cfg.bonuses.sets.complete.rewardPacks * cfg.sets.super_apex.packPriceCents,
       xp: cfg.bonuses.sets.complete.rewardXp,
     });
+  });
+
+  it("skips types with fewer than three cards and pays Titans rewards at 10.000 € a pack (ADR-182)", () => {
+    const titans: NexamonBonusCardInput[] = [
+      { key: "tr-x1", set: "titans_revenge", number: 1, rarity: "iron", type: "psychic" },
+      { key: "tr-x2", set: "titans_revenge", number: 2, rarity: "iron", type: "rock" },
+      { key: "tr-x3", set: "titans_revenge", number: 3, rarity: "iron", type: "rock" },
+      { key: "tr-x4", set: "titans_revenge", number: 4, rarity: "titanium", type: "rock" },
+    ];
+    const types = nexamonCollections(titans, []).filter((c) => c.kind === "type");
+    expect(types.map((c) => c.type)).toEqual(["rock"]);
+    expect(nexamonCollectionReward("type", "titans_revenge").cents).toBe(3 * 1_000_000);
   });
 });
 

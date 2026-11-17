@@ -8055,3 +8055,32 @@ Migrationen `20261204006900_company_economy`, `…6910_company_autopilot`, `…6
 - RPCs: `get_company_autopilot()` (Mitglieder) und `set_company_autopilot(p_request_id, p_on)` (Gründer, idempotent)
   liefern `{on, can_toggle, mood, chance_bps, reward_bps, fail_penalty_bps, max_per_day, every_minutes,
 pay_factor_bps, today {done, success, cents}, log [...], last_hour {…, ai_utilization_bps, awareness_parts}}`.
+
+## Nachtrag: Titans Revenge und Yin Yang (ADR-182)
+
+Migrationen `20261204007200_nexamon_new_sets_packs.sql`, `…7210_nexamon_new_sets_ranks.sql`,
+`…7220_nexamon_uranium_feed.sql`, `…7230_nexamon_new_sets_collections.sql`. Keine neue Tabelle: die
+461 Karten und Regeln kommen über `game_config` (`pnpm db:config`), `nexamon_sync()` übernimmt die Sets und legt den
+KI-Startbestand an.
+
+- `game_config.nexamon`: neu `setOdds` (Platz-Tabelle je Set, Yin Yang in Teilen von 36.000), `packRules.titans_revenge`,
+  `quickSell.setRarities.titans_revenge`, `ai.excludedRarities` mit `uranium`; je Seltenheit Einträge für `iron`,
+  `titanium`, `diamond`, `uranium`. `game_config.nexamon_rarities.rank` mit den neuen Rängen.
+- Intern (service_role): neu `nexamon_slot_rarity(p_set, p_slot, p_u)` (Tabelle des Sets, sonst `odds`). Gepatcht:
+  `nexamon_open_pack()` würfelt Platz 4/5 mit der Set-Tabelle und überspringt in KI-Packs Stufen einer KI-gesperrten
+  Seltenheit (die nächste Stufe rückt nach, der Rest ist Basis); `buy_nexamon_pack()`, `open_nexamon_sealed_pack()`, `nexamon_battle_pull()`
+  zählen die Missionen nach `nexamon_rarity_rank()` (≥ 1 Rare, ≥ 2 Ultra).
+- `nexamon_bonus_recompute()`: Typ-Sammlungen erst ab `bonuses.sets.type.minCards` Karten, Belohnung je Pack aus
+  `bonuses.sets.rewardPackCents[set]`, sonst Packpreis. `feed_item_label()` nennt einen Uranium-Zug „Uranium-Karte“.
+- RPC `get_nexamon_market()`: der Filter `p_rarity` nimmt jede Seltenheit mit bekanntem Rang.
+- Kartenart `warrior` gibt es nur im Client-Katalog (Anzeige), die Datenbank kennt sie nicht.
+- Migration `20261204007240_nexamon_multi_packs_live.sql`: `nexamon_live.pack_no` (integer, 1) und `nexamon_live.queue`
+  (jsonb, `[{pack_id, set, cards}]`) für fortgesetzte Live-Öffnungen; intern `nexamon_live_pack_ms()`,
+  `nexamon_live_promote(live, pack, now)`, neu definiert `nexamon_pack_live()` (Trigger), `nexamon_live_progress()`,
+  `get_nexamon_live()` (Antwort zusätzlich `pack_no`). Neuer RPC `buy_nexamon_packs(p_request_id, p_set, p_count)` ->
+  `{set, count, price_cents, packs}`. `nexamon_set_released(set, now)` aus `sets.<set>.releaseAt`; Fehler NX310
+  `nexamon_set_not_released` in `buy_nexamon_pack`, `buy_nexamon_sealed_pack`, `challenge_nexamon_battle`,
+  `nexamon_open_pack` (KI: leeres Pack), `nexamon_grant_sealed_packs` (0), `nexamon_sync` (kein KI-Startbestand vorher).
+- Nachrichten: Tabelle `news_announcements_aired` (`announcement_at` PK, `slot`, `first_at`; nur Server),
+  `news_show_announcements(p_now)` für `news_show_build()`; Segmentart `release` mit `nexamon` `{set, card_key}`;
+  `store_news_show_script()` behält `release`-Segmente.

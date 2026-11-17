@@ -15,6 +15,10 @@ const RARITY_TONE: Record<NexamonRarity, BadgeProps["tone"]> = {
   prisma: "accent",
   legendary: "warn",
   one_of_one: "neutral",
+  iron: "neutral",
+  titanium: "info",
+  diamond: "accent",
+  uranium: "gain",
 };
 
 export interface RarityBadgeProps {

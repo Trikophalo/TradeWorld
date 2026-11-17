@@ -61,6 +61,27 @@ const FOILS: Record<NexamonRarity, readonly FoilSpec[]> = {
     { ink: "nexamon-foil-glitter", blend: "screen", opacity: 0.5, travel: 5, idle: "nexamon-twinkle-b" },
     { ink: "nexamon-foil-glare", blend: "soft-light", opacity: 0.6, travel: -18 },
   ],
+  // ADR-182, Titans Revenge. Iron: no foil, just a few sparks that glint now and then
+  iron: [{ ink: "nexamon-foil-sparks", blend: "screen", opacity: 0.55, travel: 4, idle: "nexamon-twinkle-b" }],
+  // Titanium: cold brushed metal, fine streaks in silver-blue that slide with the light
+  titanium: [
+    { ink: "nexamon-foil-brushed", blend: "overlay", opacity: 0.5, travel: 22, idle: "nexamon-foil-idle" },
+    { ink: "nexamon-foil-glare", blend: "soft-light", opacity: 0.55, travel: -24 },
+  ],
+  // Diamond: prismatic facets and a brilliant sparkle on top
+  diamond: [
+    { ink: "nexamon-foil-facets", blend: "color-dodge", opacity: 0.32, travel: 18, idle: "nexamon-foil-idle" },
+    { ink: "nexamon-foil-rainbow-b", blend: "overlay", opacity: 0.28, travel: -14, idle: "nexamon-foil-idle-b" },
+    { ink: "nexamon-foil-glitter", blend: "screen", opacity: 0.95, travel: 9, idle: "nexamon-twinkle" },
+    { ink: "nexamon-foil-glitter-b", blend: "screen", opacity: 0.9, travel: -7, idle: "nexamon-twinkle-b" },
+    { ink: "nexamon-foil-glare", blend: "overlay", opacity: 0.6, travel: -26 },
+  ],
+  // Uranium: a green glow that pulses from the edges
+  uranium: [
+    { ink: "nexamon-foil-uranium", blend: "screen", opacity: 0.7, travel: 6, idle: "nexamon-foil-pulse" },
+    { ink: "nexamon-foil-glitter-b", blend: "screen", opacity: 0.45, travel: 5, idle: "nexamon-twinkle" },
+    { ink: "nexamon-foil-glare", blend: "soft-light", opacity: 0.45, travel: -18 },
+  ],
 };
 
 export function FoilLayer({ spec, light, still }: { spec: FoilSpec; light: CardLight; still: boolean }) {

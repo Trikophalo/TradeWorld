@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { BALANCE } from "@/config/balance";
 import { buildGagSegment } from "@/lib/sim/running-gag";
+import { announcementSegments } from "@/features/game/demo/news-show";
 import {
   NewsStudio,
   segmentMood,
@@ -122,6 +123,8 @@ const EXTRAS = {
   },
   /** The running gag (ADR-179) with the made-up preview company of the config. */
   gag: gagPreview(),
+  /** ADR-182: Mr. Doodle Dangle announces a new Nexamon set, its pack and a card on the TV. */
+  release: announcementSegments(0, true)[0]!,
 } as const satisfies Record<string, StudioSegment>;
 
 type Extra = keyof typeof EXTRAS;
@@ -142,6 +145,7 @@ const BUTTONS: { phase: Phase; label: string }[] = [
   { phase: "tax", label: "Finanzamt" },
   { phase: "corp", label: "Börsenfirma" },
   ...(BALANCE.newsShow.runningGags.vulcan.demo.preview ? [{ phase: "gag" as const, label: "Running Gag" }] : []),
+  { phase: "release", label: "Neues Set" },
   { phase: "outro", label: "Outro" },
   { phase: "off", label: "Aus" },
 ];

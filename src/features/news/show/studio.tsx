@@ -49,6 +49,9 @@ import {
 } from "@/components/pixel/news-art";
 import { PixelIcon, type PixelArt } from "@/components/pixel/pixel-icon";
 import { PlayerFigure } from "@/components/ui/player-figure";
+import { nexamonCard, type NexamonSetKey } from "@/config/nexamon";
+import { CardThumb } from "@/features/nexamon/components/card-face";
+import { NexamonPack } from "@/features/nexamon/components/pack";
 import { BALANCE } from "@/config/balance";
 import { formatCountdown, localizeMoneyDeep } from "@/lib/format";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
@@ -82,6 +85,8 @@ export interface StudioSegment {
   effects: StudioEffect[];
   /** Shown on the topic screen instead of the icon, like a news photo with a caption ("Gesucht", …). */
   figure?: StudioFigure | null;
+  /** ADR-182: a new Nexamon set on the topic screen: its pack and a highlight card. */
+  nexamon?: { set: NexamonSetKey; cardKey: string } | null;
   /**
    * The face he reads this story with. Left out, it follows from the kind and the effects (`defaultMood`). Every
    * mood but "neutral" begins with a short reaction (`MOOD_REACTION`), and the typewriter waits for it.
@@ -827,6 +832,8 @@ export function NewsStudio({
   const signWidth = sign.grid[0]?.length ?? 0;
   // A story about a player shows them on the topic screen (half the scale, so the whole figure fits inside).
   const figure = mode === "live" ? (story?.figure ?? null) : null;
+  const release = mode === "live" && !figure ? (story?.nexamon ?? null) : null;
+  const releaseCard = release ? nexamonCard(release.cardKey) : undefined;
   const figureScale = Math.max(1, Math.floor(scale / 2));
   const frame = frameKind(story?.kind);
   const topicIcon = kind
@@ -1006,6 +1013,22 @@ export function NewsStudio({
                           }}
                         >
                           <PixelIcon {...topicIcon} scale={scale} className="block" />
+                        </div>
+                      )}
+                      {release && (
+                        <div
+                          key={`${segmentKey}:nexamon`}
+                          className={cn("absolute z-10 flex items-end justify-center gap-1", !reduced && "animate-pop")}
+                          style={{
+                            left: (topicX + TOPIC_WIDTH / 2) * scale - 76,
+                            top: TOPIC_TOP * scale,
+                            width: 152,
+                          }}
+                          data-testid="news-nexamon"
+                          data-set={release.set}
+                        >
+                          <NexamonPack set={release.set} scale={1} />
+                          {releaseCard && <CardThumb card={releaseCard} scale={1} />}
                         </div>
                       )}
                       {figure && (

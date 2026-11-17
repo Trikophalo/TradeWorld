@@ -18,6 +18,7 @@ import { chanceBps, formatChance, formatDecimal, packOdds } from "../view";
 import { ConditionBadge, RarityBadge } from "./badges";
 import { NexamonPack, TiltPack } from "./pack";
 import { PackOverlay } from "./pack-overlay";
+import { ReleaseBadge } from "./release";
 import { SealedPacksStrip } from "./sealed-packs";
 
 /**
@@ -40,20 +41,50 @@ export function Shop({
   const [selected, setSelected] = useState<NexamonSetKey | null>(null);
   /** The bought pack on the table (always of the selected set). */
   const [pack, setPack] = useState<NexamonPackResult | null>(null);
+  /** ADR-182: packs bought at once, opened one after another; `at` is the one on the table. */
+  const [series, setSeries] = useState<{ packs: NexamonPackResult[]; at: number; all: boolean } | null>(null);
   const action = useNexamonAction();
 
-  const buy = (set: NexamonSetKey) =>
-    void action.run((requestId) => engine.buyNexamonPack(requestId, set), {
-      errorTitle: t("shop.buyFailed"),
-      onDone: (bought) => {
-        void playSound("buy");
-        // Remembered until the summary shows: a closed window or a reload keeps the pack to tear open.
-        setPending(bought);
-        setPack(bought);
+  const buy = (set: NexamonSetKey, count = 1) =>
+    void action.run(
+      async (requestId) =>
+        count > 1
+          ? (await engine.buyNexamonPacks(requestId, set, count)).packs
+          : [await engine.buyNexamonPack(requestId, set)],
+      {
+        errorTitle: t("shop.buyFailed"),
+        onDone: (bought) => {
+          void playSound("buy");
+          // Remembered until the summary shows: a closed window or a reload keeps the pack to tear open.
+          setPending(bought[0]!);
+          setPack(bought[0]!);
+          setSeries(bought.length > 1 ? { packs: bought, at: 0, all: false } : null);
+        },
       },
+    );
+  const next = () => {
+    if (!series || series.at + 1 >= series.packs.length) return;
+    const at = series.at + 1;
+    setSeries({ ...series, at });
+    setPending(series.packs[at]!);
+    setPack(series.packs[at]!);
+  };
+  const skipAll = () => {
+    if (!series) return;
+    const rest = series.packs.slice(series.at);
+    setSeries({ ...series, all: true });
+    setPending(null);
+    setPack({
+      packId: `all-${rest[0]!.packId}`,
+      set: rest[0]!.set,
+      priceCents: rest.reduce((sum, p) => sum + p.priceCents, 0),
+      cards: rest.flatMap((p) => p.cards),
+      packsOpened: rest.at(-1)!.packsOpened,
     });
+  };
   const show = (set: NexamonSetKey) => {
     setPack(null);
+    setSeries(null);
     setSelected(set);
   };
   const resume = () => {
@@ -123,6 +154,7 @@ export function Shop({
                       <span className="mt-0.5 block text-xs text-pretty text-fg-3">
                         {t("shop.inside", { count: overview.packSize })}
                       </span>
+                      <ReleaseBadge set={set.key} className="mt-1.5" />
                     </span>
                     <span className="block">
                       <span className="flex items-baseline justify-between gap-2 text-xs text-fg-2">
@@ -160,13 +192,18 @@ export function Shop({
         pack={pack && pack.set === selected ? pack : null}
         collection={collection}
         cashCents={cash}
-        onBuy={() => selected && buy(selected)}
+        onBuy={(count) => selected && buy(selected, count)}
+        series={series ? { index: series.at + 1, total: series.packs.length } : null}
+        onNext={series && !series.all ? next : undefined}
+        onSkipAll={series && !series.all ? skipAll : undefined}
+        summaryOnly={series?.all ?? false}
         buyState={action.state}
         onFinished={() => setPending(null)}
         oneOfOnes={overview?.oneOfOnes}
         onClose={() => {
           setSelected(null);
           setPack(null);
+          setSeries(null);
         }}
       />
     </div>
@@ -179,6 +216,13 @@ function OddsCard({ packSize }: { packSize: number }) {
   const rows = packOdds();
   // ADR-174: the One of One row of the set that has them
   const oneOfOne = packOdds("cosmic_winds").find((row) => row.kind === "one_of_one");
+  // ADR-182: the two sets with their own rules
+  const titans = packOdds("titans_revenge");
+  const yinYang = packOdds("yin_yang");
+  const yinYangChance = (rarity: string) => {
+    const row = yinYang.find((r) => r.rarity === rarity);
+    return row ? formatChance(chanceBps(row.slot5, row.denominator)) : "–";
+  };
   const weights = BALANCE.nexamon.conditions.weightBps;
   return (
     <Card padding="lg" data-testid="nexamon-odds">
@@ -248,6 +292,20 @@ function OddsCard({ packSize }: { packSize: number }) {
           {t("odds.oneOfOneNote", { count: formatInteger(oneOfOne.denominator) })}
         </p>
       )}
+      <p className="mt-3 text-sm text-pretty text-fg-2" data-testid="odds-titans">
+        {t("odds.titansNote", {
+          titanium: formatInteger(titans.find((row) => row.rarity === "titanium")?.oneInPacks ?? 0),
+          diamond: formatInteger(titans.find((row) => row.rarity === "diamond")?.oneInPacks ?? 0),
+          uranium: formatInteger(titans.find((row) => row.rarity === "uranium")?.oneInPacks ?? 0),
+        })}
+      </p>
+      <p className="mt-3 text-sm text-pretty text-fg-2" data-testid="odds-yin-yang">
+        {t("odds.yinYangNote", {
+          ultra: yinYangChance("ultra"),
+          prisma: yinYangChance("prisma"),
+          legendary: yinYangChance("legendary"),
+        })}
+      </p>
       <p className="mt-3 text-sm text-pretty text-fg-2">{t("odds.conditionIntro")}</p>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
         {[...NEXAMON_CONDITIONS].reverse().map((condition) => (

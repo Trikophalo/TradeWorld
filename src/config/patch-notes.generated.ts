@@ -514,6 +514,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Jedes NFT bekommt beim Prägen ein Kritiker-Urteil von 0 bis 100 (du siehst es mit Stärke und Schwäche, der Markt als kleines Abzeichen).",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-ef1a3d78",
+        title: "Yin Yang",
+        text: "110 Karten im Tuschestil für 2.000 € je Pack, mit einsamen Kriegern und dem Paar Yin und Yang in Schwarz und Weiß.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-06b87ec3",
+        title: "Titans Revenge",
+        text: "Das teuerste Nexamon-Set für 100.000 € je Pack: 30 Titanen in Iron, Titanium, Diamond und Uranium.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-b37900d5",
         title: "Slabs bleiben im Umlauf",
         text: "Bewertete Karten, die die KI kauft, verschwinden nie; sie behält sie eine Weile (1 bis 72 h) und bietet sie dann zum aktuellen Wert wieder am Markt…",

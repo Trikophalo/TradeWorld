@@ -79,8 +79,10 @@ describe("Nexamon in the demo (ADR-165)", () => {
     expect(overview.sets.map((s) => [s.key, s.packPriceCents, s.cards])).toEqual([
       ["mystic_energy", 20_000, 77],
       ["super_apex", 100_000, 77],
+      ["yin_yang", 200_000, 110],
       ["cosmic_winds", 500_000, 90],
       ["prismatic_peak", 1_000_000, 77],
+      ["titans_revenge", 10_000_000, 30],
     ]);
     expect(overview.oneOfOnes.map((x) => [x.cardKey, x.pulled])).toEqual([
       ["cw-088", false],
@@ -95,16 +97,24 @@ describe("Nexamon in the demo (ADR-165)", () => {
   it("starts with the AI's stock: every card listed 10 % above its start price, no legendary, few prismas", async () => {
     const { engine } = setup();
     const { cards } = await engine.nexamonCollection();
-    expect(cards).toHaveLength(321);
+    expect(cards).toHaveLength(461);
     for (const card of cards) {
       expect(card.valueCents).toBe(nexamonCard(card.cardKey)!.startPriceCents);
       expect(card.listed).toBe(Math.min(card.population, cfg.ai.listedPerCard[card.rarity]));
       if (card.rarity === "legendary") expect(card.population).toBe(0);
     }
-    expect(cards.filter((c) => c.rarity === "prisma" && c.population > 0)).toHaveLength(8);
+    expect(cards.filter((c) => c.rarity === "prisma" && c.population > 0)).toHaveLength(10);
     expect(cards.filter((c) => c.rarity === "one_of_one" && c.population > 0)).toHaveLength(0);
+    // ADR-182: the AI holds iron and titanium, no diamond at the start and never uranium
+    expect(cards.filter((c) => c.rarity === "diamond" && c.population > 0)).toHaveLength(0);
+    expect(cards.filter((c) => c.rarity === "uranium" && c.population > 0)).toHaveLength(0);
     const market = await engine.nexamonMarket({ sort: "price_asc" });
-    expect(market.total).toBe(3 * (50 * 4 + 10 * 3 + 10 * 2 + 2) + (50 * 4 + 15 * 3 + 15 * 2 + 2));
+    expect(market.total).toBe(
+      3 * (50 * 4 + 10 * 3 + 10 * 2 + 2) +
+        (50 * 4 + 15 * 3 + 15 * 2 + 2) +
+        (15 * 4 + 7 * 2) +
+        (54 * 4 + 30 * 3 + 16 * 2 + 2),
+    );
     expect(market.listings).toHaveLength(cfg.market.pageSize);
     for (const listing of market.listings) {
       expect(listing.sellerAi).toBe(true);
@@ -413,7 +423,7 @@ describe("Nexamon in the demo (ADR-165)", () => {
       expect(own.summary).toEqual({
         copies: 10,
         distinct: new Set(copies.map((c) => c.cardKey)).size,
-        total: 321,
+        total: 461,
         valueCents: copies.reduce((sum, c) => sum + c.valueCents, 0),
         graded: 0,
         tens: 0,
@@ -435,8 +445,10 @@ describe("Nexamon in the demo (ADR-165)", () => {
       expect(own.sets.map((s) => [s.key, s.cards, s.distinct, s.copies])).toEqual([
         ["mystic_energy", 77, 5, 10],
         ["super_apex", 77, 0, 0],
+        ["yin_yang", 110, 0, 0],
         ["cosmic_winds", 90, 0, 0],
         ["prismatic_peak", 77, 0, 0],
+        ["titans_revenge", 30, 0, 0],
       ]);
       // by the own name it is the same answer
       expect((await engine.playerNexamon(" demo ")).cards).toEqual(own.cards);

@@ -32,6 +32,12 @@ export const TITAN_PRICE_RANGE: Record<TitanRarity, readonly [number, number]> =
   uranium: [850_000_000, 3_500_000_000],
 };
 
+/**
+ * Wiring (ADR-182): the ranges above give a pack an expected value of only 80 % of its price at start prices, so the
+ * catalogue takes every start price x 1.125 (rounded to whole euros). That lands at 90 %.
+ */
+export const TITAN_VALUE_FACTOR = 1.125;
+
 /** Art sizes: iron 60 x 40 (framed), titanium 68 x 48 (breaks out), diamond and uranium 72 x 100 full art. */
 export const TITAN_ART_SIZE: Record<TitanRarity, { width: number; height: number }> = {
   iron: { width: 60, height: 40 },

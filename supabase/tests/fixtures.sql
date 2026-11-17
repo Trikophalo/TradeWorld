@@ -1476,6 +1476,8 @@ select public.get_nexamon_sealed_packs();
 select public.get_nexamon_sealed_packs() #>> '{packs,0,id}' as fx_sealed \gset
 \o :fixture_dir/open_nexamon_sealed_pack.json
 select public.open_nexamon_sealed_pack(gen_random_uuid(), :'fx_sealed');
+\o :fixture_dir/buy_nexamon_packs.json
+select public.buy_nexamon_packs(gen_random_uuid(), 'mystic_energy', 2);
 \o
 select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') -> 'cards' as fx_nx \gset
 select :'fx_nx'::jsonb #>> '{0,copy_id}' as fx_nx1 \gset

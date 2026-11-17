@@ -14,6 +14,7 @@ import {
   nexamonPackRule,
   nexamonGradeFactorBps,
   nexamonTierOdds,
+  nexamonExpectedCounts,
   nexamonTierRarities,
   nexamonTradeOnly,
   nexamonAiBuyChanceBps,
@@ -61,21 +62,19 @@ import { createRng } from "./rng.ts";
 const cfg = BALANCE.nexamon;
 const DEN = cfg.odds.denominator;
 const SET = placeholderSet("mystic_energy");
+const NONE = Object.fromEntries(NEXAMON_RARITIES.map((r) => [r, 0])) as Record<NexamonRarity, number>;
 
 describe("Nexamon packs (ADR-165)", () => {
   it("has the exact slot odds: slots 1-3 common, slot 4 ultra/rare, slot 5 legendary/prisma/ultra/rare", () => {
     expect(DEN).toBe(3600);
     for (const slot of [1, 2, 3])
       expect(nexamonSlotOdds(slot)).toEqual({
+        ...NONE,
         common: 3600,
-        rare: 0,
-        ultra: 0,
-        prisma: 0,
-        legendary: 0,
-        one_of_one: 0,
       });
-    expect(nexamonSlotOdds(4)).toEqual({ common: 2550, rare: 900, ultra: 150, prisma: 0, legendary: 0, one_of_one: 0 });
+    expect(nexamonSlotOdds(4)).toEqual({ ...NONE, common: 2550, rare: 900, ultra: 150 });
     expect(nexamonSlotOdds(5)).toEqual({
+      ...NONE,
       common: 2501,
       rare: 900,
       ultra: 150,
@@ -161,6 +160,10 @@ describe("Nexamon packs (ADR-165)", () => {
       prisma: 0,
       legendary: 0,
       one_of_one: 0,
+      iron: 0,
+      titanium: 0,
+      diamond: 0,
+      uranium: 0,
     };
     const perCard = new Map<string, number>();
     const conditions: Record<string, number> = {};
@@ -259,7 +262,67 @@ describe("Nexamon packs (ADR-165)", () => {
     expect(nexamonTierOdds(rule).map((t) => t.perPack)).toEqual([1 / 500, 1 / 50, 1 / 5]);
   }, 60_000);
 
-  it("values a 10 at 2.5x to 4x and a 9.5 at 1.8x to 2.6x by popularity, the ladder always in order (ADR-174)", () => {
+  it("fills a Titans Revenge pack by its tiers and keeps uranium out of AI packs (ADR-182)", () => {
+    const rule = nexamonPackRule("titans_revenge")!;
+    expect(rule.base).toBe("iron");
+    expect(nexamonTierOdds(rule).map((t) => [t.rarity, t.perPack])).toEqual([
+      ["uranium", 1 / 500],
+      ["diamond", 1 / 50],
+      ["titanium", 1 / 5],
+    ]);
+    const cards = placeholderSet("titans_revenge");
+    const rng = createRng(182);
+    const seen: Record<string, number> = {};
+    const packs = 100_000;
+    for (let i = 0; i < packs; i++) {
+      const pulls = nexamonOpenPack(cards, rng.next, cfg, { rule, set: "titans_revenge" });
+      const iron = pulls.filter((p) => p.rarity === "iron");
+      expect(iron.length).toBeGreaterThanOrEqual(1);
+      expect(new Set(iron.map((p) => p.key)).size).toBe(iron.length);
+      for (const p of new Set(pulls.map((x) => x.rarity))) seen[p] = (seen[p] ?? 0) + 1;
+    }
+    const near = (got: number, p: number) =>
+      expect(Math.abs(got - packs * p)).toBeLessThan(5 * Math.sqrt(packs * p * (1 - p)));
+    expect(seen.iron).toBe(packs);
+    near(seen.titanium ?? 0, 1 / 5);
+    near(seen.diamond ?? 0, 1 / 50);
+    near(seen.uranium ?? 0, 1 / 500);
+    // an AI pack: the uranium tier is skipped, its slot stays iron
+    const always = () => 0;
+    const ai = nexamonOpenPack(cards, always, cfg, {
+      rule,
+      set: "titans_revenge",
+      skipRarities: cfg.ai.excludedRarities,
+    });
+    expect(ai.some((p) => p.rarity === "uranium")).toBe(false);
+    expect(nexamonAiAllowed("uranium")).toBe(false);
+    expect(nexamonAiAllowed("diamond")).toBe(true);
+    // expected cards per pack: 5 in total, iron 3 to 5 in practice
+    const counts = nexamonExpectedCounts("titans_revenge");
+    expect(Object.values(counts).reduce((a, b) => a + b, 0)).toBeCloseTo(5, 10);
+    expect(counts.titanium).toBeCloseTo(0.3, 3);
+    expect(counts.iron).toBeGreaterThan(4.6);
+  }, 60_000);
+
+  it("pulls Yin Yang chase cards 10 % less often, the rest goes to the rares (ADR-182)", () => {
+    const base = nexamonExpectedPerPack();
+    const yy = nexamonExpectedPerPack(cfg, "yin_yang");
+    for (const rarity of ["ultra", "prisma", "legendary"] as const)
+      expect(yy[rarity] / base[rarity]).toBeCloseTo(0.9, 10);
+    expect(yy.common).toBeCloseTo(base.common, 10);
+    expect(yy.rare + yy.ultra + yy.prisma + yy.legendary).toBeCloseTo(
+      base.rare + base.ultra + base.prisma + base.legendary,
+      10,
+    );
+    for (const slot of [4, 5])
+      expect(Object.values(nexamonSlotOdds(slot, cfg, "yin_yang")).reduce((a, b) => a + b, 0)).toBe(36_000);
+    expect(nexamonSlotRarity(5, 0, cfg, "yin_yang")).toBe("legendary");
+    expect(nexamonSlotRarity(5, 36 / 36_000, cfg, "yin_yang")).toBe("prisma");
+    // no other set uses the table
+    expect(nexamonExpectedPerPack(cfg, "cosmic_winds")).toEqual(base);
+  });
+
+  it("values a 10 at 2.5x and a 9.5 at 1.8x to 2.6x by popularity, the ladder always in order (ADR-174)", () => {
     expect(nexamonGradeFactorBps(10, 0)).toBe(25_000);
     expect(nexamonGradeFactorBps(10, 10_000)).toBe(40_000);
     expect(nexamonGradeFactorBps(10, 5_000)).toBe(32_500);
@@ -480,8 +543,13 @@ describe("Nexamon market value (ADR-165)", () => {
   });
 
   it("finds rare cards with a low population popular", () => {
-    const pops = NEXAMON_RARITIES.map((r) => nexamonPopularityBps(r, 10));
-    for (let i = 1; i < pops.length; i++) expect(pops[i]!).toBeGreaterThan(pops[i - 1]!);
+    for (const order of [
+      ["common", "rare", "ultra", "prisma", "legendary", "one_of_one"],
+      ["iron", "titanium", "diamond", "uranium"],
+    ] as const) {
+      const pops = order.map((r) => nexamonPopularityBps(r, 10));
+      for (let i = 1; i < pops.length; i++) expect(pops[i]!).toBeGreaterThan(pops[i - 1]!);
+    }
     expect(nexamonPopularityBps("legendary", 1)).toBe(10_000);
     expect(nexamonPopularityBps("legendary", 1_000)).toBeLessThan(9_100);
     expect(nexamonPopularityBps("prisma", 2)).toBeGreaterThan(nexamonPopularityBps("prisma", 200));

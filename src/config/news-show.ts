@@ -160,6 +160,39 @@ export const NEWS_SHOW_RULES = {
   },
   /** Running gags (ADR-179): stories that come back every show while their player company exists. */
   runningGags: NEWS_RUNNING_GAGS,
+  /**
+   * Announcements (ADR-182): exactly one show carries an entry, the one airing in the hour that starts at `at`
+   * (the server remembers the slot, a later show never repeats it). It opens with one segment per entry of `sets`
+   * (kind "release"): the pack and a highlight card on the studio TV, "{time}" in the text is `releaseAt` in Berlin
+   * time. Claude's rewrite keeps these segments as drafted.
+   */
+  announcements: [
+    {
+      at: "2026-11-17T16:00:00Z",
+      releaseAt: "2026-11-17T16:30:00Z",
+      sets: [
+        {
+          set: "titans_revenge",
+          cardKey: "tr-027",
+          mood: "shocked",
+          headline: "Neu: Titans Revenge",
+          text:
+            "Achtung, Sammler! Die Titanen sind erwacht: Titans Revenge, das neue Nexamon-Set für 100.000 € je Pack. " +
+            "Iron in jedem Booster, dazu Titanium und Diamond, und wer ganz viel Glück hat, zieht Uranium: nur in " +
+            "einem von fünfhundert Packs! Ab {time} Uhr im Shop.",
+        },
+        {
+          set: "yin_yang",
+          cardKey: "yy-109",
+          mood: "proud",
+          headline: "Neu: Yin Yang",
+          text:
+            "Und gleich noch eins: Yin Yang, 110 Karten in Schwarz und Weiß, einsame Krieger und epische Landschaften, " +
+            "für 2.000 € je Pack. Die Legendaries Yin und Yang gehören zusammen. Ebenfalls ab {time} Uhr!",
+        },
+      ],
+    },
+  ] as readonly NewsShowAnnouncement[],
   /** The loser of the day: biggest loss of net worth in this window, at least minLossBps. Gets a consolation. */
   loser: { windowHours: 24, minLossBps: 300, consolationCents: 50_000 },
   /** The winner of the day: biggest gain, at least minGainBps. */
@@ -232,11 +265,15 @@ export const NEWS_SHOW_RULES = {
       prisma: "Prisma",
       legendary: "Legendär",
       one_of_one: "One of One",
+      iron: "Eisen",
+      titanium: "Titan",
+      diamond: "Diamant",
+      uranium: "Uran",
     },
     cards: {
       /** A pull of these rarities is a story; a spree of at least dudMinPacks packs without any of hitRarities too. */
-      pullRarities: ["prisma", "legendary"],
-      hitRarities: ["ultra", "prisma", "legendary"],
+      pullRarities: ["prisma", "legendary", "diamond", "uranium"],
+      hitRarities: ["ultra", "prisma", "legendary", "titanium", "diamond", "uranium"],
       dudMinPacks: 5,
       /** A sale from this price on; a card whose value left the day's first value by at least minMoveBps. */
       minSaleCents: 100_000,
@@ -793,4 +830,10 @@ export const NEWS_SHOW_RULES = {
 } as const;
 
 export type NewsShowRules = typeof NEWS_SHOW_RULES;
+/** A show segment that announces new Nexamon sets (ADR-182). */
+export interface NewsShowAnnouncement {
+  at: string;
+  releaseAt: string;
+  sets: readonly { set: string; cardKey: string; mood: string; headline: string; text: string }[];
+}
 export type NewsShowTextKey = keyof typeof NEWS_SHOW_RULES.texts;

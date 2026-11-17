@@ -166,6 +166,8 @@ test("a tooltip shows on hover and on keyboard focus", async ({ page }) => {
 });
 
 test("a pack is opened and emptied by dragging the cards away", async ({ page }) => {
+  // six drags with pauses on a big /dev/ui page: close to 30 s on a busy machine
+  test.setTimeout(60_000);
   const opening = await openPack(page);
   const log = page.getByTestId("nexamon-reveal-log");
   await expect(log).toHaveText("1: Glimmfuchs");

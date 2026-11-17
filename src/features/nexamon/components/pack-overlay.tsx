@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Dialog } from "radix-ui";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { BALANCE } from "@/config/balance";
 import { nexamonCard, type NexamonCard, type NexamonSetKey } from "@/config/nexamon";
 import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonState } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { TiltPack } from "./pack";
 import { PackOpening } from "./pack-opening";
 import { BuySealedButton } from "./sealed-packs";
 import { LiveWatchers } from "../live/live-watchers";
+import { useSetRelease } from "./release";
 
 export interface PackOverlayProps {
   /** The set whose pack is on the table; null closes the popup. */
@@ -39,8 +41,16 @@ export interface PackOverlayProps {
   /** For the list of all cards of the set and which of them the player owns. */
   collection: NexamonCollection | undefined;
   cashCents: number;
-  /** Buys one pack of the set (the only step that costs money). */
-  onBuy: () => void;
+  /** Buys `count` packs of the set (the only step that costs money; ADR-182: 1 to packs.maxPerBuy at once). */
+  onBuy: (count: number) => void;
+  /** ADR-182: the pack on the table is pack `index` (1-based) of `total` bought at once. */
+  series?: { index: number; total: number } | null;
+  /** Tears the next pack of the series open. */
+  onNext?: () => void;
+  /** Skips the rest of the series: one summary of every pack left. */
+  onSkipAll?: () => void;
+  /** The pack is that summary of several packs: shown as a summary only. */
+  summaryOnly?: boolean;
   buyState: ButtonState;
   onClose: () => void;
   /** The summary is showing (all cards pulled away or skipped). */
@@ -65,6 +75,10 @@ export function PackOverlay({
   onClose,
   onFinished,
   oneOfOnes = [],
+  series = null,
+  onNext,
+  onSkipAll,
+  summaryOnly = false,
 }: PackOverlayProps) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
@@ -87,24 +101,58 @@ export function PackOverlay({
     onFinished();
   };
   const price = set?.packPriceCents ?? 0;
-  const short = Math.max(0, price - cashCents);
+  const [count, setCount] = useState(1);
+  const total = price * count;
+  const short = Math.max(0, total - cashCents);
+  // ADR-182: a set before its release can be looked at, not bought
+  const release = useSetRelease(set?.key ?? null);
+  const hasNext = series !== null && series.index < series.total;
+  // ADR-182: after a pack of a series the next one tears open by itself
+  const nextRef = useRef(onNext);
+  useEffect(() => {
+    nextRef.current = onNext;
+  });
+  const canAutoNext = Boolean(onNext);
+  useEffect(() => {
+    if (!done || !hasNext || !canAutoNext) return;
+    const id = window.setTimeout(() => nextRef.current?.(), NEXT_PACK_MS);
+    return () => window.clearTimeout(id);
+  }, [done, hasNext, canAutoNext, pack?.packId]);
   const stage = !pack ? "preview" : done ? "summary" : "opening";
   const buyButton = (label: string, testId: string) => (
     <div className="flex w-full flex-col items-center gap-1.5 sm:w-auto">
       <Button
         size="lg"
         state={buyState}
-        disabled={short > 0}
-        onClick={onBuy}
+        disabled={short > 0 || release.locked}
+        onClick={() => onBuy(count)}
         data-testid={testId}
         className="w-full sm:w-auto"
       >
         {label}
       </Button>
-      {short > 0 && <p className="text-xs text-warn">{t("shop.short", { amount: formatMoney(short) })}</p>}
+      {release.locked && release.time ? (
+        <p className="text-xs text-fg-2" data-testid="pack-release">
+          {t("shop.releaseLocked", { time: release.time })}
+        </p>
+      ) : (
+        short > 0 && <p className="text-xs text-warn">{t("shop.short", { amount: formatMoney(short) })}</p>
+      )}
     </div>
   );
-  const again = buyButton(t("opening.again", { price: formatMoney(price, { whole: true }) }), "pack-again");
+  const again =
+    hasNext && onNext ? (
+      <div className="flex w-full flex-col items-center gap-1.5 sm:w-auto">
+        <Button size="lg" onClick={onNext} data-testid="pack-next" className="w-full sm:w-auto">
+          {t("opening.next", { n: series!.index + 1, total: series!.total })}
+        </Button>
+        <p className="text-xs text-fg-3">{t("opening.nextSoon")}</p>
+      </div>
+    ) : count > 1 ? (
+      buyButton(t("shop.buyMany", { count, price: formatMoney(total, { whole: true }) }), "pack-again")
+    ) : (
+      buyButton(t("opening.again", { price: formatMoney(price, { whole: true }) }), "pack-again")
+    );
 
   return (
     <Dialog.Root open={set !== null} onOpenChange={(open) => !open && onClose()}>
@@ -130,8 +178,8 @@ export function PackOverlay({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <LiveWatchers packId={pack?.packId ?? null} revealed={shownCount} />
-              {stage === "opening" && pack && (
+              <LiveWatchers packId={summaryOnly ? null : (pack?.packId ?? null)} revealed={shownCount} />
+              {stage === "opening" && pack && !summaryOnly && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -151,6 +199,18 @@ export function PackOverlay({
               </Dialog.Close>
             </div>
           </header>
+          {series && series.total > 1 && !summaryOnly && (
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b-2 border-line-1 px-4 py-2 lg:px-6">
+              <Badge tone="accent" data-testid="pack-series">
+                {t("opening.series", { n: series.index, total: series.total })}
+              </Badge>
+              {hasNext && onSkipAll && (
+                <Button variant="ghost" size="sm" data-testid="pack-skip-all" onClick={onSkipAll}>
+                  {t("opening.skipAll")}
+                </Button>
+              )}
+            </div>
+          )}
           {set && (
             <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
               {stage === "preview" && (
@@ -160,8 +220,20 @@ export function PackOverlay({
                     <p className="nums text-2xl font-semibold text-fg-1" data-testid="pack-price">
                       {formatMoney(price, { whole: true })}
                     </p>
-                    {buyButton(t("shop.buy", { price: formatMoney(price, { whole: true }) }), "confirm-buy")}
-                    <BuySealedButton set={set.key} priceCents={price} cashCents={cashCents} />
+                    <CountPicker count={count} onChange={setCount} />
+                    {buyButton(
+                      count > 1
+                        ? t("shop.buyMany", { count, price: formatMoney(total, { whole: true }) })
+                        : t("shop.buy", { price: formatMoney(price, { whole: true }) }),
+                      "confirm-buy",
+                    )}
+                    {release.locked && release.time ? (
+                      <p className="text-sm text-pretty text-fg-2" data-testid="pack-preview-note">
+                        {t("shop.releasePreview", { time: release.time })}
+                      </p>
+                    ) : (
+                      <BuySealedButton set={set.key} priceCents={price} cashCents={cashCents} />
+                    )}
                     <p className="text-sm text-pretty text-fg-2">{t("opening.howTo")}</p>
                     <p className="text-xs text-fg-3">{t("opening.scrollHint")}</p>
                   </div>
@@ -170,7 +242,16 @@ export function PackOverlay({
               )}
               {pack && stage !== "preview" && (
                 <div className="flex min-h-full flex-col items-center justify-center px-4 py-6">
-                  {skipped ? (
+                  {summaryOnly ? (
+                    <div className="flex w-full flex-col items-center gap-3">
+                      <p className="font-pixel text-sm text-fg-1 uppercase" data-testid="pack-all-title">
+                        {t("opening.allTitle", { count: series?.total ?? 1 })}
+                      </p>
+                      <Summary pack={pack} thumbs>
+                        <Actions>{again}</Actions>
+                      </Summary>
+                    </div>
+                  ) : skipped ? (
                     <Summary pack={pack} thumbs>
                       <Actions>{again}</Actions>
                     </Summary>
@@ -199,6 +280,42 @@ export function PackOverlay({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/** After a pack of a series, the next one opens by itself after this long (ADR-182). */
+const NEXT_PACK_MS = 4_000;
+
+/** How many packs to buy at once: 1 to packs.maxPerBuy (ADR-182). */
+function CountPicker({ count, onChange }: { count: number; onChange: (count: number) => void }) {
+  const t = useTranslations("nexamon");
+  const max = BALANCE.nexamon.packs.maxPerBuy;
+  return (
+    <div className="flex items-center gap-2" role="group" aria-label={t("shop.count")} data-testid="pack-count">
+      <Button
+        variant="secondary"
+        size="sm"
+        aria-label={t("shop.countLess")}
+        disabled={count <= 1}
+        onClick={() => onChange(Math.max(1, count - 1))}
+        data-testid="pack-count-less"
+      >
+        −
+      </Button>
+      <span className="w-8 text-center nums text-lg font-semibold text-fg-1" data-testid="pack-count-value">
+        {count}
+      </span>
+      <Button
+        variant="secondary"
+        size="sm"
+        aria-label={t("shop.countMore")}
+        disabled={count >= max}
+        onClick={() => onChange(Math.min(max, count + 1))}
+        data-testid="pack-count-more"
+      >
+        +
+      </Button>
+    </div>
   );
 }
 
@@ -256,25 +373,31 @@ function SetContents({
                 ? t("contents.oneOfOne", { count: formatInteger(group.odds.denominator) })
                 : group.odds.kind === "tier"
                   ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks ?? 0) })
-                  : group.odds.oneInPacks !== null
-                    ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks) })
-                    : t("odds.perPack", { count: formatDecimal(group.odds.perPack) })}
+                  : group.odds.kind === "base"
+                    ? t("contents.base", { count: formatDecimal(group.odds.perPack) })
+                    : group.odds.oneInPacks !== null
+                      ? t("odds.oneIn", { count: formatInteger(group.odds.oneInPacks) })
+                      : t("odds.perPack", { count: formatDecimal(group.odds.perPack) })}
             </span>
             <span className="nums text-xs text-fg-3">
               {group.odds.kind === "one_of_one"
                 ? t("contents.oneOfOneLeft", {
                     count: group.cards.filter(({ card }) => !status.get(card.key)?.pulled).length,
                   })
-                : group.odds.kind !== "slots"
-                  ? null
-                  : group.odds.slot4 > 0
-                    ? t("contents.slots", {
-                        slot4: formatChance(chanceBps(group.odds.slot4, group.odds.denominator)),
-                        slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
-                      })
-                    : t("contents.lastSlot", {
-                        slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
-                      })}
+                : group.odds.kind === "tier"
+                  ? group.odds.max === 1
+                    ? t("contents.tierOne")
+                    : t("contents.tierRange", { min: group.odds.min ?? 1, max: group.odds.max ?? 1 })
+                  : group.odds.kind !== "slots"
+                    ? null
+                    : group.odds.slot4 > 0
+                      ? t("contents.slots", {
+                          slot4: formatChance(chanceBps(group.odds.slot4, group.odds.denominator)),
+                          slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                        })
+                      : t("contents.lastSlot", {
+                          slot5: formatChance(chanceBps(group.odds.slot5, group.odds.denominator)),
+                        })}
             </span>
             <span className="ml-auto nums text-xs text-fg-2" data-testid="contents-owned">
               {collection ? (

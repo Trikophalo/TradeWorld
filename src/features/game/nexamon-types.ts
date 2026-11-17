@@ -184,6 +184,14 @@ export interface NexamonPackResult {
   packsOpened: number;
 }
 
+/** Several packs bought at once (ADR-182). */
+export interface NexamonPacksResult {
+  set: NexamonSetKey;
+  count: number;
+  priceCents: number;
+  packs: NexamonPackResult[];
+}
+
 export interface NexamonCollection {
   /** Every card of the catalogue (or of the set asked for), in set and number order. */
   cards: NexamonCardStats[];
@@ -345,6 +353,8 @@ export interface NexamonEngine {
   nexamon(): Promise<NexamonOverview>;
   /** Buys and opens one booster pack of a set. */
   buyNexamonPack(requestId: string, set: NexamonSetKey): Promise<NexamonPackResult>;
+  /** Buys 1 to packs.maxPerBuy packs of a set at once (ADR-182), all or nothing; the packs in opening order. */
+  buyNexamonPacks(requestId: string, set: NexamonSetKey, count: number): Promise<NexamonPacksResult>;
   /** All cards (value, population, on the market, owned) and the own copies; `set` narrows both. */
   nexamonCollection(set?: NexamonSetKey | null): Promise<NexamonCollection>;
   /** One card: value, history, population, listings, own copies, recent sales. */

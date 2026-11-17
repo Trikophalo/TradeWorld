@@ -8,6 +8,7 @@ import type { ArtQualityKey } from "@/lib/sim/art-quality";
  * computed with BigInt (src/features/market/order-schema.ts).
  */
 import type { BattleEngine } from "./battle-types";
+import type { NexamonSetKey } from "@/config/nexamon/types";
 import type { NexamonEngine } from "./nexamon-types";
 import type { NexamonSealedEngine } from "./nexamon-sealed-types";
 import type { PackBattleEngine } from "./pack-battle-types";
@@ -2231,6 +2232,8 @@ export const GAME_ERROR_KEYS = [
   // ADR-174
   "nexamon_one_of_one_taken",
   "nexamon_ai_excluded",
+  // ADR-182
+  "nexamon_set_not_released",
   "nexamon_not_enough",
   "not_listed",
   "item_unknown",
@@ -2296,6 +2299,12 @@ export interface NewsShowSegment {
   effects: { label: string; tone: "gain" | "loss" | "neutral" }[];
   /** The player the story is about, in their current look (ADR-157). */
   figure?: NewsShowFigure;
+  /** ADR-182: a new Nexamon set on the studio TV, its pack and a highlight card. */
+  nexamon?: NewsShowNexamon;
+}
+export interface NewsShowNexamon {
+  set: NexamonSetKey;
+  cardKey: string;
 }
 export interface NewsShowChatMessage {
   id: number;

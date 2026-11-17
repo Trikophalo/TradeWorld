@@ -99,6 +99,8 @@ export interface NexamonLobby {
 }
 
 export interface NexamonLiveView extends NexamonLiveSession {
+  /** ADR-182: which pack of a continued live opening is shown (1 = the first). */
+  packNo: number;
   /** Cards the spectator may see. */
   progress: number;
   cards: NexamonShownPull[];

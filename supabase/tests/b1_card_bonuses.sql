@@ -67,8 +67,8 @@ select tests.assert(
   'card bonus definitions, slab boost, stacking with knee and cap (same numbers as the unit tests)');
 select tests.assert(
   (select count(*) from public.nexamon_cards k
-    where public.nexamon_card_bonus_def(k.rarity, k.set_key, k.number, public.nexamon_types() ->> k.card_key) is not null) = 80,
-  '80 of 321 cards give a bonus (every ultra, prisma, legendary, One of One and rare no. 60 of each set)');
+    where public.nexamon_card_bonus_def(k.rarity, k.set_key, k.number, public.nexamon_types() ->> k.card_key) is not null) = 122,
+  '122 of 461 cards give a bonus (every ultra, prisma, legendary, One of One, titanium, diamond, uranium and rare no. 60 of each set)');
 
 -- =============================================================================
 -- B. A bonus comes with a card and goes with a listing; slabs boost it
@@ -196,7 +196,7 @@ select public.get_nexamon_bonuses() as cb \gset
 select public.get_player_nexamon(null, 5) as cp \gset
 reset role;
 select tests.assert(
-  jsonb_array_length(:'cb'::jsonb -> 'totals') = 7 and jsonb_array_length(:'cb'::jsonb -> 'cards') = 80
+  jsonb_array_length(:'cb'::jsonb -> 'totals') = 7 and jsonb_array_length(:'cb'::jsonb -> 'cards') = 122
   and exists (select 1 from jsonb_array_elements(:'cb'::jsonb -> 'collections') x
                where x ->> 'kind' = 'master' and x ->> 'set' = 'mystic_energy' and (x ->> 'complete')::boolean
                  and x ->> 'completed_at' is not null)
@@ -206,7 +206,7 @@ select tests.assert(
   and jsonb_array_length(:'cp'::jsonb -> 'badges') >= 13
   and jsonb_array_length(:'cp'::jsonb -> 'slabs') = 7 and (:'cp'::jsonb #>> '{summary,black_labels}')::integer = 0
   and (:'cp'::jsonb #>> '{slabs,0,grade}')::double precision = 9,
-  'get_nexamon_bonuses(): totals, the 80 bonus cards, collections with what is missing; profile: badges and slabs');
+  'get_nexamon_bonuses(): totals, the 122 bonus cards, collections with what is missing; profile: badges and slabs');
 
 -- =============================================================================
 -- F. Black Label hype

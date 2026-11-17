@@ -21,6 +21,7 @@ import {
 } from "../types";
 import { buildGagSegment, gagChatLines, matchesNamePattern } from "@/lib/sim/running-gag";
 import { demoTopicCandidates } from "./news-topics";
+import type { NexamonSetKey } from "@/config/nexamon/types";
 
 /*
  * NEXA Nachrichten in the offline demo (ADR-150): the same rules as the server. The show of an hour starts when the
@@ -84,6 +85,31 @@ const bots = cfg.chat.bots;
 /** Stories about a person: in the demo always the player, shown on the TV in their current look (ADR-157). */
 const PLAYER_KINDS = new Set(["loser", "winner", "gossip", "scandal", "hype", "nft", "interview"]);
 
+const MOODS = ["neutral", "shocked", "crying", "laughing", "angry", "smug", "confused", "proud"];
+const berlinTime = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+
+/**
+ * The segments of the new-set announcements (ADR-182) for the show of the hour starting at `slot` (ms): only the
+ * one show whose hour starts at an announcement's `at`, like news_show_announcements() on the server.
+ */
+export function announcementSegments(slot: number, force = false): NewsShowSegment[] {
+  const out: NewsShowSegment[] = [];
+  for (const a of BALANCE.newsShow.announcements) {
+    if (!force && Date.parse(a.at) !== slot) continue;
+    const time = berlinTime.format(Date.parse(a.releaseAt));
+    for (const s of a.sets)
+      out.push({
+        kind: "release",
+        mood: (MOODS.includes(s.mood) ? s.mood : "proud") as NewsShowSegment["mood"],
+        headline: s.headline,
+        text: s.text.replaceAll("{time}", time),
+        effects: [],
+        nexamon: { set: s.set as NexamonSetKey, cardKey: s.cardKey },
+      });
+  }
+  return out;
+}
+
 export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "newsShow" | "postNewsShowMessage"> & {
   startNow(inMs?: number): void;
 } {
@@ -107,6 +133,8 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
     // every story carries its place in the running order, like the server's "ord"
     const stories: { ord: number; segment: NewsShowSegment }[] = [];
     const segments = { push: (segment: NewsShowSegment, ord: number) => stories.push({ ord, segment }) };
+    // ADR-182: the announcement of new sets opens the one show of its hour
+    for (const segment of announcementSegments(slot)) segments.push(segment, 1);
     const sign = (up: boolean) => (up ? "+" : "−");
 
     const change = host.dayChange();

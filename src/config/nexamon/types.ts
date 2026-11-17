@@ -3,7 +3,14 @@
  * the market. Three sets of 77 cards and Cosmic Winds with 90 (ADR-174). Every set has its own rarity layout
  * (`NEXAMON_SET_LAYOUT`): how many cards of each rarity, numbered by rarity. Pure data, no imports.
  */
-export const NEXAMON_SETS = ["mystic_energy", "super_apex", "prismatic_peak", "cosmic_winds"] as const;
+export const NEXAMON_SETS = [
+  "mystic_energy",
+  "super_apex",
+  "prismatic_peak",
+  "cosmic_winds",
+  "titans_revenge",
+  "yin_yang",
+] as const;
 export type NexamonSetKey = (typeof NEXAMON_SETS)[number];
 /** Prefix of the card keys of a set ("me-001"). */
 export const NEXAMON_SET_PREFIX: Record<NexamonSetKey, string> = {
@@ -11,6 +18,8 @@ export const NEXAMON_SET_PREFIX: Record<NexamonSetKey, string> = {
   super_apex: "sa",
   prismatic_peak: "pp",
   cosmic_winds: "cw",
+  titans_revenge: "tr",
+  yin_yang: "yy",
 };
 
 /**
@@ -19,7 +28,18 @@ export const NEXAMON_SET_PREFIX: Record<NexamonSetKey, string> = {
  * them here and fills the per-rarity records (rank, art size, prices, badges, rules); TypeScript lists every place.
  * "one_of_one": a card that exists exactly once in the whole game.
  */
-export const NEXAMON_RARITIES = ["common", "rare", "ultra", "prisma", "legendary", "one_of_one"] as const;
+export const NEXAMON_RARITIES = [
+  "common",
+  "rare",
+  "ultra",
+  "prisma",
+  "legendary",
+  "one_of_one",
+  "iron",
+  "titanium",
+  "diamond",
+  "uranium",
+] as const;
 export type NexamonRarity = (typeof NEXAMON_RARITIES)[number];
 /**
  * Rank of a rarity across all sets, higher is rarer: sorting, badges, the Pack Battle tie-break, "is it a hit", the
@@ -32,6 +52,12 @@ export const NEXAMON_RARITY_RANK: Record<NexamonRarity, number> = {
   prisma: 3,
   legendary: 4,
   one_of_one: 5,
+  // Titans Revenge (ADR-182): iron is the bulk, titanium the hit of every fifth pack, diamond a prisma-sized moment,
+  // uranium the biggest reveal a pack can hold (on par with a One of One)
+  iron: 0,
+  titanium: 2,
+  diamond: 3,
+  uranium: 5,
 };
 /** One entry of a set's layout: a rarity and how many cards of it, numbered on from the entry before. */
 export type NexamonLayoutEntry = readonly [rarity: NexamonRarity, count: number];
@@ -57,6 +83,19 @@ export const NEXAMON_SET_LAYOUT: Record<NexamonSetKey, readonly NexamonLayoutEnt
     ["prisma", 5],
     ["legendary", 2],
     ["one_of_one", 3],
+  ],
+  titans_revenge: [
+    ["iron", 15],
+    ["titanium", 7],
+    ["diamond", 4],
+    ["uranium", 4],
+  ],
+  yin_yang: [
+    ["common", 54],
+    ["rare", 30],
+    ["ultra", 16],
+    ["prisma", 8],
+    ["legendary", 2],
   ],
 };
 /** Cards of a rarity in a set (0 if the set does not use it). */
@@ -96,7 +135,8 @@ export const NEXAMON_TYPES = [
 ] as const;
 export type NexamonType = (typeof NEXAMON_TYPES)[number];
 
-export type NexamonCardKind = "monster" | "event";
+/** "warrior": a lone warrior of Yin Yang (ADR-182), a monster card with a "KRIEGER" label. */
+export type NexamonCardKind = "monster" | "event" | "warrior";
 export const nexamonCardKind = (card: { kind?: NexamonCardKind }): NexamonCardKind => card.kind ?? "monster";
 
 export interface NexamonCard {
@@ -143,6 +183,10 @@ export const NEXAMON_ART_SIZE: Record<NexamonRarity, { width: number; height: nu
   prisma: { width: 72, height: 100 },
   legendary: { width: 72, height: 100 },
   one_of_one: { width: 72, height: 100 },
+  iron: { width: 60, height: 40 },
+  titanium: { width: 68, height: 48 },
+  diamond: { width: 72, height: 100 },
+  uranium: { width: 72, height: 100 },
 };
 
 /**
@@ -156,6 +200,10 @@ export const NEXAMON_BASE_PRICE_RANGE: Record<NexamonRarity, readonly [number, n
   prisma: [500_000, 2_500_000],
   legendary: [9_000_000, 18_000_000],
   one_of_one: [0, 0],
+  iron: [0, 0],
+  titanium: [0, 0],
+  diamond: [0, 0],
+  uranium: [0, 0],
 };
 /** A One of One is worth 16 to 33 million euros at the start, whatever its set (ADR-174). */
 export const NEXAMON_ONE_OF_ONE_PRICE_RANGE = [1_600_000_000, 3_300_000_000] as const;
@@ -164,10 +212,36 @@ export const NEXAMON_SET_PRICE_FACTOR: Record<NexamonSetKey, number> = {
   super_apex: 5,
   prismatic_peak: 37.5,
   cosmic_winds: 22.5,
+  titans_revenge: 1,
+  yin_yang: 10,
+};
+/**
+ * Sets whose ranges are not just the base ranges x their factor (ADR-182): Titans Revenge has its own rarities
+ * (`titans-draft.ts`), Yin Yang is worth 10 x the base and 12 % more from ultra upwards (`yinyang-draft.ts`).
+ */
+export const NEXAMON_SET_PRICE_RANGE: Partial<
+  Record<NexamonSetKey, Partial<Record<NexamonRarity, readonly [number, number]>>>
+> = {
+  // TITAN_PRICE_RANGE x 1.125 (TITAN_VALUE_FACTOR)
+  titans_revenge: {
+    iron: [281_250, 675_000],
+    titanium: [3_375_000, 8_437_500],
+    diamond: [33_750_000, 95_625_000],
+    uranium: [956_250_000, 3_937_500_000],
+  },
+  yin_yang: {
+    common: [1_000, 10_000],
+    rare: [7_000, 80_000],
+    ultra: [179_200, 2_800_000],
+    prisma: [5_600_000, 28_000_000],
+    legendary: [100_800_000, 201_600_000],
+  },
 };
 /** Start price range of a rarity in a set, in cents. */
 export function nexamonPriceRange(set: NexamonSetKey, rarity: NexamonRarity): readonly [number, number] {
   if (rarity === "one_of_one") return NEXAMON_ONE_OF_ONE_PRICE_RANGE;
+  const own = NEXAMON_SET_PRICE_RANGE[set]?.[rarity];
+  if (own) return own;
   const [lo, hi] = NEXAMON_BASE_PRICE_RANGE[rarity];
   return [lo * NEXAMON_SET_PRICE_FACTOR[set], hi * NEXAMON_SET_PRICE_FACTOR[set]];
 }

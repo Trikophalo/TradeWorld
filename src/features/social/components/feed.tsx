@@ -160,7 +160,11 @@ function useFeedText() {
       case "nexamon_hype":
         return t("nexamon_hype", { name: nexamonCard(str(p.card_key))?.name ?? str(p.name) });
       case "nexamon_pull":
-        return t("nexamon_pull", { name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key), serial: n(p.serial) });
+        return t("nexamon_pull", {
+          name: nexamonCard(str(p.card_key))?.name ?? str(p.card_key),
+          serial: n(p.serial),
+          rarity: str(p.rarity),
+        });
       case "tax_penalty":
       case "tax_audit":
       case "greedy_founder":

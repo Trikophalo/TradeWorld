@@ -1,9 +1,11 @@
+import { NEXAMON_ART, nexamonCard } from "@/config/nexamon";
 import type { NexamonArt, NexamonCard } from "@/config/nexamon/types";
 import { bayer } from "./nexamon-raster";
 
 /*
- * Six sample cards with artwork, one per rarity (the One of One since ADR-174), and an event card, for the showcase on /dev/ui and the tests (ADR-165). They are
- * fixtures of the renderer and never part of the catalogue: the real cards live in src/config/nexamon.
+ * Sample cards with artwork, one per rarity (the One of One since ADR-174), and an event card, for the showcase on
+ * /dev/ui and the tests (ADR-165). The classic six are fixtures of the renderer and never part of the catalogue; the
+ * Titans Revenge rarities, the warrior and Yin and Yang (ADR-182) are real catalogue cards with their artwork.
  * The artworks are drawn by code (blobs with three tones, light from the top left, an ink outline) and come out
  * as the same character grids the catalogue uses.
  */
@@ -876,7 +878,10 @@ const card = (
   ...rest,
 });
 
-/** One sample card per rarity, in rarity order. */
+/** Cards of Titans Revenge for the new rarities (ADR-182): real catalogue cards, one per rarity. */
+const TITANS_SAMPLE_KEYS = ["tr-001", "tr-016", "tr-023", "tr-027"] as const;
+
+/** One sample card per rarity, in the order of NEXAMON_RARITIES. */
 export const NEXAMON_SAMPLE_CARDS: readonly NexamonCard[] = [
   card(12, "common", {
     set: "mystic_energy",
@@ -938,7 +943,12 @@ export const NEXAMON_SAMPLE_CARDS: readonly NexamonCard[] = [
     attack: { name: "Erster Atem", damage: 250, text: "Alle Karten im Spiel drehen sich einmal um sich selbst." },
     flavor: "Bevor es Sterne gab, gab es den Wind, der sie zusammenblies. Es gibt ihn genau einmal.",
   }),
+  ...TITANS_SAMPLE_KEYS.map((key) => nexamonCard(key)!),
 ];
+
+/** Yin Yang (ADR-182): a warrior card and the two legendaries Yin and Yang. */
+export const NEXAMON_SAMPLE_WARRIOR: NexamonCard = nexamonCard("yy-094")!;
+export const NEXAMON_SAMPLE_YIN_YANG: readonly NexamonCard[] = [nexamonCard("yy-109")!, nexamonCard("yy-110")!];
 
 /** A sample event card (ADR-174): no HP, an effect instead of an attack. */
 export const NEXAMON_SAMPLE_EVENT: NexamonCard = {
@@ -974,6 +984,12 @@ export function nexamonSampleArt(): Readonly<Record<string, NexamonArt>> {
     "demo-077": aurodrak(),
     "demo-090": galaxy(72, 100, 90),
     "demo-009": galaxy(60, 40, 9),
+    ...Object.fromEntries(
+      [...TITANS_SAMPLE_KEYS, NEXAMON_SAMPLE_WARRIOR.key, ...NEXAMON_SAMPLE_YIN_YANG.map((c) => c.key)].map((key) => [
+        key,
+        NEXAMON_ART[key]!,
+      ]),
+    ),
   };
   return artCache;
 }

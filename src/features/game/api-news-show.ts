@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NEXAMON_SETS } from "@/config/nexamon/types";
 import type { GameEngine, NewsShowChatMessage, NewsShowFigure, NewsShowState } from "./types";
 import { rpc } from "./rpc";
 
@@ -45,6 +46,10 @@ const showSchema = z.object({
             .array(z.object({ label: z.string(), tone: z.enum(["gain", "loss", "neutral"]).catch("neutral") }))
             .default([]),
           figure: figureSchema.nullish().catch(null),
+          nexamon: z
+            .object({ set: z.enum(NEXAMON_SETS), card_key: z.string() })
+            .nullish()
+            .catch(null),
         }),
       ),
     })
@@ -79,9 +84,11 @@ export const liveNewsShowEngine: Pick<GameEngine, "newsShow" | "postNewsShowMess
         airsAt: r.show.airs_at,
         startedAt: r.show.started_at,
         writer: r.show.writer,
-        segments: r.show.segments.map(({ figure, ...segment }) =>
-          figure ? { ...segment, figure: toFigure(figure) } : segment,
-        ),
+        segments: r.show.segments.map(({ figure, nexamon, ...segment }) => ({
+          ...segment,
+          ...(figure ? { figure: toFigure(figure) } : {}),
+          ...(nexamon ? { nexamon: { set: nexamon.set, cardKey: nexamon.card_key } } : {}),
+        })),
       },
       chat: toChat(r.chat),
     };
