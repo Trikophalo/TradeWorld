@@ -15,7 +15,7 @@ import { parseEuroCents } from "@/features/market/order-schema";
 import { formatMoney } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { useNexamonAction } from "../hooks";
+import { useNexamonAction, useNexamonCollection } from "../hooks";
 import { formatGrade, isBlackLabel } from "../lib";
 import {
   centsToInput,
@@ -36,6 +36,63 @@ import { CopyQuality, FactRow, GradeChip } from "./parts";
 type Dialog = "sell" | "quick" | "grade" | "crack" | null;
 
 /**
+ * The own copies that can go together with `copy` (ADR-174): the same card, raw in the same condition or slabs of
+ * the same grade, not listed and not at ASP, oldest first; `copy` itself always first.
+ */
+export function twinCopies(copy: NexamonCopy, copies: readonly NexamonCopy[]): NexamonCopy[] {
+  const same = copies.filter(
+    (c) =>
+      c.id !== copy.id &&
+      c.cardKey === copy.cardKey &&
+      c.listing === null &&
+      c.gradingUntil === null &&
+      (copy.grade === null ? c.grade === null && c.condition === copy.condition : c.grade === copy.grade),
+  );
+  same.sort((a, b) => Date.parse(a.acquiredAt) - Date.parse(b.acquiredAt) || a.serial - b.serial);
+  return [copy, ...same];
+}
+
+/** How many copies: minus, the number, plus and "alle". */
+function QuantityPicker({ value, max, onChange }: { value: number; max: number; onChange: (n: number) => void }) {
+  const t = useTranslations("nexamon");
+  return (
+    <div className="flex items-center gap-2" data-testid="quantity">
+      <span className="label-pixel text-fg-3">{t("quantity.label")}</span>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={value <= 1}
+        onClick={() => onChange(value - 1)}
+        aria-label={t("quantity.less")}
+      >
+        −
+      </Button>
+      <span className="min-w-12 text-center nums font-semibold text-fg-1" data-testid="quantity-value">
+        {t("quantity.of", { n: value, max })}
+      </span>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={value >= max}
+        onClick={() => onChange(value + 1)}
+        aria-label={t("quantity.more")}
+      >
+        +
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={value === max}
+        onClick={() => onChange(max)}
+        data-testid="quantity-all"
+      >
+        {t("quantity.all")}
+      </Button>
+    </div>
+  );
+}
+
+/**
  * Everything a player can do with one copy (ADR-165): list it, take it back, sell it to the AI at once, send it to
  * ASP, crack its slab. Each action explains what it costs and brings before it runs.
  */
@@ -54,6 +111,9 @@ export function CopyActions({
   const t = useTranslations("nexamon");
   const [dialog, setDialog] = useState<Dialog>(null);
   const unlist = useNexamonAction();
+  const unlistAll = useNexamonAction();
+  const owned = useNexamonCollection().data?.copies ?? [];
+  const listedTwins = owned.filter((c) => c.cardKey === copy.cardKey && c.listing !== null);
   const status = copyStatus(copy);
   const quick = quickSellOffer(copy, card.rarity);
   const close = () => setDialog(null);
@@ -88,6 +148,29 @@ export function CopyActions({
           >
             {t("copy.unlist")}
           </Button>
+          {listedTwins.length > 1 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              state={unlistAll.state}
+              data-testid="copy-unlist-all"
+              onClick={() =>
+                void unlistAll.run(
+                  (requestId) =>
+                    engine.unlistNexamonCards(
+                      requestId,
+                      listedTwins.map((c) => c.listing!.id),
+                    ),
+                  {
+                    errorTitle: t("copy.unlistFailed"),
+                    onDone: (r) => toast.success(t("copy.unlistManyDone", { count: r.copies.length }), card.name),
+                  },
+                )
+              }
+            >
+              {t("copy.unlistAll", { count: listedTwins.length })}
+            </Button>
+          )}
         </>
       ) : (
         <>
@@ -143,6 +226,8 @@ const AI_HINT_POPULATION = 100_000;
 function SellSheet({ copy, card, population, onClose }: SheetProps & { population: number }) {
   const t = useTranslations("nexamon");
   const action = useNexamonAction();
+  const twins = twinCopies(copy, useNexamonCollection().data?.copies ?? []);
+  const [count, setCount] = useState(1);
   const [text, setText] = useState(() => centsToInput(suggestedPriceCents(copy.valueCents)));
   const cents = parseEuroCents(text);
   const valid = isListablePrice(cents);
@@ -165,21 +250,38 @@ function SellSheet({ copy, card, population, onClose }: SheetProps & { populatio
           data-testid="sell-confirm"
           onClick={() =>
             valid &&
-            void action.run((requestId) => engine.listNexamonCard(requestId, copy.id, cents), {
-              errorTitle: t("sell.failed"),
-              onDone: () => {
-                toast.success(t("sell.done"), formatMoney(cents));
-                onClose();
+            void action.run<unknown>(
+              (requestId) =>
+                count > 1
+                  ? engine.listNexamonCards(requestId, copy.cardKey, copy.condition, copy.grade, count, cents)
+                  : engine.listNexamonCard(requestId, copy.id, cents),
+              {
+                errorTitle: t("sell.failed"),
+                onDone: () => {
+                  toast.success(count > 1 ? t("sell.doneMany", { count }) : t("sell.done"), formatMoney(cents));
+                  onClose();
+                },
               },
-            })
+            )
           }
         >
-          {valid ? t("sell.confirm", { price: formatMoney(cents) }) : t("sell.confirmPlain")}
+          {valid
+            ? count > 1
+              ? t("sell.confirmMany", { count, price: formatMoney(cents) })
+              : t("sell.confirm", { price: formatMoney(cents) })
+            : t("sell.confirmPlain")}
         </Button>
       }
     >
       <div className="space-y-4" data-testid="sell-sheet">
         <CopyLine copy={copy} card={card} />
+        {twins.length > 1 && (
+          <QuantityPicker
+            value={count}
+            max={Math.min(twins.length, BALANCE.nexamon.market.maxListings)}
+            onChange={setCount}
+          />
+        )}
         <Field
           label={t("sell.price")}
           inputMode="decimal"
@@ -229,6 +331,9 @@ function SellSheet({ copy, card, population, onClose }: SheetProps & { populatio
 function QuickSheet({ copy, card, offer, onClose }: SheetProps & { offer: number }) {
   const t = useTranslations("nexamon");
   const action = useNexamonAction();
+  const twins = twinCopies(copy, useNexamonCollection().data?.copies ?? []);
+  const [count, setCount] = useState(1);
+  const ids = twins.slice(0, count).map((c) => c.id);
   return (
     <Sheet
       open
@@ -241,7 +346,7 @@ function QuickSheet({ copy, card, offer, onClose }: SheetProps & { offer: number
           state={action.state}
           data-testid="quick-confirm"
           onClick={() =>
-            void action.run((requestId) => engine.sellNexamonToAi(requestId, [copy.id]), {
+            void action.run((requestId) => engine.sellNexamonToAi(requestId, ids), {
               errorTitle: t("quick.failed"),
               onDone: (result) => {
                 void playSound("coin");
@@ -251,12 +356,21 @@ function QuickSheet({ copy, card, offer, onClose }: SheetProps & { offer: number
             })
           }
         >
-          {t("quick.confirm", { price: formatMoney(offer) })}
+          {count > 1
+            ? t("quick.confirmMany", { count, price: formatMoney(offer * count) })
+            : t("quick.confirm", { price: formatMoney(offer) })}
         </Button>
       }
     >
       <div className="space-y-4" data-testid="quick-sheet">
         <CopyLine copy={copy} card={card} />
+        {twins.length > 1 && (
+          <QuantityPicker
+            value={count}
+            max={Math.min(twins.length, BALANCE.nexamon.quickSell.maxPerCall)}
+            onChange={setCount}
+          />
+        )}
         <dl className="divide-y divide-line-1 rounded-md bg-surface-2 px-3">
           <FactRow label={t("sell.value")}>{formatMoney(copy.valueCents)}</FactRow>
           <FactRow label={t("quick.offer", { rate: formatChance(BALANCE.nexamon.quickSell.bps) })} strong>

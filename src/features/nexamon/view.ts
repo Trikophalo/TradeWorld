@@ -25,6 +25,7 @@ import {
   nexamonGradingFeeCents,
   nexamonMarketFeeCents,
   nexamonQuickSellCents,
+  nexamonIsBulk,
   nexamonPackRule,
   nexamonSlotOdds,
 } from "@/lib/sim/nexamon";
@@ -512,4 +513,79 @@ export function profileBinder(cards: readonly PlayerNexamonCard[], onlyOwned: bo
       entries: onlyOwned ? all.filter((e) => e.owned !== null) : all,
     };
   }).filter((group) => group.entries.length > 0);
+}
+
+// ------------------------------------------------------------------------------------------------- bulk
+
+/** Filters of the collection's bulk mode (ADR-174). */
+export interface BulkFilter {
+  set: NexamonSetKey | "all";
+  rarity: NexamonRarity | "all";
+  condition: NexamonCondition | "all";
+  /** Only cards the player owns more than once. */
+  duplicatesOnly: boolean;
+  /** Never sell the best copy of a card (default on). */
+  keepOne: boolean;
+  /** Never sell a card that gives a bonus (default on). */
+  skipBonus: boolean;
+  /** Only copies worth at most this; null: any value. */
+  maxValueCents: number | null;
+}
+export const DEFAULT_BULK_FILTER: BulkFilter = {
+  set: "all",
+  rarity: "all",
+  condition: "all",
+  duplicatesOnly: false,
+  keepOne: true,
+  skipBonus: true,
+  maxValueCents: null,
+};
+
+export interface BulkGroup {
+  card: NexamonCard;
+  /** The copies that may go, cheapest first (the best copy stays when `keepOne`). */
+  copies: NexamonCopy[];
+}
+
+/**
+ * What the bulk mode offers (ADR-174): raw copies of the bulk rarities of their set, not listed and not at ASP,
+ * grouped by card in set and number order, after the player's filters. `hasBonus` says whether a card gives a bonus.
+ */
+export function bulkGroups(
+  copies: readonly NexamonCopy[],
+  filter: BulkFilter,
+  hasBonus: (card: NexamonCard) => boolean,
+): BulkGroup[] {
+  const byCard = new Map<string, NexamonCopy[]>();
+  for (const copy of copies) {
+    const list = byCard.get(copy.cardKey) ?? [];
+    list.push(copy);
+    byCard.set(copy.cardKey, list);
+  }
+  const groups: BulkGroup[] = [];
+  for (const [key, own] of byCard) {
+    const card = nexamonCard(key);
+    if (!card) continue;
+    if (filter.set !== "all" && card.set !== filter.set) continue;
+    if (filter.rarity !== "all" && card.rarity !== filter.rarity) continue;
+    if (filter.duplicatesOnly && own.length < 2) continue;
+    if (filter.skipBonus && hasBonus(card)) continue;
+    const free = own.filter((c) => nexamonIsBulk(card.rarity, c.grade, card.set) && !c.listing && !c.gradingUntil);
+    let pool = [...free].sort((a, b) => a.valueCents - b.valueCents || b.serial - a.serial);
+    // keep the best copy of the card, unless a slab or a listed copy already stays
+    if (filter.keepOne && free.length === own.length) pool = pool.slice(0, -1);
+    pool = pool.filter(
+      (c) =>
+        (filter.condition === "all" || c.condition === filter.condition) &&
+        (filter.maxValueCents === null || c.valueCents <= filter.maxValueCents),
+    );
+    if (pool.length > 0) groups.push({ card, copies: pool });
+  }
+  const order = (c: NexamonCard) => NEXAMON_SETS.indexOf(c.set) * 1_000 + c.number;
+  return groups.sort((a, b) => order(a.card) - order(b.card));
+}
+
+/** The copies a selection (card key -> how many) sells: the cheapest first of every card. */
+export function bulkPick(groups: readonly BulkGroup[], selection: Readonly<Record<string, number>>): NexamonCopy[] {
+  return groups.flatMap((g) => g.copies.slice(0, Math.max(0, Math.min(g.copies.length, selection[g.card.key] ?? 0))));
 }

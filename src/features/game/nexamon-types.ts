@@ -357,10 +357,26 @@ export interface NexamonEngine {
   playerNexamon(nickname: string | null, limit?: number | null): Promise<PlayerNexamon>;
   listNexamonCard(requestId: string, copyId: string, priceCents: number): Promise<NexamonListResult>;
   unlistNexamonCard(requestId: string, listingId: string): Promise<{ copy: NexamonCopy }>;
+  /**
+   * ADR-174: lists `count` own copies of a card at one price each: raw copies of `condition` (grade null) or slabs
+   * of `grade`, oldest first.
+   */
+  listNexamonCards(
+    requestId: string,
+    cardKey: string,
+    condition: NexamonCondition,
+    grade: number | null,
+    count: number,
+    priceCents: number,
+  ): Promise<{ listings: NexamonListing[]; copies: NexamonCopy[] }>;
+  /** ADR-174: takes several own listings back at once. */
+  unlistNexamonCards(requestId: string, listingIds: string[]): Promise<{ copies: NexamonCopy[] }>;
   /** `priceCents` is the price the player saw; a changed price fails with nexamon_price_changed. */
   buyNexamonListing(requestId: string, listingId: string, priceCents: number): Promise<NexamonBuyResult>;
   /** Instant sale of raw commons and rares to the AI for half their value. */
   sellNexamonToAi(requestId: string, copyIds: string[]): Promise<NexamonQuickSellResult>;
+  /** ADR-174: the collection's bulk mode: raw bulk copies to the game for their value minus the bulk fee. */
+  bulkSellNexamon(requestId: string, copyIds: string[]): Promise<NexamonQuickSellResult>;
   /** Sends a raw copy to ASP: half its value, back after an hour with a grade. */
   gradeNexamonCard(requestId: string, copyId: string): Promise<NexamonGradeResult>;
   /** Cracks a slab: the raw card with its condition comes back, no refund. */

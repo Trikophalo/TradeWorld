@@ -255,6 +255,9 @@ const bonusesSchema = z.object({
 
 const listedSchema = z.object({ listing: listingSchema, copy: copySchema });
 const unlistedSchema = z.object({ copy: copySchema });
+// ADR-174: several copies at once
+const listedManySchema = z.object({ listings: z.array(listingSchema), copies: z.array(copySchema) });
+const unlistedManySchema = z.object({ copies: z.array(copySchema) });
 const boughtSchema = z.object({
   copy: copySchema,
   card: cardSchema,
@@ -279,8 +282,11 @@ export const NEXAMON_RPC_SCHEMAS = {
   buy_nexamon_pack: packSchema,
   list_nexamon_card: listedSchema,
   unlist_nexamon_card: unlistedSchema,
+  list_nexamon_cards: listedManySchema,
+  unlist_nexamon_cards: unlistedManySchema,
   buy_nexamon_listing: boughtSchema,
   sell_nexamon_to_ai: quickSoldSchema,
+  bulk_sell_nexamon: quickSoldSchema,
   grade_nexamon_card: gradingSchema,
   crack_nexamon_slab: crackedSchema,
   get_nexamon_bonuses: bonusesSchema,
@@ -504,6 +510,37 @@ export const liveNexamonEngine: NexamonEngine = {
   async unlistNexamonCard(requestId, listingId) {
     const r = await rpc("unlist_nexamon_card", { p_request_id: requestId, p_listing_id: listingId }, unlistedSchema);
     return { copy: toCopy(r.copy) };
+  },
+  async bulkSellNexamon(requestId, copyIds) {
+    const r = await rpc("bulk_sell_nexamon", { p_request_id: requestId, p_copy_ids: copyIds }, quickSoldSchema);
+    return {
+      sold: r.sold.map((s) => ({ copyId: s.copy_id, cardKey: s.card_key, priceCents: s.price_cents })),
+      count: r.count,
+      totalCents: r.total_cents,
+    };
+  },
+  async listNexamonCards(requestId, cardKey, condition, grade, count, priceCents) {
+    const r = await rpc(
+      "list_nexamon_cards",
+      {
+        p_request_id: requestId,
+        p_card_key: cardKey,
+        p_condition: condition,
+        p_grade: grade,
+        p_count: count,
+        p_price_cents: priceCents,
+      },
+      listedManySchema,
+    );
+    return { listings: r.listings.map(toListing), copies: r.copies.map(toCopy) };
+  },
+  async unlistNexamonCards(requestId, listingIds) {
+    const r = await rpc(
+      "unlist_nexamon_cards",
+      { p_request_id: requestId, p_listing_ids: listingIds },
+      unlistedManySchema,
+    );
+    return { copies: r.copies.map(toCopy) };
   },
   async buyNexamonListing(requestId, listingId, priceCents) {
     const r = await rpc(

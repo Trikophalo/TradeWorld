@@ -1471,6 +1471,18 @@ select public.grade_nexamon_card(gen_random_uuid(), :'fx_nx2');
 \o :fixture_dir/sell_nexamon_to_ai.json
 select public.sell_nexamon_to_ai(gen_random_uuid(), array[:'fx_nx3']::uuid[]);
 \o
+-- ADR-174: several copies at once, bulk to the game (commons of a fresh pack)
+select public.buy_nexamon_pack(gen_random_uuid(), 'mystic_energy') -> 'cards' as fx_nb \gset
+\o :fixture_dir/list_nexamon_cards.json
+select public.list_nexamon_cards(gen_random_uuid(), :'fx_nb'::jsonb #>> '{0,card_key}', :'fx_nb'::jsonb #>> '{0,condition}', null, 1, 500);
+\o
+select array_agg(l.id)::text as fx_nxls from public.nexamon_listings l where l.seller_id = :'fx_g' and l.card_key = :'fx_nb'::jsonb #>> '{0,card_key}' \gset
+\o :fixture_dir/unlist_nexamon_cards.json
+select public.unlist_nexamon_cards(gen_random_uuid(), :'fx_nxls'::uuid[]);
+\o
+\o :fixture_dir/bulk_sell_nexamon.json
+select public.bulk_sell_nexamon(gen_random_uuid(), array[(:'fx_nb'::jsonb #>> '{1,copy_id}')::uuid]);
+\o
 reset role;
 update public.nexamon_copies set grading_until = public.game_now() - interval '1 second' where id = :'fx_nx2';
 select tests.login_as('authenticated', :fx_h) is null as ok \gset

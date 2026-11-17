@@ -883,6 +883,9 @@
     "nexamon_battle_opponent_locked": "Dein Freund hat Nexamon noch nicht freigeschaltet.",
     "nexamon_live_unknown": "Dieses Live-Öffnen ist schon vorbei.",
     "nexamon_battle_not_yours": "Darauf kann nur der andere Spieler antworten.",
+    "nexamon_one_of_one_taken": "Diese One of One hat gerade jemand anderes gezogen.",
+    "nexamon_ai_excluded": "One of Ones handeln nur Spieler untereinander.",
+    "nexamon_not_enough": "So viele passende Karten hast du nicht frei.",
     "not_listed": "Das geht erst, wenn deine Firma an der Börse ist.",
     "item_unknown": "Das gibt es nicht (mehr).",
     "item_locked": "Dafür fehlt noch eine Voraussetzung.",
@@ -8842,7 +8845,9 @@
       "sell": "Verkaufen",
       "grade": "Zu ASP",
       "quick": "Sofort an KI",
-      "crack": "Slab aufbrechen"
+      "crack": "Slab aufbrechen",
+      "unlistAll": "Alle {count} zurücknehmen",
+      "unlistManyDone": "{count} Angebote zurückgenommen"
     },
     "sell": {
       "title": "Am Markt anbieten",
@@ -8861,7 +8866,9 @@
       "aiMax": "Für diese Kopie zahlen KI-Sammler bis zu {max}, {premium} über dem Wert: Guter Zustand ist ihnen etwas mehr wert.",
       "aiMaxValue": "Mehr als den Wert zahlen KI-Sammler für diese Kopie nicht.",
       "aiMinutes": "Zu diesem Preis kauft die KI nur mit etwas Glück: im Schnitt nach etwa {minutes} Minuten.",
-      "aiNever": "So viel zahlen KI-Sammler nie. Zu diesem Preis kaufen nur andere Spieler."
+      "aiNever": "So viel zahlen KI-Sammler nie. Zu diesem Preis kaufen nur andere Spieler.",
+      "confirmMany": "{count} Stück für je {price} anbieten",
+      "doneMany": "{count} Karten stehen am Markt"
     },
     "quick": {
       "title": "Sofort an die KI verkaufen",
@@ -8869,7 +8876,8 @@
       "done": "Karte verkauft",
       "confirm": "Für {price} verkaufen",
       "offer": "Die KI zahlt ({rate})",
-      "text": "Das Geld kommt sofort, die Karte ist weg. Das geht nur mit losen Commons und Rares. Am Markt bekommst du meistens mehr, musst aber auf einen Käufer warten."
+      "text": "Das Geld kommt sofort, die Karte ist weg. Das geht nur mit losen Commons und Rares. Am Markt bekommst du meistens mehr, musst aber auf einen Käufer warten.",
+      "confirmMany": "{count} Stück für {price} verkaufen"
     },
     "grade": {
       "title": "Zu ASP schicken",
@@ -9140,6 +9148,13 @@
       "emptyTitle": "Noch kein Slab",
       "emptyText": "Schick Karten zu ASP. Bewertete Karten erscheinen hier, die beste Note zuerst.",
       "label": "{name}, {grade}, Wert {value}"
+    },
+    "quantity": {
+      "label": "Anzahl",
+      "less": "Eine weniger",
+      "more": "Eine mehr",
+      "of": "{n} / {max}",
+      "all": "Alle"
     }
   },
   "hq": {

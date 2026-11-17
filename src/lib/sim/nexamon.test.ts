@@ -6,6 +6,9 @@ import {
   nexamonAiAllowed,
   nexamonAiAskCents,
   nexamonOneOfOneChance,
+  nexamonBulkPayout,
+  nexamonBulkRarities,
+  nexamonIsBulk,
   nexamonOneOfOneHit,
   nexamonPackRule,
   nexamonTierOdds,
@@ -668,11 +671,15 @@ describe("Nexamon AI and fees (ADR-165)", () => {
       expect(cfg.ai.listedPerCard[rarity]).toBeLessThanOrEqual(cfg.ai.seedCopies[rarity]);
   });
 
-  it("takes 5 % from a selling player and pays half the value for bulk", () => {
+  it("takes 5 % from a selling player and 35 % from bulk sold to the game (ADR-174)", () => {
     expect(nexamonMarketFeeCents(10_000)).toBe(500);
     expect(nexamonMarketFeeCents(19)).toBe(0);
-    expect(nexamonQuickSellCents(1_001, "common", null)).toBe(500);
-    expect(nexamonQuickSellCents(1_000, "rare", null)).toBe(500);
+    expect(nexamonQuickSellCents(1_001, "common", null)).toBe(650);
+    expect(nexamonQuickSellCents(1_000, "rare", null)).toBe(650);
+    expect(nexamonQuickSellCents(1_000, "rare", null, cfg, "cosmic_winds")).toBe(650);
+    expect(nexamonIsBulk("one_of_one", null, "cosmic_winds")).toBe(false);
+    expect(nexamonBulkRarities("super_apex")).toEqual(["common", "rare"]);
+    expect(nexamonBulkPayout([1_001, 1_000, 3])).toEqual({ valueCents: 2_004, feeCents: 703, payoutCents: 1_301 });
     expect(nexamonQuickSellCents(1_000, "ultra", null)).toBeNull();
     expect(nexamonQuickSellCents(1_000, "common", 9)).toBeNull();
   });

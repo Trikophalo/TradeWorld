@@ -210,5 +210,90 @@ select tests.assert(
   and (select count(distinct x ->> 'card_key') from jsonb_array_elements(:'tp'::jsonb -> 'cards') x where x ->> 'rarity' = 'common') = 3,
   'tier rule: a sure tier fills the last slots, the base rarity the rest, never the same base card twice');
 
+select tests.set_cfg('nexamon', '{packRules}', '{}');
+
+-- =============================================================================
+-- H. Several copies at once: list n, take n back
+-- =============================================================================
+create or replace function tests.cw_give(p_player uuid, p_card text, p_n integer) returns void
+language plpgsql security definer as $$
+begin
+  for i in 1 .. p_n loop
+    perform public.nexamon_mint_copy(p_card, p_player, null, 'mint', 'pack', null, public.game_now() + make_interval(secs => i));
+  end loop;
+end $$;
+grant execute on function tests.cw_give(uuid, text, integer) to public;
+select tests.cw_give(:c, 'me-005', 4);
+select tests.cw_give(:c, 'me-006', 1);
+\set rqb '''0b4b4b4b-0000-4000-8000-0000000000f1'''
+select tests.login_as('authenticated', :c);
+select tests.throws_key($$select public.list_nexamon_cards(gen_random_uuid(), 'me-005', 'mint', null, 5, 500)$$,
+  'nexamon_not_enough', 'list_nexamon_cards(): not more copies than owned (NX272)');
+select public.list_nexamon_cards(:rqb, 'me-005', 'mint', null, 3, 500) as bl \gset
+select public.list_nexamon_cards(:rqb, 'me-005', 'mint', null, 3, 500) as bl2 \gset
+reset role;
+select tests.assert(
+  :'bl'::jsonb = :'bl2'::jsonb and jsonb_array_length(:'bl'::jsonb -> 'listings') = 3
+  and (select count(*) from public.nexamon_listings where seller_id = :c and card_key = 'me-005' and price_cents = 500) = 3
+  -- the oldest three, the newest stays
+  and not exists (select 1 from public.nexamon_listings l join public.nexamon_copies c on c.id = l.copy_id
+                   where l.seller_id = :c and c.acquired_at = (select max(acquired_at) from public.nexamon_copies where owner_id = :c and card_key = 'me-005')),
+  'list_nexamon_cards(): three copies at one price, oldest first, idempotent');
+select tests.set_cfg('nexamon', '{market,maxListings}', '4');
+select tests.login_as('authenticated', :c);
+select tests.throws_key($$select public.list_nexamon_cards(gen_random_uuid(), 'me-005', 'mint', null, 2, 500)$$,
+  'nexamon_listing_limit', 'list_nexamon_cards(): the listing limit counts every copy');
+select public.unlist_nexamon_cards(gen_random_uuid(),
+  (select array_agg(id) from public.nexamon_listings where seller_id = :c)) as ul \gset
+reset role;
+select tests.set_cfg('nexamon', '{market,maxListings}', '30');
+select tests.assert(jsonb_array_length(:'ul'::jsonb -> 'copies') = 3
+  and not exists (select 1 from public.nexamon_listings where seller_id = :c),
+  'unlist_nexamon_cards(): all three back at once');
+
+-- =============================================================================
+-- I. The AI's offers reset every six hours; its stock is capped
+-- =============================================================================
+select count(public.nexamon_mint_copy('me-001', null, 'Karten-Kalle', 'mint', 'seed', null, now())) as ok
+  from generate_series(1, 8) \gset
+update public.nexamon_listings set price_cents = 1 where seller_ai is not null and card_key = 'me-002';
+select public.nexamon_ai_reset() as rs \gset
+select public.nexamon_ai_reset() as rs2 \gset
+select tests.assert(
+  (:'rs'::jsonb ->> 'deleted')::integer > 0 and :'rs2'::jsonb ->> 'skipped' = 'not due'
+  and (select count(*) from public.nexamon_copies where card_key = 'me-001' and ai_owner is not null) = 12
+  and not exists (select 1 from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+                   where c.ai_owner is not null
+                   group by c.card_key, k.rarity
+                  having count(*) > (:'nx_cfg'::jsonb #>> array['ai', 'stockCap', k.rarity])::integer)
+  and (select count(*) from public.nexamon_listings where seller_ai is not null and card_key = 'me-001') = 4
+  and not exists (select 1 from public.nexamon_listings where seller_ai is not null and price_cents = 1)
+  and (select population from public.nexamon_cards where card_key = 'me-001') >= 14,
+  'nexamon_ai_reset(): AI offers gone and listed anew at the value, stock capped per card, once per period; population still counts every copy');
+update public.nexamon_meta set ai_reset_at = ai_reset_at - interval '7 hours';
+select (public.nexamon_ai_reset() ->> 'deleted') is not null as ok \gset
+select tests.assert(:'ok'::boolean, 'nexamon_ai_reset(): runs again after six hours');
+
+-- =============================================================================
+-- J. Bulk to the game: value minus 35 %
+-- =============================================================================
+select tests.cw_give(:c, 'me-007', 3);
+select array_agg(id order by acquired_at) as bk from public.nexamon_copies where owner_id = :c and card_key = 'me-007' \gset
+select sum(public.nexamon_copy_value_cents(k.value_e4, c.condition, null) * 6500 / 10000) as bkpay
+  from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where c.id = any (:'bk'::uuid[]) \gset
+select tests.cash(:c) as cb0 \gset
+\set rqk '''0b4b4b4b-0000-4000-8000-0000000000f2'''
+select tests.login_as('authenticated', :c);
+select public.bulk_sell_nexamon(:rqk, :'bk'::uuid[]) as bs \gset
+select public.bulk_sell_nexamon(:rqk, :'bk'::uuid[]) as bs2 \gset
+select tests.throws_key(format($$select public.bulk_sell_nexamon(gen_random_uuid(), array[%L]::uuid[])$$, :'c1'),
+  'nexamon_not_owner', 'bulk_sell_nexamon(): only own copies');
+reset role;
+select tests.assert(
+  :'bs'::jsonb = :'bs2'::jsonb and (:'bs'::jsonb ->> 'count')::integer = 3
+  and (:'bs'::jsonb ->> 'total_cents')::bigint = :bkpay::bigint and tests.cash(:c) = :cb0::bigint + :bkpay::bigint
+  and not exists (select 1 from public.nexamon_copies where owner_id = :c and card_key = 'me-007'),
+  'bulk_sell_nexamon(): three copies at their value minus 35 %, paid at once, idempotent');
+
 update public.game_config set value = :'nx_cfg'::jsonb where key = 'nexamon';
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant holds after Cosmic Winds');

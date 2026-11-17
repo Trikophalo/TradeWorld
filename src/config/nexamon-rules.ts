@@ -221,12 +221,26 @@ export const NEXAMON_RULES = {
      * Rarities the AI never pulls, holds or buys (ADR-174): One of Ones change hands only between players.
      */
     excludedRarities: ["one_of_one"],
+    /**
+     * The AI's offers do not pile up (ADR-174): every `listingResetHours` all AI listings go, the AI's stock of a card
+     * above `stockCap` is retired (newest first; the population still counts it) and it lists its normal amounts
+     * again at the current value.
+     */
+    listingResetHours: 6,
+    stockCap: { common: 12, rare: 8, ultra: 4, prisma: 2, legendary: 1, one_of_one: 0 },
   },
-  /** Instant sale of raw bulk cards to the AI, below value; every copy sold this way lowers the value a little. */
+  /**
+   * Bulk (ADR-174): raw copies of the bulk rarities (`rarities`, or per set `setRarities[set]`, e.g. Titans Revenge's
+   * iron) can be sold to the game at once for `bps` of their value (a 35 % fee, since ADR-174; before 50 %), from the
+   * households. Every copy sold this way lowers its card's value by `dropBps`. Up to `maxPerCall` copies per call and
+   * `callsPerMinute` calls of the collection's bulk mode per minute.
+   */
   quickSell: {
     rarities: ["common", "rare"],
-    bps: 5_000,
-    maxPerCall: 50,
+    setRarities: {} as Readonly<Record<string, readonly string[]>>,
+    bps: 6_500,
+    maxPerCall: 500,
+    callsPerMinute: 10,
     dropBps: 25,
   },
   /**

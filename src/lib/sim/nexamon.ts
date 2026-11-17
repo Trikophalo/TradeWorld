@@ -218,15 +218,40 @@ export function nexamonMarketFeeCents(priceCents: number, cfg: Config = BALANCE.
   return mulDivFloor(priceCents, cfg.market.feeBps, 10_000);
 }
 
-/** What the AI pays at once for a raw bulk copy; null if the rarity or a slab is not taken. */
+/** The bulk rarities of a set (ADR-174): `quickSell.setRarities[set]`, else `quickSell.rarities`. */
+export function nexamonBulkRarities(set: string | null, cfg: Config = BALANCE.nexamon): readonly string[] {
+  const own = set ? (cfg.quickSell.setRarities as Readonly<Record<string, readonly string[]>>)[set] : undefined;
+  return own ?? (cfg.quickSell.rarities as readonly string[]);
+}
+
+/** Whether a copy is bulk: raw and of a bulk rarity of its set. */
+export const nexamonIsBulk = (
+  rarity: NexamonRarity,
+  grade: number | null,
+  set: string | null = null,
+  cfg: Config = BALANCE.nexamon,
+): boolean => grade === null && nexamonBulkRarities(set, cfg).includes(rarity);
+
+/** What the game pays at once for a raw bulk copy (value minus the bulk fee); null if it is not bulk. */
 export function nexamonQuickSellCents(
   copyValueCents: number,
   rarity: NexamonRarity,
   grade: number | null,
   cfg: Config = BALANCE.nexamon,
+  set: string | null = null,
 ): number | null {
-  if (grade !== null || !(cfg.quickSell.rarities as readonly string[]).includes(rarity)) return null;
+  if (!nexamonIsBulk(rarity, grade, set, cfg)) return null;
   return mulDivFloor(copyValueCents, cfg.quickSell.bps, 10_000);
+}
+
+/** A bulk sale of several copies: their value, the fee and the payout (each copy rounded down, like the server). */
+export function nexamonBulkPayout(
+  copyValuesCents: readonly number[],
+  cfg: Config = BALANCE.nexamon,
+): { valueCents: number; feeCents: number; payoutCents: number } {
+  const valueCents = copyValuesCents.reduce((a, b) => a + b, 0);
+  const payoutCents = copyValuesCents.reduce((a, v) => a + mulDivFloor(v, cfg.quickSell.bps, 10_000), 0);
+  return { valueCents, feeCents: valueCents - payoutCents, payoutCents };
 }
 
 // ---------------------------------------------------------------------------------------------- grading
