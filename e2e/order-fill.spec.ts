@@ -19,13 +19,13 @@ test("the order sheet shows the expected amount and the price impact, and the fi
   // A small order: little impact, no warning.
   await dialog.getByLabel("Betrag in €").fill("100");
   await expect(dialog.getByText("Du zahlst ca.")).toBeVisible();
-  await expect(dialog.getByTestId("order-impact")).toHaveText(/^\+0,\d+ %$/);
+  await expect(dialog.getByTestId("order-impact")).toHaveText(/^\+0,\d+\s?%$/);
   await expect(dialog.getByTestId("order-high-impact")).toHaveCount(0);
 
   // All cash in a penny stock: about 10 % impact, the sheet warns with the exact amount.
   await dialog.getByRole("button", { name: "Max", exact: true }).click();
   await expect(dialog.getByTestId("order-high-impact")).toContainText("Große Order");
-  await expect(dialog.getByTestId("order-impact")).toHaveText(/^\+\d+(,\d+)? %$/);
+  await expect(dialog.getByTestId("order-impact")).toHaveText(/^\+\d+(,\d+)?\s?%$/);
   // the warning names the exact amount (the total row animates)
   const warning = (await dialog.getByTestId("order-high-impact").textContent()) ?? "";
   const net = euros(/ca\. ([\d.,]+)/.exec(warning)?.[1] ?? "");
@@ -34,6 +34,7 @@ test("the order sheet shows the expected amount and the price impact, and the fi
 
   await dialog.screenshot({ path: "test-results/order-fill-sheet.png" });
 
+  await expect(dialog.locator('[data-tour="order-confirm"] button')).toBeEnabled();
   await dialog.locator('[data-tour="order-confirm"] button').hover();
   await page.mouse.down();
   await expect(page.getByText("Gekauft")).toBeVisible({ timeout: 5000 });

@@ -198,6 +198,8 @@ test("reaching level 2 starts Finn's job tour", async ({ page }) => {
   await page.locator('[data-tour="buy"]').filter({ visible: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "VLT kaufen" });
   await dialog.getByLabel("Betrag in €").fill("200");
+  // the hold button waits for the exact preview (ADR-189)
+  await expect(dialog.locator('[data-tour="order-confirm"] button')).toBeEnabled();
   await dialog.locator('[data-tour="order-confirm"] button').hover();
   await page.mouse.down();
   await expect(page.getByText("Aufgestiegen!")).toBeVisible({ timeout: 8000 });

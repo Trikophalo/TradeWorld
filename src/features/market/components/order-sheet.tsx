@@ -413,7 +413,7 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
         {plan && plan.fillQuantityE6 > 0 && Math.abs(plan.impactBps) >= HIGH_IMPACT_BPS && (
           <p data-testid="order-high-impact" className="rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">
             {t(buying ? "highImpactBuy" : "highImpactSell", {
-              impact: formatBps(Math.abs(plan.impactBps)),
+              impact: formatBps(Math.abs(plan.impactBps)).replace(/^[+−-]/, ""),
               amount: formatMoney(plan.netCents),
             })}
           </p>
@@ -441,11 +441,7 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
                     plan && Math.abs(plan.impactBps) >= HIGH_IMPACT_BPS ? "text-warn" : "text-fg-1",
                   )}
                 >
-                  {plan ? (
-                    `${plan.impactBps > 0 ? "+" : plan.impactBps < 0 ? "−" : ""}${formatBps(Math.abs(plan.impactBps))}`
-                  ) : (
-                    <Skeleton className="h-5 w-14" />
-                  )}
+                  {plan ? formatBps(plan.impactBps) : <Skeleton className="h-5 w-14" />}
                 </dd>
               </div>
             </>

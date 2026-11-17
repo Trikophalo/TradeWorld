@@ -59,6 +59,8 @@ test("a new player is guided through the first session and cannot skip it", asyn
   await tour(page, "buy").click();
   await expect(finn(page)).toContainText("gedrückt");
   await page.getByRole("dialog").getByRole("button", { name: "25 %" }).click();
+  // the hold button waits for the exact preview (ADR-189)
+  await expect(tour(page, "order-confirm").locator("button")).toBeEnabled();
   await tour(page, "order-confirm").locator("button").hover();
   await page.mouse.down();
   await expect(finn(page)).toContainText("Portfolio", { timeout: 5000 });

@@ -76,6 +76,8 @@ test("buying by euro amount, seeing the position and selling it again", async ({
   await expect(dialog.getByRole("radio", { name: /Limit/ })).toHaveCount(0);
 
   const hold = dialog.locator('[data-tour="order-confirm"] button');
+  // the hold button waits for the exact preview (ADR-189)
+  await expect(hold).toBeEnabled();
   await hold.hover();
   await page.mouse.down();
   await expect(page.getByText("Gekauft")).toBeVisible({ timeout: 5000 });
@@ -92,6 +94,7 @@ test("buying by euro amount, seeing the position and selling it again", async ({
   await page.getByRole("button", { name: "Verkaufen", exact: true }).filter({ visible: true }).first().click();
   const sell = page.getByRole("dialog", { name: "VLT verkaufen" });
   await sell.getByRole("button", { name: "Alle", exact: true }).click();
+  await expect(sell.locator('[data-tour="order-confirm"] button')).toBeEnabled();
   await sell.locator('[data-tour="order-confirm"] button').hover();
   await page.mouse.down();
   await expect(page.getByText("Verkauft")).toBeVisible({ timeout: 5000 });
