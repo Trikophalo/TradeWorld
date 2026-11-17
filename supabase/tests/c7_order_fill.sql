@@ -50,6 +50,11 @@ grant execute on all functions in schema tests to public;
 begin;
 select tests.set_cfg('aiInvestors', '{tickNoiseScale}', '0');
 select tests.set_cfg('abuse', '{rateLimits,ordersPerMinute}', '1000');
+-- the live values (earlier test files change them)
+select tests.set_cfg('trading', '{playerImpact,depthCentsPer100Bps}', '{"penny": 100000, "midcap": 500000, "bluechip": 2000000}');
+select tests.set_cfg('trading', '{maxTickReturnBps}', '1000');
+select tests.set_cfg('trading', '{maxOrderQuantity}', '1000000000');
+select tests.set_cfg('trading', '{playerStocks,dailyBandBps}', '10000');
 
 -- =============================================================================
 -- A. A listed player company (penny tier), bid 1,63 EUR, previous close 1,63 EUR
@@ -64,7 +69,7 @@ update public.company_share_offers set ends_at = now() - interval '1 second' whe
 select public.close_due_offers() is not null as ok \gset
 select c.ticker as tkr, c.security_id as sec from public.companies c where c.id = :'co' \gset
 -- enough free shares for the owner's position (ADR-153)
-update public.companies set shares_outstanding = 10000000 where id = :'co';
+update public.companies set shares_outstanding = 10000000, tier = 'penny' where id = :'co';
 select tests.c7_quote(:'sec', 16300, 16300);
 select set_config('c7.sec', :'sec', false) is not null and set_config('c7.tkr', :'tkr', false) is not null as ok \gset
 
