@@ -1153,3 +1153,19 @@ nach dem Stundenbeginn liegt, sonst eine darunter.
 
 Die Faktoren werden in `listed_hour_effect` mit den Termen der Börsenfirma bzw. dem Ruf-Faktor privater Firmen
 multipliziert; die Abschlussstunde nutzt sie unverändert.
+
+## Nachtrag: Talente (ADR-199)
+
+`src/lib/sim/talents.ts`, gespiegelt in SQL (Migrationen 8900 und 8910):
+
+- Kosten je Stunde = Lohn + Σ Lohn × `benefitCostBps` / 10 000 (Löhne in ganzen Euro, daher exakt in Cent).
+- Annahme: alle Prüfungen erfüllt (Lohn, Benefits, Ruf, Bekanntheit, Rechtsform, Büro-Ausstattung braucht Ausbau ≥ 1,
+  freie Kasse ≥ 12 × Kosten).
+- Abwerben: Kosten ≥ ⌈jetzige Kosten × (10 000 + 1 500 + Σ Loyalität) / 10 000⌉.
+- Zufriedenheit je Stunde: +250 bps, wenn alles erfüllt ist, sonst −(Σ Verluste) × Π(decayPct / 100); plus HR-Moral;
+  0 … 10 000. Warnung < 3 500, Kündigung ≤ 1 000.
+- Wirkung eines Talents: Basis der Stelle × Stufenfaktor (100/180/300/450/650 %) × (100 + Σ effectPct) / 100. Summe je
+  Art gedeckelt (`capBps`); Faktoren wie bei den Fertigkeiten (Nachfrage und Kapazität 1 + x, Wareneinsatz und
+  Fixkosten 1 − x, Qualität + x / 10 000).
+- Mit-GF: Strategie nach Stil (vorsichtig: höchste Abmilderung; risikofreudig: −10 × Schritte + Abmilderung;
+  ausgewogen: Abmilderung / (1 + Schritte)); Ausgabegrenze = Restbudget des Tages (vorsichtig × 50 %).

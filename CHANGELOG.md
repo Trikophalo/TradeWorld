@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Talente und 15 Stellen (ADR-199):** Deine Firma hat jetzt 15 Stellen von Vertrieb bis Betriebsarzt. Im Talentmarkt warten 660 Fachleute mit Namen, Persönlichkeit und Forderungen: Erfüllst du Lohn, Benefits, Ruf und Co., fangen sie an und heben Umsatz und Aktie deutlich, solange sie zufrieden sind. Talente anderer Spieler kannst du abwerben (der Chef hat 15 Minuten zum Nachbessern), gute Talente machst du zur Mit-Geschäftsführung, die selbst entscheidet.
+
 - **KI kauft auch teure Karten (ADR-195):** Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab. Bis 15 % über Wert klappt es nur manchmal, eher bei beliebten Karten; darüber nie.
 
 - **Fertigkeiten für Firmen (ADR-194):** Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“. Jede Stufe braucht die passende Fähigkeit aus deinem Skilltree (oder dem eines Mitarbeiters), kostet Firmengeld und hebt danach Nachfrage, Kapazität oder Qualität oder senkt Kosten, also mehr Gewinn und einen besseren Kurs.

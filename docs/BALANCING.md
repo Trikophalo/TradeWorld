@@ -1595,3 +1595,25 @@ Schulung 1 / 2 / 4 / 8 / 12 h. Je Stufe: Daten analysieren und Kampagnen Nachfra
 Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazität +10 %, Wareneinsatz −8 %, Fixkosten
 −10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
 von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
+
+## Talente (ADR-199)
+
+Werte in `src/config/talents.ts` (`TALENT_RULES`, `TALENT_ROLES`, `TALENT_TRAITS`), zur Laufzeit `game_config.talents`.
+
+| Wert                         | Junior | Profi  | Senior           | Experte | Legende |
+| ---------------------------- | ------ | ------ | ---------------- | ------- | ------- |
+| Lohn je Stunde (vor Stelle)  | 40 €   | 90 €   | 200 €            | 420 €   | 900 €   |
+| Wirkung (× Basis der Stelle) | 100 %  | 180 %  | 300 %            | 450 %   | 650 %   |
+| Anzahl je Stelle             | 14     | 12     | 10               | 6       | 2       |
+| Ruf mindestens               | 0      | 35     | 45               | 55      | 65      |
+| Bekanntheit mindestens       | 0 %    | 3 %    | 10 %             | 25 %    | 45 %    |
+| Rechtsform mindestens        | Garage | Garage | Kleinunternehmen | GmbH    | AG      |
+| Benefits mindestens          | 0      | 1      | 1                | 2       | 3       |
+
+Lohnfaktor der Stelle 80–130 %, Eigenschaften −5 … +25 %, Streuung ±10 %. Benefits (Anteil am Lohn): Homeoffice 2 %,
+Firmenwagen 15 %, Bonus 10 %, Weiterbildung 8 %, Mitspracherecht 0, Büro-Ausstattung 5 %, Fitness 4 %, Gleitzeit 0.
+Deckel: Nachfrage +35 %, Kapazität +35 %, Wareneinsatz −15 %, Fixkosten −25 %, Qualität +0,08, Bekanntheit
++0,006 je Stunde, Ruf +0,3 je Stunde, Moral +600 bps je Stunde. Abwerben: +15 % plus Loyalität, Nachbessern
+15 Minuten. Markt: 65 % der freien Talente je Tag, Pause 12 h, Kassendeckung 12 h. Mit-GF: höchstens 2, ab Senior
+(Führungskraft ab Profi), +30 % Lohn, Budget ≤ 100.000 € je Tag, Ereignis nach 30 Minuten, vorsichtig 50 % des
+Restbudgets.
