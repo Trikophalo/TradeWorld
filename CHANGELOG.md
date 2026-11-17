@@ -115,6 +115,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 - **Titans Revenge (ADR-182):** Das teuerste Nexamon-Set für 100.000 € je Pack: 30 Titanen in Iron, Titanium, Diamond und
   Uranium. Uranium steckt in 1 von 500 Packs, die KI hat sie nie; im Mittel bringt ein Pack 90 % seines Preises.
+  Erhältlich ab 17.11. um 17:30 Uhr, um 17:00 Uhr stellt Mr. Doodle Dangle beide Sets in den Nachrichten vor. Bis zu
+  zehn Packs kaufst du jetzt auf einmal; Zuschauer bleiben im Live-Öffnen, wenn das nächste Pack gleich folgt.
 - **Yin Yang (ADR-182):** 110 Karten im Tuschestil für 2.000 € je Pack, mit einsamen Kriegern und dem Paar Yin und Yang
   in Schwarz und Weiß. Ab Ultra Rare sind die Chancen 10 % kleiner, die Karten dafür 12 % mehr wert.
 

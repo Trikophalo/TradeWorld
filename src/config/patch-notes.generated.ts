@@ -519,7 +519,7 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "110 Karten im Tuschestil für 2.000 € je Pack, mit einsamen Kriegern und dem Paar Yin und Yang in Schwarz und Weiß.",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-9b4668ed",
+        id: "startseite-waehrung-zur-wahl-freundescode-06b87ec3",
         title: "Titans Revenge",
         text: "Das teuerste Nexamon-Set für 100.000 € je Pack: 30 Titanen in Iron, Titanium, Diamond und Uranium.",
       },

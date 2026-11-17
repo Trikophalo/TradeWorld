@@ -1536,5 +1536,9 @@ Startpreise je Seltenheit):
 | Titans Revenge | 100.000 € | Iron 4,678 · Titanium 0,300 · Diamond 0,020 · Uranium 0,002         |     89.901 € |  89,9 % |      87,7 % |
 | Yin Yang       | 2.000 €   | Common 4,403 · Rare 0,510 · Ultra 0,075 · Prisma 0,011 · Leg. 0,001 |      4.453 € | 222,7 % |     217,3 % |
 
+Weitere Werte: `packs.maxPerBuy` 10 Packs je Kauf (jedes zählt für `packs.perMinute`), `live.continueSeconds` 30 s,
+`sets.titans_revenge.releaseAt` und `sets.yin_yang.releaseAt` 2026-11-17T16:30:00Z, `newsShow.announcements` (Sendung
+um 16:00 UTC).
+
 Zum Vergleich mit derselben Rechnung: Mystic Energy 241,7 %, Super Apex 236,0 %, Cosmic Winds 187,0 % (ohne One of
 One), Prismatic Peak 166,9 %. Ohne den Faktor 1,125 läge Titans bei 79,9 %.

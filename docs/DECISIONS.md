@@ -4079,3 +4079,28 @@ Popup, Pack Battles, Live-Öffnungen, versiegelte Packs, Demo und Datenbank.
 **Folgen:** Erwartungswerte (Startwerte): Titans 89.901 € je Pack (89,9 %), Yin Yang 4.453 € (222,7 %). Titans ist
 das einzige Set, das im Mittel Geld kostet; der Reiz liegt in Uranium (1 in 500, 9,6–39,4 Mio. €). Der Shop-Hinweis
 „Raten gelten für alle Sets“ gilt nur noch für die klassischen Sets; die Ratenkarte erklärt die beiden neuen.
+
+**Nachtrag (Wünsche des Besitzers am Starttag):**
+
+- **Erscheinungstermin:** `sets.<set>.releaseAt` (UTC). Titans Revenge und Yin Yang erscheinen am 17.11.2026 um
+  17:30 Uhr Berliner Zeit (16:30 UTC). Vorher lehnt der Server Kauf, Mehrfachkauf, versiegelte Packs, Pack Battles,
+  das Öffnen und Preis-Gutschriften des Sets ab (`nexamon_set_not_released`, NX310); KI-Packs ziehen nichts, die KI
+  bekommt ihren Startbestand erst beim ersten Abgleich nach dem Termin (der Katalog-Hash enthält die erschienenen Sets).
+  Der Shop zeigt „Neu ab 17:30“ mit Countdown, das Popup die Karten als Vorschau. Die Demo hält sich an dieselbe Zeit.
+- **Ankündigung in den Nachrichten:** `newsShow.announcements` (`at`, `releaseAt`, `sets` mit Karte, Stimmung,
+  Überschrift, Text). Genau eine Sendung bringt einen Eintrag: die, deren Sendestunde (volle Stunde von Entwurfszeit
+  - 30 Minuten) bei `at` beginnt. `news_announcements_aired` merkt sich diese Stunde; ein neu gebauter Entwurf derselben
+    Sendung bekommt die Segmente wieder (er ersetzt den alten), jede andere Stunde nie. Segmentart „release“ mit Ord 1
+    (ganz vorn), auf dem Studio-Bildschirm das Pack und eine Karte (Uranium-Auge, Yin). Claudes Umschreiben lässt die
+    Segmente unverändert, wie die Running Gags. Die SQL-Tests der Sendung leeren die Liste, damit sie nicht von der Uhr
+    abhängen.
+- **Mehrere Packs auf einmal:** `buy_nexamon_packs(p_request_id, p_set, p_count)`, 1 bis `packs.maxPerBuy` (10), jedes
+  Pack über `buy_nexamon_pack` mit abgeleiteter Request-ID (Zahlung, Ziehung, Missionen, Ratenlimit je Pack), alles oder
+  nichts, idempotent. Das Popup hat eine Anzahl mit Gesamtpreis; danach „Pack 2 von 5“, „Nächstes Pack“, nach 4 s
+  automatisch weiter, „Alle aufdecken“ zeigt eine Zusammenfassung aller restlichen Packs.
+- **Live-Öffnen geht weiter:** Startet das nächste Pack eines Spielers (gekauft, versiegelt oder aus einem Mehrfachkauf),
+  solange seine Live-Sitzung läuft oder höchstens `live.continueSeconds` (30) nach ihrem Ende, hängt es an diese
+  Sitzung (`nexamon_live.queue`, `pack_no`). Ist das gezeigte Pack ganz aufgedeckt, wechselt sie sofort, sonst sobald
+  der Öffner eine Karte des nächsten meldet oder, ohne Meldungen, wenn das gezeigte nach dem Ersatztempo durch ist und
+  `lingerMs` vorbei sind. Zuschauer behalten Live-ID und Zuschauerzählung und sehen „Pack 2“. Die Demo macht es nach
+  (eigene Packs; der erfundene Freund öffnet zwei Packs in einer Sitzung).

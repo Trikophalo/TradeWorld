@@ -8074,3 +8074,13 @@ KI-Startbestand an.
   `bonuses.sets.rewardPackCents[set]`, sonst Packpreis. `feed_item_label()` nennt einen Uranium-Zug „Uranium-Karte“.
 - RPC `get_nexamon_market()`: der Filter `p_rarity` nimmt jede Seltenheit mit bekanntem Rang.
 - Kartenart `warrior` gibt es nur im Client-Katalog (Anzeige), die Datenbank kennt sie nicht.
+- Migration `20261204007240_nexamon_multi_packs_live.sql`: `nexamon_live.pack_no` (integer, 1) und `nexamon_live.queue`
+  (jsonb, `[{pack_id, set, cards}]`) für fortgesetzte Live-Öffnungen; intern `nexamon_live_pack_ms()`,
+  `nexamon_live_promote(live, pack, now)`, neu definiert `nexamon_pack_live()` (Trigger), `nexamon_live_progress()`,
+  `get_nexamon_live()` (Antwort zusätzlich `pack_no`). Neuer RPC `buy_nexamon_packs(p_request_id, p_set, p_count)` ->
+  `{set, count, price_cents, packs}`. `nexamon_set_released(set, now)` aus `sets.<set>.releaseAt`; Fehler NX310
+  `nexamon_set_not_released` in `buy_nexamon_pack`, `buy_nexamon_sealed_pack`, `challenge_nexamon_battle`,
+  `nexamon_open_pack` (KI: leeres Pack), `nexamon_grant_sealed_packs` (0), `nexamon_sync` (kein KI-Startbestand vorher).
+- Nachrichten: Tabelle `news_announcements_aired` (`announcement_at` PK, `slot`, `first_at`; nur Server),
+  `news_show_announcements(p_now)` für `news_show_build()`; Segmentart `release` mit `nexamon` `{set, card_key}`;
+  `store_news_show_script()` behält `release`-Segmente.
