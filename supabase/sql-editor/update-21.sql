@@ -2796,4 +2796,82 @@ begin
 end;
 $do$;
 
+-- ---------------------------------------------------------------------------
+-- A 10 is worth 2.5x to 4x, a 9.5 1.8x to 2.6x, by the card's popularity (nexamonGradeFactorBps)
+-- ---------------------------------------------------------------------------
+-- grading.tenFactorRange / nineHalfFactorRange: low end for popularity 0, high end for 10 000, linear, rounded down.
+-- Every function that values a copy with its card at hand (nexamon_copy_value_cents(..., card), and the sale's
+-- factor through nexamon_copy_factor_bps(condition, grade, card)) uses it; grading.valueBps stays the fallback.
+create or replace function public.nexamon_grade_factor_bps(p_grade double precision, p_card text)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  g       jsonb := public.nexamon_cfg() -> 'grading';
+  v_idx   integer := public.nexamon_grade_index(p_grade);
+  v_num   double precision := coalesce((g #>> array['grades', v_idx::text])::double precision, 0);
+  v_range jsonb;
+  v_pop   integer;
+begin
+  v_range := case when v_num = 10 then g -> 'tenFactorRange' when v_num = 9.5 then g -> 'nineHalfFactorRange' end;
+  if v_range is null or p_card is null then
+    return coalesce((g #>> array['valueBps', v_idx::text])::integer, 10000);
+  end if;
+  select public.nexamon_popularity_bps(k.rarity, k.population) into v_pop from public.nexamon_cards k where k.card_key = p_card;
+  if v_pop is null then
+    return coalesce((g #>> array['valueBps', v_idx::text])::integer, 10000);
+  end if;
+  return (v_range ->> 0)::integer
+         + floor(((v_range ->> 1)::bigint - (v_range ->> 0)::bigint) * least(10000, greatest(0, v_pop)) / 10000.0)::integer;
+end;
+$$;
+
+create or replace function public.nexamon_copy_factor_bps(p_condition text, p_grade double precision, p_card text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_grade >= 10.75 and p_card is not null then public.nexamon_black_label_bps(p_card)
+              when p_grade is not null and p_grade < 10.75 then public.nexamon_grade_factor_bps(p_grade, p_card)
+              else public.nexamon_copy_factor_bps(p_condition, p_grade) end;
+$$;
+
+create or replace function public.nexamon_copy_value_cents(p_value_e4 bigint, p_condition text, p_grade double precision, p_card text)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_grade >= 10.75 and p_card is not null
+              then public.div_round_half_even(p_value_e4::numeric * public.nexamon_black_label_bps(p_card), 1000000)
+              when p_grade is not null and p_card is not null
+              then public.div_round_half_even(p_value_e4::numeric * public.nexamon_grade_factor_bps(p_grade, p_card), 1000000)
+              else public.nexamon_copy_value_cents(p_value_e4, p_condition, p_grade) end;
+$$;
+
+-- the sale's factor (price per card) with the card at hand
+do $do$
+declare
+  r     record;
+  v_def text;
+  v_new text;
+begin
+  for r in select p.oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.prosrc like '%nexamon_copy_factor_bps(c.condition, c.grade)%'
+              and p.proname <> 'nexamon_copy_factor_bps' loop
+    v_def := pg_get_functiondef(r.oid);
+    v_new := replace(v_def, 'nexamon_copy_factor_bps(c.condition, c.grade)', 'nexamon_copy_factor_bps(c.condition, c.grade, c.card_key)');
+    execute v_new;
+  end loop;
+  revoke all on function public.nexamon_grade_factor_bps(double precision, text) from public, anon, authenticated;
+  revoke all on function public.nexamon_copy_factor_bps(text, double precision, text) from public, anon, authenticated;
+end;
+$do$;
+
 commit;
