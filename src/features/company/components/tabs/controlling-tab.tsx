@@ -137,6 +137,9 @@ export function ControllingTab({
               <MarketingBudgetCard company={company} />
               <CampaignCard company={company} />
             </CollapsibleSection>
+          </div>
+          {/* The long list of business moves gets the full width instead of stretching one column. */}
+          <div className="lg:col-span-2">
             <CollapsibleSection
               {...section("moves")}
               title={ts("moves")}

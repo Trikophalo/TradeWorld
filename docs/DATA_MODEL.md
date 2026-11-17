@@ -4818,6 +4818,11 @@ offer, last_price_e4 }`
 - `player_companies.last_hour_at timestamptz not null` (Standard: volle Stunde von `game_now()`, bestehende Firmen
   bekommen die laufende Stunde): Ende der zuletzt abgerechneten Betriebsstunde = Beginn der nächsten. Für Clients
   lesbar. `player_companies.pay_factor_bps` ist jetzt der Lohnfaktor der letzten Betriebsstunde.
+- `company_strengths` (PK `company_id`, ADR-176): `scores` (jsonb: `awareness`, `quality`, `delivery`, `margin`,
+  `team`, `finance`, je 0..100), `hours`, `updated_at`. RLS ohne Policies, gelesen nur über `company_state()` (Schlüssel
+  `strengths` mit `scores`, `overall`, `hours`, `reward_bps`, `next`, `close_error` aus `job_runs`).
+  `player_company_hours.strength_bonus_cents` (≥ 0) ist der Teil von `revenue_cents`, den die Haushalte als Stärken-Bonus
+  zahlen.
 - `player_company_hours` (PK `company_id, hour_start`): `game_quarter_id` (Quartal, in dem die Stunde beginnt),
   `demand_cents`, `capacity_cents`, `revenue_cents`, `cogs_cents`, `fixed_cents`, `marketing_cents`,
   `player_wages_due_cents`, `player_wages_paid_cents`, `ai_wages_due_cents`, `ai_wages_paid_cents`, `pay_factor_bps`,
