@@ -133,7 +133,11 @@ const minutesLeft = (task: CompanyTask, now: number) =>
 /** Who could do the task, best first, each with Mira's reason. */
 export function adviseTask(task: CompanyTask, state: MiraState, names: MiraNames): MiraOption[] {
   const { tasks, now } = state;
-  const value = names.money(task.valueCents);
+  // ADR-185: a solved task pays its value times the strengths' pay factor (ADR-180), not the bare value.
+  const value = names.money(Math.round((task.valueCents * (state.autopilot?.payFactorBps ?? 10_000)) / 10_000));
+  // The AI helper is surer with an AI worker trained for the task's branch (same rule as the server).
+  const trained = (state.company?.aiWorkerSkills ?? []).some((k) => k.startsWith(`${task.branch}_`));
+  const aiChance = Math.min(9_500, taskCfg.ai.chanceBps + (trained ? taskCfg.ai.skillBonusBps : 0));
   const scored: { option: MiraOption; score: number }[] = [];
   const targets = tasks.people.filter((p) => !p.isMe && (tasks.role === "founder" || p.reportsToMe));
 
@@ -177,7 +181,7 @@ export function adviseTask(task: CompanyTask, state: MiraState, names: MiraNames
                 key: "why.ai",
                 values: {
                   minutes: tasks.aiMinutes,
-                  chance: Math.round(taskCfg.ai.chanceBps / 100),
+                  chance: Math.round(aiChance / 100),
                   share: Math.round(taskCfg.ai.valueBps / 100),
                 },
               },
@@ -1429,9 +1433,44 @@ export function healthTurn(key: HealthFactorKey | null, state: MiraState, names:
       : factor.status === "good" || factor.status === "ok"
         ? { key: "health.fine" }
         : { key: "health.noGain" },
+    // ADR-185: the numbers behind the factor from the facts (awareness: the last hour by lever, what marketing buys)
+    ...factLines(k, state),
     { key: steps.length > 0 ? "health.steps" : "health.noSteps" },
   ];
   return { id, lines, options: steps };
+}
+
+/** What the facts add to a factor's answer. */
+function factLines(key: HealthFactorKey, state: MiraState): MiraLine[] {
+  if (!state.company) return [];
+  const f = companyFacts(state);
+  const a = f.awareness;
+  switch (key) {
+    case "awareness":
+      return [
+        a.change
+          ? {
+              key: "health.facts.awareness",
+              values: {
+                points: a.points,
+                cap: a.capPoints,
+                marketing: a.change.marketing,
+                word: a.change.wordOfMouth,
+                decay: a.change.decay,
+              },
+            }
+          : { key: "report.awarenessFlat", values: { points: a.points, cap: a.capPoints } },
+        ...(a.atCap
+          ? [{ key: "health.facts.atCap" }]
+          : [{ key: "health.facts.marketing", values: { now: a.marketingGainNow, gain: a.marketingGainSuggested } }]),
+      ];
+    case "capacity":
+      return f.ai.workers > 0 && f.ai.utilizationBps !== null
+        ? [{ key: "report.ai", values: { workers: f.ai.workers, util: Math.round(f.ai.utilizationBps / 100) } }]
+        : [];
+    default:
+      return [];
+  }
 }
 
 /** Mira raises the weakest point on her own once it is weak or critical (once per factor and status). */

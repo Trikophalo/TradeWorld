@@ -7917,6 +7917,11 @@
         "campaign": "Die Kampagne „{kind, select, flyer {Flyer} online {Online} other {TV-Spot}}“ läuft! Wie sie ankommt, siehst du im Controlling unter Marketing.",
         "hireAi": "Erledigt: {count, plural, one {Eine KI-Kraft ist} other {# KI-Kräfte sind}} an Bord.",
         "dismissAi": "Erledigt: {count, plural, one {Eine KI-Kraft} other {# KI-Kräfte}} weniger."
+      },
+      "facts": {
+        "awareness": "Bekanntheit {points} von höchstens {cap} Punkten. Letzte Stunde: +{marketing} durch Marketing, +{word} durch Mundpropaganda, −{decay} vergessen.",
+        "atCap": "Am Deckel dieser Stufe bringt Marketing nichts mehr; erst die nächste Stufe hebt ihn.",
+        "marketing": "Marketing bringt gerade etwa +{now} Punkte je Stunde; mit meinem Vorschlag wären es etwa +{gain}."
       }
     },
     "open": {

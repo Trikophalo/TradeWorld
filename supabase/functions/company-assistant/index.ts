@@ -38,6 +38,10 @@ So denkst du, bevor du antwortest:
   Tricks gehen oft nach hinten los. Ist der Auftrag gerade gesperrt, sag wann er wieder geht und biete eine
   Alternative an. Ist die Idee schwach, schlag eine bessere Formulierung vor und frag, statt sie zu verschwenden.
 - Krise oder Chance: Die Strategie muss an die Ursache gehen. Ein Imagefilm bei schlechter Bezahlung ist Greenwashing.
+- Fakten (ADR-185): Im Block <fakten> stehen alle Zahlen, die die Firmenseite gerade zeigt (Kasse, letzte Stunde,
+  24 Stunden, Nachfrage und Kapazität, KI-Auslastung, Bekanntheit, Ruf, Stärken, Steuern ...). Nur diese Zahlen sind
+  wahr. Erfinde NIE eine Zahl, rechne nur mit diesen Werten. Steht etwas nicht in den Fakten, sag ehrlich
+  "Das weiß ich nicht" und nenne, wo die Person nachsehen kann.
 - Nutze den Verlauf des Gesprächs: Bezieht sich die Person auf etwas von vorhin ("mach das", "die zweite"), dann
   verstehe das. Nutze die Ergebnisse der letzten Aufgaben und Aufträge, um aus Fehlern zu lernen (die KI hat
   mehrfach gepatzt: lieber Menschen; ein Zug ist gescheitert: vorsichtiger).
@@ -198,6 +202,20 @@ const historySchema = z
   .max(12)
   .catch([]);
 
+/** The client's company facts (ADR-185): flat values, size-limited; only material for the answer. */
+const factsSchema = z
+  .record(z.string().max(60), z.union([z.string().max(120), z.number(), z.boolean(), z.null()]))
+  .refine((r) => Object.keys(r).length <= 120)
+  .catch({});
+type Facts = Record<string, string | number | boolean | null>;
+
+function factsBlock(facts: Facts) {
+  const lines = Object.entries(facts)
+    .filter(([, v]) => v !== null)
+    .map(([k, v]) => "- " + k + ": " + String(v));
+  return lines.length > 0 ? "<fakten>\n" + lines.join("\n") + "\n</fakten>" : "<fakten>keine</fakten>";
+}
+
 const euro = (cents: number) => `${Math.round(cents / 100).toLocaleString("de-DE")} €`;
 
 function results(c: Context, names: Names) {
@@ -232,7 +250,13 @@ function orderLine(c: Context, now: number) {
     : `Freier Auftrag: jetzt möglich, kostet ${cost}, danach eine Stunde Pause.`;
 }
 
-function prompt(c: Context, names: Names, history: { from: "mira" | "me"; text: string }[], now: number) {
+function prompt(
+  c: Context,
+  names: Names,
+  history: { from: "mira" | "me"; text: string }[],
+  now: number,
+  facts: Facts = {},
+) {
   const talk =
     history.length > 0
       ? `<verlauf>\n${history.map((h) => `${h.from === "me" ? "Person" : "Mira"}: ${h.text}`).join("\n")}\n</verlauf>`
@@ -270,10 +294,16 @@ function prompt(c: Context, names: Names, history: { from: "mira" | "me"; text: 
   const event = c.event
     ? `<lage>\n${c.event.polarity === "crisis" ? "Krise" : "Chance"} (${c.event.archetype}, Schwere ${c.event.severity} von 3)${c.event.headline ? `: ${c.event.headline}` : ""}\n</lage>`
     : "<lage>Keine Krise, keine Chance gerade.</lage>";
-  return `${firm}\n<team>\n${people}\n</team>\n<aufgaben>\n${tasks || "keine"}\n</aufgaben>\n${ai}\n${moves}\n${event}\n${quarter}\n${orderLine(c, now)}\n${results(c, names)}\n${talk}\n<nachricht>\n${c.text}\n</nachricht>\n\nAntworte als Mira wie beschrieben.`;
+  return `${firm}\n<team>\n${people}\n</team>\n<aufgaben>\n${tasks || "keine"}\n</aufgaben>\n${ai}\n${moves}\n${event}\n${quarter}\n${orderLine(c, now)}\n${factsBlock(facts)}\n${results(c, names)}\n${talk}\n<nachricht>\n${c.text}\n</nachricht>\n\nAntworte als Mira wie beschrieben.`;
 }
 
-async function answer(client: Anthropic, c: Context, names: Names, history: { from: "mira" | "me"; text: string }[]) {
+async function answer(
+  client: Anthropic,
+  c: Context,
+  names: Names,
+  history: { from: "mira" | "me"; text: string }[],
+  facts: Facts,
+) {
   const response = await client.beta.messages.create({
     model: MODEL,
     max_tokens: 6_000,
@@ -282,7 +312,7 @@ async function answer(client: Anthropic, c: Context, names: Names, history: { fr
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: SYSTEM,
-    messages: [{ role: "user", content: prompt(c, names, history, Date.now()) }],
+    messages: [{ role: "user", content: prompt(c, names, history, Date.now(), facts) }],
   });
   if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") return null;
   const text = response.content.find((b) => b.type === "text");
@@ -309,6 +339,7 @@ Deno.serve(async (req) => {
   if (text === null) return json({ error: "invalid_argument" }, 400);
   const names = namesSchema.parse(body?.names ?? {});
   const history = historySchema.parse(body?.history ?? []);
+  const facts = factsSchema.parse(body?.facts ?? {});
 
   // The user's own client: the context RPC checks the company and the hourly limit.
   const asUser = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -322,7 +353,7 @@ Deno.serve(async (req) => {
 
   const client = new Anthropic({ apiKey });
   try {
-    const result = await answer(client, context.data as Context, names, history);
+    const result = await answer(client, context.data as Context, names, history, facts);
     if (!result) return json({ ok: false, reason: "no_answer" });
     return json({ ok: true, reply: result.reply, actions: result.actions });
   } catch (error) {
