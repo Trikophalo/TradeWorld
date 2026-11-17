@@ -24,6 +24,7 @@ create table if not exists public.news_running_gags (
   last_at      timestamptz,
   primary key (gag_key, company_id)
 );
+create index if not exists news_running_gags_company_idx on public.news_running_gags (company_id);
 alter table public.news_running_gags enable row level security;
 comment on table public.news_running_gags is
   'Running gags of NEXA Nachrichten (ADR-179): aired episodes and the last host line per gag and player company. '
