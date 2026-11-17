@@ -18,6 +18,7 @@ import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { NEWS_PROMO_RPC_SCHEMAS, liveNewsPromoEngine } from "./api-news-promos";
+import { COMPANY_SKILLS_RPC_SCHEMAS, liveCompanySkillsEngine } from "./api-company-skills";
 import { INTERVIEW_RPC_SCHEMAS, liveInterviewEngine } from "./api-interviews";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
@@ -561,6 +562,7 @@ export const RPC_SCHEMAS = {
   record_security_view: z.object({ counted: z.boolean() }),
   ...CAREER_RPC_SCHEMAS,
   ...NEWS_PROMO_RPC_SCHEMAS,
+  ...COMPANY_SKILLS_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
@@ -602,6 +604,7 @@ export const liveEngine: GameEngine = {
   ...liveTourEngine,
   ...liveNewsShowEngine,
   ...liveNewsPromoEngine,
+  ...liveCompanySkillsEngine,
   ...liveInterviewEngine,
   ...liveBattleEngine,
   ...liveNexamonEngine,

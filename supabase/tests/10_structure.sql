@@ -177,7 +177,9 @@ select tests.assert(
            -- order preview (ADR-189)
            'quote_order', 'get_company_awareness',
            -- News-Aktionen (ADR-193)
-           'get_news_promo', 'file_news_tax_return']
+           'get_news_promo', 'file_news_tax_return',
+           -- Fertigkeiten of player companies (ADR-194)
+           'get_company_skills', 'learn_company_skill']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

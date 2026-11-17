@@ -59,6 +59,7 @@ import { createPackBattleEngine } from "./demo/pack-battle";
 import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/floor";
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
+import { createCompanySkillsEngine, type DemoCompanySkills } from "./demo/company-skills";
 import { createInterviewEngine, type DemoInterviewState } from "./demo/interviews";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
@@ -147,6 +148,8 @@ interface PlayerState {
   tag?: string;
   /** Business moves of the demo company (ADR-127). */
   companyMoves?: DemoMoveRun[];
+  /** Fertigkeiten of the demo company (ADR-194). */
+  companySkills?: DemoCompanySkills;
   companyTasks?: DemoTasksState;
   /** NEXA Nachrichten (ADR-150). */
   newsShow?: DemoNewsShowState;
@@ -1686,6 +1689,23 @@ const companyMoves = createCompanyMovesEngine({
   random: () => Math.random(),
 });
 
+const companySkills = createCompanySkillsEngine({
+  company: () => p().company ?? null,
+  addCompanyCash: (cents) => {
+    const c = p().company;
+    if (c) c.cashCents += cents;
+    persist();
+  },
+  learnedSkills: () => new Set(career.learnedSkills()),
+  state: () => p().companySkills ?? {},
+  setState: (next) => {
+    p().companySkills = next;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+});
+
 const companyTasks = createCompanyTasksEngine({
   company: () => p().company ?? null,
   nickname: () => p().nickname,
@@ -1975,6 +1995,7 @@ export const demoEngine: GameEngine = {
   ...stockNews,
   ...protests,
   ...companyMoves,
+  ...companySkills,
   ...companyTasks,
   ...pitches,
   // AI companies of the demo (ADR-125): facts from the start values, no players work there.
