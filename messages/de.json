@@ -5623,7 +5623,12 @@
       "route": "Tour planen",
       "haggle": "Verhandeln",
       "pack": "Einpacken",
-      "catch": "Zugreifen"
+      "catch": "Zugreifen",
+      "restock": "Nachbestellen",
+      "receipts": "Belege prüfen",
+      "offer": "Bestes Angebot",
+      "pattern": "Zahlenreihe",
+      "shelf": "Regal einräumen"
     },
     "doIt": "Erledigen",
     "take": "Übernehmen",
@@ -5705,7 +5710,19 @@
       "packOver": "Zu schwer!",
       "catchHint": "Tippe nur die richtigen Kacheln an, sobald sie auftauchen.",
       "catchGood": "Fangen: {label}",
-      "catchCaught": "{count} gefangen"
+      "catchCaught": "{count} gefangen",
+      "restockHint": "Bestell bei jedem Artikel genau so viel nach, dass der Bestand das Ziel erreicht.",
+      "restockStock": "Im Lager {stock}, Ziel {target}",
+      "less": "Weniger",
+      "more": "Mehr",
+      "receiptsHint": "Welche Belege ergeben zusammen genau {total}? Tippe sie an.",
+      "receiptsSum": "Ausgewählt {sum} von {total}",
+      "offerHint": "Welcher Kunde bringt am meisten Umsatz? Menge mal Preis.",
+      "offerLine": "{qty} × {price}",
+      "patternHint": "Wie geht die Reihe weiter? Wähle die nächste Zahl.",
+      "shelfHint": "Jede Reihe, jede Spalte und jedes 2×2-Fach braucht jede Ware genau einmal. Tippe auf eine Lücke, um die Ware zu wechseln.",
+      "shelfCell": "Reihe {row}, Platz {col}: {item}",
+      "shelfEmpty": "leer"
     },
     "hierarchy": "Wer berichtet an wen",
     "hierarchyIntro": "Vorgesetzte sind für ihr Team verantwortlich und geben Aufgaben weiter. Eine Vorgesetzte oder ein Vorgesetzter braucht einen höheren Rang.",
@@ -6813,6 +6830,49 @@
         "ok": "Bei {company} ging kein einziges kaputtes Teil raus.",
         "fail": "Reklamationen bei {company}: Kaputte Teile landeten beim Kunden.",
         "labels": ["Kaputt", "Gut", "Neu"]
+      },
+      "restock_shelves": {
+        "name": "Lager auffüllen",
+        "how": "Bestell für jeden Artikel genau die Menge, die bis zum Zielbestand fehlt.",
+        "ok": "{company} hat das Lager auf den Punkt aufgefüllt. Nichts fehlt, nichts verstaubt.",
+        "fail": "{company} hat sich verzählt. Jetzt stapeln sich Kartons im Flur.",
+        "labels": ["Kartons", "Etiketten", "Klebeband", "Füllmaterial"]
+      },
+      "expense_check": {
+        "name": "Spesen prüfen",
+        "how": "Finde die Belege, die zusammen genau die gemeldete Summe ergeben.",
+        "ok": "{company} hat die Spesen auf den Cent genau abgerechnet.",
+        "fail": "Bei {company} passt die Spesenabrechnung nicht. Das Finanzamt fragt nach."
+      },
+      "best_customer": {
+        "name": "Besten Kunden wählen",
+        "how": "Drei Anfragen, wenig Zeit: Nimm jeweils den Auftrag mit dem höchsten Umsatz.",
+        "ok": "{company} hat sich jedes Mal den dicksten Auftrag geschnappt.",
+        "fail": "{company} hat sich mit Kleinkram aufgehalten. Der große Auftrag ging an die Konkurrenz.",
+        "labels": [
+          "Café Rösti",
+          "Autohaus Blech",
+          "Praxis Dr. Huber",
+          "Bäckerei Korn",
+          "Kita Sonnenschein",
+          "Hotel Möwe",
+          "Schreinerei Holz",
+          "Kanzlei Recht",
+          "Fitness Fit"
+        ]
+      },
+      "sales_forecast": {
+        "name": "Absatz vorhersagen",
+        "how": "Die Verkaufszahlen folgen einem Muster. Sag die nächste Zahl voraus.",
+        "ok": "Die Prognose von {company} lag genau richtig. Die Planung steht.",
+        "fail": "{company} hat sich verschätzt. Jetzt fehlt Ware oder sie liegt herum."
+      },
+      "shelf_order": {
+        "name": "Regal einräumen",
+        "how": "Räum das Regal so ein, dass jede Ware in jeder Reihe, Spalte und jedem Fach genau einmal steht.",
+        "ok": "Das Regal von {company} ist perfekt sortiert. Kunden finden alles sofort.",
+        "fail": "Im Regal von {company} herrscht Chaos. Kunden suchen vergeblich.",
+        "labels": ["Äpfel", "Brot", "Milch", "Käse"]
       }
     },
     "delegatedPopup": {

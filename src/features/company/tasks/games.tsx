@@ -9,6 +9,7 @@ import { SPRING } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { DragSortGame, MatchGame, PathGame, RotateGame, SliderGame } from "./drag-games";
 import { CatchGame, DiffGame, HaggleGame, MemoryGame, PackGame, QuickGame, RouteGame, TimingGame } from "./more-games";
+import { OfferGame, PatternGame, ReceiptsGame, RestockGame, ShelfGame } from "./new-games";
 import { useTaskText } from "./task-text";
 
 /*
@@ -323,5 +324,15 @@ export function TaskGameView(props: GameProps & { game: TaskGame }) {
       return <PackGame {...props} />;
     case "catch":
       return <CatchGame {...props} />;
+    case "restock":
+      return <RestockGame {...props} />;
+    case "receipts":
+      return <ReceiptsGame {...props} />;
+    case "offer":
+      return <OfferGame {...props} />;
+    case "pattern":
+      return <PatternGame {...props} />;
+    case "shelf":
+      return <ShelfGame {...props} />;
   }
 }

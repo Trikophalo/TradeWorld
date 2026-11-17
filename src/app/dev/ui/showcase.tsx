@@ -56,6 +56,9 @@ import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
 import { InterviewCard } from "@/features/company/components/interview-card";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
+import { AutopilotCard } from "@/features/company/components/autopilot-card";
+import { PulseCard } from "@/features/company/components/pulse-card";
+import type { CompanyAutopilot } from "@/features/game/types";
 import type { CompanyMoves, CompanyTasks, MyJob, PlayerCard } from "@/features/game/types";
 import { SpeechBubble } from "@/features/tutorial/components/speech-bubble";
 import { useTutorial } from "@/features/tutorial/store";
@@ -343,7 +346,74 @@ const SAMPLE_GAMES = [
       show_ms: 900,
     },
   },
+  // ADR-180: five more games
+  { game: "restock", taskKey: "restock_shelves", puzzle: { stock: [3, 9, 0, 5], target: [12, 14, 8, 10] } },
+  { game: "receipts", taskKey: "expense_check", puzzle: { amounts: [23, 48, 15, 72, 9, 31], target: 87 } },
+  {
+    game: "offer",
+    taskKey: "best_customer",
+    puzzle: {
+      offers: [
+        [
+          [12, 9],
+          [4, 30],
+          [18, 5],
+        ],
+        [
+          [7, 16],
+          [15, 8],
+          [3, 35],
+        ],
+      ],
+    },
+  },
+  {
+    game: "pattern",
+    taskKey: "sales_forecast",
+    puzzle: {
+      rows: [
+        { seq: [3, 7, 11, 15], options: [21, 19, 17] },
+        { seq: [2, 4, 8, 16], options: [32, 28, 36] },
+      ],
+    },
+  },
+  {
+    game: "shelf",
+    taskKey: "shelf_order",
+    puzzle: { grid: [1, -1, 0, -1, 0, -1, 1, 2, -1, 0, -1, -1, 3, -1, 2, 0] },
+  },
 ] as const;
+
+/** Autopilot and the last hour (ADR-180). */
+const SAMPLE_AUTOPILOT: CompanyAutopilot = {
+  on: true,
+  canToggle: true,
+  mood: 0.8,
+  chanceBps: 10_800,
+  rewardBps: 7_000,
+  failPenaltyBps: 3_000,
+  maxPerDay: 24,
+  everyMinutes: 60,
+  payFactorBps: 12_400,
+  today: { done: 14, success: 9, cents: 342_000 },
+  log: [
+    { at: "2026-11-17T06:10:00Z", key: "restock_shelves", success: true, resultCents: 38_000, chanceBps: 10_800 },
+    { at: "2026-11-17T05:10:00Z", key: "pay_invoices", success: false, resultCents: -12_000, chanceBps: 9_200 },
+  ],
+  lastHour: {
+    hourStart: "2026-11-17T06:00:00Z",
+    revenueCents: 281_900,
+    profitCents: 31_700,
+    demandCents: 250_000,
+    capacityCents: 281_250,
+    aiWorkers: 3,
+    aiWagesDueCents: 25_300,
+    aiUtilizationBps: 7_000,
+    awarenessBefore: 0.48,
+    awarenessAfter: 0.492,
+    awarenessParts: { wordOfMouth: 0.006, marketing: 0.014, decay: 0.01, extra: 0.002, cap: 0.7 },
+  },
+};
 
 function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
   const [round, setRound] = useState(0);
@@ -1019,6 +1089,8 @@ export function Showcase() {
         <HealthShowcase />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
         <TaskBoard preview={SAMPLE_TASKS} />
+        <AutopilotCard preview={SAMPLE_AUTOPILOT} />
+        <PulseCard lastHour={SAMPLE_AUTOPILOT.lastHour} />
         {SAMPLE_GAMES.map((sample) => (
           <SampleGame key={sample.game} sample={sample} />
         ))}

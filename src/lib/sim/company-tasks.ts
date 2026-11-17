@@ -6,6 +6,7 @@
  */
 import type { CompanyTaskConfig } from "../../config/company-tasks.ts";
 import { COMPANY_TASK_RULES } from "../../config/company-tasks.ts";
+import { generateMore, gradeMore, type MorePuzzle, type MoreSolution } from "./company-tasks-more.ts";
 import { discountedCents, withBonusCents } from "./upgrades.ts";
 
 export type TaskPuzzle =
@@ -25,7 +26,8 @@ export type TaskPuzzle =
   | { points: [number, number][] }
   | { rounds: number[][] }
   | { weights: number[]; values: number[]; cap: number }
-  | { events: CatchEvent[]; every_ms: number; show_ms: number };
+  | { events: CatchEvent[]; every_ms: number; show_ms: number }
+  | MorePuzzle;
 
 /** quick (ADR-173): one sum and its answers to choose from. */
 export interface QuickProblem {
@@ -57,7 +59,8 @@ export type TaskSolution =
   | { choices: number[] }
   | { points: [number, number][]; best: number; step_bps: number }
   | { rounds: number[][]; ok_bps: number }
-  | { weights: number[]; values: number[]; cap: number; best: number };
+  | { weights: number[]; values: number[]; cap: number; best: number }
+  | MoreSolution;
 
 /** path (ADR-144): the grid again, so grading needs nothing but the solution. */
 export interface PathSolution {
@@ -83,7 +86,9 @@ export type TaskAnswer =
   | { path: number[] }
   | { pairs: [number, number][]; misses: number }
   | { stops: number[] }
-  | { choices: number[] };
+  | { choices: number[] }
+  | { values: number[] }
+  | { grid: number[] };
 
 type Rules = typeof COMPANY_TASK_RULES;
 
@@ -105,6 +110,12 @@ export function generatePuzzle(
 ): { puzzle: TaskPuzzle; solution: TaskSolution } {
   const g = rules.games;
   switch (task.game) {
+    case "restock":
+    case "receipts":
+    case "offer":
+    case "pattern":
+    case "shelf":
+      return generateMore(task.game, rng, rules);
     case "pick":
     case "count": {
       const cfg = g[task.game];
@@ -508,6 +519,12 @@ export function gradeAnswer(game: CompanyTaskConfig["game"], solution: TaskSolut
   const ans = answer as Record<string, unknown>;
   const sol = solution as Record<string, unknown>;
   switch (game) {
+    case "restock":
+    case "receipts":
+    case "offer":
+    case "pattern":
+    case "shelf":
+      return gradeMore(game, solution as MoreSolution, answer);
     case "pick":
     case "diff":
     case "catch": {

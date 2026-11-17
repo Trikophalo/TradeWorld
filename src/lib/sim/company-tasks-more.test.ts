@@ -1,158 +1,100 @@
 import { describe, expect, it } from "vitest";
-import { COMPANY_TASK_RULES, COMPANY_TASKS, type CompanyTaskConfig } from "../../config/company-tasks.ts";
-import { bestPack, bestTour, generatePuzzle, gradeAnswer, mathValue, tourLength } from "./company-tasks.ts";
-import { bestLoad, bestOrder, memoryPairs } from "./company-tasks.fixtures.ts";
+import { COMPANY_TASK_RULES, COMPANY_TASKS } from "../../config/company-tasks.ts";
+import { generatePuzzle, gradeAnswer } from "./company-tasks.ts";
+import { MORE_TASK_GAMES, patternRow, shelfBase, type MoreTaskGame } from "./company-tasks-more.ts";
+import { createRng } from "./rng.ts";
 
-/* ADR-173: the eight new task games, their puzzles and their scoring. */
+const task = (game: MoreTaskGame) => COMPANY_TASKS.find((t) => t.game === game)!;
+const rngOf = (seed: number) => {
+  const r = createRng(seed);
+  return () => r.next();
+};
 
-function seeded(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1_103_515_245 + 12_345) % 2_147_483_648;
-    return s / 2_147_483_648;
-  };
-}
-const g = COMPANY_TASK_RULES.games;
-const taskOf = (game: CompanyTaskConfig["game"]) => COMPANY_TASKS.find((t) => t.game === game)!;
-
-describe("ADR-173 task games", () => {
-  it("every new game has at least one task in two different departments or products", () => {
-    for (const game of ["memory", "timing", "diff", "quick", "route", "haggle", "pack", "catch"] as const) {
-      const tasks = COMPANY_TASKS.filter((t) => t.game === game);
-      expect(tasks.length, game).toBeGreaterThanOrEqual(2);
-      expect(new Set(tasks.map((t) => `${t.branch}:${t.product}`)).size, game).toBeGreaterThanOrEqual(2);
+describe("five more task games (ADR-180)", () => {
+  it("every new game has a task in the catalogue and a config", () => {
+    for (const g of MORE_TASK_GAMES) {
+      expect(task(g)).toBeDefined();
+      expect(COMPANY_TASK_RULES.games[g].seconds).toBeGreaterThan(0);
     }
   });
 
-  it("memory: all pairs full marks, each wrong flip costs missBps, foreign or reused cards count nothing", () => {
-    const { solution } = generatePuzzle(taskOf("memory"), seeded(3));
-    const cards = (solution as { cards: number[] }).cards;
-    expect(cards).toHaveLength(g.memory.pairs * 2);
-    const pairs = memoryPairs(cards);
-    expect(gradeAnswer("memory", solution, { pairs, misses: 0 })).toBe(10_000);
-    expect(gradeAnswer("memory", solution, { pairs, misses: 3 })).toBe(10_000 - 3 * g.memory.missBps);
-    expect(gradeAnswer("memory", solution, { pairs: pairs.slice(0, 2), misses: 0 })).toBe(5_000);
-    // the same pair twice counts once; a pair of different cards not at all
-    expect(gradeAnswer("memory", solution, { pairs: [pairs[0], pairs[0]], misses: 0 })).toBe(2_500);
-    const odd = cards.findIndex((c) => c !== cards[0]);
-    expect(gradeAnswer("memory", solution, { pairs: [[0, odd]], misses: 0 })).toBe(0);
-    expect(gradeAnswer("memory", solution, { pairs, misses: 100 })).toBe(0);
-    expect(gradeAnswer("memory", solution, { pairs: "x" })).toBe(0);
+  it("restock: exact amounts full marks, one off half, more off nothing", () => {
+    const { puzzle, solution } = generatePuzzle(task("restock"), rngOf(1));
+    const p = puzzle as { stock: number[]; target: number[] };
+    const right = p.target.map((t, i) => t - p.stock[i]!);
+    expect(right.every((v) => v >= 2)).toBe(true);
+    expect(gradeAnswer("restock", solution, { values: right })).toBe(10_000);
+    const oneOff = right.map((v, i) => (i === 0 ? v + 1 : v));
+    expect(gradeAnswer("restock", solution, { values: oneOff })).toBe(8_750);
+    expect(gradeAnswer("restock", solution, { values: right.map(() => 0) })).toBe(0);
+    expect(gradeAnswer("restock", solution, { values: "x" })).toBe(0);
   });
 
-  it("timing: within the tolerance full marks, within 3× half, else nothing", () => {
-    const { puzzle, solution } = generatePuzzle(taskOf("timing"), seeded(5));
-    const targets = (puzzle as { targets: number[] }).targets;
-    expect(targets).toHaveLength(g.timing.rounds);
-    for (const t of targets) expect(t).toBeGreaterThanOrEqual(g.timing.min);
-    const tol = g.timing.tolerance;
-    expect(gradeAnswer("timing", solution, { stops: targets.map((t) => t + tol) })).toBe(10_000);
-    expect(gradeAnswer("timing", solution, { stops: targets.map((t) => t - 2 * tol) })).toBe(5_000);
-    expect(gradeAnswer("timing", solution, { stops: targets.map((t) => t + 4 * tol) })).toBe(0);
-    expect(gradeAnswer("timing", solution, { stops: [targets[0]] })).toBe(3_333);
-  });
-
-  it("diff: the right grid differs exactly in the solution's cells; graded like pick", () => {
-    const rng = seeded(11);
-    for (let k = 0; k < 20; k++) {
-      const { puzzle, solution } = generatePuzzle(taskOf("diff"), rng);
-      const { left, right } = puzzle as { left: number[]; right: number[] };
-      const targets = (solution as { targets: number[] }).targets;
-      expect(left.flatMap((l, i) => (l !== right[i] ? [i] : []))).toEqual(targets);
-      expect(targets.length).toBeGreaterThanOrEqual(g.diff.minDiffs);
-      expect(right.every((x) => x >= 0 && x < g.diff.symbols)).toBe(true);
-      expect(gradeAnswer("diff", solution, { picked: targets })).toBe(10_000);
+  it("receipts: the right sum full marks, every euro off costs 5 %", () => {
+    for (let seed = 1; seed < 20; seed++) {
+      const { puzzle, solution } = generatePuzzle(task("receipts"), rngOf(seed));
+      const p = puzzle as { amounts: number[]; target: number };
+      // find any subset with the right sum (there is at least the drawn one)
+      let best: number[] | null = null;
+      for (let m = 1; m < 1 << p.amounts.length && !best; m++) {
+        const idx = p.amounts.flatMap((_, i) => (m & (1 << i) ? [i] : []));
+        if (idx.reduce((s, i) => s + p.amounts[i]!, 0) === p.target) best = idx;
+      }
+      expect(best).not.toBeNull();
+      expect(gradeAnswer("receipts", solution, { picked: best })).toBe(10_000);
     }
-    const { solution } = generatePuzzle(taskOf("diff"), seeded(2));
-    const targets = (solution as { targets: number[] }).targets;
-    const wrong = [...Array(g.diff.cells).keys()].find((i) => !targets.includes(i))!;
-    expect(gradeAnswer("diff", solution, { picked: [...targets, wrong] })).toBeLessThan(10_000);
+    const sol = { amounts: [10, 20, 30], target: 30, step_bps: 500, picked: [2] };
+    expect(gradeAnswer("receipts", sol, { picked: [0] })).toBe(0);
+    expect(gradeAnswer("receipts", sol, { picked: [1] })).toBe(5_000);
+    expect(gradeAnswer("receipts", sol, { picked: [0, 0] })).toBe(0);
+    expect(gradeAnswer("receipts", sol, { picked: [7] })).toBe(0);
   });
 
-  it("quick: every problem has distinct options, one of them right", () => {
-    const rng = seeded(13);
-    for (const task of COMPANY_TASKS.filter((t) => t.game === "quick")) {
-      const { puzzle, solution } = generatePuzzle(task, rng);
-      const { problems } = puzzle as {
-        problems: { a: number; b: number; op: NonNullable<CompanyTaskConfig["op"]>; options: number[] }[];
-      };
-      const { choices } = solution as { choices: number[] };
-      expect(problems).toHaveLength(g.quick.problems);
-      problems.forEach((p, i) => {
-        expect(new Set(p.options).size).toBe(g.quick.options);
-        expect(p.options[choices[i]!]).toBe(mathValue(p.op, p.a, p.b));
+  it("offer: the customer with the highest revenue, one per round, always unique", () => {
+    for (let seed = 1; seed < 30; seed++) {
+      const { puzzle, solution } = generatePuzzle(task("offer"), rngOf(seed));
+      const p = puzzle as { offers: [number, number][][] };
+      const choices = p.offers.map((round) => {
+        const rev = round.map(([a, b]) => a * b);
+        const top = Math.max(...rev);
+        expect(rev.filter((r) => r === top)).toHaveLength(1);
+        return rev.indexOf(top);
       });
-      expect(gradeAnswer("quick", solution, { choices })).toBe(10_000);
-      expect(gradeAnswer("quick", solution, { choices: choices.map((c) => (c + 1) % 3) })).toBe(0);
+      expect(gradeAnswer("offer", solution, { choices })).toBe(10_000);
     }
+    expect(gradeAnswer("offer", { choices: [0, 1, 2] }, { choices: [0, 1, 0] })).toBe(6_666);
   });
 
-  it("route: the best round trip full marks, every extra field costs stepBps, a broken order nothing", () => {
-    const pts: [number, number][] = [
-      [0, 0],
-      [3, 0],
-      [0, 3],
-      [3, 3],
-      [1, 0],
-    ];
-    expect(bestTour(pts)).toBe(12);
-    expect(tourLength(pts, [1, 2, 3, 4])).toBe(18);
-    const solution = { points: pts, best: 12, step_bps: g.route.stepBps };
-    expect(gradeAnswer("route", solution, { order: bestOrder(pts) })).toBe(10_000);
-    expect(gradeAnswer("route", solution, { order: [1, 2, 3, 4] })).toBe(10_000 - 6 * g.route.stepBps);
-    expect(gradeAnswer("route", solution, { order: [1, 2, 3] })).toBe(0);
-    expect(gradeAnswer("route", solution, { order: [1, 1, 3, 4] })).toBe(0);
-    expect(gradeAnswer("route", solution, { order: [0, 2, 3, 4] })).toBe(0);
-    const { puzzle } = generatePuzzle(taskOf("route"), seeded(17));
-    const points = (puzzle as { points: [number, number][] }).points;
-    expect(points).toHaveLength(g.route.stops + 1);
-    expect(new Set(points.map(([x, y]) => `${x},${y}`)).size).toBe(points.length);
+  it("pattern: rows add, double or grow; the right next number is among the options", () => {
+    expect(patternRow(0, 3, 4, 5)).toEqual([3, 7, 11, 15, 19]);
+    expect(patternRow(1, 3, 0, 5)).toEqual([3, 6, 12, 24, 48]);
+    expect(patternRow(2, 1, 2, 5)).toEqual([1, 3, 6, 10, 15]);
+    const { puzzle, solution } = generatePuzzle(task("pattern"), rngOf(7));
+    const rows = (puzzle as { rows: { seq: number[]; options: number[] }[] }).rows;
+    expect(rows).toHaveLength(COMPANY_TASK_RULES.games.pattern.rounds);
+    for (const r of rows) expect(new Set(r.options).size).toBe(3);
+    const choices = (solution as { choices: number[] }).choices;
+    expect(gradeAnswer("pattern", solution, { choices })).toBe(10_000);
   });
 
-  it("haggle: best reply full marks, the middle one okBps, the bad one nothing; averaged over rounds", () => {
-    const solution = {
-      rounds: [
-        [2, 0, 1],
-        [0, 1, 2],
-        [1, 2, 0],
-      ],
-      ok_bps: g.haggle.okBps,
-    };
-    expect(gradeAnswer("haggle", solution, { choices: [1, 0, 2] })).toBe(10_000);
-    expect(gradeAnswer("haggle", solution, { choices: [2, 1, 0] })).toBe(5_000);
-    expect(gradeAnswer("haggle", solution, { choices: [0, 2, 1] })).toBe(0);
-    expect(gradeAnswer("haggle", solution, { choices: [1, 0] })).toBe(6_666);
-    expect(gradeAnswer("haggle", solution, { choices: [9, 0, 2] })).toBe(6_666);
-  });
-
-  it("pack: value against the best load; over the capacity nothing", () => {
-    const weights = [5, 4, 3, 2];
-    const values = [10, 8, 4, 5];
-    expect(bestPack(weights, values, 7)).toBe(15);
-    const solution = { weights, values, cap: 7, best: 15 };
-    expect(gradeAnswer("pack", solution, { picked: bestLoad(weights, values, 7) })).toBe(10_000);
-    expect(gradeAnswer("pack", solution, { picked: [1, 2] })).toBe(8_000);
-    expect(gradeAnswer("pack", solution, { picked: [0, 1] })).toBe(0);
-    expect(gradeAnswer("pack", solution, { picked: [0, 0] })).toBe(0);
-    const { puzzle } = generatePuzzle(taskOf("pack"), seeded(19));
-    const p = puzzle as { weights: number[]; cap: number };
-    expect(p.weights).toHaveLength(g.pack.items);
-    expect(p.cap).toBeLessThan(p.weights.reduce((a, b) => a + b, 0));
-  });
-
-  it("catch: at least two good tiles, never twice on one field in a row; graded like pick", () => {
-    const rng = seeded(23);
-    for (let k = 0; k < 30; k++) {
-      const { puzzle, solution } = generatePuzzle(taskOf("catch"), rng);
-      const { events } = puzzle as { events: { cell: number; good: boolean }[] };
-      expect(events).toHaveLength(g.catch.events);
-      expect(events.filter((e) => e.good).length).toBeGreaterThanOrEqual(2);
-      events.forEach((e, i) => i > 0 && expect(e.cell).not.toBe(events[i - 1]!.cell));
-      const targets = (solution as { targets: number[] }).targets;
-      expect(gradeAnswer("catch", solution, { picked: targets })).toBe(10_000);
-      expect(gradeAnswer("catch", solution, { picked: [] })).toBe(0);
-    }
-    // the whole sweep fits into the time limit
-    expect(g.catch.events * g.catch.everyMs).toBeLessThan(g.catch.seconds * 1000);
+  it("shelf: the base grid is valid; a solved shelf full marks; changed givens nothing", () => {
+    const base = shelfBase();
+    for (let r = 0; r < 4; r++) expect(new Set(base.slice(r * 4, r * 4 + 4)).size).toBe(4);
+    for (let c = 0; c < 4; c++) expect(new Set([0, 1, 2, 3].map((r) => base[r * 4 + c])).size).toBe(4);
+    const { puzzle, solution } = generatePuzzle(task("shelf"), rngOf(3));
+    const grid = (puzzle as { grid: number[] }).grid;
+    const sol = solution as { grid: number[]; blanks: number[] };
+    expect(grid.filter((v) => v < 0)).toHaveLength(COMPANY_TASK_RULES.games.shelf.blanks);
+    expect(gradeAnswer("shelf", solution, { grid: sol.grid })).toBe(10_000);
+    // one wrong gap: that gap and its twins in row, column or box count as wrong
+    const wrong = [...sol.grid];
+    const g0 = sol.blanks[0]!;
+    wrong[g0] = (wrong[g0]! + 1) % 4;
+    expect(gradeAnswer("shelf", solution, { grid: wrong })).toBeLessThan(10_000);
+    const tampered = [...sol.grid];
+    const fixed = [...Array(16).keys()].find((i) => !sol.blanks.includes(i))!;
+    tampered[fixed] = (tampered[fixed]! + 1) % 4;
+    expect(gradeAnswer("shelf", solution, { grid: tampered })).toBe(0);
+    expect(gradeAnswer("shelf", solution, { grid: [1, 2] })).toBe(0);
   });
 });
