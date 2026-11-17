@@ -113,6 +113,9 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Pack Battles und Live-Öffnen (ADR-172):** Im Collectibles-Tab stehen deine Freunde als Figuren. Fordere einen zum
+  Pack Battle heraus: beide zahlen ein Pack vom gleichen Set, wer mehr Wert zieht, bekommt alle zehn Karten. Über
+  „Live“ schaust du anderen beim Öffnen zu und schickst Emojis; abschalten geht in den Einstellungen.
 - **Neue Themen in den Nachrichten (ADR-169):** Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt
   samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte Trades, Miete, Outfits, Battles,
   Schläfer. Dazu Nachrufe, Werbung und Horoskope; jede Sendung bringt drei Themen, die nicht direkt wiederkommen.

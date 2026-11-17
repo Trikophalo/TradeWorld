@@ -334,7 +334,11 @@ function BattleSidePanel({
                     ? { y: [0, -4, 0] }
                     : undefined
               }
-              exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 1.3, y: -30 }}
+              exit={
+                reduced
+                  ? { opacity: 0, transition: { duration: DURATION.fast } }
+                  : { opacity: 0, scale: 1.3, y: -30, transition: { duration: DURATION.slow, ease: EASE.out } }
+              }
               transition={{ duration: phase === "tearing" ? 0.5 : 1.2, repeat: Infinity, ease: "easeInOut" }}
             >
               <NexamonPack set={b.set} scale={desktop ? 3 : 2} />

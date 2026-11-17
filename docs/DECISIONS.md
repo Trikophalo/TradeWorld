@@ -3529,3 +3529,45 @@ Auktionen von Spielern bekamen von der KI gar keine Gebote. Jetzt:
 - Demo: Kapitalerhöhungen rechnen mit demselben KI-Faktor und derselben Sperre; Sammler-Angebote laufen nach zwei
   Stunden aus, der Handel unter Sammlern hat dieselbe Stundengrenze. Insiderregel, Tagesband und Auktionsgebote der
   Sammler gibt es nur auf dem Server (die Demo handelt die eigene Aktie nicht, ihre Auktionen haben eigene Bieter).
+
+## ADR-172: Pack Battles und Live-Öffnen bei den Nexamon-Karten — `Annahme`
+
+**Kontext:** Karten öffnen ist bisher ein Solo-Moment. Gewünscht: zwei Freunde öffnen gegeneinander ein Pack, der
+Bessere bekommt alles, und man kann anderen beim Öffnen live zuschauen.
+
+**Entscheidung:**
+
+- **Anwesenheit:** Die Collectibles-Seite ruft alle `presence.pingSeconds` (15 s) `nexamon_lobby(p_allow_watch)`. Wer
+  in den letzten `presence.presenceSeconds` (60 s) gefragt hat, steht als Figur (Avatar und Accessoires) auf dem
+  kleinen Platz über den Tabs; gezeigt werden Freunde, höchstens `maxPlayers`. Abzeichen „öffnet gerade“ und „im
+  Battle“. Die Anwesenheit ist kein Spielzustand und trägt darum keine `request_id` (wie `last_active_at`).
+- **Pack Battle:** Herausfordern geht nur gegen einen Freund, der gerade im Tab ist und Nexamon freigeschaltet hat;
+  ein Battle pro Spieler gleichzeitig, `battles.cooldownSeconds` zwischen Herausforderungen, `battles.perHour`
+  angenommene Battles pro Stunde und Spieler. Die Herausforderung gilt `challengeSeconds` (60 s); bezahlt wird erst
+  beim Annehmen. Dann zahlen beide ein Pack (Ledger, an die Haushalte, wie ein Kauf), beide Packs werden in derselben
+  Transaktion mit den Regeln von `buy_nexamon_pack` geöffnet (jede Kopie zählt zur Population), und das Ergebnis
+  steht sofort fest: höherer Gesamtwert zum Zugzeitpunkt gewinnt, bei Gleichstand die seltenste Einzelkarte, dann
+  ein Münzwurf (`coin_seed % 2 = 0` → Herausforderer, Seed gespeichert). Der Gewinner besitzt sofort alle zehn
+  Kopien, der Verlierer nichts. Kann der Herausforderer beim Annehmen nicht mehr zahlen, endet das Battle als
+  „abgebrochen“ und niemand zahlt; zwischen Bezahlen und Ziehen kann ein Battle nicht abbrechen, eine Erstattung ist
+  deshalb nie nötig. Wer während der Enthüllung geht, ändert nichts.
+- **Gleichschritt:** Der Server legt die Uhr fest: Start `startDelayMs` nach dem Annehmen, `tearMs` Aufreißen, dann
+  je `slotMs` ein Slot auf beiden Seiten. `get_nexamon_battle` liefert die Karten eines Slots erst `leadMs` vor seinem
+  Zeitpunkt, Summen und Gewinner erst zur Entscheidung; vorher sieht niemand etwas (auch nicht die Spieler).
+  Clients rechnen den Versatz zur Serverzeit aus jeder Antwort und animieren von `starts_at` aus
+  (`battleShownSlots`, `src/lib/sim/nexamon-battle.ts`). Polling statt Realtime: 0,7 s im Battle, das reicht für vier
+  Spieler und braucht keinen eigenen Kanal.
+- **Live-Öffnen:** Jedes gekaufte Pack wird per Trigger auf `nexamon_packs` zu einer Live-Sitzung, außer der
+  Öffner hat „Andere dürfen beim Öffnen zuschauen“ ausgeschaltet (Einstellung, Standard an, mit der Anwesenheit zum
+  Server). Die Seite des Öffners meldet jede gezeigte Karte (`nexamon_live_progress`); Zuschauer sehen nur, was der
+  Öffner schon gesehen hat. Schweigt die Seite `live.staleMs`, kommt alle `fallbackSlotMs` eine Karte dazu. Jedes
+  Battle ist ebenfalls live. Zuschauerzahl und Emoji-Reaktionen (`live.reactions`, mit `request_id`, begrenzt).
+- **Nachrichten:** Feed-Arten `nexamon_battle_won` und, ab `gossipMinCents`, `nexamon_battle_big`; letztere ist
+  Klatsch für die NEXA Nachrichten (Replace-Patch an `news_show_build`).
+- **Kartenboni:** Nach dem Übertrag ruft das Battle `nexamon_bonus_recompute(uuid)` für beide Spieler, falls die
+  Funktion existiert (kommt parallel).
+- **Demo:** Die erfundenen Freunde (ohne welche drei Demo-Sammler) stehen im Tab, nehmen nach 2,5 s an und öffnen
+  alle 45 s eines ihrer Packs live; eigene Packs sind live mit zwei erfundenen Zuschauern.
+
+**Offen:** Die gewonnenen Kopien liegen schon während der Enthüllung in der Sammlung des Gewinners; wer dort
+nachsieht, kennt das Ergebnis ein paar Sekunden früher.

@@ -1,0 +1,108 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/*
+ * Pack Battles and live openings (ADR-172), demo mode: the made-up friends stand on the Collectibles tab, a friend is
+ * challenged and accepts by himself, the battle view plays to the winner, and the Live button opens a spectator view.
+ */
+async function preparePlayer(page: Page, theme: "dark" | "light" = "dark", extra: Record<string, unknown> = {}) {
+  await page.addInitScript(
+    ([mode, more]) => {
+      if (window.sessionStorage.getItem("nexa-test-prepared")) return;
+      window.sessionStorage.setItem("nexa-test-prepared", "1");
+      window.sessionStorage.setItem("nexa-daily-reward-seen", new Date().toDateString());
+      window.localStorage.setItem("nexa-settings", JSON.stringify({ state: { theme: mode }, version: 1 }));
+      window.localStorage.setItem(
+        "nexa-tutorial",
+        JSON.stringify({
+          demo: {
+            status: "done",
+            step: 0,
+            seenTours: [
+              "first_job",
+              "limit_orders",
+              "bonds",
+              "found_garage",
+              "visit_skill_map",
+              "artworks",
+              "visit_artworks",
+              "property",
+              "visit_property",
+              "visit_nexamon",
+            ],
+          },
+        }),
+      );
+      window.localStorage.setItem(
+        "nexa-demo-player-v2",
+        JSON.stringify({
+          nickname: "Sammlerin",
+          tag: "K7Q2",
+          cashCents: 50_000_000,
+          xpTotal: 90_000,
+          tutorialCompleted: true,
+          curveVersion: 2,
+          friendList: [
+            {
+              nickname: "Anna",
+              tag: "A1B2",
+              level: 14,
+              avatarKey: "seller",
+              accessories: [],
+              online: true,
+              since: "2026-11-01T10:00:00Z",
+            },
+            {
+              nickname: "Bruno",
+              tag: "B3C4",
+              level: 4,
+              avatarKey: "punk",
+              accessories: [],
+              online: false,
+              since: "2026-11-02T10:00:00Z",
+            },
+          ],
+          ...more,
+        }),
+      );
+    },
+    [theme, extra] as const,
+  );
+}
+
+const SHOTS = process.env.NEXA_SHOT_DIR;
+
+test("presence strip, a pack battle against a demo friend and the live spectator view", async ({ page }, info) => {
+  test.setTimeout(120_000);
+  await preparePlayer(page);
+  await page.goto("/nexamon");
+  const lobby = page.getByTestId("nexamon-lobby");
+  await expect(lobby).toBeVisible();
+  const anna = lobby.locator('[data-testid="lobby-figure"][data-nickname="Anna"]');
+  await expect(anna).toBeVisible();
+  await expect(lobby.locator('[data-nickname="Bruno"]')).toHaveCount(0);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/lobby-${info.project.name}.png` });
+
+  await anna.getByTestId("lobby-figure-button").click();
+  await page.getByTestId("lobby-challenge").click();
+  await page.getByTestId("challenge-send").click();
+  const view = page.getByTestId("battle-view");
+  await expect(view).toBeVisible({ timeout: 15_000 });
+  await expect(view).toHaveAttribute("data-phase", "revealing", { timeout: 20_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/battle-${info.project.name}.png` });
+  await expect(page.getByTestId("battle-summary")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("battle-side-challenger")).toHaveAttribute("data-shown", "5");
+  await expect(page.getByTestId("battle-side-opponent")).toHaveAttribute("data-shown", "5");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/battle-end-${info.project.name}.png` });
+  await page.getByTestId("battle-done").click();
+
+  // a made-up friend opens live in the first 26 s of every 45 s
+  await expect
+    .poll(async () => Number(await page.getByTestId("live-button").getAttribute("data-count")), { timeout: 60_000 })
+    .toBeGreaterThan(0);
+  await page.getByTestId("live-button").click();
+  await page.getByTestId("live-session").first().click();
+  const spect = page.getByTestId("spectator-view");
+  await expect(spect).toBeVisible();
+  await expect(spect).not.toHaveAttribute("data-shown", "0", { timeout: 20_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/spectate-${info.project.name}.png` });
+});

@@ -463,6 +463,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Neue Themen in den Nachrichten",
         text: "Mr. Doodle Dangle lästert jetzt auch über Sammelkarten, das Finanzamt samt Oberamtsrat Griesgram, Börsenfirmen und eure Taten im Spiel: verzockte…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-ed315771",
+        title: "Pack Battles und Live-Öffnen",
+        text: "Im Collectibles-Tab stehen deine Freunde als Figuren.",
+      },
     ],
   },
   {

@@ -7685,6 +7685,13 @@ genau einmal Geld, kaufmännisch „half even“ (`nexamon_copy_value_cents`).
   von einem Spieler, `quick` = Sofortverkauf an die KI), `counted` (hat den Wert bewegt), `value_before_e4`,
   `value_after_e4`, `at`.
 - **`nexamon_packs`** (intern): Booster der Spieler mit den fünf Zügen (`cards` jsonb), für Zähler und Verlauf.
+- **Pack Battles und Live-Öffnen (ADR-172, intern, RLS ohne Grants):** `nexamon_presence` (wer im Collectibles-Tab
+  ist, `allow_watch`), `nexamon_battles` (Herausforderung bis Ergebnis: Status, beide Züge, Summen, Gewinner,
+  `tie_break`, `coin_seed`), `nexamon_live` (Live-Sitzung eines Packs oder Battles mit `progress`),
+  `nexamon_live_viewers`, `nexamon_live_reactions`. RPCs: `nexamon_lobby`, `challenge_nexamon_battle`,
+  `respond_nexamon_battle`, `cancel_nexamon_battle`, `get_nexamon_battle`, `get_nexamon_live`,
+  `nexamon_live_progress`, `nexamon_live_react`; Fehler NX240–NX250. Ledger: Battle-Zahlungen als `nexamon_pack`
+  mit `ref_type = 'nexamon_battle'`.
 - **`nexamon_value_points`** (intern): Wertverlauf, letzter Wert je Stunde mit Änderung (PK `card_key, at`), 60 Tage.
 - **`nexamon_set_state`** (intern): je Set `ai_packs_at` (bis wann die KI-Booster geöffnet sind), `ai_packs_opened`,
   `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs; `peak_scaled_at` merkt
