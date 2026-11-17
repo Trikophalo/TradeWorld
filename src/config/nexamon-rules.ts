@@ -109,13 +109,13 @@ export const NEXAMON_RULES = {
     /**
      * Chance of every grade in basis points, per condition, in the order of `grades` (index 0 is grade 1, the last
      * one grade 10, Black Label included). A 10 or better: poor 0.05 %, good 0.5 %, near mint 3.5 % (1 % of it a
-     * Black Label), mint 15 % (5 % of it a Black Label, so a plain 10 is 10 %).
+     * Black Label), mint 40 % (5 % of it a Black Label, so a plain 10 is 35 %, ADR-198).
      */
     gradeWeightsBps: {
       poor: [800, 1_200, 1_500, 2_000, 2_000, 1_500, 700, 200, 50, 30, 15, 5],
       good: [0, 0, 0, 750, 1_200, 2_000, 2_500, 1_700, 1_000, 600, 200, 50],
       near_mint: [0, 0, 0, 0, 0, 500, 1_200, 2_200, 2_400, 2_400, 950, 350],
-      mint: [0, 0, 0, 0, 0, 0, 500, 1_200, 1_800, 3_000, 2_000, 1_500],
+      mint: [0, 0, 0, 0, 0, 0, 200, 500, 1_000, 2_300, 2_000, 4_000],
     },
     /**
      * A slab is worth the card's market value x this (the condition no longer counts), in the order of `grades`.

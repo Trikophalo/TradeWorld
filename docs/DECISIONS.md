@@ -4760,3 +4760,20 @@ bei allen Verbesserungen), Preis 3.000 € · 1,5^Stufe (bis rund 259.500 €). 
 4 Tagen, Stufe 12 nach etwa 11 Wochen. Das Geld bleibt geschlossen (ADR-041): Käufe fließen in die Staatskasse, die
 das Grundeinkommen zahlt; leert sie sich unter das Ziel (`basicIncome.treasuryTargetCents`, 250 Mio. €), sinkt der
 Faktor bis `minFactor` 0,25. Bei vier Spielern auf Stufe 12 sind das höchstens rund 45.000 € am Tag, weit unter dem Ziel.
+
+## ADR-198: Mint-Karten werden bei ASP in 40 % der Fälle eine 10 — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer wünscht: „Mint-Karten sollen eine 40 % Chance auf ASP 10 haben.“ Bisher wurde ein
+Mint-Grading in 15 % der Fälle eine 10 oder besser (10 % 10, 5 % Black Label).
+
+**Entscheidung.** `grading.gradeWeightsBps.mint` wird `[0, 0, 0, 0, 0, 0, 200, 500, 1 000, 2 300, 2 000, 4 000]`:
+7 = 2 %, 8 = 5 %, 8,5 = 10 %, 9 = 23 %, 9,5 = 20 %, 10 oder besser 40 %. Die Black Label bleibt bei 5 % aller
+Mint-Gradings, eine reine 10 also 35 %. Die anderen Zustände bleiben unverändert. Der Server liest die Tabelle aus
+`game_config` (`pnpm db:config`), es braucht keine Migration; die Oberfläche zeigt die Chancen aus der Konfiguration.
+
+**Folgen.** Der erwartete Faktor eines Mint-Gradings steigt von 2,311 auf 2,969 des Kartenwerts, nach der Gebühr
+(0,4) von 1,91 auf 2,57: im Schnitt + 157 % statt + 91 %. Geld verliert ein Mint-Grading nur noch bei 7 oder 8
+(7 % statt 17 %). Mint-Grading ist damit klar profitabel, das ist gewollt. Der KI-Aufschlag für rohe Mint-Karten
+(`premiumBps.mint`, 12 %) bleibt; wer eine Mint-Karte zieht, gradet sie lieber, als sie roh an die KI zu verkaufen.
+Mehr 10er bringen mehr Slabs mit hohem Wert in Umlauf; Marktwert und KI-Käufe für Slabs (`gradePremiumBps`) bleiben
+und sind zu beobachten.

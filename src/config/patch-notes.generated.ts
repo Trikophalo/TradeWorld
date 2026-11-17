@@ -599,6 +599,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Im Controlling unter „Wachstum“ lernt deine Firma Fertigkeiten wie „Daten analysieren“.",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-d8d70fb8",
+        title: "Mint-Karten graden lohnt sich mehr",
+        text: "Eine Mint-Karte bekommt bei ASP jetzt in 40 % der Fälle eine 10 oder besser (35 % 10, 5 % Black Label), vorher 15 %.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-27c07659",
         title: "Karten sofort verkaufen",
         text: "Nach jedem Pack-Opening und jedem gewonnenen Pack Battle kannst du die gezogenen Karten direkt für 90 % ihres Werts an das Spiel verkaufen, alle auf…",
