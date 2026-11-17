@@ -9,7 +9,12 @@ import {
   type NexamonCard as NexamonCardData,
   type NexamonSetKey,
 } from "@/config/nexamon";
-import { NEXAMON_SAMPLE_CARDS, NEXAMON_SAMPLE_EVOLVES, nexamonSampleArt } from "@/components/pixel/nexamon-samples";
+import {
+  NEXAMON_SAMPLE_CARDS,
+  NEXAMON_SAMPLE_EVENT,
+  NEXAMON_SAMPLE_EVOLVES,
+  nexamonSampleArt,
+} from "@/components/pixel/nexamon-samples";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
@@ -93,6 +98,8 @@ function Block({ label, children, testId }: { label: string; children: ReactNode
   );
 }
 
+const ONE_OF_ONE_SAMPLE = NEXAMON_SAMPLE_CARDS.find((c) => c.rarity === "one_of_one")!;
+
 /** The Nexamon cards on /dev/ui (ADR-165): every rarity, the back, slabs, packs, the opening and the small parts. */
 export function NexamonShowcase() {
   const art = nexamonSampleArt();
@@ -112,6 +119,20 @@ export function NexamonShowcase() {
               <RarityBadge rarity={card.rarity} short />
             </div>
           ))}
+        </div>
+      </Block>
+
+      <Block label="Cosmic Winds (ADR-174): Ereigniskarte, One of One, One-of-One-Slab" testId="nexamon-cosmic">
+        <div className="flex flex-wrap items-start justify-center gap-4">
+          <div className="flex flex-col items-center gap-2" data-testid="showcase-event">
+            <NexamonCard card={NEXAMON_SAMPLE_EVENT} art={art[NEXAMON_SAMPLE_EVENT.key]} scale={3} />
+            <RarityBadge rarity={NEXAMON_SAMPLE_EVENT.rarity} short />
+          </div>
+          <div className="flex flex-col items-center gap-2" data-testid="showcase-one-of-one">
+            <NexamonCard card={ONE_OF_ONE_SAMPLE} art={art[ONE_OF_ONE_SAMPLE.key]} scale={3} />
+            <RarityBadge rarity="one_of_one" />
+          </div>
+          <NexamonSlab card={ONE_OF_ONE_SAMPLE} art={art[ONE_OF_ONE_SAMPLE.key]} grade={10} serial={1} scale={2} />
         </div>
       </Block>
 

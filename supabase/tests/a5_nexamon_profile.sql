@@ -117,7 +117,7 @@ select tests.assert(
 select tests.assert(
   (:'empty_own'::jsonb ->> 'unlocked')::boolean and (:'empty_own'::jsonb #>> '{summary,copies}')::integer = 0
   and (:'empty_own'::jsonb #>> '{summary,value_cents}')::bigint = 0 and :'empty_own'::jsonb -> 'cards' = '[]'::jsonb
-  and jsonb_array_length(:'empty_own'::jsonb -> 'sets') = 3,
+  and jsonb_array_length(:'empty_own'::jsonb -> 'sets') = 4,
   'a player without cards: zeros and an empty list');
 select tests.assert(
   not (:'locked'::jsonb ->> 'unlocked')::boolean and (:'locked'::jsonb #>> '{summary,copies}')::integer = 0

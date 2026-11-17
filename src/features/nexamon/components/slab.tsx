@@ -82,7 +82,7 @@ export function NexamonSlab({
   const tier = slabTier(grade);
   const gold = tier === "gold";
   const black = tier === "black";
-  const rasters = composeSlab(grade);
+  const rasters = composeSlab(grade, card.rarity === "one_of_one");
   const l = SLAB_LABEL;
   const brand = black ? BLACK_LABEL_INK.white : gold ? GOLD_INK.dark : ASP_INK.brand;
   const onBand = black ? BLACK_LABEL_INK.black : gold ? GOLD_INK.deep : "#ffffff";

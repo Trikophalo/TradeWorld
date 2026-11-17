@@ -8825,7 +8825,9 @@
       },
       "listedTag": "Im Markt",
       "listedHint": "{count, plural, one {Steht im Markt für {price}} other {# Kopien im Markt, ab {price}}}",
-      "slabsOnly": "Nur gegradete"
+      "slabsOnly": "Nur gegradete",
+      "modeLabel": "Ansicht der Sammlung",
+      "modeCards": "Karten"
     },
     "filter": {
       "set": "Set",
@@ -9155,6 +9157,34 @@
       "more": "Eine mehr",
       "of": "{n} / {max}",
       "all": "Alle"
+    },
+    "bulk": {
+      "mode": "Bulk verkaufen",
+      "intro": "Bulk sind lose Karten unter Ultra Rare. Stell ein, was gehen darf: An das Spiel verkauft bekommst du sofort den Marktwert abzüglich {fee} Gebühr. Oder du stellst sie zum Marktwert auf den Markt und wartest auf Käufer.",
+      "condition": "Zustand",
+      "anyCondition": "Alle Zustände",
+      "maxValue": "Höchstens wert (€)",
+      "maxValueAny": "egal",
+      "keepOne": "Behalte 1 pro Karte",
+      "skipBonus": "Bonus-Karten behalten",
+      "duplicatesOnly": "Nur Duplikate",
+      "emptyTitle": "Kein Bulk zu diesen Filtern",
+      "emptyText": "Lose Commons und Rares, die du abgeben kannst, erscheinen hier. Stell die Filter anders ein oder öffne ein paar Booster.",
+      "selectAll": "Alle auswählen",
+      "selectNone": "Keine",
+      "rowValue": "ab {value} je Karte",
+      "count": "Ausgewählt",
+      "value": "Marktwert",
+      "fee": "Gebühr ({rate})",
+      "payout": "Auszahlung",
+      "sellGame": "An das Spiel verkaufen · {price}",
+      "sellFailed": "Bulk nicht verkauft",
+      "sold": "{count, plural, one {# Karte verkauft} other {# Karten verkauft}}",
+      "share": "% vom Wert",
+      "listMarket": "Auf den Markt stellen",
+      "listFailed": "Nicht alle Karten eingestellt",
+      "listed": "{count, plural, one {# Karte steht am Markt} other {# Karten stehen am Markt}}",
+      "listLimit": "Auf den Markt passen höchstens {max} Angebote auf einmal."
     }
   },
   "hq": {
