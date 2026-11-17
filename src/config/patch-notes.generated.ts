@@ -548,6 +548,21 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Was du siehst, bekommst du",
         text: "Die Order-Maske zeigt vor dem Bestätigen den echten Ausführungskurs, die Kursauswirkung und „Du erhältst ca. …“; Orders jeder Größe werden ganz…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-f759f69f",
+        title: "Mira kennt jetzt deine Zahlen",
+        text: "Sie rät nur noch zu Dingen, die gerade gehen, sagt, was sie je Stunde bringen, und beantwortet „Was soll ich tun?“, „Warum Verlust?“, „Mehr…",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-bedb198f",
+        title: "Umsätze an der Börse",
+        text: "Jede Aktie zeigt ihren aktuellen Umsatz mit Trendpfeil, die Detailseite „Geschäftszahlen“ mit Gewinn, Ruf und Bekanntheit.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-28a6a95a",
+        title: "Bulk verkaufen aufgeräumt",
+        text: "Die Knöpfe bleiben im Fenster, die Summe liegt am PC daneben statt über der Liste.",
+      },
     ],
   },
   {
