@@ -483,6 +483,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Pack Battles und Live-Öffnen",
         text: "Im Collectibles-Tab stehen deine Freunde als Figuren.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-9fb9962c",
+        title: "Cosmic Winds",
+        text: "Das vierte Nexamon-Set für 5.000 € je Pack: kosmische Monster, Ereigniskarten und drei One of Ones, die es nur ein einziges Mal gibt (1 in 5.000…",
+      },
     ],
   },
   {

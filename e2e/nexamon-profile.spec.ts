@@ -110,7 +110,7 @@ test("a friend's profile shows their collectibles and the whole collection", asy
   await expect(binder.getByRole("button", { name: /einstellen|verkaufen|ASP/i })).toHaveCount(0);
 
   await binder.getByText("Alle Karten", { exact: true }).click();
-  await expect(binder.getByTestId("profile-nexamon-tile")).toHaveCount(231);
+  await expect(binder.getByTestId("profile-nexamon-tile")).toHaveCount(321);
   await expect(ownedTiles).toHaveCount(owned);
 
   // A card leads to its page.

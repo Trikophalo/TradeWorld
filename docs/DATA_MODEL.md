@@ -7952,3 +7952,21 @@ bonus_kind, bonus_bps, completed_at}], server_time}`. Jede Karte in Antworten (`
 
 **Benachrichtigungen:** `nexamon_bonus`, `nexamon_set`, `nexamon_hype`. **Feed:** `nexamon_master_set`, `nexamon_hype`
 (beide auch Klatsch der NEXA Nachrichten).
+
+## Nachtrag: Cosmic Winds, One of Ones, Bulk (ADR-174)
+
+- `nexamon_cards.rarity`: jede Seltenheit, die ein Set erklärt (Prüfung nur noch auf 1–32 Zeichen); neue Prüfung
+  `population <= 1` für `one_of_one`.
+- `nexamon_one_of_ones` (neu, nur über Funktionen): `card_key` (PK), `copy_id` (unique), `player_id` (wer zog),
+  `pack_id`, `pulled_at`. Der Primärschlüssel macht einen zweiten Zug unmöglich.
+- Trigger `nexamon_copies_ai_guard`: eine Kopie einer Seltenheit aus `ai.excludedRarities` bekommt nie einen
+  KI-Besitzer.
+- `nexamon_meta.ai_reset_at`: letzter Neuanfang der KI-Angebote.
+- `game_config.nexamon_rarities`: `{ rank, layout }` aus `src/config/nexamon/types.ts`.
+- RPCs: `get_nexamon()` liefert zusätzlich `one_of_ones` (`card_key`, `set`, `pulled`, `pulled_by`, `pulled_at`);
+  neu `list_nexamon_cards(p_request_id, p_card_key, p_condition, p_grade, p_count, p_price_cents)`,
+  `unlist_nexamon_cards(p_request_id, p_listing_ids)`, `bulk_sell_nexamon(p_request_id, p_copy_ids)`.
+- Intern: `nexamon_roll_one_of_one()`, `nexamon_ai_reset()` (Cron `nexa-nexamon-ai-reset`, stündlich, wirkt alle
+  `ai.listingResetHours`), `nexamon_rarity_rank()` liest den Rang aus der Konfiguration.
+- Feed-Art `nexamon_one_of_one` (auch Klatschquelle der Nachrichten), Benachrichtigung `nexamon_one_of_one`.
+- Fehler NX270 `nexamon_one_of_one_taken`, NX271 `nexamon_ai_excluded`, NX272 `nexamon_not_enough`.

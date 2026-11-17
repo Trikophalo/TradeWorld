@@ -333,8 +333,15 @@ test("the pack popup shows what a card of the set is worth on hover, focus and t
 test("buy a card from an AI seller on the market", async ({ page }) => {
   await preparePlayer(page);
   await page.goto("/nexamon?tab=market");
+  // ADR-174: first the set, then its offers; Raw / Graded as a switch
+  await expect(page.getByTestId("market-set-picker")).toBeVisible();
+  await expect(page.getByTestId("market-set-cosmic_winds")).toBeVisible();
+  await expectNoSidewaysScroll(page);
+  await page.getByTestId("market-set-mystic_energy").click();
+  await expect(page).toHaveURL(/set=mystic_energy/);
   await expect(page.getByTestId("market-list")).toBeVisible();
   await expect(page.getByTestId("market-page")).toContainText("Seite 1");
+  await page.getByTestId("market-condition").getByText("Raw", { exact: true }).click();
   await expectNoSidewaysScroll(page);
   // Filters and sorting go to the server: only rares, cheapest first.
   await page.getByTestId("market-rarity").selectOption("rare");
@@ -356,6 +363,9 @@ test("buy a card from an AI seller on the market", async ({ page }) => {
   await page.getByRole("link", { name: "Im Markt zeigen" }).click();
   await expect(page.getByTestId("market-card-filter")).toBeVisible();
   await expect(page.locator(`[data-testid="listing-row"]:not([data-card="${key}"])`)).toHaveCount(0);
+  // back to the set picker; the chosen set is remembered
+  await page.getByTestId("market-back").click();
+  await expect(page.getByTestId("market-set-picker")).toBeVisible();
 });
 
 /** Left and right edge of a text node's ink (a range), so squeezed text is measured as drawn. */
