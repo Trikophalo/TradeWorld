@@ -18,7 +18,6 @@ import {
   trainingFor,
   initialStartup,
   marketingGain,
-  awarenessHour,
   maxEmployees,
   potentialEstimate,
   potentialFromUniform,
@@ -29,6 +28,18 @@ import {
   issueAiFactor,
   postIssueFairCents,
 } from "./startup.ts";
+import { awarenessCap, awarenessHour as newAwarenessHour } from "./awareness.ts";
+
+// ADR-188: the old positional form of the hourly awareness step, for a garage of the given stage
+const awarenessHour = (a: number, q: number, mk: number, pot: number, price: number, stage: number) =>
+  newAwarenessHour({
+    awareness: a,
+    cap: awarenessCap("garage", stage),
+    quality: q,
+    priceAwareness: price,
+    marketingCentsThisHour: mk,
+    effectivePotentialAnnualCents: pot,
+  });
 
 const b = (n: number) => BigInt(n);
 const base: StartupQuarterInput = {
@@ -184,8 +195,10 @@ describe("growth stages (ADR-062)", () => {
   it("cap the awareness: without specialists no growth", () => {
     const s = { ...initialStartup(1e9, b(1_000_000)), awareness: 0.9, quality: 1 };
     const hour = (stage: number) => awarenessHour(s.awareness, s.quality, 0, 1e9, 1, stage);
-    expect(hour(0).next).toBeLessThanOrEqual(BALANCE.startups.stages.awarenessCaps[0]!);
-    expect(hour(4).next).toBeGreaterThan(0.8);
+    // ADR-188: above the cap the awareness only sinks; stage 4 of a garage reaches 80 %
+    expect(hour(0).next).toBeLessThan(0.9);
+    expect(awarenessCap("garage", 0)).toBe(0.6);
+    expect(awarenessCap("garage", 4)).toBeCloseTo(0.8, 10);
   });
 
   it("every product's skills exist on the skill map", () => {

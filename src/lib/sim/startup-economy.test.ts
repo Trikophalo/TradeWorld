@@ -3,12 +3,23 @@ import { BALANCE } from "../../config/balance.ts";
 import {
   aiUtilizationBps,
   aiWageDueCents,
-  awarenessHour,
   closeStartupHour,
   effectivePotentialCents,
   initialStartup,
   potentialFromUniform,
 } from "./startup.ts";
+import { awarenessCap, awarenessHour as newAwarenessHour } from "./awareness.ts";
+
+// ADR-188: the old positional form of the hourly awareness step, for a garage of the given stage
+const awarenessHour = (a: number, q: number, mk: number, pot: number, price: number, stage: number) =>
+  newAwarenessHour({
+    awareness: a,
+    cap: awarenessCap("garage", stage),
+    quality: q,
+    priceAwareness: price,
+    marketingCentsThisHour: mk,
+    effectivePotentialAnnualCents: pot,
+  });
 
 const b = (n: number) => BigInt(n);
 const sc = BALANCE.startups;
@@ -55,14 +66,15 @@ describe("economy overhaul (ADR-180)", () => {
     expect(team.profitCents).toBeGreaterThan(solo.profitCents);
   });
 
-  it("awareness moves every hour: marketing adds, decay takes, the stage caps", () => {
+  it("awareness moves every hour: marketing adds, decay takes, the cap holds (ADR-188)", () => {
     const quiet = awarenessHour(0.2, 0.5, 0, 1e7, 1, 2);
     const loud = awarenessHour(0.2, 0.5, 100_000, 1e7, 1, 2);
     expect(loud.marketing).toBeGreaterThan(0.005);
     expect(loud.next - quiet.next).toBeCloseTo(loud.marketing, 10);
-    expect(quiet.decay).toBeCloseTo((sc.awareness.decayPerQuarter / hours) * 0.2, 10);
+    expect(quiet.decay).toBeCloseTo(sc.awareness.decayPerHour * (0.2 - sc.awareness.min), 10);
     expect(quiet.next).toBeCloseTo(0.2 + quiet.wordOfMouth - quiet.decay, 10);
-    expect(awarenessHour(0.69, 1, 1e9, 1e7, 1, 1).next).toBe(sc.stages.awarenessCaps[1]);
+    expect(awarenessHour(0.69, 1, 1e9, 1e7, 1, 1).next).toBeLessThanOrEqual(0.69);
+    expect(awarenessHour(0.6, 1, 1e9, 1e7, 1, 1).next).toBeLessThanOrEqual(awarenessCap("garage", 1));
     expect(awarenessHour(sc.awareness.min, 0, 0, 1e7, 1, 0).next).toBeGreaterThanOrEqual(sc.awareness.min);
   });
 

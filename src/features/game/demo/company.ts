@@ -10,6 +10,7 @@ import {
   type Campaign,
 } from "@/lib/sim/campaigns";
 import { BALANCE } from "@/config/balance";
+import { awarenessAdd, awarenessCap, awarenessOfCap } from "@/lib/sim/awareness";
 import { SKILL_BRANCHES, type SkillBranch } from "@/config/skills";
 import type { SectorKey } from "@/components/pixel/art";
 import { matchScore, productivityBps } from "@/lib/sim/skills";
@@ -133,6 +134,8 @@ export interface DemoCompanyState {
   id: string;
   /** ADR-180: awareness added by tasks and the autopilot since the last closed hour. */
   awarenessBoost?: number;
+  /** ADR-188: the awareness cap of the last closed hour (tier, stage, expansion). */
+  awarenessCap?: number;
   /** ADR-183: reputation 0..100 (listed companies mirror the listed state). */
   reputation?: number;
   name: string;
@@ -415,12 +418,14 @@ export function createCompanyEngine(host: CompanyHost) {
         taskMomentum: company.taskMomentum ?? 1,
         listed: host.listed?.hourTerms(company, at),
         reputationDemandFactor: reputationDemandFactor(company.reputation ?? reputationCfg.start),
+        reputation: company.reputation ?? reputationCfg.start,
       },
     );
     // ADR-180: awareness moves every hour; boosts since the last hour (tasks, autopilot) count as "extra"
     const awarenessExtra = company.awarenessBoost ?? 0;
     company.awarenessBoost = 0;
     company.awareness = r.awareness.next;
+    company.awarenessCap = r.awareness.cap;
     const revenue = Number(r.revenueCents);
     const costs = Number(r.cogsCents + r.aiWagesPaidCents + r.fixedCents + r.marketingCents);
     const available = company.cashCents + revenue;
@@ -1219,8 +1224,11 @@ export function createCompanyEngine(host: CompanyHost) {
           costCents: cost,
           luck,
         };
-        const cap = startups.stages.awarenessCaps[stageOf(company)] ?? 1;
-        company.awareness = Math.min(cap, Math.max(company.awareness, company.awareness + spec.awareness));
+        // ADR-188: the same cap as the hour, booked as an extra of the next hour
+        const cap = awarenessCap(company.tier, stageOf(company), company.expansionLevel ?? 0);
+        const add = awarenessAdd(company.awareness, cap, spec.awareness);
+        company.awareness += add;
+        company.awarenessBoost = (company.awarenessBoost ?? 0) + add;
       }).then((c) => c.campaign!),
 
     expandCompany: (requestId) =>
@@ -1484,7 +1492,11 @@ export function demoStrengths(company: DemoCompanyState): MyCompany["strengths"]
       scores,
       strengthsInstant(
         {
-          awareness: company.awareness,
+          // ADR-188: the score counts the awareness against the cap of that hour
+          awareness: awarenessOfCap(
+            h.awarenessAfter ?? company.awareness,
+            h.awarenessParts?.cap ?? company.awarenessCap ?? awarenessCap(company.tier, 0, company.expansionLevel ?? 0),
+          ),
           quality: company.quality,
           demandCents: h.demandCents,
           capacityCents: h.capacityCents,

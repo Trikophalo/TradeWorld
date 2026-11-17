@@ -41,7 +41,7 @@ describe("company strengths (ADR-176)", () => {
       },
       cfg,
     );
-    expect(bad.awareness).toBeCloseTo(60); // ADR-180: 30 % of awarenessFull 50 %
+    expect(bad.awareness).toBeCloseTo(30); // ADR-188: awareness / cap, the caller divides
     expect(bad.delivery).toBe(50);
     expect(bad.margin).toBeCloseTo(40); // 10 % margin of 25 % = full
     expect(bad.team).toBe(80);
@@ -60,7 +60,8 @@ describe("company strengths (ADR-176)", () => {
       hours += 1;
     }
     expect(hours).toBeGreaterThan(24 * 7);
-    expect(strengthsOverall(strengthsStep(EMPTY_STRENGTHS, perfect, cfg))).toBeCloseTo(2);
+    // ADR-188: awareness follows with 25 % per hour, the other five with 2 %
+    expect(strengthsOverall(strengthsStep(EMPTY_STRENGTHS, perfect, cfg))).toBeCloseTo((25 + 5 * 2) / 6);
     const down = strengthsStep(s, EMPTY_STRENGTHS, cfg);
     expect(strengthsOverall(s) - strengthsOverall(down)).toBeGreaterThan(4);
   });
@@ -83,7 +84,7 @@ describe("company strengths (ADR-176)", () => {
       { awareness: 90, quality: 20, delivery: 50, margin: 100, team: 100, finance: 0 },
       cfg,
     );
-    expect(s.awareness).toBeCloseTo(41);
+    expect(s.awareness).toBeCloseTo(52.5); // ADR-188: follows with 25 % of the gap
     expect(s.quality).toBeCloseTo(58);
     expect(s.margin).toBeCloseTo(11.8);
     expect(s.finance).toBeCloseTo(76);

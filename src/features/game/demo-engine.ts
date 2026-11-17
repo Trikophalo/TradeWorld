@@ -1,4 +1,5 @@
 import { BALANCE } from "@/config/balance";
+import { awarenessAdd, awarenessCap } from "@/lib/sim/awareness";
 import {
   MAX_QUANTITY_E6,
   MIN_ORDER_CENTS,
@@ -1640,9 +1641,10 @@ const companyTasks = createCompanyTasksEngine({
   boostAwareness: (add) => {
     const c = p().company;
     if (!c) return;
-    const next = Math.min(Math.max(c.awareness, 1), c.awareness + add);
-    c.awarenessBoost = (c.awarenessBoost ?? 0) + (next - c.awareness);
-    c.awareness = next;
+    // ADR-188: never above the company's cap (the one of the last closed hour)
+    const applied = awarenessAdd(c.awareness, c.awarenessCap ?? awarenessCap(c.tier, 0, c.expansionLevel ?? 0), add);
+    c.awarenessBoost = (c.awarenessBoost ?? 0) + applied;
+    c.awareness += applied;
     persist();
   },
   lastHour: () => demoLastHour(p().company ?? null),
