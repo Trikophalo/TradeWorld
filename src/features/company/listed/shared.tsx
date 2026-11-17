@@ -14,6 +14,7 @@ import { formatCountdown, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { InfoTip } from "../components/firm-layout";
 
 export const money = (cents: number) => formatMoney(cents, { whole: true });
 export const signed = (cents: number) => formatMoney(cents, { whole: true, sign: true });
@@ -99,6 +100,8 @@ export function useClientTarget(at: string | null): number | null {
 export function Panel({
   title,
   aside,
+  description,
+  info,
   children,
   className,
   id,
@@ -106,6 +109,10 @@ export function Panel({
 }: {
   title: string;
   aside?: ReactNode;
+  /** One line under the title: what the card is for (ADR-183). */
+  description?: ReactNode;
+  /** An "i" next to the title with a longer explanation (ADR-183). */
+  info?: ReactNode;
   children: ReactNode;
   className?: string;
   id?: string;
@@ -118,9 +125,15 @@ export function Panel({
       data-testid={testId}
       className={cn("scroll-mt-24 space-y-4 data-[highlight]:ring-2 data-[highlight]:ring-accent", className)}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 className="label-pixel text-fg-2">{title}</h3>
-        {aside}
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <h3 className="flex items-center gap-1.5 label-pixel text-fg-2">
+            {title}
+            {info && <InfoTip text={info} label={title} />}
+          </h3>
+          {aside}
+        </div>
+        {description && <p className="text-xs text-pretty text-fg-3">{description}</p>}
       </div>
       {children}
     </Card>
@@ -132,6 +145,7 @@ export function Stat({
   label,
   children,
   hint,
+  info,
   tone,
   className,
   testId,
@@ -139,13 +153,18 @@ export function Stat({
   label: string;
   children: ReactNode;
   hint?: ReactNode;
+  /** An "i" next to the label: what the number means (ADR-183). */
+  info?: ReactNode;
   tone?: "gain" | "loss" | "warn";
   className?: string;
   testId?: string;
 }) {
   return (
     <div className={cn("min-w-0 rounded-md bg-surface-2 px-3 py-2.5", className)} data-testid={testId}>
-      <p className="truncate text-xs text-fg-3">{label}</p>
+      <p className="flex items-center gap-1 text-xs text-fg-3">
+        <span className="min-w-0 truncate">{label}</span>
+        {info && <InfoTip text={info} label={label} className="size-4" />}
+      </p>
       <p
         className={cn(
           "truncate nums text-lg font-semibold",

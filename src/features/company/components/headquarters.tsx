@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { edgeStripes } from "../banner-fill";
 import { useCompanyRefresh } from "../hooks";
 import { useProductText } from "../product-name";
+import { CompanyStatusBar } from "./status-bar";
 
 const QUARTER_MS = BALANCE.time.quarterHours * 3_600_000;
 const day = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "long", year: "numeric" });
@@ -199,6 +200,7 @@ export function HeadquartersHero({
           </span>
         </div>
       )}
+      <CompanyStatusBar company={company} />
       <QuarterClock company={company} />
     </section>
   );

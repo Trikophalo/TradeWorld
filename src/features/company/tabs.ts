@@ -11,7 +11,7 @@ export const LISTED_TABS: readonly CompanyTab[] = ["books", "board"];
 
 export interface CompanyTarget {
   tab: CompanyTab;
-  /** Collapsible section to open (id without the `section-` prefix). */
+  /** Section to scroll to (id without the `section-` prefix; nothing folds since ADR-183). */
   section?: string;
   /** Element id to scroll to; defaults to the section. */
   target?: string;
@@ -32,17 +32,20 @@ const TAB_ALIASES: Record<string, CompanyTarget> = {
 const SECTIONS: Record<string, CompanyTarget> = {
   // Dashboard
   mira: { tab: "dashboard", target: "mira" },
-  health: { tab: "dashboard", section: "details", target: "health" },
-  details: { tab: "dashboard", section: "details" },
+  health: { tab: "dashboard", target: "health" },
+  details: { tab: "dashboard", target: "health" },
+  diagnosis: { tab: "dashboard", section: "diagnosis" },
   autopilot: { tab: "dashboard", target: "autopilot" },
-  "staff-value": { tab: "dashboard", section: "details", target: "staff-value" },
+  "staff-value": { tab: "dashboard", target: "staff-value" },
   strengths: { tab: "dashboard", target: "strengths" },
   todo: { tab: "dashboard", target: "todo" },
   situation: { tab: "dashboard", section: "situation" },
-  history: { tab: "dashboard", section: "history" },
+  history: { tab: "dashboard", target: "history" },
   numbers: { tab: "dashboard", section: "numbers" },
-  quarter: { tab: "dashboard", section: "numbers", target: "quarter" },
+  quarter: { tab: "dashboard", target: "quarter" },
   reputation: { tab: "dashboard", target: "reputation" },
+  mood: { tab: "dashboard", target: "mood" },
+  timers: { tab: "dashboard", section: "team-value" },
   // Controlling
   profit: { tab: "controlling", section: "profit" },
   strategy: { tab: "controlling", section: "profit" },

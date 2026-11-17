@@ -27,6 +27,7 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { Line, money, Panel, ServerCountdown, signed, Stat, useItemText, useListedAction } from "../../listed/shared";
 import { nextTaxDue, taxPeriodState } from "../../listed/view";
+import { FirmSection } from "../firm-layout";
 
 const dayTime = new Intl.DateTimeFormat("de-DE", {
   day: "2-digit",
@@ -49,9 +50,16 @@ const cfg = BALANCE.listed.taxes;
  * that are due with their deadline, the tax advisor, closed periods and the full account statement.
  */
 export function BooksTab({ listed }: { listed: ListedCompany }) {
+  const t = useTranslations("hq.books.sections");
   return (
-    <div className="space-y-4" data-testid="company-books">
-      <div className="grid items-start gap-4 *:min-w-0 lg:grid-cols-2 lg:gap-5">
+    <div className="space-y-8" data-testid="company-books">
+      <FirmSection
+        id="books-due"
+        icon={UI_ICONS.portfolio}
+        title={t("due.title")}
+        description={t("due.text")}
+        columns={2}
+      >
         <div className="space-y-4">
           <BooksDuty listed={listed} />
           <AdvisorCard listed={listed} />
@@ -60,8 +68,10 @@ export function BooksTab({ listed }: { listed: ListedCompany }) {
           <TaxCard listed={listed} />
           <PeriodsCard listed={listed} />
         </div>
-      </div>
-      <AccountingCard />
+      </FirmSection>
+      <FirmSection id="books-ledger" icon={UI_ICONS.search} title={t("ledger.title")} description={t("ledger.text")}>
+        <AccountingCard />
+      </FirmSection>
     </div>
   );
 }

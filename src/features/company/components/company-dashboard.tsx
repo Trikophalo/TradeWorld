@@ -24,7 +24,6 @@ import { useCompanyHealth } from "../health";
 import { BoardView } from "../listed/board";
 import { useListedCompany } from "../listed/shared";
 import { companyTodos } from "../listed/view";
-import { useCompanySections } from "../sections";
 import { companyHref, resolveCompanyTarget, type CompanyTab, type CompanyTarget } from "../tabs";
 import { useCompanyTasks } from "../tasks/task-board";
 import { BannerEditor } from "./banner-editor";
@@ -37,6 +36,7 @@ import { BooksTab } from "./tabs/books-tab";
 import { ControllingTab } from "./tabs/controlling-tab";
 import { DashboardTab, ListedTeaser } from "./tabs/dashboard-tab";
 import { StaffTab } from "./tabs/staff-tab";
+import { FirmSection } from "./firm-layout";
 
 const money = (cents: number) => formatMoney(cents, { whole: true });
 
@@ -49,6 +49,7 @@ const money = (cents: number) => formatMoney(cents, { whole: true });
 export function CompanyDashboard({ company }: { company: MyCompany }) {
   const t = useTranslations("firm");
   const th = useTranslations("hq.tabs");
+  const tb = useTranslations("hq.board");
   const tl = useTranslations("logo");
   const router = useRouter();
   const params = useSearchParams();
@@ -61,14 +62,6 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   );
   const tab = current.tab;
 
-  const sections = useCompanySections();
-  useEffect(() => useCompanySections.getState().load(), []);
-  const section = (id: string) => ({
-    id,
-    open: sections.open.includes(id),
-    onOpenChange: (open: boolean) => sections.toggle(id, open),
-  });
-
   const isListed = company.listing?.status === "listed";
   const listedQuery = useListedCompany(isListed);
   const listed = isListed ? (listedQuery.data ?? null) : null;
@@ -76,9 +69,8 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const teaser = useDisclosed("companyListed");
   const now = useServerClock();
 
-  /** Opens the section and scrolls to the place, with a short highlight. */
+  /** Scrolls to the place (nothing folds any more, ADR-183), with a short highlight. */
   const focus = useCallback((target: CompanyTarget) => {
-    if (target.section) useCompanySections.getState().reveal(target.section, target.target);
     const id = target.target ?? (target.section ? `section-${target.section}` : null);
     if (!id) return;
     let tries = 0;
@@ -206,7 +198,6 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
             onAsk={askAbout}
             onMira={onMira}
             go={go}
-            section={section}
           />
         )}
         {tab === "controlling" && (
@@ -214,7 +205,6 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
             company={company}
             listed={listed}
             listedPending={listedPending}
-            section={section}
             go={go}
             onHire={setHire}
             onDrawLogo={() => setDrawing(true)}
@@ -226,7 +216,14 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
         )}
         {tab === "books" &&
           (listed ? <BooksTab listed={listed} /> : listedPending ? <ListedSkeleton /> : <ListedTeaser focus="books" />)}
-        {tab === "board" && (isListed ? <BoardView companyId={null} /> : <ListedTeaser focus="board" />)}
+        {tab === "board" &&
+          (isListed ? (
+            <FirmSection id="board" icon={UI_ICONS.deal} title={th("board")} description={tb("tabText")}>
+              <BoardView companyId={null} />
+            </FirmSection>
+          ) : (
+            <ListedTeaser focus="board" />
+          ))}
       </div>
 
       <HireSheet company={company} request={hire} onClose={() => setHire(null)} />
