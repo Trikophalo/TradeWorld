@@ -139,7 +139,7 @@ export function SkillTree() {
         </div>
       </Card>
       <div className="grid gap-5 *:min-w-0 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
-        <HexMap state={data} learned={learned} onOpen={setOpen} focus={focus} goTo={goTo} />
+        <HexMap state={data} learned={learned} onOpen={setOpen} focus={focus} goTo={goTo} marked={asked} />
         <Card padding="md" className="self-start">
           <p className="mb-1 label-pixel text-fg-3">{t("overview")}</p>
           <p className="mb-2 text-xs text-fg-3">{t("branchHint")}</p>
@@ -213,16 +213,24 @@ function HexMap({
   onOpen,
   focus,
   goTo,
+  marked = null,
 }: {
   state: SkillState;
   learned: ReadonlySet<string>;
   onOpen: (key: string) => void;
   focus: SkillBranch | null;
   goTo: { branch: SkillBranch; n: number } | null;
+  /** ?skill=<key> from the company's Fertigkeiten (ADR-194): that skill glows and the map starts on it. */
+  marked?: string | null;
 }) {
   const t = useTranslations("skillTree");
   const ts = useTranslations("skills");
-  const [view, setView] = useState({ x: 0, y: 0, zoom: START_ZOOM });
+  const [view, setView] = useState(() => {
+    const node = marked ? SKILL_NODES.find((n) => n.key === marked) : undefined;
+    if (!node) return { x: 0, y: 0, zoom: START_ZOOM };
+    const p = toPixel(node.q, node.r);
+    return { x: -p.x, y: -p.y, zoom: 1 };
+  });
   const [dragging, setDragging] = useState(false);
   const [hover, setHover] = useState<Hover | null>(null);
   // The map is drawn in screen pixels: one map unit = one CSS pixel at zoom 1.
@@ -443,6 +451,7 @@ function HexMap({
               showText={showText}
               dim={focus !== null && !node.branches.includes(focus)}
               hovered={hover?.key === node.key}
+              marked={marked === node.key}
             />
           ))}
         </g>
@@ -567,6 +576,7 @@ const Hex = memo(function Hex({
   showText,
   dim,
   hovered,
+  marked = false,
 }: {
   node: SkillNodeConfig;
   check: LearnCheck;
@@ -574,6 +584,7 @@ const Hex = memo(function Hex({
   showText: boolean;
   dim: boolean;
   hovered: boolean;
+  marked?: boolean;
 }) {
   const { x, y } = toPixel(node.q, node.r);
   const color = BRANCH_COLORS[node.branches[0]!];
@@ -599,6 +610,25 @@ const Hex = memo(function Hex({
           transition: "transform var(--duration-fast) var(--ease-standard)",
         }}
       >
+        {marked && (
+          <g data-testid="skill-marked" pointerEvents="none">
+            <polygon
+              points={HEX}
+              transform="scale(1.45)"
+              fill="var(--accent)"
+              fillOpacity={0.25}
+              className="motion-safe:animate-pulse"
+            />
+            <polygon
+              points={HEX}
+              transform="scale(1.25)"
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth={4}
+              className="motion-safe:animate-pulse"
+            />
+          </g>
+        )}
         {check === "ok" && (
           <polygon
             points={HEX}
