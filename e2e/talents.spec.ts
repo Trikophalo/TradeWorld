@@ -19,7 +19,7 @@ test("Talente: find a talent for an empty Stelle, offer, hire", async ({ page },
   await page.goto("/company");
   await page.locator('[data-tier="garage"]').getByRole("button", { name: "Gründen" }).click();
   const found = page.getByRole("dialog", { name: "Firma gründen" });
-  await found.getByLabel("Firmenname").fill("Kopfjäger");
+  await found.getByLabel("Firmenname").fill("Kopfwerk");
   await found.getByLabel("Deine Idee in einem Satz").fill("Wir finden die Besten.");
   await expect(found.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
