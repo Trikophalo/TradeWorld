@@ -37,8 +37,7 @@ export function StaffValueCard({ company, id }: { company: MyCompany; id?: strin
             aiWorkers: company.aiWorkers,
             aiWageCentsPerHour: company.aiWageCentsPerHour,
             aiProductivityBps: 10_000,
-            teamProductivityBps: company.teamProductivityBps,
-            hourRevenuesCents: company.hours.map((h) => h.revenueCents),
+            hours: company.hours,
             paidHoursPerDay: BALANCE.careers.paidHoursPerDayCap,
           })
         : null,

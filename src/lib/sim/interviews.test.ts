@@ -100,25 +100,25 @@ describe("CEO interviews (ADR-173)", () => {
     expect(judgeInterviewAnswer(question, { quick: 7, text: "" }).verdict).toBe("none");
   });
 
-  it("effects are capped; declining costs a little, ignoring a bit more; reputation only for listed", () => {
+  it("effects are capped; declining costs a little, ignoring a bit more; reputation for every company (ADR-183)", () => {
     const e = R.effects;
-    expect(interviewEffects({ kind: "answered", points: 6 }, false)).toEqual({
+    expect(interviewEffects({ kind: "answered", points: 6 })).toEqual({
       awarenessBps: Math.min(6 * e.awarenessPerPointBps, e.maxAwarenessBps),
-      reputation: 0,
+      reputation: Math.min(6 * e.reputationPerPoint, e.maxReputation),
     });
-    expect(interviewEffects({ kind: "answered", points: 99 }, true)).toEqual({
+    expect(interviewEffects({ kind: "answered", points: 99 })).toEqual({
       awarenessBps: e.maxAwarenessBps,
       reputation: e.maxReputation,
     });
-    expect(interviewEffects({ kind: "answered", points: -99 }, true)).toEqual({
+    expect(interviewEffects({ kind: "answered", points: -99 })).toEqual({
       awarenessBps: -e.maxAwarenessBps,
       reputation: -e.maxReputation,
     });
-    expect(interviewEffects({ kind: "declined" }, true)).toEqual({
+    expect(interviewEffects({ kind: "declined" })).toEqual({
       awarenessBps: e.declineAwarenessBps,
       reputation: e.declineReputation,
     });
-    expect(interviewEffects({ kind: "expired" }, false).awarenessBps).toBeLessThan(e.declineAwarenessBps);
+    expect(interviewEffects({ kind: "expired" }).awarenessBps).toBeLessThan(e.declineAwarenessBps);
   });
 
   it("fills placeholders and formats the effect", () => {

@@ -68,6 +68,8 @@ export interface InterviewHost {
   } | null;
   /** Adds bps of the 0..1 awareness scale to the demo company. */
   addAwareness(bps: number): void;
+  /** ADR-183: interviews move the reputation of every company. */
+  addReputation?(points: number): void;
   idempotent<T>(requestId: string, run: () => T): T;
   now(): number;
   random(): number;
@@ -138,15 +140,13 @@ export function createInterviewEngine(host: InterviewHost): Pick<
   }
 
   function finish(iv: DemoInterview, status: "answered" | "declined" | "expired", now: number, points = 0) {
-    const effect = interviewEffects(
-      status === "answered" ? { kind: "answered", points } : { kind: status },
-      host.company()?.listed ?? false,
-    );
+    const effect = interviewEffects(status === "answered" ? { kind: "answered", points } : { kind: status });
     iv.status = status;
     iv.answeredAt = now;
     iv.awarenessBps = effect.awarenessBps;
     iv.reputation = effect.reputation;
     host.addAwareness(effect.awarenessBps);
+    host.addReputation?.(effect.reputation);
   }
 
   function tick(): DemoInterviewState {

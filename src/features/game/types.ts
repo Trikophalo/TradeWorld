@@ -1722,7 +1722,23 @@ export interface MyCompany {
     supplyGoodsCents: number;
     /** Profit shares paid to silent partners (ADR-098). */
     stakePayoutCents: number;
+    /**
+     * What the hour used (ADR-183), null on servers before 7310: demand and capacity in units at the normal price,
+     * the strengths bonus, how busy the AI workers were and the wages actually paid.
+     */
+    demandCents: number | null;
+    capacityCents: number | null;
+    strengthBonusCents: number;
+    aiUtilizationBps: number | null;
+    aiWagesPaidCents: number | null;
+    playerWagesPaidCents: number | null;
+    /** Reputation after the hour (ADR-183). */
+    reputation: number | null;
   }[];
+  /** Reputation of the company (ADR-183, every company); null on servers before 7310. */
+  reputation: CompanyReputation | null;
+  /** Extra steps of the hourly close that failed in the last day (ADR-183); the hour itself was recorded. */
+  closeWarnings: { step: string; at: string; error: string; failures: number }[];
   /** Share of every profitable hour paid to the founder automatically (ADR-086). */
   founderPayoutBps: number;
   /**
@@ -2623,6 +2639,19 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
 }
 
 /** Company strengths (ADR-176), see src/lib/sim/company-strengths.ts. */
+/** Reputation of a player company (ADR-183): value, where it is heading and why, the last hours. */
+export interface CompanyReputation {
+  value: number;
+  target: number;
+  /** Demand factor of the value (1 = neutral). */
+  demandFactor: number;
+  /** Points per driver of the last closed hour (base only for listed companies, from their shareholder target). */
+  drivers: Record<string, number>;
+  /** The last closed hour that judged the reputation; null before the first one. */
+  at: string | null;
+  history: { hourStart: string; value: number; target: number }[];
+}
+
 export interface CompanyStrengths {
   scores: Record<"awareness" | "quality" | "delivery" | "margin" | "team" | "finance", number>;
   overall: number;

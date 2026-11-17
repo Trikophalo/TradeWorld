@@ -204,6 +204,13 @@ export function createCompanyEventsEngine(host: CompanyEventsHost) {
     return eventModifiers(a, e.severity, phase, mitigation, stepCfg?.capacityHit ?? 0);
   }
 
+  /** Severity of an open or running crisis (0 for none), for the reputation of the hour (ADR-183). */
+  function crisisSeverity(company: DemoCompanyState): number {
+    const e = stateOf(company).events.find((x) => x.status !== "over" && x.status !== "expired");
+    if (!e) return 0;
+    return archetypeOf(e.archetype)?.polarity === "crisis" ? e.severity : 0;
+  }
+
   function brief(company: DemoCompanyState): CompanyBrief {
     return {
       id: company.id,
@@ -375,6 +382,7 @@ export function createCompanyEventsEngine(host: CompanyEventsHost) {
     engine,
     tick,
     modifiers,
+    crisisSeverity,
     /** Demo only: start an event now (a random one, or the given archetype). */
     triggerNow(archetypeKey?: string) {
       const company = host.company();

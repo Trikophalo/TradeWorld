@@ -50,6 +50,12 @@ import {
   strengthsRewardBps,
   strengthsStep,
 } from "@/lib/sim/company-strengths";
+import {
+  reputationDemandFactor,
+  reputationDrivers,
+  reputationStep,
+  reputationTargetAll,
+} from "@/lib/sim/company-reputation";
 import { DEMO_COMPANIES } from "@/lib/demo/market";
 import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
 import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
@@ -78,6 +84,7 @@ import {
 
 const { startups, company: companyCfg, jobs } = BALANCE;
 const HOUR_MS = 3_600_000;
+const reputationCfg = BALANCE.companyHealth.reputation;
 const QUARTER_MS = BALANCE.time.quarterHours * HOUR_MS;
 const SUBSCRIPTION_MS = startups.ipo.subscriptionMinutes * 60_000;
 const berlinDay = (at: number) => new Intl.DateTimeFormat("en-CA", { timeZone: BALANCE.time.timezone }).format(at);
@@ -109,6 +116,10 @@ interface DemoHour {
   awarenessBefore?: number;
   awarenessAfter?: number;
   awarenessParts?: { wordOfMouth: number; marketing: number; decay: number; extra: number; cap: number };
+  /** ADR-183: reputation after the hour, its target and the drivers. */
+  reputation?: number;
+  reputationTarget?: number;
+  reputationDrivers?: Record<string, number>;
 }
 
 /** One hour as the deals part sees it (ADR-098). */
@@ -122,6 +133,8 @@ export interface DemoCompanyState {
   id: string;
   /** ADR-180: awareness added by tasks and the autopilot since the last closed hour. */
   awarenessBoost?: number;
+  /** ADR-183: reputation 0..100 (listed companies mirror the listed state). */
+  reputation?: number;
   name: string;
   idea: string;
   sector: SectorKey;
@@ -223,6 +236,8 @@ export interface CompanyHost {
   startFounderNotice(): void;
   /** Effect of the company's current crisis or chance in this hour (ADR-091). */
   eventModifiers?(company: DemoCompanyState, at: number): EventModifiers;
+  /** Severity of an open or running crisis, 0 for none (ADR-183: reputation). */
+  crisisSeverity?(company: DemoCompanyState): number;
   /** Silent partners' share of a profitable hour, paid before the founder (ADR-098); returns what was paid. */
   stakePayout?(company: DemoCompanyState, profitCents: number, freeCashCents: number): number;
   /** Listed companies (ADR-167): terms of the hour, the board's limits, the hour's follow-up (demo/listed.ts). */
@@ -399,6 +414,7 @@ export function createCompanyEngine(host: CompanyHost) {
         campaignFactor: campaignDemandFactor(company.campaign, at),
         taskMomentum: company.taskMomentum ?? 1,
         listed: host.listed?.hourTerms(company, at),
+        reputationDemandFactor: reputationDemandFactor(company.reputation ?? reputationCfg.start),
       },
     );
     // ADR-180: awareness moves every hour; boosts since the last hour (tasks, autopilot) count as "extra"
@@ -456,6 +472,28 @@ export function createCompanyEngine(host: CompanyHost) {
         cap: r.awareness.cap,
       },
     };
+    // ADR-183: every company has a reputation; listed companies add their shareholder target (demo/listed.ts)
+    const drivers = reputationDrivers({
+      quality: company.quality,
+      demandCents: hour.demandCents,
+      capacityCents: hour.capacityCents,
+      priceLevel: company.priceLevel ?? "normal",
+      payFactorBps: r.payFactorBps,
+      unpaidCents: company.unpaidCents,
+      crisisSeverity: host.crisisSeverity?.(company) ?? 0,
+      campaign: campaignDemandFactor(company.campaign, at) !== 1,
+    });
+    if (!company.listing || company.listing.status !== "listed") {
+      const target = reputationTargetAll(drivers);
+      company.reputation = reputationStep(
+        company.reputation ?? reputationCfg.start,
+        target,
+        reputationCfg.adjustPerHour,
+      );
+      hour.reputation = company.reputation;
+      hour.reputationTarget = target;
+      hour.reputationDrivers = { ...drivers };
+    }
     const supply = host.afterHour?.(company, hour) ?? {};
     Object.assign(hour, supply);
     hour.profitCents +=
@@ -478,6 +516,7 @@ export function createCompanyEngine(host: CompanyHost) {
       marketingCents: hour.marketingCents,
       profitCents: Number(r.profitCents),
       payoutCents: payout,
+      reputationDrivers: drivers,
       payFactorBps: r.payFactorBps,
     });
   }
@@ -840,7 +879,16 @@ export function createCompanyEngine(host: CompanyHost) {
         supplyFeeIncomeCents: h.supplyFeeIncomeCents ?? 0,
         supplyGoodsCents: h.supplyGoodsCents ?? 0,
         stakePayoutCents: h.stakePayoutCents ?? 0,
+        demandCents: h.demandCents,
+        capacityCents: h.capacityCents,
+        strengthBonusCents: 0,
+        aiUtilizationBps: h.aiUtilizationBps ?? null,
+        aiWagesPaidCents: h.aiWagesCents,
+        playerWagesPaidCents: 0,
+        reputation: h.reputation ?? null,
       })),
+      reputation: demoReputation(company),
+      closeWarnings: [],
       founderPayoutBps: company.founderPayoutBps ?? 0,
       strengths: demoStrengths(company),
       campaign: campaignView(company),
@@ -1406,6 +1454,25 @@ export interface DemoListedStock {
   logo: CompanyLogoData | null;
   priceE4: number;
   marketCapCents: number;
+}
+
+/** Reputation (ADR-183) as the company page shows it, from the kept hours. */
+export function demoReputation(company: DemoCompanyState): MyCompany["reputation"] {
+  const hours = (company.hours ?? []).filter((h) => h.reputation !== undefined);
+  const last = hours.at(-1);
+  const value = company.reputation ?? reputationCfg.start;
+  return {
+    value,
+    target: last?.reputationTarget ?? value,
+    demandFactor: reputationDemandFactor(value),
+    drivers: last?.reputationDrivers ?? {},
+    at: last ? new Date(last.at).toISOString() : null,
+    history: hours.map((h) => ({
+      hourStart: new Date(h.at).toISOString(),
+      value: h.reputation ?? value,
+      target: h.reputationTarget ?? h.reputation ?? value,
+    })),
+  };
 }
 
 /** Strengths (ADR-176) in the demo: replayed from the kept hours with the same rules as the server. */

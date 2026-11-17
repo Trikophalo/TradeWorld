@@ -136,22 +136,24 @@ export function judgeInterviewAnswer(
   return { verdict: points >= 1 ? "good" : points <= -1 ? "bad" : "ok", points, text };
 }
 
-/** Effects of a finished interview, capped: awareness bps (100 = +1 point) and reputation (listed only). */
+/**
+ * Effects of a finished interview, capped: awareness bps (100 = +1 point) and reputation points. Since ADR-183 every
+ * company has a reputation, so the interview moves it for private companies too.
+ */
 export function interviewEffects(
   outcome: { kind: "answered"; points: number } | { kind: "declined" } | { kind: "expired" },
-  listed: boolean,
   rules: Rules = INTERVIEW_RULES,
 ): { awarenessBps: number; reputation: number } {
   const e = rules.effects;
   if (outcome.kind === "declined") {
-    return { awarenessBps: e.declineAwarenessBps, reputation: listed ? e.declineReputation : 0 };
+    return { awarenessBps: e.declineAwarenessBps, reputation: e.declineReputation };
   }
   if (outcome.kind === "expired") {
-    return { awarenessBps: e.ignoreAwarenessBps, reputation: listed ? e.ignoreReputation : 0 };
+    return { awarenessBps: e.ignoreAwarenessBps, reputation: e.ignoreReputation };
   }
   return {
     awarenessBps: clamp(outcome.points * e.awarenessPerPointBps, -e.maxAwarenessBps, e.maxAwarenessBps),
-    reputation: listed ? clamp(outcome.points * e.reputationPerPoint, -e.maxReputation, e.maxReputation) : 0,
+    reputation: clamp(outcome.points * e.reputationPerPoint, -e.maxReputation, e.maxReputation),
   };
 }
 
