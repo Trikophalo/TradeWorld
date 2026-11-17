@@ -18,6 +18,7 @@ import {
   trainingFor,
   initialStartup,
   marketingGain,
+  awarenessHour,
   maxEmployees,
   potentialEstimate,
   potentialFromUniform,
@@ -134,7 +135,14 @@ describe("garage startups over ten real days (scenario, ADR-057)", () => {
         // The founder brings the first stage's skill; later stages need specialists.
         stage: 1,
       });
-      state = result.next;
+      // ADR-180: awareness moves every hour of the quarter
+      let awareness = state.awareness;
+      const hours = BALANCE.time.quarterHours;
+      for (let h = 0; h < hours; h++) {
+        const potential = effectivePotentialCents(state.potentialAnnualCents, "garage");
+        awareness = awarenessHour(awareness, result.next.quality, marketing / hours, potential, 1, 1).next;
+      }
+      state = { ...result.next, awareness };
       last = result.operatingProfitCents;
       revenue = result.revenueCents;
       soldOut = result.utilization >= 0.99 && ai >= maxEmployees("garage");
@@ -150,16 +158,16 @@ describe("garage startups over ten real days (scenario, ADR-057)", () => {
   });
   const share = (pick: (run: (typeof runs)[number]) => boolean) => runs.filter(pick).length / runs.length;
 
-  it("not everyone succeeds: a fifth to two fifths run out of money", () => {
-    expect(share((r) => r.broke)).toBeGreaterThan(0.2);
-    expect(share((r) => r.broke)).toBeLessThan(0.45);
+  // ADR-180: a sensibly run garage is clearly profitable (before: a fifth to two fifths went broke, about half
+  // ended in profit); the risk now sits in the bigger legal forms with their fixed costs.
+  it("a sensible owner rarely runs out of money", () => {
+    expect(share((r) => r.broke)).toBeLessThan(0.05);
   });
 
-  it("about half end in profit, a few outgrow the garage", () => {
-    expect(share((r) => r.profitable)).toBeGreaterThan(0.45);
-    expect(share((r) => r.profitable)).toBeLessThan(0.75);
-    expect(share((r) => r.soldOut)).toBeGreaterThan(0.03);
-    expect(share((r) => r.soldOut)).toBeLessThan(0.2);
+  it("most end in profit, some outgrow the garage", () => {
+    expect(share((r) => r.profitable)).toBeGreaterThan(0.85);
+    expect(share((r) => r.soldOut)).toBeGreaterThan(0.05);
+    expect(share((r) => r.soldOut)).toBeLessThan(0.4);
   });
 });
 
@@ -175,9 +183,9 @@ describe("growth stages (ADR-062)", () => {
 
   it("cap the awareness: without specialists no growth", () => {
     const s = { ...initialStartup(1e9, b(1_000_000)), awareness: 0.9, quality: 1 };
-    const capped = closeStartupQuarter(s, { ...base, stage: 0 });
-    expect(capped.next.awareness).toBeLessThanOrEqual(BALANCE.startups.stages.awarenessCaps[0]!);
-    expect(closeStartupQuarter(s, { ...base, stage: 4 }).next.awareness).toBeGreaterThan(0.8);
+    const hour = (stage: number) => awarenessHour(s.awareness, s.quality, 0, 1e9, 1, stage);
+    expect(hour(0).next).toBeLessThanOrEqual(BALANCE.startups.stages.awarenessCaps[0]!);
+    expect(hour(4).next).toBeGreaterThan(0.8);
   });
 
   it("every product's skills exist on the skill map", () => {
@@ -236,12 +244,12 @@ describe("operating hours (ADR-072)", () => {
   };
 
   it("pays players and AI workers with the same factor, never more than the hour earned", () => {
-    const small = { ...initialStartup(2_000_000, b(1_000_000)), awareness: 0.3, quality: 0.5 };
+    const small = { ...initialStartup(200_000, b(1_000_000)), awareness: 0.3, quality: 0.5 };
     const r = closeStartupHour(small, hourInput);
     const gross = r.revenueCents - r.cogsCents;
     expect(r.payFactorBps).toBeLessThan(10_000);
     expect(r.playerWagesPaidCents + r.aiWagesPaidCents).toBeLessThanOrEqual(gross);
-    expect(Number(r.aiWagesPaidCents) / BALANCE.startups.aiWorkerWageCentsPerHour).toBeCloseTo(
+    expect(Number(r.aiWagesPaidCents) / Number(r.aiWagesDueCents)).toBeCloseTo(
       Number(r.playerWagesPaidCents) / 20_000,
       3,
     );
@@ -277,7 +285,10 @@ describe("operating hours (ADR-072)", () => {
     const hour = closeStartupHour(s, { ...hourInput, noise: 0 });
     const quarter = closeStartupQuarter(s, { ...base, productivityBps: [15_000, 10_000], aiWorkers: 1, stage: 1 });
     const demandQuarter = Number(hour.demandCents) * BALANCE.time.quarterHours;
-    expect(Math.abs(demandQuarter - (50_000_000 / 4) * 0.6 * 0.8) / demandQuarter).toBeLessThan(0.01);
+    expect(
+      Math.abs(demandQuarter - ((50_000_000 * BALANCE.startups.marketFactorByTier.garage) / 4) * 0.6 * 0.8) /
+        demandQuarter,
+    ).toBeLessThan(0.01);
     expect(Number(hour.capacityCents) * BALANCE.time.quarterHours).toBeCloseTo(Number(quarter.capacityCents), -2);
   });
 });
@@ -335,8 +346,10 @@ describe("profit levers and growth without limit (ADR-083)", () => {
     expect(budget.demandCents).toBeGreaterThan(normal.demandCents);
     expect(premium.revenueCents - premium.cogsCents).toBeGreaterThan(normal.revenueCents - normal.cogsCents);
 
-    const quarter = (priceLevel: "budget" | "premium") => closeStartupQuarter(young, { ...base, priceLevel });
-    expect(quarter("budget").next.awareness).toBeGreaterThan(quarter("premium").next.awareness);
+    // ADR-180: word of mouth per hour, scaled by the price strategy
+    const spread = (priceLevel: "budget" | "premium") =>
+      awarenessHour(young.awareness, young.quality, 0, 1e7, priceEffect(priceLevel, young.quality).awareness, 4).next;
+    expect(spread("budget")).toBeGreaterThan(spread("premium"));
   });
 
   it("a bigger legal form reaches a bigger market; upgrading the same company grows it", () => {
@@ -455,7 +468,7 @@ describe("marketing campaign in the operating hour (ADR-097)", () => {
   };
 
   it("raises demand by its factor and sells more when capacity is free", () => {
-    const s = { ...initialStartup(2_000_000, b(0)), awareness: 0.3, quality: 0.6 };
+    const s = { ...initialStartup(200_000, b(0)), awareness: 0.3, quality: 0.6 };
     const plain = closeStartupHour(s, hourInput);
     const push = closeStartupHour(s, { ...hourInput, campaignFactor: 1.4 });
     expect(plain.demandCents).toBeLessThan(plain.capacityCents);

@@ -38,7 +38,7 @@ interface Setup {
 /** A company whose last hour is what closeStartupHour computes for it. */
 function company(s: Setup = {}): HealthCompany {
   const state: StartupState = {
-    potentialAnnualCents: s.potential ?? 2_000_000,
+    potentialAnnualCents: s.potential ?? 200_000,
     awareness: s.awareness ?? 0.3,
     quality: s.quality ?? 0.6,
     quartersActive: 3,
@@ -190,7 +190,8 @@ describe("company health: each factor", () => {
     const idle = factor(company({ awareness: 0.03, aiWorkers: 3, input: { contractWork: false } }), "capacity");
     expect(idle.reason.key).toBe("capacity.idle");
     expect(idle.impactCents).toBeGreaterThan(0);
-    expect(idle.levers[0]).toEqual({ kind: "dismissAi", count: 3 });
+    // ADR-180: idle AI workers cost only the standby share, so contract work may beat dismissing them
+    expect(idle.levers).toContainEqual({ kind: "dismissAi", count: 3 });
 
     // Idle hands without AI wages: contract work turns the free capacity into money.
     const free = factor(company({ awareness: 0.03, input: { contractWork: false } }), "capacity");

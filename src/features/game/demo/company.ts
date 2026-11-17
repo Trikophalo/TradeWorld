@@ -103,6 +103,11 @@ interface DemoHour {
   supplyFeeIncomeCents?: number;
   supplyGoodsCents?: number;
   stakePayoutCents?: number;
+  /** ADR-180: AI capacity used, awareness step of the hour. */
+  aiUtilizationBps?: number;
+  awarenessBefore?: number;
+  awarenessAfter?: number;
+  awarenessParts?: { wordOfMouth: number; marketing: number; decay: number; extra: number; cap: number };
 }
 
 /** One hour as the deals part sees it (ADR-098). */
@@ -114,6 +119,8 @@ interface DemoReport extends CompanyQuarter {
 
 export interface DemoCompanyState {
   id: string;
+  /** ADR-180: awareness added by tasks and the autopilot since the last closed hour. */
+  awarenessBoost?: number;
   name: string;
   idea: string;
   sector: SectorKey;
@@ -393,6 +400,10 @@ export function createCompanyEngine(host: CompanyHost) {
         listed: host.listed?.hourTerms(company, at),
       },
     );
+    // ADR-180: awareness moves every hour; boosts since the last hour (tasks, autopilot) count as "extra"
+    const awarenessExtra = company.awarenessBoost ?? 0;
+    company.awarenessBoost = 0;
+    company.awareness = r.awareness.next;
     const revenue = Number(r.revenueCents);
     const costs = Number(r.cogsCents + r.aiWagesPaidCents + r.fixedCents + r.marketingCents);
     const available = company.cashCents + revenue;
@@ -433,6 +444,16 @@ export function createCompanyEngine(host: CompanyHost) {
       contractRevenueCents: Number(r.contractRevenueCents),
       founderPayoutCents: payout,
       stakePayoutCents: stakes,
+      aiUtilizationBps: r.aiUtilizationBps,
+      awarenessBefore: r.awareness.before - awarenessExtra,
+      awarenessAfter: r.awareness.next,
+      awarenessParts: {
+        wordOfMouth: r.awareness.wordOfMouth,
+        marketing: r.awareness.marketing,
+        decay: r.awareness.decay,
+        extra: awarenessExtra,
+        cap: r.awareness.cap,
+      },
     };
     const supply = host.afterHour?.(company, hour) ?? {};
     Object.assign(hour, supply);

@@ -325,12 +325,21 @@ describe("listed companies: the operating hour", () => {
   });
 
   it("the listed terms change demand, capacity, goods and fixed costs; running costs count as fixed costs (SQL)", () => {
-    const plain = closeStartupHour(state, input);
+    // the scale before ADR-180 (market x 40 for an AG, 300 000 per productivity), so the numbers below stay readable
+    const old = {
+      ...BALANCE,
+      startups: {
+        ...BALANCE.startups,
+        marketFactorByTier: { ...BALANCE.startups.marketFactorByTier, ag: 40 },
+        capacityCentsPerProductivity: { ...BALANCE.startups.capacityCentsPerProductivity, tech: 300_000 },
+      },
+    };
+    const plain = closeStartupHour(state, input, old);
     const e = listedHourEffect(fx, 45, 40);
     // running costs: a second product (1.5 %) and a region (2 %) of 750 € reference revenue
     const costs = itemUpkeepCents(item("p_second"), 1, 75_000, 1) + itemUpkeepCents(item("g_south"), 1, 75_000, 1);
     expect(costs).toBe(2_625);
-    const r = closeStartupHour(state, { ...input, listed: { ...e, costsCents: costs } });
+    const r = closeStartupHour(state, { ...input, listed: { ...e, costsCents: costs } }, old);
     // demand: potential x 40 (AG) / 4 / 6 x awareness 0.52 x (0.5 + 0.5 x 0.4925) x 1.14048
     expect(Number(plain.demandCents)).toBe(18_750_000);
     expect(Number(r.demandCents)).toBe(Math.round(50_000_000 * 0.52 * (0.5 + 0.5 * 0.4925) * 1.14048));

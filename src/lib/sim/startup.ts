@@ -317,7 +317,8 @@ export function closeStartupQuarter(
     utilization: capacity > 0 ? Math.min(1, demand / capacity) : 1,
     next: {
       potentialAnnualCents: state.potentialAnnualCents,
-      awareness,
+      // ADR-180: awareness moves every operating hour (awarenessHour); the quarter only reports it
+      awareness: state.awareness,
       quality,
       quartersActive: state.quartersActive + 1,
       cashCents: state.cashCents + operatingProfitCents,
@@ -460,9 +461,15 @@ export interface StartupHourResult {
   /** Share of the wages paid this hour: never more than revenue minus goods (ADR-072). */
   readonly payFactorBps: number;
   readonly playerWagesPaidCents: bigint;
+  /** AI wages due this hour: the full wage only for used AI capacity, the standby share otherwise (ADR-180). */
+  readonly aiWagesDueCents: bigint;
   readonly aiWagesPaidCents: bigint;
+  /** How much of the AI workers' capacity the hour used, 0..10 000 (ADR-180). */
+  readonly aiUtilizationBps: number;
   /** Revenue minus goods, wages paid, fixed costs and marketing. */
   readonly profitCents: bigint;
+  /** Awareness after the hour and what moved it (ADR-180). */
+  readonly awareness: AwarenessHour;
 }
 
 /**
@@ -513,7 +520,10 @@ export function closeStartupHour(
     roundToBigInt(contract * (1 - sc.contractWork.grossMargin));
   const gross = Number(revenueCents - cogsCents);
 
-  const aiDue = input.aiWorkers * sc.aiWorkerWageCentsPerHour;
+  // ADR-180: AI workers fill what founder and players cannot; only the used part of their capacity earns the full wage
+  const totalUnits = input.productivityBps.reduce((sum, p) => sum + p / 10_000, 0);
+  const aiUtilization = aiUtilizationBps(sold, capacity, input.aiWorkers, totalUnits);
+  const aiDue = aiWageDueCents(input.aiWorkers, aiUtilization, cfg);
   const due = aiDue + Math.max(0, input.playerWagesCents);
   const payFactorBps = due <= 0 ? 10_000 : clamp(Math.floor((Math.max(0, gross) * 10_000) / due), 0, 10_000);
   const aiWagesPaidCents = BigInt(Math.floor((aiDue * payFactorBps) / 10_000));
@@ -535,7 +545,86 @@ export function closeStartupHour(
     marketingCents,
     payFactorBps,
     playerWagesPaidCents,
+    aiWagesDueCents: BigInt(aiDue),
     aiWagesPaidCents,
+    aiUtilizationBps: aiUtilization,
     profitCents: revenueCents - cogsCents - playerWagesPaidCents - aiWagesPaidCents - fixedCents - marketingCents,
+    awareness: awarenessHour(
+      state.awareness,
+      state.quality,
+      Number(marketingCents),
+      potential,
+      priceEffect(input.priceLevel, state.quality, sc).awareness,
+      stage,
+      cfg,
+    ),
   };
+}
+
+// ------------------------------------------------------------------ hourly awareness and AI wages (ADR-180)
+
+/** What moved the awareness in one operating hour; all values are shares (0.008 = 0,8 Punkte). */
+export interface AwarenessHour {
+  readonly before: number;
+  readonly next: number;
+  readonly wordOfMouth: number;
+  readonly marketing: number;
+  readonly decay: number;
+  /** Highest awareness the stage allows (ADR-062). */
+  readonly cap: number;
+}
+
+/**
+ * Awareness after one operating hour (ADR-180): word of mouth (S-curve, x price strategy, x quality), the hour's
+ * marketing (diminishing returns, the quarter rule spread over its hours) and a slow decay, capped by the stage.
+ * Before ADR-180 this happened once per quarter; now every hour shows its effect.
+ */
+export function awarenessHour(
+  awareness: number,
+  quality: number,
+  marketingCentsThisHour: number,
+  effectivePotential: number,
+  priceAwareness: number,
+  stage: number,
+  cfg: BalanceConfig = BALANCE,
+): AwarenessHour {
+  const sc = cfg.startups;
+  const a = sc.awareness;
+  const hours = Math.max(1, cfg.time.quarterHours);
+  const s = clamp(Math.floor(stage), 0, sc.stages.awarenessCaps.length - 1);
+  const wordOfMouth = (a.growthPerQuarter / hours) * priceAwareness * awareness * (1 - awareness) * (0.5 + quality);
+  const marketing = marketingGain(marketingCentsThisHour * hours, effectivePotential, sc) / hours;
+  const decay = (a.decayPerQuarter / hours) * awareness;
+  const cap = Math.max(a.min, sc.stages.awarenessCaps[s] ?? 1);
+  return {
+    before: awareness,
+    next: clamp(awareness + wordOfMouth + marketing - decay, a.min, cap),
+    wordOfMouth,
+    marketing,
+    decay,
+    cap,
+  };
+}
+
+/**
+ * Share of the AI workers' capacity the hour used, in bps (ADR-180): founder and players serve first, the AI workers
+ * the rest. `sold` and `capacity` in the same unit, `totalUnits` = all productivity / 10 000.
+ */
+export function aiUtilizationBps(sold: number, capacity: number, aiWorkers: number, totalUnits: number): number {
+  if (aiWorkers <= 0 || totalUnits <= 0 || capacity <= 0) return 0;
+  const aiCapacity = (capacity * Math.min(aiWorkers, totalUnits)) / totalUnits;
+  const used = clamp((sold - (capacity - aiCapacity)) / aiCapacity, 0, 1);
+  return Math.floor(used * 10_000);
+}
+
+/**
+ * AI wages due this hour (ADR-180): the full wage for the used part of their capacity, at least the standby share.
+ * An AI worker thus costs less than it earns whenever it is busy (contribution = capacity x gross margin > wage);
+ * idle ones cost only the standby share ("zu wenig Nachfrage").
+ */
+export function aiWageDueCents(aiWorkers: number, utilizationBps: number, cfg: BalanceConfig = BALANCE): number {
+  if (aiWorkers <= 0) return 0;
+  const sc = cfg.startups;
+  const bps = Math.max(sc.aiWorkerStandbyBps, Math.min(10_000, Math.floor(utilizationBps)));
+  return Math.floor((aiWorkers * sc.aiWorkerWageCentsPerHour * bps) / 10_000);
 }

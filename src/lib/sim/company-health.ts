@@ -13,6 +13,8 @@ import {
   capacityCents as teamCapacityCents,
   expansionCapacityFactor,
   fixedCostCents,
+  aiUtilizationBps,
+  aiWageDueCents,
   marketingGain,
   priceEffect,
 } from "./startup.ts";
@@ -199,7 +201,13 @@ function simulate(h: Hour, c: HealthCompany, cfg: BalanceConfig): HourResult {
     Math.max(0, sold * (1 - sc.grossMargin[c.sector]) + own * h.event.extraCostShare) +
     contract * (1 - sc.contractWork.grossMargin);
   const gross = revenue - cogs;
-  const wagesDue = h.aiWorkers * c.aiWageCentsPerHour + h.playerWagesDue;
+  // ADR-180: AI workers cost the full wage only for the capacity the hour used, else the standby share
+  const units = h.capacity / Math.max(1e-9, capacityPerWorker(c, cfg));
+  const aiDue = aiWageDueCents(h.aiWorkers, aiUtilizationBps(sold, capacity, h.aiWorkers, units), {
+    ...cfg,
+    startups: { ...sc, aiWorkerWageCentsPerHour: c.aiWageCentsPerHour },
+  });
+  const wagesDue = aiDue + h.playerWagesDue;
   const paid = Math.min(wagesDue, Math.max(0, gross));
   return { demand, capacity, revenue, gross, profit: gross - paid - h.fixed - h.marketing, wagesDue };
 }
