@@ -4,6 +4,7 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.
 - Projekt: Next.js 16, TypeScript strict, Tailwind 4, Supabase-Anbindung, Vitest, Playwright, Prettier, Husky.
 - Design: Tokens für Farben, Schrift, Radien, Motion und Ebenen in dunklem und hellem Theme mit fünf
   Akzentfarben; Komponentenbibliothek mit Showcase unter `/dev/ui`; erstes Pixel-Art-Set.

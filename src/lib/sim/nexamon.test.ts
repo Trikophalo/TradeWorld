@@ -782,11 +782,11 @@ describe("Nexamon AI and fees (ADR-165)", () => {
       expect(cfg.ai.listedPerCard[rarity]).toBeLessThanOrEqual(cfg.ai.seedCopies[rarity]);
   });
 
-  it("pays 90 % of a fresh pull's value, half-even per copy, within the window (ADR-196)", () => {
-    expect(nexamonInstantSellCents(1_245)).toBe(1_120);
-    expect(nexamonInstantSellCents(1_235)).toBe(1_112);
-    expect(nexamonInstantSellCents(10_000)).toBe(9_000);
-    expect(nexamonInstantPayout([1_245, 10_000])).toEqual({ valueCents: 11_245, payoutCents: 10_120 });
+  it("pays 85 % of a fresh pull's value, half-even per copy, within the window (ADR-196)", () => {
+    expect(nexamonInstantSellCents(1_245)).toBe(1_058);
+    expect(nexamonInstantSellCents(1_235)).toBe(1_050);
+    expect(nexamonInstantSellCents(10_000)).toBe(8_500);
+    expect(nexamonInstantPayout([1_245, 10_000])).toEqual({ valueCents: 11_245, payoutCents: 9_558 });
     const w = cfg.instantSell.windowSeconds * 1_000;
     expect(nexamonInstantSellable(0, w)).toBe(true);
     expect(nexamonInstantSellable(0, w + 1)).toBe(false);

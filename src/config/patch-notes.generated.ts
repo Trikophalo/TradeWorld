@@ -932,6 +932,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Projekt: Next.js 16, TypeScript strict, Tailwind 4, Supabase-Anbindung, Vitest, Playwright, Prettier, Husky.",
       },
+      {
+        id: "m0-fundament-d114eb35",
+        title: null,
+        text: "Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.",
+      },
     ],
   },
 ];

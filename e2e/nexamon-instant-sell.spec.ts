@@ -43,7 +43,7 @@ for (const width of [390, 1440]) {
     await page.getByTestId("pack-skip").click();
     const panel = page.getByTestId("instant-sell");
     await expect(panel).toBeVisible();
-    await expect(panel).toContainText("90 %");
+    await expect(panel).toContainText("85 %");
     await expect(panel.getByTestId("instant-all")).toContainText("an das Spiel verkaufen");
     // inside the viewport on a phone: no horizontal overflow
     const box = await panel.boundingBox();

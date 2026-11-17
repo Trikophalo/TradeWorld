@@ -390,7 +390,7 @@ export const NEXAMON_RULES = {
    */
   instantSell: {
     windowSeconds: 900,
-    payoutBps: 9_000,
+    payoutBps: 8_500,
     maxPerCall: 200,
     callsPerMinute: 20,
     vaultOwner: "NEXA-Tresor",
