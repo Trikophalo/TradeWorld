@@ -113,6 +113,7 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Firma übersichtlicher (ADR-187):** Das Dashboard zeigt nur Zahlen und Grafiken, ein Tipp führt zum passenden Hebel; alles Fällige steht in einer Liste „Zu erledigen“, das Controlling in fünf Karten statt endlos langer Seite, Mira auf jedem Tab, Stärken und „Wo es fehlt“ in einer Ansicht.
 - **Firma aufgeräumt (ADR-183):** klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter
   dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je Punkt sagt, was zu tun ist.
 - **Ruf für jede Firma:** Qualität, faire Preise, bezahlte Löhne und Kampagnen heben ihn jede Stunde, er bewegt die Nachfrage.

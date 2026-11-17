@@ -137,3 +137,28 @@ eingeklappt.
     (Handy zuletzt, ab `lg` daneben).
   - Buchhaltung: Bücher und Steuern · Kontobuch. Geschäftsrat mit Kopf und Zweck.
 - Deep Links (`tabs.ts`), Mira-Ziele und Benachrichtigungen führen auf dieselben Stellen; `data-tour`-Ziele bleiben.
+
+## 5. Aufbau seit ADR-187 (übersichtlicher, weniger Scrollen)
+
+Der Aufbau aus Abschnitt 4 gilt weiter für Kopf, Abschnitte und Sprungleiste. Neu:
+
+- **Dashboard = nur Zahlen und Grafiken.** Kennzahlen als Kacheln (Kasse, Umsatz, Kosten, Gewinn je Stunde,
+  Bekanntheit, Qualität, Ruf, notiert Zufriedenheit, Aktienkurs, laufende Kosten, Steuer, Zu erledigen), darunter die
+  laufenden Timer als kleine Chips. Grafiken: 24 Stunden, letzte Stunde, Ruf, notiert Stimmung, Quartal, Verlauf.
+  Jede Kachel und jede Grafik führt dorthin, wo der Wert beeinflusst wird („Beeinflussen in Controlling → Marketing“,
+  bei Maus beim Überfahren und Fokus, am Handy immer sichtbar).
+- **Stärken & Schwächen in einer Ansicht:** ein Netzdiagramm (die acht Punkte von „Wo es fehlt“), jede Zeile ein
+  Thema mit „Jetzt“ (Diagnose der letzten Stunde) und, klar getrennt, „Langfristige Stärke x/100“ mit der nächsten
+  Bonusstufe. Image und Schwung gibt es nur als Diagnose. Der Kopf zeigt Gesamtwert, langfristige Stärke Ø mit Bonus
+  und Gewinn pro Stunde. Beide Berechnungen sind unverändert.
+- **Mitarbeiter:** oben **Zu erledigen** (alles Fällige als eine Liste nach Dringlichkeit: Bücher, Steuern,
+  Abstimmungen, Krisen und Chancen, Interview-Anfragen, offene Rechnungen, Bewerbungen, Aufgaben, Hinweise der letzten
+  Stunde) neben dem Autopiloten, dann Aufgaben, **Lage & Ereignisse** (Lage, Interview, Ereignis, Nachrichten) und eine
+  **Team-Karte** mit Umschalter: Team & Plätze (mit Büro) · Stimmung (notiert) · Wert des Teams. Firmenchat daneben.
+- **Controlling in fünf Karten** mit Umschalter statt Stapel: Angebot & Produktion (Preise & Strategie · Produktion),
+  Marketing (Budget & Kampagnen · Geschäftszüge), Geld (Kasse & Auszahlung · Kapital & Börse · Dividenden),
+  Wachstum (Ausbau & Rechtsform · Forschung · Produkte & Märkte, dort je Art umschaltbar), Marke & Firma. Innerhalb
+  einer Ansicht zwei Spalten ab `lg`. Am PC etwa 13 000 px → 4 500 px Seitenhöhe.
+- **Mira** ist ein eigenes Panel, der Knopf steht neben den Tabs auf jedem Tab (`data-tour="assistant"`).
+- **Links:** Jede alte Abschnitts-ID führt weiter an die richtige Stelle; eine Karte schaltet beim Ankommen auf die
+  passende Ansicht (`COMPANY_GROUPS`, `groupOf`, `placeOf` in `tabs.ts`, geprüft in `tabs.test.ts`).

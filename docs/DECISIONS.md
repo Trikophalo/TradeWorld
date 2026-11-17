@@ -4170,3 +4170,36 @@ Funktionskarte: `docs/FIRMA_ANALYSE.md`.
 **Offen.** Ob auf Live eine Firma an einem Nebenschritt scheiterte, zeigt nach dem Deploy
 `select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
 aus Spec 6.6) bleibt unbenutzt.
+
+## ADR-187: Firma übersichtlicher – Dashboard nur Zahlen, eine Liste „Zu erledigen“, zusammengeführte Karten — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: Die Aufgaben im Unternehmen seien verstreut, man scrolle ewig, vor allem im
+Controlling (am PC rund 13 000 px). Das Dashboard soll nur Zahlen und Grafiken zeigen, ein Klick darauf führt zum
+Hebel. „Stärken der Firma“ und „Wo es fehlt“ zeigten dieselben Namen mit sehr unterschiedlichen Zahlen in zwei
+Netzdiagrammen und wirkten widersprüchlich.
+
+**Entscheidung.** Nur Darstellung, keine Funktion entfernt, keine SQL-Änderung.
+
+- **Dashboard:** Kennzahl-Kacheln, Timer-Chips, Grafiken, „Stärken & Schwächen“. Jede Kachel und Grafik verlinkt über
+  `tabs.ts` auf die Stelle, an der der Wert beeinflusst wird, mit Hinweis „Beeinflussen in Tab → Ort“ (`DashLink`,
+  `ChartLink`, `useWhere`). Autopilot, Mira, Aufgaben, Lage, Interview, Ereignis, Büro und „Was jeder leistet“
+  ziehen um.
+- **Stärken & Schwächen:** `HealthPanel` bekommt optional die Stärken: ein Diagramm (acht Diagnose-Punkte), je Zeile
+  „Jetzt“ und getrennt „Langfristige Stärke x/100“ mit nächster Bonusstufe; Image und Schwung nur als Diagnose. Die
+  Zuordnung ist die bestehende (`STRENGTH_OF`): Menge → Lieferfähigkeit, Preis → Rendite, Kasse → Finanzen. Zahlen
+  kommen unverändert aus der API.
+- **Zu erledigen** (`todo-center.tsx`): alle fälligen Dinge als eine Liste nach Dringlichkeit (Dringend, Bald, Wenn
+  Zeit ist), eine Zeile je Punkt mit Frist und „Öffnen“, oben im Tab Mitarbeiter neben dem Autopiloten. Der
+  Mitarbeiter-Tab zählt die Punkte, die dort erledigt werden; das Dashboard zeigt die Gesamtzahl als Kachel.
+- **Zusammengeführte Karten** (`MergedCard`): eine Karte, ein Kopf, ein Umschalter (Segmented) zwischen Ansichten.
+  Controlling: Angebot & Produktion, Marketing, Geld, Wachstum, Marke & Firma. Mitarbeiter: Team (Team & Plätze,
+  Stimmung, Wert). Jede Ansicht behält ihre alte Abschnitts-ID; ein Link (Adresse oder `announceFocus`) schaltet die
+  Karte vor dem Scrollen um.
+- **Mira** als Panel (Sheet) mit Knopf neben den Tabs auf jedem Tab; `section=mira` öffnet es. Die Logik in
+  `assistant/` bleibt unverändert; das Tour-Ziel `assistant` sitzt am Knopf.
+- **Links:** `tabs.ts` kennt alle alten IDs (auch `group-sell`, `group-run`, `group-listed`, `reputation-mood`,
+  `team-value`, `assist`) und führt sie zur neuen Karte und Ansicht; `tabs.test.ts` prüft, dass jede alte ID auf eine
+  vorhandene Karte desselben Tabs führt und jeder Link zur selben Stelle zurückführt.
+
+**Folgen.** Inhalte einer Karte, die nicht gewählt ist, sind nicht im DOM; E2E-Tests wählen die Ansicht vorher
+(`showPane` in `e2e/company-helpers.ts`). Die Beschreibungen und „i“-Erklärungen aus ADR-183 bleiben.
