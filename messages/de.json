@@ -5690,7 +5690,16 @@
       "receipts": "Belege prüfen",
       "offer": "Bestes Angebot",
       "pattern": "Zahlenreihe",
-      "shelf": "Regal einräumen"
+      "shelf": "Regal einräumen",
+      "tiles": "Schiebepuzzle",
+      "bins": "Einsortieren",
+      "untangle": "Entwirren",
+      "odd": "Fehler finden",
+      "rebuild": "Nachbauen",
+      "align": "Montieren",
+      "pipes": "Rohre drehen",
+      "sizes": "Nach Größe",
+      "conveyor": "Fließband"
     },
     "doIt": "Erledigen",
     "take": "Übernehmen",
@@ -5784,7 +5793,44 @@
       "patternHint": "Wie geht die Reihe weiter? Wähle die nächste Zahl.",
       "shelfHint": "Jede Reihe, jede Spalte und jedes 2×2-Fach braucht jede Ware genau einmal. Tippe auf eine Lücke, um die Ware zu wechseln.",
       "shelfCell": "Reihe {row}, Platz {col}: {item}",
-      "shelfEmpty": "leer"
+      "shelfEmpty": "leer",
+      "tilesHint": "Schieb die Teile in die Lücke, bis 1 bis 8 der Reihe nach liegen. Antippen oder ziehen.",
+      "tilesMoves": "{count, plural, one {# Zug} other {# Züge}}",
+      "tilesTile": "Teil {n}",
+      "tilesGap": "Lücke",
+      "binsHintColor": "Zieh jede Kiste in das Regal mit ihrer Farbe. Oder tippe erst die Kiste, dann das Regal.",
+      "binsHintShape": "Zieh jede Kiste in das Regal mit ihrer Form. Oder tippe erst die Kiste, dann das Regal.",
+      "binsColors": ["Rot", "Blau", "Grün"],
+      "binsShapes": ["Quadrat", "Kreis", "Dreieck"],
+      "binsItem": "{item} {n}: {color}, {shape}",
+      "binsShelf": "Regal {name}",
+      "binsOpen": "Noch {count}",
+      "untangleHint": "Zieh die Punkte so, dass sich keine Kabel mehr kreuzen. Punkt antippen und mit den Pfeiltasten schieben geht auch.",
+      "untangleCrossings": "{count, plural, =0 {Keine Kreuzung} one {# Kreuzung} other {# Kreuzungen}}",
+      "untangleNode": "Punkt {n}, Spalte {x}, Reihe {y}",
+      "oddHint": "Ein Teil ist fehlerhaft. Finde es und tippe es an.",
+      "oddCell": "Teil {index}",
+      "rebuildShow": "Merk dir, wo alles steht!",
+      "rebuildHint": "Stell alles wieder an seinen Platz. Ziehen oder erst die Ware, dann das Feld antippen.",
+      "rebuildCell": "Feld {row}-{col}: {item}",
+      "rebuildEmpty": "leer",
+      "rebuildTray": "Noch {count} zu stellen",
+      "alignHint": "Zieh jedes Teil auf den Umriss, in den es genau passt. Oder erst das Teil, dann die Station antippen.",
+      "alignShapes": ["Zahnrad", "Schraube", "Platte", "Chip", "Feder", "Mutter"],
+      "alignSlot": "Station {n}: {shape}",
+      "alignPart": "Teil {shape}",
+      "alignOpen": "Noch {count} Teile",
+      "pipesHint": "Tippe die Rohre an, um sie zu drehen, bis die Leitung von links nach rechts durchgeht.",
+      "pipesOpen": "Noch nicht dicht",
+      "pipesClosed": "Leitung steht!",
+      "pipesCell": "Rohr {row}-{col}",
+      "sizesHint": "Zieh die Pakete in eine Reihe von klein nach groß. Oder tippe zwei Pakete an, um sie zu tauschen.",
+      "sizesSmall": "klein",
+      "sizesBig": "groß",
+      "sizesParcel": "Paket {n}, Platz {pos}",
+      "conveyorHint": "Zieh jede Ware vom Band in die richtige Kiste, bevor sie runterfällt. Tippen auf eine Kiste nimmt die vorderste Ware.",
+      "conveyorDone": "{count} von {total} einsortiert",
+      "conveyorItem": "Ware: {label}"
     },
     "hierarchy": "Wer berichtet an wen",
     "hierarchyIntro": "Vorgesetzte sind für ihr Team verantwortlich und geben Aufgaben weiter. Eine Vorgesetzte oder ein Vorgesetzter braucht einen höheren Rang.",
@@ -6935,6 +6981,204 @@
         "ok": "Das Regal von {company} ist perfekt sortiert. Kunden finden alles sofort.",
         "fail": "Im Regal von {company} herrscht Chaos. Kunden suchen vergeblich.",
         "labels": ["Äpfel", "Brot", "Milch", "Käse"]
+      },
+      "shipment_tiles": {
+        "name": "Lieferung ordnen",
+        "how": "Die Paletten der Lieferung stehen durcheinander. Schieb sie in die Reihenfolge 1 bis 8.",
+        "ok": "{company} hat die Lieferung in Rekordzeit sortiert. Der Lkw fährt pünktlich.",
+        "fail": "Bei {company} steht Palette 7 vor Palette 2. Der Fahrer wartet und schimpft."
+      },
+      "crate_shelves": {
+        "name": "Kisten einsortieren",
+        "how": "Jede Kiste gehört in das Regal mit ihrer Farbe oder Form, je nach Ansage.",
+        "ok": "Im Lager von {company} steht jede Kiste da, wo sie hingehört.",
+        "fail": "Im Lager von {company} sucht jemand seit einer Stunde die blaue Kiste.",
+        "item": "Kiste"
+      },
+      "cable_mess": {
+        "name": "Kabelsalat entwirren",
+        "how": "Unter dem Schreibtisch ist ein Kabelsalat. Zieh die Stecker so, dass sich nichts mehr kreuzt.",
+        "ok": "Bei {company} liegt jedes Kabel ordentlich. Niemand stolpert mehr.",
+        "fail": "Bei {company} hat jemand am falschen Kabel gezogen. Der Server ist aus."
+      },
+      "defect_spot": {
+        "name": "Fehlerteil finden",
+        "how": "Zwischen vielen guten Teilen versteckt sich eins mit Fehler. Finde es.",
+        "ok": "Die Qualitätskontrolle von {company} hat jedes Fehlerteil erwischt.",
+        "fail": "Ein Fehlerteil von {company} ist beim Kunden gelandet. Reklamation!"
+      },
+      "desk_layout": {
+        "name": "Büro wieder einrichten",
+        "how": "Nach dem Putzen soll alles wieder genau so stehen wie vorher. Schau gut hin.",
+        "ok": "Das Büro von {company} sieht aus wie vorher. Niemand merkt, dass geputzt wurde.",
+        "fail": "Bei {company} steht die Kaffeemaschine jetzt im Besprechungsraum.",
+        "labels": ["Laptop", "Pflanze", "Lampe", "Kaffee"]
+      },
+      "line_setup": {
+        "name": "Fertigungsstraße einrichten",
+        "how": "Setz jedes Teil an die Station, deren Umriss genau passt.",
+        "ok": "Die Fertigungsstraße von {company} läuft rund. Kein Teil klemmt.",
+        "fail": "Bei {company} klemmt die Straße. Ein Teil sitzt an der falschen Station."
+      },
+      "pipe_fix": {
+        "name": "Leitung verlegen",
+        "how": "Dreh die Rohre, bis das Wasser vom Zulauf bis zum Ablauf fließt.",
+        "ok": "Bei {company} fließt alles. Die Leitung ist dicht.",
+        "fail": "Bei {company} steht das Wasser im Keller. Die Leitung war nicht zu.",
+        "start": "Zulauf",
+        "goal": "Ablauf"
+      },
+      "parcel_sizes": {
+        "name": "Pakete nach Größe",
+        "how": "Stell die Pakete von klein nach groß, damit der Wagen sauber beladen wird.",
+        "ok": "Der Wagen von {company} ist perfekt beladen. Nichts wackelt.",
+        "fail": "Bei {company} liegt das große Paket oben. Darunter knirscht es."
+      },
+      "belt_sort": {
+        "name": "Fließband sortieren",
+        "how": "Waren kommen über das Band. Zieh jede in die richtige Kiste, bevor sie runterfällt.",
+        "ok": "Am Band von {company} geht nichts verloren. Alles ist sortiert.",
+        "fail": "Am Band von {company} landen Briefe im Sperrgut. Chaos im Versand.",
+        "labels": ["Paket", "Brief", "Sperrgut"]
+      },
+      "network_map": {
+        "name": "Netzwerkplan entwirren",
+        "how": "Der Netzwerkplan ist unlesbar. Ordne die Knoten so, dass sich keine Leitung kreuzt.",
+        "ok": "Der Netzwerkplan von {company} ist glasklar. Angreifer finden keine Lücke.",
+        "fail": "Im Netzwerkplan von {company} hat sich eine Lücke versteckt."
+      },
+      "screen_layout": {
+        "name": "App-Layout nachbauen",
+        "how": "Das Design zeigt kurz, wo alles hin soll. Bau den Bildschirm genau so nach.",
+        "ok": "Die neue Ansicht von {company} sieht aus wie im Design. Das Team ist begeistert.",
+        "fail": "In der App von {company} sitzt der Kaufen-Knopf jetzt in der Fußzeile.",
+        "labels": ["Logo", "Suche", "Menü", "Kaufen"]
+      },
+      "data_pipeline": {
+        "name": "Datenleitung schalten",
+        "how": "Dreh die Leitungsstücke, bis die Daten vom Eingang bis zum Speicher fließen.",
+        "ok": "Die Daten bei {company} fließen ohne Stau.",
+        "fail": "Bei {company} hängen die Daten fest. Kunden sehen nur Ladebalken.",
+        "start": "Eingang",
+        "goal": "Speicher"
+      },
+      "file_stacks": {
+        "name": "Aktenstapel ordnen",
+        "how": "Stell die Aktenstapel von klein nach groß, der dickste Fall kommt nach hinten.",
+        "ok": "Die Akten bei {company} stehen ordentlich. Jeder Fall ist schnell zur Hand.",
+        "fail": "Bei {company} ist ein Aktenstapel umgekippt. Alles muss neu sortiert werden."
+      },
+      "fake_note": {
+        "name": "Falschgeld finden",
+        "how": "In jedem Stapel steckt eine falsche Note. Finde sie.",
+        "ok": "{company} hat jede Blüte erkannt. Die Kasse stimmt.",
+        "fail": "{company} hat eine Blüte angenommen. Die Bank ist nicht amüsiert."
+      },
+      "parcel_belt": {
+        "name": "Pakete am Band",
+        "how": "Bestellungen kommen über das Band. Zieh jede in die richtige Versandkiste.",
+        "ok": "Alle Bestellungen von {company} sind richtig unterwegs.",
+        "fail": "Bei {company} gingen Retouren an Neukunden raus. Peinlich.",
+        "labels": ["Bestellung", "Retoure", "Express"]
+      },
+      "fabric_bins": {
+        "name": "Stoffe einsortieren",
+        "how": "Leg jede Stoffrolle in das Fach mit ihrer Farbe oder Form, je nach Ansage.",
+        "ok": "Das Stofflager von {company} ist wie ein Regenbogen sortiert.",
+        "fail": "Bei {company} wurde das Kleid aus dem falschen Stoff genäht.",
+        "item": "Rolle"
+      },
+      "bad_apple": {
+        "name": "Faules Stück finden",
+        "how": "Ein Stück in der Auslage ist nicht mehr gut. Finde es, bevor ein Kunde es tut.",
+        "ok": "Die Auslage von {company} ist makellos. Kunden greifen gern zu.",
+        "fail": "Ein Kunde hat bei {company} das faule Stück erwischt. Er schreibt eine Bewertung."
+      },
+      "store_layout": {
+        "name": "Filiale einrichten",
+        "how": "Die Zentrale zeigt kurz den Plan. Richte die Filiale genau so ein.",
+        "ok": "Die Filiale von {company} sieht aus wie alle anderen. Genau so soll es sein.",
+        "fail": "In der Filiale von {company} steht die Kasse im Lager.",
+        "labels": ["Kasse", "Theke", "Regal", "Tische"]
+      },
+      "panel_mount": {
+        "name": "Module montieren",
+        "how": "Setz jedes Bauteil an die Halterung, deren Umriss genau passt.",
+        "ok": "Die Anlage von {company} sitzt bombenfest auf dem Dach.",
+        "fail": "Bei {company} hängt ein Modul schief. Der Sturm kann kommen."
+      },
+      "grid_switch": {
+        "name": "Stromleitung schalten",
+        "how": "Dreh die Leitungsstücke, bis der Strom vom Umspannwerk bis zum Viertel fließt.",
+        "ok": "Bei {company} brennt im ganzen Viertel wieder Licht.",
+        "fail": "Das Viertel bleibt dunkel. Bei {company} klingelt das Telefon Sturm.",
+        "start": "Werk",
+        "goal": "Viertel"
+      },
+      "cell_sizes": {
+        "name": "Zellen nach Größe",
+        "how": "Stell die Akkuzellen von klein nach groß, damit sie ins Gehäuse passen.",
+        "ok": "Die Zellen von {company} sitzen perfekt im Gehäuse.",
+        "fail": "Bei {company} passt der Deckel nicht mehr drauf."
+      },
+      "trade_lines": {
+        "name": "Handelswege entwirren",
+        "how": "Die Handelswege laufen kreuz und quer. Ordne die Knoten, bis sich nichts mehr kreuzt.",
+        "ok": "Die Handelswege von {company} laufen sauber. Kein Engpass in Sicht.",
+        "fail": "Bei {company} stauen sich die Lieferungen an einer Kreuzung."
+      },
+      "pill_belt": {
+        "name": "Tabletten sortieren",
+        "how": "Packungen kommen über das Band. Zieh jede in die richtige Kiste.",
+        "ok": "Jede Packung von {company} ist richtig einsortiert. Die Apotheken sind zufrieden.",
+        "fail": "Bei {company} landeten Hustensaft und Pflaster in einer Kiste.",
+        "labels": ["Tabletten", "Saft", "Pflaster"]
+      },
+      "gel_tiles": {
+        "name": "Probenplatte ordnen",
+        "how": "Die Proben sind verrutscht. Schieb sie in die Reihenfolge 1 bis 8.",
+        "ok": "Die Probenplatte von {company} ist perfekt geordnet. Die Messung kann starten.",
+        "fail": "Bei {company} wurden Proben vertauscht. Der Versuch beginnt von vorn."
+      },
+      "device_parts": {
+        "name": "Gerät zusammensetzen",
+        "how": "Setz jedes Bauteil an die Stelle im Gehäuse, deren Umriss genau passt.",
+        "ok": "Das Gerät von {company} besteht jeden Test.",
+        "fail": "Bei {company} klappert es im Gehäuse. Ein Teil sitzt falsch."
+      },
+      "form_bins": {
+        "name": "Formulare einsortieren",
+        "how": "Leg jedes Formular in die Ablage mit seiner Farbe oder Form, je nach Ansage.",
+        "ok": "Die Ablage von {company} ist so ordentlich, dass die Behörde staunt.",
+        "fail": "Bei {company} ist ein Antrag im falschen Fach verschwunden.",
+        "item": "Formular"
+      },
+      "sort_hub": {
+        "name": "Verteilzentrum",
+        "how": "Sendungen rollen über das Band. Zieh jede in die richtige Tour.",
+        "ok": "Im Verteilzentrum von {company} landet jede Sendung in der richtigen Tour.",
+        "fail": "Bei {company} fährt ein Paket für Nord nach Süd.",
+        "labels": ["Nord", "Mitte", "Süd"]
+      },
+      "pallet_bins": {
+        "name": "Paletten einlagern",
+        "how": "Jede Palette gehört in die Zone mit ihrer Farbe oder Form, je nach Ansage.",
+        "ok": "Das Lager von {company} ist bestens eingeräumt. Der Stapler findet alles.",
+        "fail": "Bei {company} steht eine Palette im Fluchtweg.",
+        "item": "Palette"
+      },
+      "container_yard": {
+        "name": "Container rangieren",
+        "how": "Die Container stehen durcheinander. Schieb sie in die Reihenfolge 1 bis 8.",
+        "ok": "Der Hafen lobt {company}: Jeder Container stand pünktlich bereit.",
+        "fail": "Bei {company} steht der falsche Container am Kai. Das Schiff wartet."
+      },
+      "room_rebuild": {
+        "name": "Möbel wie vorher",
+        "how": "Im neuen Zuhause soll alles stehen wie im alten. Merk dir den Plan und bau ihn nach.",
+        "ok": "Die Kunden von {company} fühlen sich sofort zu Hause.",
+        "fail": "Bei den Kunden von {company} steht das Bett in der Küche.",
+        "labels": ["Sofa", "Bett", "Tisch", "Schrank"]
       }
     },
     "delegatedPopup": {

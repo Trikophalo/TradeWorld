@@ -1,5 +1,5 @@
 /**
- * Company task games (ADR-129, ADR-144, ADR-173): puzzles and grading. Mirrors company_task_puzzle() and
+ * Company task games (ADR-129, ADR-144, ADR-173; ADR-180 and ADR-186 in their own files): puzzles and grading. Mirrors company_task_puzzle() and
  * company_task_grade() in supabase/migrations/20261204006400_task_games_more.sql; the server is the authority, this
  * runs the demo.
  * Pure: randomness comes in as `rng` (0 ≤ x < 1).
@@ -7,6 +7,14 @@
 import type { CompanyTaskConfig } from "../../config/company-tasks.ts";
 import { COMPANY_TASK_RULES } from "../../config/company-tasks.ts";
 import { generateMore, gradeMore, type MorePuzzle, type MoreSolution } from "./company-tasks-more.ts";
+import {
+  generateVisual,
+  gradeVisual,
+  VISUAL_TASK_GAMES,
+  type VisualPuzzle,
+  type VisualSolution,
+  type VisualTaskGame,
+} from "./company-tasks-visual.ts";
 import { discountedCents, withBonusCents } from "./upgrades.ts";
 
 export type TaskPuzzle =
@@ -27,7 +35,8 @@ export type TaskPuzzle =
   | { rounds: number[][] }
   | { weights: number[]; values: number[]; cap: number }
   | { events: CatchEvent[]; every_ms: number; show_ms: number }
-  | MorePuzzle;
+  | MorePuzzle
+  | VisualPuzzle;
 
 /** quick (ADR-173): one sum and its answers to choose from. */
 export interface QuickProblem {
@@ -60,7 +69,8 @@ export type TaskSolution =
   | { points: [number, number][]; best: number; step_bps: number }
   | { rounds: number[][]; ok_bps: number }
   | { weights: number[]; values: number[]; cap: number; best: number }
-  | MoreSolution;
+  | MoreSolution
+  | VisualSolution;
 
 /** path (ADR-144): the grid again, so grading needs nothing but the solution. */
 export interface PathSolution {
@@ -88,9 +98,17 @@ export type TaskAnswer =
   | { stops: number[] }
   | { choices: number[] }
   | { values: number[] }
-  | { grid: number[] };
+  | { grid: number[] }
+  | { moves: number[] }
+  | { bins: number[] }
+  | { points: [number, number][] }
+  | { layout: number[] }
+  | { at: number[] }
+  | { turns: number[] };
 
 type Rules = typeof COMPANY_TASK_RULES;
+
+const isVisual = (game: string): game is VisualTaskGame => (VISUAL_TASK_GAMES as readonly string[]).includes(game);
 
 const between = (rng: () => number, lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1));
 
@@ -109,6 +127,7 @@ export function generatePuzzle(
   rules: Rules = COMPANY_TASK_RULES,
 ): { puzzle: TaskPuzzle; solution: TaskSolution } {
   const g = rules.games;
+  if (isVisual(task.game)) return generateVisual(task.game, rng, rules);
   switch (task.game) {
     case "restock":
     case "receipts":
@@ -518,6 +537,7 @@ export function gradeAnswer(game: CompanyTaskConfig["game"], solution: TaskSolut
   if (!answer || typeof answer !== "object") return 0;
   const ans = answer as Record<string, unknown>;
   const sol = solution as Record<string, unknown>;
+  if (isVisual(game)) return gradeVisual(game, solution as VisualSolution, answer);
   switch (game) {
     case "restock":
     case "receipts":

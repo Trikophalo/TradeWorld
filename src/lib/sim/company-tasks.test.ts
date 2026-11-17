@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COMPANY_TASK_RULES, COMPANY_TASKS } from "../../config/company-tasks.ts";
-import { bestLoad, bestOrder, memoryPairs } from "./company-tasks.fixtures.ts";
+import { bestLoad, bestOrder, memoryPairs, pipeTurns, tileMoves } from "./company-tasks.fixtures.ts";
 import {
   aiMinutes,
   generatePuzzle,
@@ -15,6 +15,10 @@ import {
 
 /** The answer a perfect player gives: the solution itself, a picked list or a shortest route. */
 function perfectAnswer(solution: TaskSolution): Record<string, unknown> {
+  // ADR-186
+  if ("max_moves" in solution) return { moves: tileMoves(solution.size, solution.board) };
+  if ("untangled" in solution) return { points: solution.untangled };
+  if ("open_bps" in solution) return { turns: pipeTurns(solution) };
   if ("targets" in solution) return { picked: solution.targets };
   if ("miss_bps" in solution) return { pairs: memoryPairs(solution.cards), misses: 0 };
   if ("points" in solution) return { order: bestOrder(solution.points) };

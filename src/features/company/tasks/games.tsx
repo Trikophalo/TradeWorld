@@ -11,6 +11,17 @@ import { DragSortGame, MatchGame, PathGame, RotateGame, SliderGame } from "./dra
 import { CatchGame, DiffGame, HaggleGame, MemoryGame, PackGame, QuickGame, RouteGame, TimingGame } from "./more-games";
 import { OfferGame, PatternGame, ReceiptsGame, RestockGame, ShelfGame } from "./new-games";
 import { useTaskText } from "./task-text";
+import {
+  AlignGame,
+  BinsGame,
+  ConveyorGame,
+  OddGame,
+  PipesGame,
+  RebuildGame,
+  SizesGame,
+  TilesGame,
+  UntangleGame,
+} from "./visual-games";
 
 /*
  * The task games (ADR-129, ADR-144; the hands-on ones in drag-games.tsx). Small and quick: a phone, one thumb, under a minute. Each game only collects the
@@ -334,5 +345,24 @@ export function TaskGameView(props: GameProps & { game: TaskGame }) {
       return <PatternGame {...props} />;
     case "shelf":
       return <ShelfGame {...props} />;
+    // ADR-186: drag and see
+    case "tiles":
+      return <TilesGame {...props} />;
+    case "bins":
+      return <BinsGame {...props} />;
+    case "untangle":
+      return <UntangleGame {...props} />;
+    case "odd":
+      return <OddGame {...props} />;
+    case "rebuild":
+      return <RebuildGame {...props} />;
+    case "align":
+      return <AlignGame {...props} />;
+    case "pipes":
+      return <PipesGame {...props} />;
+    case "sizes":
+      return <SizesGame {...props} />;
+    case "conveyor":
+      return <ConveyorGame {...props} />;
   }
 }

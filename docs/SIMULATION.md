@@ -1134,3 +1134,9 @@ Ereignis  = Zuwachs bis zur Grenze (nichts, wenn darüber), Verlust bis min
 landet in `company_awareness_log` (Quelle je Stunde). TS und SQL stimmen in `awareness.test.ts`,
 `b8_company_overhaul.sql` und `c6_awareness.sql` überein (`company_awareness_step(0,2; 0,6; 0,5; 1,5; 10.000; 10 Mio.;
 0,8; 70)` → 0,213907).
+
+`src/lib/sim/company-tasks-visual.ts` (ADR-186): Rätsel und Bewertung der neun Schiebe- und Sehspiele (`tiles`,
+`bins`, `untangle`, `odd`, `rebuild`, `align`, `pipes`, `sizes`, `conveyor`), dazu `segmentsMeet`/`crossings`
+(ganzzahlig), `slideTiles`, `pipesFlow`/`pipesConnected`. `src/lib/sim/company-task-mix.ts`: `pickWeightedTask`
+(Wahrscheinlichkeit Gewicht/Summe, wie `company_tasks_run_due`) und `taskMix` (Anteil je Art). SQL und TS stimmen auf
+den Fällen in `supabase/tests/task_games_visual_cases.inc` überein.

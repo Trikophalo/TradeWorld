@@ -4451,3 +4451,56 @@ Züge derselben Transaktion (eine Öffnung, ein Mehrfachkauf) werden zu einer Na
 
 **Folgen.** Neue Tabelle `nexamon_big_pull_broadcasts`, neuer Benachrichtigungstyp (abschaltbar), Feed-Art
 `nexamon_big_pull`. Test `supabase/tests/c8_big_pull.sql`.
+
+## ADR-186: Mehr Schiebe- und Sehaufgaben, weniger Rechnen und Tippen bei den Firmenaufgaben — `Annahme`
+
+**Kontext.** Der Owner: „Weniger Rechen- und Schreibaufgaben bitte bei den Unternehmensaufgaben. Mehr Schiebe- und
+Sehaufgaben.“ Bisher zog `company_tasks_run_due()` jede passende Aufgabe gleich wahrscheinlich (allgemeine Aufgaben etwas
+seltener). Gemessen mit `taskMix` über den alten Katalog: je Produkt 39–47 % Rechnen und Tippen (`math`, `quick`,
+`receipts`, `offer`, `pattern`, `pack`, `restock`, `count`, `order`, `haggle`), 21–25 % Ziehen.
+
+**Entscheidung.**
+
+- _Art je Spiel:_ `TASK_GAME_KINDS` in `src/config/company-tasks.ts` ordnet jedes Spiel `calc` (Rechnen, Zahlen, Lesen
+  und Tippen), `drag` (Schieben, Ziehen, Drehen) oder `visual` (Hinsehen, Finden, Merken) zu.
+- _Gewicht je Aufgabe:_ `companyTasks.mix`: Gewicht = `kindWeight` (calc 1, drag 4, visual 3) × 2 für Aufgaben des
+  eigenen Produkts (× 1 für allgemeine). `taskWeight()` schreibt es als `weight` in jeden Katalogeintrag
+  (`game_config`). Server (`company_tasks_run_due`, Migration 7620) ordnet nach `-ln(1 − random()) / weight` und nimmt
+  die erste: Aufgabe i kommt mit Wahrscheinlichkeit Gewicht_i / Summe. Die Demo zieht genauso (`pickWeightedTask`).
+  Einträge ohne Gewicht zählen 1. Keine Aufgabe wurde gestrichen; Rechenaufgaben bleiben, nur seltener.
+- _Neue Mischung (je Produkt, `taskMix`):_ Rechnen und Tippen 10–14 % (Ziel höchstens 20 %, Test
+  `maxCalcShareBps`), Ziehen 53–61 %, Sehen 27–36 %. Der Autopilot legt seine eigene Aufgabe weiter gleichverteilt an; er
+  spielt kein Minispiel, die Mischung betrifft dort nur den Namen in der Liste.
+- _Neun neue Spiele (Ziehen und Sehen)_, Bewertung in `src/lib/sim/company-tasks-visual.ts`, gleich in SQL
+  (`company_task_puzzle_visual`, `company_task_grade_visual`, Migration 7600; `company_task_puzzle` und
+  `company_task_grade` vollständig neu in 7610):
+  - `tiles` Schiebepuzzle 3 × 3, 14 Schiebezüge gemischt (nie direkt zurück), mindestens 5 Teile falsch. Der Server
+    spielt die Züge nach (ungültiger Zug: 0), jedes Teil am Platz zählt ein Achtel.
+  - `bins` acht Kisten in drei Farben und drei Formen, nach Farbe oder Form (würfelt das Rätsel) ins Regal.
+  - `untangle` sechs Punkte auf einem 6 × 6-Raster, ein Ring plus zwei Sehnen, die sich kreuzungsfrei legen lassen;
+    die Punkte starten vertauscht mit mindestens zwei Kreuzungen. Jedes Paar Kabel ohne gemeinsamen Punkt, das sich
+    berührt, kostet 20 % (ganzzahlig exakt).
+  - `odd` drei Runden mit 16 gleichen Waren (Karton, Flasche, Dose, Glas) und einer fehlerhaften.
+  - `rebuild` vier Waren auf einem 3 × 3-Regal, 5 s zu sehen, dann aus dem Gedächtnis zurückstellen; jede Ware höchstens
+    einmal.
+  - `align` vier Bauteile aus sechs Formen auf die Station mit dem passenden Umriss (sechs Stationen).
+  - `pipes` 4 × 4 Rohre (gerade, Bogen) drehen; durchgehend von links nach rechts: 100 %, sonst der Anteil richtig
+    gedrehter Rohre der Route × 50 %. Mindestens vier Rohre der Route stehen falsch, die Leitung ist anfangs offen.
+  - `sizes` sechs Pakete (30–100 %, mindestens 8 Punkte Abstand) ohne Zahlen von klein nach groß ziehen.
+  - `conveyor` zehn Waren in drei Sorten laufen über ein Band (alle 2,4 s eine, 5,6 s lang); richtige Kiste +1,
+    falsche −1, verpasst 0.
+    30 neue Aufgaben: je Spiel eine für alle Firmen und je Produkt eine eigene (alle 21 Produkte), quer durch die
+    Abteilungen. Texte in `companyTasks.items`.
+- _Bedienung:_ Handy zuerst, Ziele mindestens 44 px; jedes Ziehen geht auch als Tippen-dann-Tippen, mit Tastatur
+  (Pfeiltasten beim Entwirren, Knöpfe sonst). Töne `tap`, `blip`, `toggle`. Bewegung nur über `transform` und
+  `opacity`; bei reduzierter Bewegung kein Layout-Gleiten, das Band läuft 1,4-mal langsamer in groben Schritten.
+- _Geheim bleibt:_ Wie bei den älteren Spielen verrät das Rätsel teils die Lösung (Farbe der Kiste, Umriss); die
+  kreuzungsfreie Anordnung (`untangled`) und die Rohr-Route bleiben in der Lösung auf dem Server.
+- _Gleiche Bewertung:_ 138 geteilte Fälle in `supabase/tests/task_games_visual_cases.inc` (TS-Test und
+  `c5_task_games_visual.sql`); der SQL-Test zieht außerdem 300 Aufgaben für eine Modefirma (Rechnen höchstens 20 %).
+- _Update-Datei:_ Die Kopie von 6920 setzt den Check `company_tasks_game_check` nur noch, solange er `conveyor` nicht
+  kennt (wie die Kopie von 6400 für `restock`), sonst schlügen Zeilen der neuen Spiele fehl.
+
+**Folgen.** Die neuen Spiele dauern etwas länger (40–90 s); die Zeitgrenzen stehen in `companyTasks.games`. Wer lieber
+rechnet, bekommt Rechenaufgaben weiter, nur seltener. Neue Spiele brauchen eine Art in `TASK_GAME_KINDS`, sonst schlägt
+der Mix-Test fehl.

@@ -16,13 +16,13 @@ import { useDragCard } from "./use-drag";
  */
 
 /** Keyboard activation only: pointer presses are handled by the drag code (a click after a drag would count twice). */
-const keyboardOnly = (event: { detail: number }) => event.detail === 0;
+export const keyboardOnly = (event: { detail: number }) => event.detail === 0;
 
 const cardBase =
   "touch-none rounded-md border-2 px-2.5 py-2 text-center text-xs font-semibold text-pretty focus-ring select-none";
 
 /** A card that follows the pointer while dragged and springs back on release. */
-function DragCard({
+export function DragCard({
   children,
   disabled,
   selected,
@@ -30,6 +30,7 @@ function DragCard({
   onTap,
   className,
   testId,
+  label,
 }: {
   children: React.ReactNode;
   disabled: boolean;
@@ -38,6 +39,8 @@ function DragCard({
   onTap?: () => void;
   className?: string;
   testId?: string;
+  /** Accessible name when the content is a picture. */
+  label?: string;
 }) {
   const { offset, dragging, handlers } = useDragCard({
     disabled,
@@ -48,6 +51,7 @@ function DragCard({
     <motion.button
       type="button"
       data-testid={testId}
+      aria-label={label}
       aria-pressed={selected}
       disabled={disabled}
       {...handlers}

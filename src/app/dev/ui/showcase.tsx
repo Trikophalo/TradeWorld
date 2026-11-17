@@ -388,6 +388,72 @@ const SAMPLE_GAMES = [
     taskKey: "shelf_order",
     puzzle: { grid: [1, -1, 0, -1, 0, -1, 1, 2, -1, 0, -1, -1, 3, -1, 2, 0] },
   },
+  // ADR-186: drag and see
+  { game: "tiles", taskKey: "shipment_tiles", puzzle: { size: 3, board: [0, 1, 2, 3, -1, 5, 6, 4, 7] } },
+  {
+    game: "bins",
+    taskKey: "crate_shelves",
+    puzzle: {
+      items: [
+        [0, 1],
+        [1, 0],
+        [2, 2],
+        [0, 0],
+        [1, 2],
+        [2, 1],
+      ],
+      by: 0,
+      kinds: 3,
+    },
+  },
+  {
+    game: "untangle",
+    taskKey: "cable_mess",
+    puzzle: {
+      grid: 5,
+      edges: [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 0],
+      ],
+      points: [
+        [0, 0],
+        [3, 3],
+        [3, 0],
+        [0, 3],
+      ],
+    },
+  },
+  {
+    game: "odd",
+    taskKey: "defect_spot",
+    puzzle: {
+      rounds: [
+        [4, 4, 4, 4, 4, 6, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+        [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 12, 12, 12, 12, 12],
+      ],
+    },
+  },
+  {
+    game: "rebuild",
+    taskKey: "desk_layout",
+    puzzle: { size: 3, layout: [0, -1, -1, -1, 1, -1, 2, -1, 3], show_seconds: 3 },
+  },
+  { game: "align", taskKey: "line_setup", puzzle: { slots: [3, 0, 5, 1, 4, 2], parts: [0, 1, 2, 3] } },
+  {
+    game: "pipes",
+    taskKey: "pipe_fix",
+    puzzle: {
+      size: 4,
+      tiles: [1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0],
+      turns: [0, 1, 2, 3, 0, 1, 0, 1, 1, 0, 2, 3, 3, 2, 1, 0],
+      from: 1,
+      to: 1,
+    },
+  },
+  { game: "sizes", taskKey: "parcel_sizes", puzzle: { sizes: [70, 40, 100, 55, 85, 30] } },
+  { game: "conveyor", taskKey: "belt_sort", puzzle: { items: [0, 1, 2, 0], every_ms: 6000, travel_ms: 60000 } },
 ] as const;
 
 /** Autopilot and the last hour (ADR-180). */
@@ -446,9 +512,14 @@ function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
   return (
     <Card padding="lg" className="space-y-3 self-start">
       <div className="flex items-center justify-between gap-2">
-        <p className="label-pixel text-fg-3">Minispiel „{sample.game}“ (ADR-144, ADR-173)</p>
-        {sample.game === "catch" && (
-          <Button size="sm" variant="ghost" onClick={() => setRound((r) => r + 1)}>
+        <p className="label-pixel text-fg-3">Minispiel „{sample.game}“ (ADR-144, ADR-173, ADR-186)</p>
+        {(sample.game === "catch" || sample.game === "conveyor") && (
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid={`sample-restart-${sample.game}`}
+            onClick={() => setRound((r) => r + 1)}
+          >
             Neu
           </Button>
         )}
@@ -462,7 +533,7 @@ function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
         onAnswer={(answer) => {
           toast.info(sample.game, JSON.stringify(answer));
           // the reaction game runs by itself: restart it only on demand, or it loops forever
-          if (sample.game !== "catch") setRound((r) => r + 1);
+          if (sample.game !== "catch" && sample.game !== "conveyor") setRound((r) => r + 1);
         }}
       />
     </Card>

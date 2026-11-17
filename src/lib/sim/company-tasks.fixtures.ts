@@ -1,7 +1,50 @@
 /**
- * Perfect answers for the task games of ADR-173, for tests (brute force; the games are tiny).
+ * Perfect answers for the task games of ADR-173 and ADR-186, for tests (brute force; the games are tiny).
  */
 import { tourLength } from "./company-tasks.ts";
+import { PIPE_BASE, slideTiles, turnMask } from "./company-tasks-visual.ts";
+
+/** tiles: the fewest slides that solve a sliding puzzle (breadth-first; 3 x 3 has at most 9!/2 boards). */
+export function tileMoves(size: number, board: readonly number[]): number[] {
+  const key = (b: readonly number[]) => b.join(",");
+  const goal = key(Array.from({ length: size * size }, (_, i) => (i < size * size - 1 ? i : -1)));
+  const prev = new Map<string, [string, number] | null>([[key(board), null]]);
+  const queue: number[][] = [[...board]];
+  for (let head = 0; head < queue.length; head++) {
+    const b = queue[head]!;
+    const k = key(b);
+    if (k === goal) {
+      const moves: number[] = [];
+      for (let at = prev.get(k); at; at = prev.get(at[0])) moves.unshift(at[1]);
+      return moves;
+    }
+    const gap = b.indexOf(-1);
+    const next = [gap - size, gap + size, gap % size > 0 ? gap - 1 : -1, gap % size < size - 1 ? gap + 1 : -1];
+    for (const m of next) {
+      if (m < 0 || m >= b.length) continue;
+      const after = slideTiles(size, b, [m])!;
+      if (!prev.has(key(after))) {
+        prev.set(key(after), [k, m]);
+        queue.push(after);
+      }
+    }
+  }
+  throw new Error("unsolvable sliding puzzle");
+}
+
+/** pipes: turns that make every pipe of the route fit (the rest stays at 0). */
+export function pipeTurns(sol: {
+  tiles: readonly number[];
+  path: readonly number[];
+  need: readonly number[];
+}): number[] {
+  const turns = sol.tiles.map(() => 0);
+  sol.path.forEach((cell, k) => {
+    while (turnMask(PIPE_BASE[sol.tiles[cell] === 1 ? 1 : 0], turns[cell]!) !== sol.need[k])
+      turns[cell] = turns[cell]! + 1;
+  });
+  return turns;
+}
 
 /** memory: every pair of equal cards. */
 export function memoryPairs(cards: readonly number[]): [number, number][] {
