@@ -50,7 +50,15 @@ select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'b
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market')$$, 'invalid_argument', 'neither quantity nor amount');
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', null, null, 150)$$, 'order_too_small', 'amount minus fee below 1 EUR');
 select tests.throws_key($$select public.place_order(gen_random_uuid(), 'KLS', 'buy', 'market', 1)$$, 'order_too_small', 'one millionth of a share is below the minimum order value');
-select tests.throws_key($$select public.place_order(gen_random_uuid(), 'VLT', 'sell', 'market', null, null, 100000000)$$, 'insufficient_position', 'selling more by amount than held');
+-- ADR-189 (8200): selling more by amount than held sells the whole free position (checked, then undone)
+do $$
+begin
+  perform tests.assert((public.place_order(gen_random_uuid(), 'VLT', 'sell', 'market', null, null, 100000000)
+                        ->> 'limited_by') = 'position', 'selling more by amount than held sells the whole position');
+  raise exception 'c54_undo';
+exception when others then
+  if sqlerrm <> 'c54_undo' then raise; end if;
+end $$;
 reset role;
 
 -- a sell of >= 99.9 % of the position sells all of it ------------------------------

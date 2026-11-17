@@ -252,7 +252,7 @@ export interface OrderResult {
 }
 
 /** Why a market order fills less than asked (ADR-189): only the stock supply (ADR-153) can limit it. */
-export type OrderLimit = "supply";
+export type OrderLimit = "supply" | "position";
 
 /** Server preview of a market order (`quote_order`, ADR-189): exactly what `place_order` would execute now. */
 export interface OrderQuote {

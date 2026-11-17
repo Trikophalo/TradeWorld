@@ -224,7 +224,7 @@ const orderResultSchema = z.object({
   xp_total: num.default(0),
   requested_quantity_e6: num.optional(),
   unfilled_quantity_e6: num.optional(),
-  limited_by: z.enum(["supply"]).nullable().optional(),
+  limited_by: z.enum(["supply", "position"]).nullable().optional(),
   impact_bps: num.optional(),
 });
 
@@ -241,7 +241,7 @@ const orderQuoteSchema = z.object({
   net_cents: num,
   slippage_bps: num,
   impact_bps: num,
-  limited_by: z.enum(["supply"]).nullable(),
+  limited_by: z.enum(["supply", "position"]).nullable(),
 });
 
 const progressSchema = z.object({ xp_awarded: num, level: num, xp_total: num });

@@ -107,8 +107,28 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const price = type === "limit" && limitPrice ? limitPrice : marketPrice;
   const heldE6 = position ? position.quantityE6 - position.reservedQuantityE6 : 0;
 
-  // What 100 % on the slider means: all cash (buy) or the whole free position (sell).
-  const maxAmountCents = buying ? cash : valueCents(heldE6, price);
+  // ADR-189: what the whole free position really brings along the price path (the slider's 100 % when selling).
+  const [fullSell, setFullSell] = useState<{ key: string; grossCents: number } | null>(null);
+  const fullSellKey = open && !buying && heldE6 > 0 ? `${ticker}|${heldE6}|${price}` : null;
+  useEffect(() => {
+    if (!fullSellKey) return;
+    let live = true;
+    engine
+      .quoteOrder({ ticker, side: "sell", quantityE6: heldE6 })
+      .then((q) => {
+        if (live) setFullSell({ key: fullSellKey, grossCents: q.grossCents });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+    // The key holds every input the quote depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullSellKey]);
+  const fullSellCents = fullSell && fullSell.key === fullSellKey ? fullSell.grossCents : null;
+
+  // What 100 % on the slider means: all cash (buy) or the whole free position at its real proceeds (sell).
+  const maxAmountCents = buying ? cash : (fullSellCents ?? valueCents(heldE6, price));
   const maxSharesE6 = buying ? Math.min(MAX_QUANTITY_E6, quantityE6ForBudget(cash, price)) : heldE6;
 
   // Fresh form and a new idempotency key every time the sheet opens.
@@ -146,7 +166,12 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const estimatedTax = estimatedGain > 0 ? Math.round((Math.max(0, estimatedGain - lossPot) * TAX_BPS) / 10_000) : 0;
 
   // ADR-189: the exact fill plan from the server for the current input (market orders).
-  const sellAllNow = !buying && heldE6 > 0 && quantityE6 >= heldE6 * 0.999;
+  // Selling (almost) everything sells exactly the whole position, also by amount (ADR-189).
+  const sellAllNow =
+    !buying &&
+    heldE6 > 0 &&
+    (quantityE6 >= heldE6 * 0.999 ||
+      (mode === "amount" && fullSellCents !== null && (amountCents ?? 0) >= fullSellCents * 0.999));
   const quoteInput =
     open && type === "market" && quantityE6 > 0 && !inputError
       ? mode === "amount" && !sellAllNow
@@ -155,6 +180,7 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
       : null;
   const quoteKey = quoteInput ? `${ticker}|${shown}|${JSON.stringify(quoteInput)}` : null;
   const [quote, setQuote] = useState<{ key: string; value: OrderQuote } | null>(null);
+  const [quoteFailed, setQuoteFailed] = useState<{ key: string; text: string } | null>(null);
   useEffect(() => {
     if (!quoteKey || !quoteInput) return;
     let live = true;
@@ -164,7 +190,10 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
         .then((value) => {
           if (live) setQuote({ key: quoteKey, value });
         })
-        .catch(() => undefined);
+        .catch((error: unknown) => {
+          // No silent fallback to quantity x price: the order waits for a real preview.
+          if (live) setQuoteFailed({ key: quoteKey, text: errorText(error) });
+        });
     }, QUOTE_DELAY_MS);
     return () => {
       live = false;
@@ -174,17 +203,19 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteKey]);
   const plan = quote && quote.key === quoteKey ? quote.value : null;
-  const quoting = quoteKey !== null && plan === null;
+  const quoting = quoteKey !== null && plan === null && quoteFailed?.key !== quoteKey;
   const shownValue = plan ? plan.grossCents : value;
   const shownTax = plan ? plan.taxCents : estimatedTax;
   const shownTotal = plan ? plan.netCents : Math.max(0, total - estimatedTax);
 
+  const quoteError = quoteFailed && quoteFailed.key === quoteKey && !plan ? quoteFailed.text : null;
   const problem =
     inputError ??
+    quoteError ??
     (type === "limit" && !limitPrice ? t("limitError") : null) ??
     (text.trim() && value < MIN_ORDER_CENTS ? t("tooSmall") : null) ??
     (buying && total > cash ? t("insufficient") : null) ??
-    (!buying && quantityE6 > heldE6 * 1.001 ? t("insufficientShares") : null);
+    (!buying && !sellAllNow && quantityE6 > heldE6 * 1.001 ? t("insufficientShares") : null);
   const ready =
     !!security && !problem && quantityE6 > 0 && (type !== "market" || (plan !== null && plan.fillQuantityE6 > 0));
 
@@ -221,7 +252,7 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
     setBusy(true);
     try {
       // Selling (almost) everything sells everything: no tiny rest stays behind.
-      const sellAll = !buying && quantityE6 >= heldE6 * 0.999;
+      const sellAll = sellAllNow;
       // A capped order executes exactly the previewed part (ADR-189).
       const result = await placeOrder({
         requestId: requestId.current,
@@ -279,7 +310,9 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
   const summary =
     quantityE6 > 0
       ? mode === "amount"
-        ? t(buying ? "amountResultBuy" : "amountResultSell", { quantity: formatShares(quantityE6) })
+        ? t(buying ? "amountResultBuy" : "amountResultSell", {
+            quantity: formatShares(plan ? plan.fillQuantityE6 : quantityE6),
+          })
         : t("sharesResult", { value: formatMoney(value) })
       : t("pickHint");
 
