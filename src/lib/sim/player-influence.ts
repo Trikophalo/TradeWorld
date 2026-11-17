@@ -45,6 +45,20 @@ export function anchoredFairValue(
   return fairValueE4 * (1 + cfg.maxHoldingsPremium * Math.tanh(held / scale));
 }
 
+/**
+ * Daily band of a player company's stock (ADR-170): at most `dailyBandBps` above the previous close and down by the
+ * same factor, so money alone cannot push the price without limit in a day.
+ */
+export function playerStockBandE4(
+  priceE4: number,
+  prevCloseE4: number,
+  cfg: TradingConfig["playerStocks"] = BALANCE.trading.playerStocks,
+): number {
+  if (cfg.dailyBandBps <= 0 || prevCloseE4 <= 0) return priceE4;
+  const f = 1 + cfg.dailyBandBps / 10_000;
+  return Math.min(Math.ceil(prevCloseE4 * f), Math.max(Math.floor(prevCloseE4 / f), priceE4));
+}
+
 /** Per-tick decay of the player activity for the configured half-life. */
 export function activityDecay(
   tickSeconds: number,

@@ -124,6 +124,13 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Für gute Zustände und hohe Noten zahlt sie etwas mehr; das Verkaufsfenster sagt, bis zu welchem Preis.
 - **Karten umdrehen:** Beim Booster-Öffnen dreht ein Klick oder Tipp eine Karte um, Taste F oder Enter ebenso.
 
+- **Kein Geld mehr aus der eigenen Aktie (ADR-170):** KI-Anleger zeichnen Kapitalerhöhungen nur noch bis zum fairen
+  Wert, Ausgabeerlöse bleiben drei Tage in der Firma, nach einer Entnahme gibt es 24 Stunden keinen Kauf der eigenen
+  Aktie, und Spieleraktien bewegen sich je Tag höchstens 30 %.
+
+- **Lebendigere NFT-Sammler (ADR-170):** Sammler bieten alle paar Stunden neu, handeln den ganzen Tag unter sich und
+  bieten in deinen Auktionen mit, nie über ihrer Bewertung.
+
 - **Collectibles auf dem Profil (ADR-165):** Auf jedem Profil siehst du die wertvollsten Karten eines Spielers und
   über „Ganze Sammlung ansehen“ seinen ganzen Binder; dein eigenes Profil zeigt deine Karten mit Anzahl und Wert.
   Was du nicht einstellst, bleibt in „Deine Sammlung“ (neuer Filter „Zum Verkauf / Nicht zum Verkauf“), und

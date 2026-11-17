@@ -176,6 +176,9 @@ select tests.assert(
   and (public.player_company_team(:'co') ->> 'team_productivity_bps')::int = 15000
   and (public.player_company_team(:'co') ->> 'stage')::int = 0,
   'LISTED: the company is at the exchange; founder 60 %, Anton 25 %, Berta 10 %, AI float 5 %');
+-- the IPO money is locked for issueProceedsLockHours (ADR-170, a9_stock_pump.sql); this file plays days later
+select public.config_jsonb('startups', '{ipo,issueProceedsLockHours}') as lock0 \gset
+select tests.set_cfg('startups', '{ipo,issueProceedsLockHours}', '0');
 
 select tests.login_as('authenticated', :f);
 select public.get_listed_company() -> 'listed' as l0 \gset
@@ -910,3 +913,4 @@ select tests.assert(
 update public.game_config set value = jsonb_set(value, '{demandNoise}', :'noise0'::jsonb) where key = 'startups';
 select tests.set_cfg('listed', '{board,cooldownHours}', '6');
 select tests.set_cfg('listed', '{board,maxOpen}', '2');
+select tests.set_cfg('startups', '{ipo,issueProceedsLockHours}', :'lock0'::jsonb);

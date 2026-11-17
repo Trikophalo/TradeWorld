@@ -35,6 +35,7 @@ create or replace function tests.nft_ai(p_buy integer, p_offer integer, p_unlist
    where key = 'nfts' $$;
 grant execute on all functions in schema tests to public;
 select tests.nft_ai(10000, 10000, 0);
+select tests.set_cfg('nfts', '{ai,auction,bidChanceBps}', '0');  -- ADR-170: no collector bids in this file
 
 -- =============================================================================
 -- A. Minting: cost, mint_cents (the collectors' anchor), XP; rules as in src/lib/sim/nfts.ts

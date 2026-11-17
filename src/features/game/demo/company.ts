@@ -19,6 +19,8 @@ import {
   capacityCents,
   capitalIncreasePriceCents,
   closeStartupHour,
+  issueAiFactor,
+  postIssueFairCents,
   closeStartupQuarter,
   founderFactor,
   issuePriceCents,
@@ -152,7 +154,11 @@ export interface DemoCompanyState {
       /** Start of the subscription (older demo offers: derived from the end). */
       startsAt?: number;
       endsAt: number;
+      /** ADR-170: AI investors subscribe only up to the fair value (1 or 0; older demo offers: 1). */
+      aiFactor?: number;
     } | null;
+    /** ADR-170: start of the last capital increase (one per capitalIncreaseCooldownHours). */
+    lastCapitalIncreaseAt?: number;
   } | null;
   /** Quarter closes in a row with open bills (ADR-058). */
   distressQuarters?: number;
@@ -662,6 +668,8 @@ export function createCompanyEngine(host: CompanyHost) {
       company.quality,
       final ? window : at - startsAt,
       window,
+      startups,
+      offer.aiFactor ?? 1,
     );
     return Math.floor(e6 / 1_000_000);
   }
@@ -1284,13 +1292,28 @@ export function createCompanyEngine(host: CompanyHost) {
         if (!listing || listing.status !== "listed" || listing.offer) throw new GameError("invalid_argument");
         const pct = Math.round(sharePercent);
         if (pct < 1 || pct > startups.ipo.capitalIncreaseMaxPercent) throw new GameError("invalid_argument");
+        const now = Date.now();
+        if (
+          listing.lastCapitalIncreaseAt !== undefined &&
+          now - listing.lastCapitalIncreaseAt < startups.ipo.capitalIncreaseCooldownHours * 3_600_000
+        ) {
+          throw new GameError("capital_increase_cooldown");
+        }
+        const priceCents = capitalIncreasePriceCents(listing.lastPriceCents ?? startups.ipo.minIssuePriceCents);
+        const offered = Math.floor((listing.sharesTotal * pct) / 100);
+        listing.lastCapitalIncreaseAt = now;
         listing.offer = {
           id: `${company.id}-ci-${company.seq}`,
           kind: "capital_increase",
-          priceCents: capitalIncreasePriceCents(listing.lastPriceCents ?? startups.ipo.minIssuePriceCents),
-          offered: Math.floor((listing.sharesTotal * pct) / 100),
-          startsAt: Date.now(),
-          endsAt: Date.now() + SUBSCRIPTION_MS,
+          priceCents,
+          offered,
+          startsAt: now,
+          endsAt: now + SUBSCRIPTION_MS,
+          // ADR-170: AI investors pay at most the fair value after the increase
+          aiFactor: issueAiFactor(
+            postIssueFairCents(valueCents(company), listing.sharesTotal, offered, priceCents),
+            priceCents,
+          ),
         };
       }),
 

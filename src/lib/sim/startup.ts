@@ -218,8 +218,9 @@ export function aiSubscribedE6(
   elapsedMs: number,
   windowMs: number,
   cfg: StartupsConfig = BALANCE.startups,
+  aiFactor = 1,
 ): number {
-  const target = Math.floor(offeredE6 * aiTakeShare(quality, cfg));
+  const target = Math.floor(offeredE6 * Math.min(1, Math.max(0, aiFactor)) * aiTakeShare(quality, cfg));
   const t = windowMs <= 0 ? 1 : Math.min(1, Math.max(0, elapsedMs / windowMs));
   const fraction = 1 - (1 - t) ** Math.max(1, cfg.ipo.aiPace ?? 1);
   return Math.max(0, Math.min(Math.floor(target * fraction), offeredE6 - playersE6));
@@ -231,6 +232,27 @@ export function aiSubscribedE6(
  */
 export function ipoFilled(offeredE6: number, takenE6: number, cfg: StartupsConfig = BALANCE.startups): boolean {
   return takenE6 * 10_000 >= offeredE6 * cfg.ipo.minFillBps;
+}
+
+/**
+ * Fair value per share after an issue (ADR-170): company value plus the new money, over all shares afterwards.
+ */
+export function postIssueFairCents(
+  valueCents: number,
+  sharesBefore: number,
+  newShares: number,
+  priceCents: number,
+): number {
+  return (valueCents + newShares * priceCents) / Math.max(1, sharesBefore + newShares);
+}
+
+/**
+ * Share of their usual part AI investors subscribe in a capital increase (ADR-170): all of it while the price is at
+ * most aiMaxPremiumBps of the fair value, nothing above. They never pay for a price players pushed up.
+ */
+export function issueAiFactor(fairCents: number, priceCents: number, cfg: StartupsConfig = BALANCE.startups): number {
+  if (fairCents <= 0 || priceCents <= 0) return 0;
+  return priceCents * 10_000 > fairCents * cfg.ipo.aiMaxPremiumBps ? 0 : 1;
 }
 
 /** Price of new shares in a capital increase (cents per share). */

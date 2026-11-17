@@ -6,6 +6,7 @@ import {
   anchoredFairValue,
   nextActivityCents,
   playerImpactReturn,
+  playerStockBandE4,
   sharesValueCents,
 } from "./player-influence.ts";
 
@@ -53,5 +54,21 @@ describe("AI weight", () => {
     const ticks = (BALANCE.aiInvestors.playerWeight.activityHalfLifeHours * 3600) / BALANCE.time.tickSeconds;
     expect(Math.pow(activityDecay(BALANCE.time.tickSeconds), ticks)).toBeCloseTo(0.5, 9);
     expect(nextActivityCents(1_000, -200, 5)).toBeCloseTo(1_000 * activityDecay(5) + 200, 9);
+  });
+});
+
+describe("playerStockBandE4 (ADR-170)", () => {
+  const cfg = { insiderCooldownHours: 24, dailyBandBps: 3_000 };
+  it("keeps a player stock within +30 % / -23 % of the previous close", () => {
+    expect(playerStockBandE4(20_000, 10_000, cfg)).toBe(13_000);
+    expect(playerStockBandE4(12_000, 10_000, cfg)).toBe(12_000);
+    expect(playerStockBandE4(5_000, 10_000, cfg)).toBe(7_692);
+  });
+  it("is off without a band or a previous close", () => {
+    expect(playerStockBandE4(20_000, 10_000, { ...cfg, dailyBandBps: 0 })).toBe(20_000);
+    expect(playerStockBandE4(20_000, 0, cfg)).toBe(20_000);
+  });
+  it("uses the game's band", () => {
+    expect(BALANCE.trading.playerStocks.dailyBandBps).toBe(3_000);
   });
 });
