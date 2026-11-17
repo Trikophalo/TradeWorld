@@ -2323,7 +2323,9 @@ export const demoEngine: GameEngine = {
         else {
           // ADR-189: exactly the plan the preview showed; the rest of a capped order is not executed.
           if (hasAmount) requestedE6 = demoPlan(input.ticker, input.side, null, input.amountCents!).quantityE6;
-          if (input.side === "sell" && requestedE6 > free && requestedE6 <= free * 1.001) requestedE6 = free;
+          // ADR-189: a sale by amount that needs more than the position sells the whole position
+          if (input.side === "sell" && requestedE6 > free && (hasAmount || requestedE6 <= free * 1.001))
+            requestedE6 = free;
           if (input.side === "sell" && requestedE6 > free) throw new GameError("insufficient_position");
           plan = demoPlan(input.ticker, input.side, requestedE6, null);
           quantityE6 = plan.quantityE6;
@@ -2359,7 +2361,12 @@ export const demoEngine: GameEngine = {
   quoteOrder: (input) =>
     delay(() => {
       if (!meta(input.ticker)) throw new GameError("unknown_security");
-      const plan = demoPlan(input.ticker, input.side, input.quantityE6 ?? null, input.amountCents ?? null);
+      let plan = demoPlan(input.ticker, input.side, input.quantityE6 ?? null, input.amountCents ?? null);
+      const held = holdings().get(input.ticker);
+      const freeE6 = (held?.quantityE6 ?? 0) - (held?.reservedE6 ?? 0);
+      // a sale by amount never needs more than the position: it sells the whole position (ADR-189)
+      const byPosition = input.side === "sell" && input.amountCents != null && plan.quantityE6 > freeE6 && freeE6 > 0;
+      if (byPosition) plan = demoPlan(input.ticker, "sell", freeE6, null);
       const fee = plan.quantityE6 > 0 ? trading.orderFeeCents : 0;
       let tax = 0;
       const position = input.side === "sell" ? portfolioNow().positions.find((x) => x.ticker === input.ticker) : null;
@@ -2382,7 +2389,7 @@ export const demoEngine: GameEngine = {
           plan.quantityE6 === 0 ? 0 : input.side === "buy" ? plan.grossCents + fee : plan.grossCents - fee - tax,
         slippageBps: plan.slippageBps,
         impactBps: plan.impactBps,
-        limitedBy: null,
+        limitedBy: byPosition ? "position" : null,
       };
     }),
 

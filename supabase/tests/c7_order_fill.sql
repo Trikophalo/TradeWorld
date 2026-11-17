@@ -211,5 +211,46 @@ select tests.assert((:'qt'::jsonb ->> 'tax_cents')::bigint > 0
   and tests.cash(:a) - :t0::bigint = (:'qt'::jsonb ->> 'net_cents')::bigint,
   'gain: the previewed 25 % tax is what is withheld, the cash matches the preview: ' || :'qt');
 
+-- =============================================================================
+-- F. Live bug (8200): selling by amount 70.067 EUR with 48.955,03 shares at 1,56 EUR sells the whole position
+-- =============================================================================
+do $$
+declare
+  v_sec uuid := current_setting('c7.sec')::uuid;
+  v_who uuid := '0c7c7c7c-0000-4000-8000-0000000000a1';
+  v_amount bigint;
+  q jsonb;
+  r jsonb;
+  c0 bigint;
+  v_left bigint;
+begin
+  foreach v_amount in array array[7006700::bigint, 7636985::bigint] loop
+    perform tests.c7_quote(v_sec, 15600, 15600);
+    select coalesce(sum(p.quantity_e6), 0) into v_left from public.positions p
+     where p.player_id = v_who and p.security_id = v_sec and p.status = 'open';
+    if v_left > 0 then
+      r := tests.c7_order(v_who, current_setting('c7.tkr'), 'sell', v_left, null);
+    end if;
+    perform tests.c7_quote(v_sec, 15600, 15600);
+    r := tests.c7_order(v_who, current_setting('c7.tkr'), 'buy', 48955030000, null);
+    perform tests.assert(not (r ? 'error'), 'setup 48.955,03 shares: ' || r::text);
+    perform tests.c7_quote(v_sec, 15600, 15600);
+    c0 := tests.cash(v_who);
+    q := tests.c7_quote_order(v_who, current_setting('c7.tkr'), 'sell', null, v_amount);
+    r := tests.c7_order(v_who, current_setting('c7.tkr'), 'sell', null, v_amount);
+    raise notice 'c7 sell by amount %: preview % -> fill %', v_amount, q, r;
+    perform tests.assert(not (r ? 'error'), 'sell by amount ' || v_amount || ' executes: ' || r::text);
+    perform tests.assert((q ->> 'limited_by') = 'position' and (r ->> 'limited_by') = 'position'
+      and (q ->> 'fill_quantity_e6')::bigint = 48955030000 and (r ->> 'filled_quantity_e6')::bigint = 48955030000,
+      'sell by amount ' || v_amount || ': the whole position is sold, said as limited_by position');
+    perform tests.assert((r ->> 'avg_price_e4')::bigint = (q ->> 'avg_price_e4')::bigint
+      and tests.cash(v_who) - c0 = (q ->> 'net_cents')::bigint,
+      'sell by amount ' || v_amount || ': fill and cash equal the preview');
+    perform tests.assert(not exists (select 1 from public.positions p where p.player_id = v_who and p.security_id = v_sec
+                                       and p.status = 'open' and p.quantity_e6 > 0),
+      'sell by amount ' || v_amount || ': nothing left in the depot');
+  end loop;
+end $$;
+
 select tests.assert(tests.money_invariant() = 'ok', 'money invariant: ' || tests.money_invariant());
 rollback;
