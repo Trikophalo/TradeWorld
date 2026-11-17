@@ -63,11 +63,20 @@ export function BulkSell({ collection }: { collection: NexamonCollection }) {
 
   const sellToGame = () =>
     void sell.run(
-      (requestId) =>
-        engine.bulkSellNexamon(
-          requestId,
-          picked.map((c) => c.id),
-        ),
+      async (requestId) => {
+        // more than one call's worth: sell in chunks, each with its own stable request id (retries stay idempotent)
+        const max = BALANCE.nexamon.quickSell.maxPerCall;
+        const ids = picked.map((c) => c.id);
+        let count = 0;
+        let totalCents = 0;
+        for (let i = 0; i * max < ids.length; i++) {
+          const id = i === 0 ? requestId : requestId.slice(0, -4) + i.toString(16).padStart(4, "0");
+          const r = await engine.bulkSellNexamon(id, ids.slice(i * max, (i + 1) * max));
+          count += r.count;
+          totalCents += r.totalCents;
+        }
+        return { count, totalCents };
+      },
       {
         errorTitle: t("bulk.sellFailed"),
         onDone: (r) => {
@@ -305,7 +314,7 @@ export function BulkSell({ collection }: { collection: NexamonCollection }) {
               size="sm"
               className="h-auto min-h-9 max-w-full px-2 py-1 text-center text-xs leading-tight whitespace-normal"
               state={sell.state}
-              disabled={picked.length === 0 || picked.length > BALANCE.nexamon.quickSell.maxPerCall}
+              disabled={picked.length === 0}
               onClick={sellToGame}
               data-testid="bulk-sell-game"
             >
