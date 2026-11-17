@@ -583,6 +583,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "News-Aktionen",
         text: "Ab und zu kündigt Mr. Doodle Dangle in der Show eine Aktion für alle an, 15 Minuten lang: ein Booster-Set 20 % günstiger, ein Gratis-NFT oder eine…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-38c36423",
+        title: "Pack Battles mit mehreren Packs und bis zu vier Spielern",
+        text: "Stell bis zu zehn Packs in beliebiger Reihenfolge zusammen, wähle 2, 3 oder 4 Spieler und lade Freunde ein.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-f0664984",
+        title: "Firma übersichtlicher",
+        text: "Das Dashboard zeigt nur Zahlen und Grafiken, ein Tipp führt zum passenden Hebel; alles Fällige steht in einer Liste „Zu erledigen“, das Controlling…",
+      },
     ],
   },
   {
