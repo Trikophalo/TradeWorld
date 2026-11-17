@@ -45,8 +45,14 @@ test("new task games: receipts and pattern on the showcase (ADR-180)", async ({ 
   const receipts = page.getByTestId("game-receipts");
   await receipts.scrollIntoViewIfNeeded();
   // amounts [23, 48, 15, 72, 9, 31], total 87 = 15 + 72
-  await receipts.getByTestId("receipt").nth(2).click();
-  await receipts.getByTestId("receipt").nth(3).click();
+  for (const i of [2, 3]) {
+    const r = receipts.getByTestId("receipt").nth(i);
+    // the showcase is heavy: a tap before hydration is lost, so tap until it sticks
+    await expect(async () => {
+      if ((await r.getAttribute("aria-pressed")) !== "true") await r.click();
+      await expect(r).toHaveAttribute("aria-pressed", "true", { timeout: 500 });
+    }).toPass();
+  }
   await expect(receipts.getByText(/Ausgewählt 87/)).toBeVisible();
   await receipts.getByRole("button", { name: "Fertig" }).click();
   await expect(page.getByText('{"picked":[2,3]}')).toBeVisible();
