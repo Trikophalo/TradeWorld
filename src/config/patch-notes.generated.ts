@@ -544,9 +544,9 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "klare Abschnitte mit Zweck und Sprungleiste statt Klappmenüs, eine Statuszeile unter dem Firmenschild, „i“-Erklärungen und ein „Wo es fehlt“, das je…",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-d5ad3d63",
+        id: "startseite-waehrung-zur-wahl-freundescode-83287dc3",
         title: "Was du siehst, bekommst du",
-        text: "Die Order-Maske zeigt vor dem Bestätigen den echten Ausführungskurs, die Kursauswirkung und „Du erhältst ca. …“; große Orders bewegen den Kurs…",
+        text: "Die Order-Maske zeigt vor dem Bestätigen den echten Ausführungskurs, die Kursauswirkung und „Du erhältst ca. …“; Orders jeder Größe werden ganz…",
       },
     ],
   },

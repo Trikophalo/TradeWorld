@@ -504,7 +504,7 @@ function demoPlan(
     quantityE6,
     amountCents,
     feeCents: trading.orderFeeCents,
-    maxMoveBps: trading.priceImpact.maxImpactBpsPerOrder,
+    maxMoveBps: trading.maxTickReturnBps,
     bandLowE4: null,
     bandHighE4: null,
     minPriceE4: trading.minPriceE4,
@@ -2255,12 +2255,11 @@ export const demoEngine: GameEngine = {
         if (limit !== null) price = input.side === "buy" ? Math.min(price, limit) : Math.max(price, limit);
         else {
           // ADR-189: exactly the plan the preview showed; the rest of a capped order is not executed.
-          if (hasAmount) requestedE6 = demoPlan(input.ticker, input.side, null, input.amountCents!).requestedE6;
+          if (hasAmount) requestedE6 = demoPlan(input.ticker, input.side, null, input.amountCents!).quantityE6;
           if (input.side === "sell" && requestedE6 > free && requestedE6 <= free * 1.001) requestedE6 = free;
           if (input.side === "sell" && requestedE6 > free) throw new GameError("insufficient_position");
           plan = demoPlan(input.ticker, input.side, requestedE6, null);
-          if (plan.fillE6 <= 0) throw new GameError("order_impact_limit");
-          quantityE6 = plan.fillE6;
+          quantityE6 = plan.quantityE6;
           price = plan.avgPriceE4;
         }
         if (quantityE6 <= 0 || valueCents(quantityE6, price) < MIN_ORDER_CENTS) throw new GameError("order_too_small");
@@ -2284,7 +2283,7 @@ export const demoEngine: GameEngine = {
           xpTotal: pl.xpTotal,
           requestedQuantityE6: requestedE6,
           unfilledQuantityE6: requestedE6 - quantityE6,
-          limitedBy: plan?.limitedBy ?? null,
+          limitedBy: null,
           impactBps: plan?.impactBps ?? 0,
         };
       }),
@@ -2294,28 +2293,29 @@ export const demoEngine: GameEngine = {
     delay(() => {
       if (!meta(input.ticker)) throw new GameError("unknown_security");
       const plan = demoPlan(input.ticker, input.side, input.quantityE6 ?? null, input.amountCents ?? null);
-      const fee = plan.fillE6 > 0 ? trading.orderFeeCents : 0;
+      const fee = plan.quantityE6 > 0 ? trading.orderFeeCents : 0;
       let tax = 0;
       const position = input.side === "sell" ? portfolioNow().positions.find((x) => x.ticker === input.ticker) : null;
-      if (position && plan.fillE6 > 0) {
-        const gain = plan.grossCents - fee - valueCents(plan.fillE6, position.avgPriceE4);
+      if (position && plan.quantityE6 > 0) {
+        const gain = plan.grossCents - fee - valueCents(plan.quantityE6, position.avgPriceE4);
         const pot = p().lossPotCents ?? 0;
         if (gain > 0) tax = Math.round((Math.max(0, gain - pot) * trading.capitalGainsTaxBps) / 10_000);
       }
       return {
-        touchE4: plan.requestedE6 >= 0 ? (input.side === "buy" ? quote(input.ticker).ask : quote(input.ticker).bid) : 0,
-        requestedQuantityE6: plan.requestedE6,
-        fillQuantityE6: plan.fillE6,
-        unfilledQuantityE6: plan.unfilledE6,
+        touchE4: input.side === "buy" ? quote(input.ticker).ask : quote(input.ticker).bid,
+        requestedQuantityE6: plan.quantityE6,
+        fillQuantityE6: plan.quantityE6,
+        unfilledQuantityE6: 0,
         avgPriceE4: plan.avgPriceE4,
         lastPriceE4: plan.lastPriceE4,
         grossCents: plan.grossCents,
         feeCents: fee,
         taxCents: tax,
-        netCents: plan.fillE6 === 0 ? 0 : input.side === "buy" ? plan.grossCents + fee : plan.grossCents - fee - tax,
+        netCents:
+          plan.quantityE6 === 0 ? 0 : input.side === "buy" ? plan.grossCents + fee : plan.grossCents - fee - tax,
         slippageBps: plan.slippageBps,
         impactBps: plan.impactBps,
-        limitedBy: plan.limitedBy,
+        limitedBy: null,
       };
     }),
 

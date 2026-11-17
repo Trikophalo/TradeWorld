@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "../../config/balance.ts";
-import { type FillPlanInput, planMarketOrder, stockSlope } from "./order-fill.ts";
+import { type FillPlanInput, moveIntegral, planMarketOrder, stockSlope } from "./order-fill.ts";
 
 // The owner's sale (ADR-189): 58.877,58 shares of a penny player stock at a bid of about 1,63 €.
 const touchE4 = 16_300;
@@ -13,62 +13,71 @@ const base: FillPlanInput = {
   quantityE6: 58_877_583_251,
   amountCents: null,
   feeCents: 100,
-  maxMoveBps: BALANCE.trading.priceImpact.maxImpactBpsPerOrder,
+  maxMoveBps: BALANCE.trading.maxTickReturnBps,
   bandLowE4: null,
   bandHighE4: null,
   minPriceE4: 1,
 };
 
 describe("planMarketOrder (ADR-189)", () => {
-  it("without a cap reproduces the half-price fill of the bug report", () => {
+  it("the old unbounded linear path reproduces the half-price fill of the bug report", () => {
     const plan = planMarketOrder({ ...base, maxMoveBps: 1_000_000 });
-    expect(plan.fillE6).toBe(base.quantityE6);
     expect(plan.avgPriceE4).toBeGreaterThan(8_400);
     expect(plan.avgPriceE4).toBeLessThan(8_600);
-    expect(plan.grossCents).toBeLessThan(5_100_000);
   });
 
-  it("caps the move of the last share and reports the rest", () => {
+  it("the owner's sale now fills completely at a fair price", () => {
     const plan = planMarketOrder(base);
-    expect(plan.limitedBy).toBe("impact");
-    expect(plan.fillE6 + plan.unfilledE6).toBe(base.quantityE6);
-    expect(plan.lastPriceE4).toBeGreaterThanOrEqual(Math.floor(touchE4 * 0.85) - 1);
-    expect(plan.slippageBps).toBeLessThanOrEqual(751);
-    expect(plan.impactBps).toBeGreaterThanOrEqual(-1500);
-    // proceeds per share stay close to the quote
-    expect(plan.avgPriceE4).toBeGreaterThanOrEqual(touchE4 * 0.925 - 1);
+    expect(plan.quantityE6).toBe(base.quantityE6);
+    const a = slope * 58_877.583251;
+    expect(plan.avgPriceE4).toBe(Math.round(touchE4 * (1 - (0.1 * a - 0.005) / a)));
+    expect(plan.grossCents).toBeGreaterThan(8_600_000);
+    expect(plan.impactBps).toBe(-1000);
+    expect(plan.netCents).toBe(plan.grossCents - 100);
   });
 
-  it("small orders fill fully with the disclosed slippage", () => {
+  it("small orders keep the ADR-126 half move", () => {
     const plan = planMarketOrder({ ...base, quantityE6: 1_000_000_000 });
-    expect(plan.limitedBy).toBeNull();
-    expect(plan.unfilledE6).toBe(0);
-    expect(plan.netCents).toBe(plan.grossCents - 100);
     expect(plan.avgPriceE4).toBe(Math.round(touchE4 * (1 - slope * 500)));
   });
 
-  it("the daily band limits before the cap", () => {
+  it("no size limit: 1 million euros fill, never further than one tick can move", () => {
+    const buy = planMarketOrder({ ...base, side: "buy", quantityE6: null, amountCents: 100_000_000 });
+    expect(buy.netCents).toBeLessThanOrEqual(100_000_000);
+    expect(buy.netCents).toBeGreaterThan(99_999_000);
+    expect(buy.avgPriceE4).toBeLessThanOrEqual(Math.ceil(touchE4 * 1.1));
+    const sell = planMarketOrder({ ...base, quantityE6: buy.quantityE6 });
+    expect(sell.avgPriceE4).toBeGreaterThanOrEqual(Math.floor(touchE4 * 0.9));
+  });
+
+  it("a round trip never earns the own move", () => {
+    const buy = planMarketOrder({ ...base, side: "buy", quantityE6: 100_000_000_000 });
+    // the next tick moves the price at most maxMove up; selling everything then
+    const after = Math.round(touchE4 * (1 + base.maxMoveBps / 10_000));
+    const sell = planMarketOrder({
+      ...base,
+      touchE4: after,
+      slope: (slope * after) / touchE4,
+      quantityE6: buy.quantityE6,
+    });
+    expect(sell.netCents).toBeLessThan(buy.netCents);
+  });
+
+  it("the daily band is never crossed, the order still fills", () => {
     const plan = planMarketOrder({ ...base, bandLowE4: 15_500 });
-    expect(plan.limitedBy).toBe("band");
-    expect(plan.lastPriceE4).toBeGreaterThanOrEqual(15_499);
-    const none = planMarketOrder({ ...base, bandLowE4: 17_000 });
-    expect(none.fillE6).toBe(0);
+    expect(plan.quantityE6).toBe(base.quantityE6);
+    expect(plan.avgPriceE4).toBe(15_500);
+    expect(plan.lastPriceE4).toBe(15_500);
   });
 
-  it("amount orders solve the price path exactly", () => {
+  it("amount sells get at least the amount", () => {
     const sell = planMarketOrder({ ...base, quantityE6: null, amountCents: 1_000_000 });
-    // the average price is rounded to 0,0001 €, so the proceeds are exact within that rounding
-    expect(Math.abs(sell.grossCents - 1_000_000)).toBeLessThanOrEqual(100);
-    const buy = planMarketOrder({ ...base, side: "buy", quantityE6: null, amountCents: 1_000_000 });
-    expect(buy.netCents).toBeLessThanOrEqual(1_000_000);
-    expect(buy.netCents).toBeGreaterThan(999_900);
-    expect(buy.avgPriceE4).toBeGreaterThan(touchE4);
+    expect(sell.grossCents).toBeGreaterThanOrEqual(1_000_000);
+    expect(sell.grossCents - 1_000_000).toBeLessThanOrEqual(2);
   });
 
-  it("buys are capped above the touch the same way", () => {
-    const plan = planMarketOrder({ ...base, side: "buy" });
-    expect(plan.limitedBy).toBe("impact");
-    expect(plan.lastPriceE4).toBeLessThanOrEqual(Math.ceil(touchE4 * 1.15) + 1);
-    expect(plan.impactBps).toBeGreaterThan(0);
+  it("moveIntegral saturates", () => {
+    expect(moveIntegral(10, 0.01, 0.1)).toBeCloseTo(0.5);
+    expect(moveIntegral(20, 0.01, 0.1)).toBeCloseTo(1.5);
   });
 });

@@ -2,10 +2,10 @@
 -- c7 · The preview is the fill (ADR-189)
 -- =============================================================================
 -- The owner's report: "Ich habe für über 100k verkauft und nur 50k bekommen." The order sheet showed
--- quantity x bid; the server filled 58.877,58 shares of a penny player stock along the impact path (ADR-126) at an
--- average of 0,8489 EUR instead of about 1,63 EUR. Now quote_order() and place_order() share one plan: what the
--- preview shows is what is executed, the last share moves the price at most maxImpactBpsPerOrder, the daily band of
--- player stocks is never crossed, and the rest is reported instead of being filled far below the quote.
+-- quantity x bid; the server filled 58.877,58 shares of a penny player stock along the unbounded impact path
+-- (ADR-126) at an average of 0,8489 EUR instead of about 1,63 EUR. Now quote_order() and place_order() share one
+-- plan: what the preview shows is what is executed, any size fills completely, no order moves the price further
+-- than one tick can (maxTickReturnBps), and no share of a player stock fills outside the daily band.
 \set QUIET 1
 set client_min_messages = notice;
 
@@ -17,7 +17,7 @@ update public.sim_runtime set is_paused = false;
 select tests.set_level(:f, 12);
 select tests.set_level(:a, 12);
 select tests.fund(:f, 5000000, 'test:c7:f');
-select tests.fund(:a, 30000000, 'test:c7:a');
+select tests.fund(:a, 150000000, 'test:c7:a');
 
 -- puts a stock at a fixed quote (bid = ask = p) with no pending player flow
 create or replace function tests.c7_quote(p_sec uuid, p_e4 bigint, p_prev bigint) returns void language sql as $$
@@ -87,20 +87,20 @@ select tests.assert((select quantity_e6 from public.positions where player_id = 
   = 58877583251, 'setup: Arne holds the owner''s 58.877,583251 shares');
 
 -- =============================================================================
--- B. Before ADR-189 (no cap): the preview now at least tells the truth, about 49.980 EUR for 58.877 shares
+-- B. Before ADR-189 (unbounded linear path): 58.877 shares at a bid of 1,63 EUR fill at about 0,85 EUR
 -- =============================================================================
 select tests.c7_quote(:'sec', 16300, 16300);
-select tests.set_cfg('trading', '{priceImpact,maxImpactBpsPerOrder}', '1000000');
+select tests.set_cfg('trading', '{maxTickReturnBps}', '1000000');
 select tests.set_cfg('trading', '{playerStocks,dailyBandBps}', '0');
 select tests.c7_quote_order(:a, :'tkr', 'sell', 58877583251, null) as old \gset
 select tests.assert((:'old'::jsonb ->> 'avg_price_e4')::bigint between 8400 and 8600
   and (:'old'::jsonb ->> 'gross_cents')::bigint between 4900000 and 5100000,
-  'old model: 58.877 shares at a bid of 1,63 EUR fill at about 0,85 EUR, about 50.000 EUR (the bug report): ' || :'old');
-select tests.set_cfg('trading', '{priceImpact,maxImpactBpsPerOrder}', '1500');
+  'old model: about 0,85 EUR, about 50.000 EUR (the bug report): ' || :'old');
+select tests.set_cfg('trading', '{maxTickReturnBps}', '1000');
 select tests.set_cfg('trading', '{playerStocks,dailyBandBps}', '10000');
 
 -- =============================================================================
--- C. The owner's sale now: preview = fill, impact capped, the rest reported
+-- C. The owner's sale now: preview = fill, all shares, fair price
 -- =============================================================================
 select tests.c7_quote(:'sec', 16300, 16300);
 select tests.cash(:a) as c0 \gset
@@ -108,57 +108,44 @@ select tests.c7_quote_order(:a, :'tkr', 'sell', 58877583251, null) as q \gset
 select tests.c7_order(:a, :'tkr', 'sell', 58877583251, null) as r \gset
 select tests.cash(:a) as c1 \gset
 select tests.assert(not (:'r'::jsonb ? 'error'), 'the sale executes: ' || :'r');
-select tests.assert((:'q'::jsonb ->> 'limited_by') = 'impact' and (:'r'::jsonb ->> 'limited_by') = 'impact'
-  and (:'q'::jsonb ->> 'unfilled_quantity_e6')::bigint > 0
-  and (:'r'::jsonb ->> 'unfilled_quantity_e6')::bigint = (:'q'::jsonb ->> 'unfilled_quantity_e6')::bigint,
-  'the preview and the result say that only part fills (impact limit): ' || :'q');
-select tests.assert((:'r'::jsonb ->> 'filled_quantity_e6')::bigint = (:'q'::jsonb ->> 'fill_quantity_e6')::bigint
-  and (:'r'::jsonb ->> 'avg_price_e4')::bigint = (:'q'::jsonb ->> 'avg_price_e4')::bigint
+select tests.assert((:'r'::jsonb ->> 'filled_quantity_e6')::bigint = 58877583251
+  and (:'q'::jsonb ->> 'fill_quantity_e6')::bigint = 58877583251
+  and (:'r'::jsonb ->> 'unfilled_quantity_e6')::bigint = 0 and (:'r'::jsonb ->> 'limited_by') is null,
+  'the whole position is sold, nothing is held back');
+select tests.assert((:'r'::jsonb ->> 'avg_price_e4')::bigint = (:'q'::jsonb ->> 'avg_price_e4')::bigint
   and (:'r'::jsonb ->> 'gross_cents')::bigint = (:'q'::jsonb ->> 'gross_cents')::bigint
   and (:'r'::jsonb ->> 'tax_cents')::bigint = (:'q'::jsonb ->> 'tax_cents')::bigint,
-  'sell: fill equals the preview (quantity, price, gross, tax)');
+  'sell: fill equals the preview (price, gross, tax)');
 select tests.assert(:c1::bigint - :c0::bigint = (:'q'::jsonb ->> 'net_cents')::bigint,
-  'sell: the cash credited is exactly the previewed "Du erhältst" (' || (:c1::bigint - :c0::bigint) || ' vs '
-  || (:'q'::jsonb ->> 'net_cents') || ')');
-select tests.assert((:'q'::jsonb ->> 'avg_price_e4')::bigint >= 15070
-  and (:'q'::jsonb ->> 'impact_bps')::integer between -1500 and -1400
-  and (:'q'::jsonb ->> 'last_price_e4')::bigint >= 13855,
-  'sell: the average stays within 7,5 % of the bid, the price moves at most 15 %: ' || :'q');
--- ledger: the seller's cash got gross - fee - tax, fee and tax went to the treasury, nothing else
+  'sell: the cash credited is exactly the previewed "Du erhältst" (' || (:c1::bigint - :c0::bigint) || ')');
+select tests.assert((:'q'::jsonb ->> 'avg_price_e4')::bigint between 14700 and 14800
+  and (:'q'::jsonb ->> 'impact_bps')::integer = -1000
+  and (:'q'::jsonb ->> 'net_cents')::bigint > 8600000,
+  'sell: about 1,475 EUR on average (-9,5 %), over 86.000 EUR instead of 49.916 EUR: ' || :'q');
 select tests.assert((select t.gross_cents - t.fee_cents - t.tax_cents from public.trades t
                       where t.order_id = (:'r'::jsonb ->> 'order_id')::uuid) = :c1::bigint - :c0::bigint
   and (select t.tax_cents from public.trades t where t.order_id = (:'r'::jsonb ->> 'order_id')::uuid) = 0,
   'ledger: the sale (a loss, no tax) credits the seller with gross minus the 1 EUR fee');
 
--- a second sale in the same tick: the cap is used up, the order is refused, nothing is booked
-select tests.c7_quote_order(:a, :'tkr', 'sell', 10000000000, null) as q2 \gset
-select tests.c7_order(:a, :'tkr', 'sell', 10000000000, null) as r2 \gset
-select tests.assert((:'q2'::jsonb ->> 'fill_quantity_e6')::bigint = 0 and (:'q2'::jsonb ->> 'net_cents')::bigint = 0
-  and (:'r2'::jsonb ->> 'error') = 'order_impact_limit' and tests.cash(:a) = :c1::bigint,
-  'in the same tick the cap is used up: preview 0, order refused with order_impact_limit: ' || :'r2');
-
 -- =============================================================================
--- D. The daily band (ADR-170) limits explicitly, never fills below it
+-- D. The daily band (ADR-170): the sale still fills completely, never below the band
 -- =============================================================================
--- band low = 30.000 / 2 = 15.000 > cap bound 13.855: the band binds
+select tests.c7_quote(:'sec', 16300, 16300);
+select tests.c7_order(:a, :'tkr', 'buy', 20000000000, null) is not null as ok \gset
 select tests.c7_quote(:'sec', 16300, 30000);
-select tests.c7_quote_order(:a, :'tkr', 'sell', 30000000000, null) as qb \gset
-select tests.c7_order(:a, :'tkr', 'sell', 30000000000, null) as rb \gset
-select tests.assert((:'qb'::jsonb ->> 'limited_by') = 'band' and (:'rb'::jsonb ->> 'limited_by') = 'band'
-  and (:'qb'::jsonb ->> 'last_price_e4')::bigint >= 15000
-  and (:'rb'::jsonb ->> 'filled_quantity_e6')::bigint = (:'qb'::jsonb ->> 'fill_quantity_e6')::bigint
-  and (:'rb'::jsonb ->> 'avg_price_e4')::bigint = (:'qb'::jsonb ->> 'avg_price_e4')::bigint,
-  'band: the sale fills only down to the band (1,50 EUR), as previewed: ' || :'qb');
--- bid already below the band: nothing fills, refused with price_band_limit
-select tests.c7_quote(:'sec', 16300, 40000);
-select tests.c7_order(:a, :'tkr', 'sell', 1000000000, null) as rb2 \gset
-select tests.assert((:'rb2'::jsonb ->> 'error') = 'price_band_limit', 'band reached: price_band_limit: ' || :'rb2');
+select tests.c7_quote_order(:a, :'tkr', 'sell', 20000000000, null) as qb \gset
+select tests.c7_order(:a, :'tkr', 'sell', 20000000000, null) as rb \gset
+select tests.assert((:'rb'::jsonb ->> 'filled_quantity_e6')::bigint = 20000000000
+  and (:'qb'::jsonb ->> 'avg_price_e4')::bigint = 15000
+  and (:'rb'::jsonb ->> 'avg_price_e4')::bigint = 15000,
+  'band: the sale fills completely at the band (1,50 EUR), as previewed: ' || :'qb');
 
 -- =============================================================================
--- E. 100.000 EUR buys and sells: player stock and AI stocks, preview = fill
+-- E. 100.000 EUR and 1.000.000 EUR buys and sells: player stock and AI stocks, preview = fill
 -- =============================================================================
-create temp table c7_cases (tkr text);
-insert into c7_cases values (:'tkr'), ('DRN'), ('ALM'), ('BRZ');
+create temp table c7_cases (tkr text, amount bigint);
+insert into c7_cases values (:'tkr', 10000000), ('DRN', 10000000), ('ALM', 10000000), ('BRZ', 10000000),
+                            (:'tkr', 100000000), ('BRZ', 100000000);
 do $$
 declare
   c record;
@@ -168,41 +155,40 @@ declare
   c0 bigint;
   v_held bigint;
   v_side text;
+  v_who uuid := '0c7c7c7c-0000-4000-8000-0000000000a1';
 begin
-  for c in select tkr from c7_cases loop
+  for c in select tkr, amount from c7_cases loop
     select id into v_sec from public.securities where ticker = c.tkr;
     foreach v_side in array array['buy', 'sell'] loop
       perform tests.c7_quote(v_sec, 16300, 16300);
-      c0 := tests.cash('0c7c7c7c-0000-4000-8000-0000000000a1');
+      c0 := tests.cash(v_who);
       if v_side = 'buy' then
-        q := tests.c7_quote_order('0c7c7c7c-0000-4000-8000-0000000000a1', c.tkr, 'buy', null, 10000000);
-        r := tests.c7_order('0c7c7c7c-0000-4000-8000-0000000000a1', c.tkr, 'buy', null, 10000000);
+        q := tests.c7_quote_order(v_who, c.tkr, 'buy', null, c.amount);
+        r := tests.c7_order(v_who, c.tkr, 'buy', null, c.amount);
       else
         select p.quantity_e6 into v_held from public.positions p
-         where p.player_id = '0c7c7c7c-0000-4000-8000-0000000000a1' and p.security_id = v_sec and p.status = 'open';
-        q := tests.c7_quote_order('0c7c7c7c-0000-4000-8000-0000000000a1', c.tkr, 'sell', v_held, null);
-        r := tests.c7_order('0c7c7c7c-0000-4000-8000-0000000000a1', c.tkr, 'sell', v_held, null);
+         where p.player_id = v_who and p.security_id = v_sec and p.status = 'open';
+        q := tests.c7_quote_order(v_who, c.tkr, 'sell', v_held, null);
+        r := tests.c7_order(v_who, c.tkr, 'sell', v_held, null);
       end if;
-      raise notice 'c7 % % 100k: preview % -> fill %', c.tkr, v_side, q, r;
+      raise notice 'c7 % % %: preview % -> fill %', c.tkr, v_side, c.amount, q, r;
       perform tests.assert(not (r ? 'error'), c.tkr || ' ' || v_side || ' executes: ' || r::text);
       perform tests.assert((r ->> 'filled_quantity_e6')::bigint = (q ->> 'fill_quantity_e6')::bigint
         and (r ->> 'avg_price_e4')::bigint = (q ->> 'avg_price_e4')::bigint
-        and (r ->> 'limited_by') is not distinct from (q ->> 'limited_by'),
-        c.tkr || ' ' || v_side || ': fill equals the preview');
-      perform tests.assert(abs(tests.cash('0c7c7c7c-0000-4000-8000-0000000000a1') - c0)
-                           = (q ->> 'net_cents')::bigint,
+        and (r ->> 'unfilled_quantity_e6')::bigint = 0,
+        c.tkr || ' ' || v_side || ' ' || c.amount || ': fill equals the preview, completely');
+      perform tests.assert(abs(tests.cash(v_who) - c0) = (q ->> 'net_cents')::bigint,
         c.tkr || ' ' || v_side || ': cash moves by exactly the previewed amount');
-      perform tests.assert(abs((q ->> 'impact_bps')::integer) <= 1500 and (q ->> 'slippage_bps')::integer <= 751,
-        c.tkr || ' ' || v_side || ': impact disclosed and capped: ' || q::text);
+      perform tests.assert(abs((q ->> 'impact_bps')::integer) <= 1000 and (q ->> 'slippage_bps')::integer <= 1000,
+        c.tkr || ' ' || v_side || ': impact disclosed, never beyond one tick: ' || q::text);
       if v_side = 'buy' then
-        perform tests.assert((q ->> 'net_cents')::bigint <= 10000000, c.tkr || ': a 100.000 EUR buy never spends more');
+        perform tests.assert((q ->> 'net_cents')::bigint <= c.amount
+                             and (q ->> 'net_cents')::bigint > c.amount * 0.999,
+          c.tkr || ': the buy spends the amount, never more');
       end if;
     end loop;
   end loop;
 end $$;
--- a blue chip absorbs 100.000 EUR in full (5 % move), a penny stock does not
-select tests.assert((tests.c7_quote_order(:a, 'BRZ', 'buy', null, 10000000) ->> 'limited_by') is null,
-  'a blue chip takes a 100.000 EUR buy in full');
 
 -- a sale with a gain: the preview shows the capital gains tax, the fill takes exactly that (25 %, never more)
 select id as brz from public.securities where ticker = 'BRZ' \gset

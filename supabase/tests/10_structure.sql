@@ -171,7 +171,9 @@ select tests.assert(
            -- sealed booster packs (ADR-177)
            'get_nexamon_sealed_packs', 'open_nexamon_sealed_pack', 'buy_nexamon_sealed_pack',
            -- company autopilot (ADR-180)
-           'get_company_autopilot', 'set_company_autopilot']
+           'get_company_autopilot', 'set_company_autopilot',
+           -- order preview (ADR-189)
+           'quote_order']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

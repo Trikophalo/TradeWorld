@@ -4171,7 +4171,7 @@ Funktionskarte: `docs/FIRMA_ANALYSE.md`.
 `select * from job_runs where job_name in ('company_hours', 'company_hour_step')`. `profiles.reputation` (Spieler-Ruf
 aus Spec 6.6) bleibt unbenutzt.
 
-## ADR-189: Die Vorschau ist die Ausführung, eine Order bewegt den Kurs höchstens 15 % — `Annahme`
+## ADR-189: Die Vorschau ist die Ausführung, große Orders zu fairem Preis ohne Größengrenze — `Annahme`
 
 Vorgabe des Besitzers: „Wenn man Aktien verkauft, bekommt man manchmal nur die Hälfte. Ich habe gerade für über 100k
 verkauft und nur 50k bekommen. Beim Kaufen ist der Fehler auch ab einer bestimmten Zahl.“ Umsatzzeile:
@@ -4193,40 +4193,43 @@ verkauft und nur 50k bekommen. Beim Kaufen ist der Fehler auch ab einer bestimmt
   Verlust 0 €), das Tagesband aus ADR-170 (begrenzt den Takt-Kurs, nicht die Ausführung) und die Buchung (der Verkäufer
   bekommt genau Brutto − Gebühr − Steuer auf `player_cash`, die Gebühr geht an den Staat).
 
-**Entscheidung:**
+**Entscheidung** (mit dem Wunsch des Besitzers: „Man soll generell von Aktien so viele auf einmal kaufen wie man will
+… keine Sperre bei 100k. So viel kaufen und verkaufen, wie man mag.“):
 
-- **Ein Plan für Vorschau und Ausführung:** `market_order_plan()` (SQL) = `planMarketOrder()` (`src/lib/sim/order-fill.ts`).
-  `quote_order(ticker, side, menge | betrag)` liefert ihn samt Gebühr und Steuer (FIFO-Lose, Verlusttopf wie
-  `execute_fill`) für die Maske; `place_order` führt bei Sofort-Orders genau diesen Plan aus. Beträge werden entlang des
-  Preispfads gelöst (quadratische Gleichung), ein Kauf gibt nie mehr als den Betrag aus.
-- **Höchstens 15 % je Order:** Der Preis der letzten Aktie entfernt sich höchstens `priceImpact.maxImpactBpsPerOrder`
-  (1.500 bps) vom Geld-/Briefkurs, der Durchschnitt also höchstens 7,5 %. Bei Spieleraktien bleibt die letzte Aktie
-  außerdem im Tagesband (ADR-170). Was darüber hinausginge, wird **nicht ausgeführt**: Ergebnis mit
-  `requested_quantity_e6`, `unfilled_quantity_e6`, `limited_by` (`impact` oder `band`) und `impact_bps`. Geht gar
-  nichts mehr (Grenze in diesem Takt schon erreicht oder Kurs am Band), lehnt der Server mit `order_impact_limit` bzw.
-  `price_band_limit` ab. Der ausstehende Spielerfluss des Takts zählt mit, Aufteilen in kleine Orders umgeht die Grenze
-  also nicht; im nächsten Takt geht es zum neuen Kurs weiter.
+- **Ein Plan für Vorschau und Ausführung:** `market_order_plan()` (SQL) = `planMarketOrder()`
+  (`src/lib/sim/order-fill.ts`). `quote_order(ticker, side, menge | betrag)` liefert ihn samt Gebühr und Steuer
+  (FIFO-Lose, Verlusttopf wie `execute_fill`) für die Maske; `place_order` führt bei Sofort-Orders genau diesen Plan
+  aus. Beträge werden entlang des Preispfads gelöst (Bisektion), ein Kauf gibt nie mehr als den Betrag aus.
+- **Fairer Preispfad statt Grenze:** Die n-te Aktie bewegt den Kurs um `min(a × n, maxTickReturnBps)`. Kleine Orders
+  zahlen wie bisher die halbe eigene Bewegung (ADR-126). Mehr als ein Takt den Kurs bewegen kann (10 %,
+  `trading.maxTickReturnBps`), kann auch eine Order ihn nicht bewegen; darüber hinaus füllt jede weitere Aktie zum
+  gesättigten Preis. Eine Order zahlt so im Schnitt höchstens knapp 10 %, egal wie groß. Ein Hin und Her lohnt sich
+  weiter nicht: der Takt hebt den Kurs höchstens um dieselben 10 %, die der Käufer schon im Schnitt fast bezahlt hat
+  (Test „a round trip never earns the own move“).
+- **Keine Größengrenze:** Jede Menge wird ganz ausgeführt; `trading.maxOrderQuantity` ist nur noch eine technische
+  Schranke (1 Mrd. Stück). Grenzen sind allein Guthaben, Depotbestand und der freie Bestand der Aktie (ADR-153,
+  `limited_by = 'supply'` mit `unfilled_quantity_e6`, in Vorschau und Ergebnis).
+- **Tagesband (ADR-170):** Keine Aktie einer Spielerfirma wird jenseits des Bands ausgeführt; die Order wird trotzdem
+  ganz ausgeführt, Aktien jenseits des Bands zum Bandpreis (nie über dem Geld- bzw. unter dem Briefkurs). Bei
+  ±100 %/−50 % und höchstens 10 % Bewegung je Order greift das nur, wenn der Kurs schon am Band steht.
 - **Die Maske zeigt den Plan:** Ø Ausführungskurs, Kursauswirkung (±%), „Du erhältst ca. X €“ / „Du zahlst ca. X €“.
-  Ab 5 % Kursauswirkung (`trading.highImpactWarnBps`) ein Warnhinweis mit dem genauen Betrag, bei einer Teilausführung
-  „Nur N von M Stück werden jetzt ausgeführt …“. Bestätigt wird erst, wenn der Plan da ist; eine begrenzte Order schickt
-  genau die angezeigte Stückzahl. Limit-Orders bleiben unverändert (im Spiel ausgeblendet, ADR-117).
-- Verworfen: die Spieler-Tiefe allgemein erhöhen (ADR-120/126/170 bauen darauf, Pumpen würde wieder billig), nur warnen
-  ohne Grenze (ein Halteknopf schützt nicht vor −50 %), Rest als offene Order liegen lassen (Sofort-Orders sollen sofort
-  fertig sein).
+  Ab 5 % Kursauswirkung (`trading.highImpactWarnBps`) ein Warnhinweis mit dem genauen Betrag; bestätigt wird mit dem
+  Halteknopf erst, wenn der Plan da ist. Limit-Orders bleiben unverändert (im Spiel ausgeblendet, ADR-117).
+- Verworfen: eine Grenze je Order mit Teilausführung (erster Entwurf; der Besitzer will beliebig große Orders), die
+  Spieler-Tiefe allgemein erhöhen (Pumpen würde wieder billig), nur warnen ohne fairen Preis.
 
-**Zahlen vorher/nachher** (Spieleraktie, Geldkurs 1,63 €, `c7_order_fill.sql`):
+**Zahlen vorher/nachher** (Geldkurs 1,63 €, `c7_order_fill.sql`):
 
-| Order                                | vorher                               | nachher                                                                                     |
-| ------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Verkauf 58.877,58 Stück (≈ 96.000 €) | Ø 0,848 €, 49.916 €, Maske: 96.000 € | 9.202,45 Stück zu Ø 1,5078 €, 13.874 € (Maske = Buchung), Rest 49.675 Stück bleibt im Depot |
-| gleich danach noch einmal            | noch tiefer                          | abgelehnt (`order_impact_limit`), Hinweis in der Maske                                      |
-| Kauf 100.000 € Pennystock (KI)       | Ø +50 %                              | 16.125 € zu Ø +7,5 %, Rest nicht ausgeführt                                                 |
-| Kauf 100.000 € Midcap (ALM)          | Ø +10 %                              | 80.624 € zu Ø +7,5 %                                                                        |
-| Kauf 100.000 € Blue Chip (BRZ)       | Ø +2,4 %                             | unverändert, ganz ausgeführt, Kursauswirkung +4,9 % angezeigt                               |
+| Order                                   | vorher                               | nachher                                                  |
+| --------------------------------------- | ------------------------------------ | -------------------------------------------------------- |
+| Verkauf 58.877,58 Stück Spieleraktie    | Ø 0,848 €, 49.916 €; Maske: 96.000 € | ganz, Ø 1,4755 € (−9,5 %), ca. 86.870 €, Maske = Buchung |
+| Kauf 100.000 € Pennystock               | Ø +50 %                              | ganz, Ø knapp +9,5 %                                     |
+| Kauf 100.000 € Blue Chip                | Ø +2,4 %                             | unverändert, Kursauswirkung +4,9 % angezeigt             |
+| Kauf 1.000.000 € Spieleraktie/Blue Chip | Ø weit über +100 % bzw. +25 %        | ganz, Ø knapp +10 % bzw. +9 %                            |
 
-Folgen: Wer eine große Position in einer Spieleraktie hat, verkauft sie über mehrere Takte, jeweils zu höchstens 7,5 %
-Abschlag, statt in einem Rutsch zur Hälfte. Mit 4 Spielern gilt die Grenze je Takt für alle zusammen (gemeinsamer
-Spielerfluss). Tests: `src/lib/sim/order-fill.test.ts`, `supabase/tests/c7_order_fill.sql`, `e2e/order-fill.spec.ts`.
+Folgen: Große Positionen lassen sich in einem Zug handeln und kosten höchstens rund 10 % Kursauswirkung. Mit 4 Spielern
+zählt der ausstehende Spielerfluss des Takts für alle zusammen. Tests: `src/lib/sim/order-fill.test.ts`,
+`supabase/tests/c7_order_fill.sql`, `e2e/order-fill.spec.ts`.
 
 **Entschädigung:** Die Verkäufe mit großer Kursauswirkung findet auf Live (nur lesend):
 

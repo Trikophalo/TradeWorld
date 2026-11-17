@@ -1770,7 +1770,8 @@ export const BALANCE = {
   trading: {
     limitOrders: false,
     orderFeeCents: 100,
-    maxOrderQuantity: 100_000,
+    // ADR-189: no order-size limit; only a technical bound (supply, cash and holdings limit real orders)
+    maxOrderQuantity: 1_000_000_000,
     quantityScale: 1_000_000,
     minOrderValueCents: 100,
     capitalGainsTaxBps: 2500,
@@ -1786,7 +1787,6 @@ export const BALANCE = {
       exponent: 1,
       immediateShare: 0.5,
       marketMakerHedgeShare: 0.5,
-      // ADR-189: the last share of a market order moves the price at most 15 % (average 7,5 %); the rest is not filled
       maxImpactBpsPerOrder: 1500,
     },
     orderBook: {

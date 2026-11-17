@@ -226,8 +226,8 @@ export interface OrderResult {
   impactBps?: number;
 }
 
-/** Why a market order fills only part (ADR-189): the per-order impact cap or the daily band. */
-export type OrderLimit = "impact" | "band";
+/** Why a market order fills less than asked (ADR-189): only the stock supply (ADR-153) can limit it. */
+export type OrderLimit = "supply";
 
 /** Server preview of a market order (`quote_order`, ADR-189): exactly what `place_order` would execute now. */
 export interface OrderQuote {
@@ -2305,8 +2305,6 @@ export const GAME_ERROR_KEYS = [
   "interview_text_invalid",
   "interview_closed",
   "insider_cooldown",
-  "order_impact_limit",
-  "price_band_limit",
   "capital_increase_cooldown",
   "issue_proceeds_locked",
   // ADR-177

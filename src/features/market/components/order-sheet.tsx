@@ -45,7 +45,6 @@ const BIG_WIN_CENTS = 100_000;
 const TAX_BPS = BALANCE.trading.capitalGainsTaxBps;
 /** ADR-189: from this price move the sheet warns with the exact amount. */
 const HIGH_IMPACT_BPS = BALANCE.trading.highImpactWarnBps;
-const MAX_MOVE_BPS = BALANCE.trading.priceImpact.maxImpactBpsPerOrder;
 /** Wait this long after the last keystroke before asking the server for the exact fill. */
 const QUOTE_DELAY_MS = 250;
 const MARKS = [0.25, 0.5, 0.75, 1] as const;
@@ -403,17 +402,11 @@ export function OrderSheet({ ticker, side, onClose }: OrderSheetProps) {
           {problem ?? summary}
         </p>
 
-        {plan && plan.fillQuantityE6 === 0 && (
-          <p role="alert" data-testid="order-nothing" className="rounded-md bg-loss-soft px-3 py-2 text-sm text-loss">
-            {t("nothingFills")}
-          </p>
-        )}
         {plan && plan.fillQuantityE6 > 0 && plan.limitedBy && (
           <p role="alert" data-testid="order-limited" className="rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">
-            {t(plan.limitedBy === "band" ? "limitedBand" : "limitedImpact", {
+            {t("limitedSupply", {
               filled: formatShares(plan.fillQuantityE6),
               requested: formatShares(plan.requestedQuantityE6),
-              cap: formatBps(MAX_MOVE_BPS),
             })}
           </p>
         )}

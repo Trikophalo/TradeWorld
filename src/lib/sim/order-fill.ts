@@ -1,14 +1,13 @@
 /**
- * Market order fill plan (ADR-126, ADR-170, ADR-189). The same formula runs as `public.order_fill_plan()` in
- * Postgres; the order preview (`quote_order`) and the execution (`place_order`) both call it, so what the player sees
+ * Market order fill plan (ADR-126, ADR-170, ADR-189). The same formula runs as `public.market_order_plan()` in
+ * Postgres; the order preview (`quote_order`) and the execution (`place_order`) both use it, so what the player sees
  * before confirming is what is executed.
  *
- * Price path: the n-th share costs `touch × (1 ± a × (pending + n))`, `a` = relative move per whole share. The
- * average price of q shares is `touch × (1 ± a × (pending + q / 2))` (the order pays half of the move it causes).
- *
- * Limits (ADR-189): the price of the last share may move at most `maxMoveBps` away from the touch price, and for
- * player stocks it stays inside the daily band. A market order fills only up to that point; the rest is not executed
- * and reported (`limitedBy`). Without this a 96.000 € sale of a penny stock filled at half the quote.
+ * Price path: the n-th share moves the price by `min(a × n, maxMove)` (a = relative move per whole share, n counted
+ * from the player flow already pending this tick). Small orders pay half their own move as before (ADR-126). Large
+ * orders cannot move the price further than one tick can (`maxMove` = `trading.maxTickReturnBps`), so beyond that
+ * point every further share fills at the saturated price instead of sliding towards zero. There is no size limit:
+ * any quantity fills completely. For player stocks no share fills outside the daily band (ADR-170).
  */
 
 export interface FillPlanInput {
@@ -24,6 +23,7 @@ export interface FillPlanInput {
   /** Buy: budget including the fee. Sell: wanted gross proceeds. */
   readonly amountCents: number | null;
   readonly feeCents: number;
+  /** Largest move the order flow can cause (fraction × 10 000). */
   readonly maxMoveBps: number;
   /** Daily band (player stocks) or null. */
   readonly bandLowE4: number | null;
@@ -31,13 +31,10 @@ export interface FillPlanInput {
   readonly minPriceE4: number;
 }
 
-export type FillLimit = "impact" | "band" | null;
-
 export interface FillPlan {
-  readonly requestedE6: number;
-  readonly fillE6: number;
-  readonly unfilledE6: number;
+  readonly quantityE6: number;
   readonly avgPriceE4: number;
+  /** Price of the last share. */
   readonly lastPriceE4: number;
   readonly grossCents: number;
   /** Buy: gross + fee. Sell: gross − fee (before tax). */
@@ -46,7 +43,6 @@ export interface FillPlan {
   readonly slippageBps: number;
   /** Move of the price by this order (last share against touch), signed bps. */
   readonly impactBps: number;
-  readonly limitedBy: FillLimit;
 }
 
 const SCALE = 1_000_000;
@@ -55,90 +51,71 @@ const SCALE = 1_000_000;
 function valueCents(quantityE6: number, priceE4: number): number {
   const exact = (quantityE6 * priceE4) / 100_000_000;
   const floor = Math.floor(exact);
-  const frac = exact - floor;
-  if (Math.abs(frac - 0.5) < 1e-9) return floor % 2 === 0 ? floor : floor + 1;
+  if (Math.abs(exact - floor - 0.5) < 1e-9) return floor % 2 === 0 ? floor : floor + 1;
   return Math.round(exact);
 }
 
-/** Average fill price (e4) of q shares (e6), never below the minimum price. */
+/** ∫₀ˣ min(a·t, M) dt: the summed move of the first x shares. */
+export function moveIntegral(x: number, slope: number, maxMove: number): number {
+  if (slope <= 0) return 0;
+  const k = maxMove / slope;
+  return x <= k ? (slope * x * x) / 2 : maxMove * x - (maxMove * k) / 2;
+}
+
+function clampBand(input: FillPlanInput, priceE4: number): number {
+  // the band only stops a move away from the quote: a sale never fills above the bid, a buy never below the ask
+  const p =
+    input.side === "sell"
+      ? Math.min(input.touchE4, Math.max(input.bandLowE4 ?? priceE4, priceE4))
+      : Math.max(input.touchE4, Math.min(input.bandHighE4 ?? priceE4, priceE4));
+  return Math.max(input.minPriceE4, p);
+}
+
+/** Average fill price (e4) of q shares (e6). */
 export function avgFillPriceE4(input: FillPlanInput, quantityE6: number): number {
   const dir = input.side === "buy" ? 1 : -1;
-  const p = input.touchE4 * (1 + dir * input.slope * (input.pendingShares + quantityE6 / SCALE / 2));
-  return Math.max(input.minPriceE4, Math.round(p));
+  const m = input.maxMoveBps / 10_000;
+  const q = quantityE6 / SCALE;
+  if (q <= 0) return input.touchE4;
+  const x0 = input.pendingShares;
+  const avgMove = (moveIntegral(x0 + q, input.slope, m) - moveIntegral(x0, input.slope, m)) / q;
+  return clampBand(input, Math.round(input.touchE4 * (1 + dir * avgMove)));
 }
 
-/** Largest quantity (e6) whose last share stays within the move cap and the band, and which bound binds first. */
-export function maxFillE6(input: FillPlanInput): { readonly maxE6: number; readonly by: "impact" | "band" } {
-  const dir = input.side === "buy" ? 1 : -1;
-  const cap = input.maxMoveBps / 10_000;
-  const capBound = input.touchE4 * (1 + dir * cap);
-  const band = dir > 0 ? input.bandHighE4 : input.bandLowE4;
-  let bound = capBound;
-  let by: "impact" | "band" = "impact";
-  if (band !== null && (dir > 0 ? band < capBound : band > capBound)) {
-    bound = band;
-    by = "band";
-  }
-  if (dir < 0 && input.minPriceE4 > bound) bound = input.minPriceE4;
-  if (input.slope <= 0) return { maxE6: Number.MAX_SAFE_INTEGER, by };
-  const move = dir * (bound / input.touchE4 - 1);
-  const shares = move / input.slope - input.pendingShares;
-  return { maxE6: Math.max(0, Math.floor(shares * SCALE)), by };
-}
-
-/** Quantity (e6) for an amount: solves the quadratic price path exactly. */
+/** Quantity (e6) whose gross (buy: plus fee) matches the amount, by bisection along the price path. */
 export function quantityForAmountE6(input: FillPlanInput, amountCents: number): number {
-  const touchCents = input.touchE4 / 100; // cents per whole share
-  const a = input.slope;
-  const pos = input.pendingShares;
-  if (input.side === "buy") {
-    const net = amountCents - input.feeCents;
-    if (net <= 0) return 0;
-    // (a/2)·T·q² + T(1 + a·pos)·q − net = 0
-    const A = (a / 2) * touchCents;
-    const B = touchCents * (1 + a * pos);
-    const q = A > 0 ? (-B + Math.sqrt(B * B + 4 * A * net)) / (2 * A) : net / B;
-    return Math.max(0, Math.floor(q * SCALE));
+  const target = input.side === "buy" ? amountCents - input.feeCents : amountCents;
+  if (target <= 0) return 0;
+  const gross = (qE6: number) => valueCents(qE6, avgFillPriceE4(input, qE6));
+  let lo = 0;
+  const floorPrice = input.side === "buy" ? input.touchE4 : input.touchE4 * (1 - input.maxMoveBps / 10_000);
+  let hi = Math.ceil((target * 100_000_000) / Math.max(1, Math.min(floorPrice, input.bandLowE4 ?? floorPrice))) + 1;
+  for (let i = 0; i < 200 && hi - lo > 1; i++) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (gross(mid) <= target) lo = mid;
+    else hi = mid;
   }
-  // (a/2)·T·q² − T(1 − a·pos)·q + amount = 0, smaller root; no root: the most proceeds possible
-  const A = (a / 2) * touchCents;
-  const B = touchCents * (1 - a * pos);
-  if (A <= 0) return Math.ceil((amountCents / B) * SCALE);
-  const disc = B * B - 4 * A * amountCents;
-  const q = disc >= 0 ? (B - Math.sqrt(disc)) / (2 * A) : B / (2 * A);
-  return Math.max(0, Math.ceil(q * SCALE));
+  // buy: never more than the amount; sell: at least the amount
+  return input.side === "buy" ? lo : gross(lo) >= target ? lo : hi;
 }
 
-/** The fill plan of a market order. */
+/** The fill plan of a market order. Every quantity fills completely. */
 export function planMarketOrder(input: FillPlanInput): FillPlan {
-  let requestedE6 = input.quantityE6 !== null ? input.quantityE6 : quantityForAmountE6(input, input.amountCents ?? 0);
-  // A buy by amount never spends more than the amount: the average price is rounded to 0,0001 €.
-  if (input.quantityE6 === null && input.side === "buy" && requestedE6 > 0) {
-    const budget = (input.amountCents ?? 0) - input.feeCents;
-    const gross = valueCents(requestedE6, avgFillPriceE4(input, requestedE6));
-    if (gross > budget) requestedE6 = Math.floor((requestedE6 * budget) / gross);
-  }
-  const { maxE6, by } = maxFillE6(input);
-  const fillE6 = Math.min(requestedE6, maxE6);
-  const limitedBy: FillLimit = fillE6 < requestedE6 ? by : null;
+  const quantityE6 = input.quantityE6 !== null ? input.quantityE6 : quantityForAmountE6(input, input.amountCents ?? 0);
   const dir = input.side === "buy" ? 1 : -1;
-  const avgPriceE4 = fillE6 > 0 ? avgFillPriceE4(input, fillE6) : input.touchE4;
-  const lastPriceE4 = Math.max(
-    input.minPriceE4,
-    Math.round(input.touchE4 * (1 + dir * input.slope * (input.pendingShares + fillE6 / SCALE))),
-  );
-  const grossCents = fillE6 > 0 ? valueCents(fillE6, avgPriceE4) : 0;
+  const m = input.maxMoveBps / 10_000;
+  const avgPriceE4 = avgFillPriceE4(input, quantityE6);
+  const ownMove = Math.min(input.slope * (input.pendingShares + quantityE6 / SCALE), m);
+  const lastPriceE4 = clampBand(input, Math.round(input.touchE4 * (1 + dir * ownMove)));
+  const grossCents = quantityE6 > 0 ? valueCents(quantityE6, avgPriceE4) : 0;
   return {
-    requestedE6,
-    fillE6,
-    unfilledE6: requestedE6 - fillE6,
+    quantityE6,
     avgPriceE4,
     lastPriceE4,
     grossCents,
-    netCents: fillE6 > 0 ? grossCents + dir * input.feeCents : 0,
+    netCents: quantityE6 > 0 ? grossCents + dir * input.feeCents : 0,
     slippageBps: Math.round((Math.abs(avgPriceE4 - input.touchE4) / input.touchE4) * 10_000),
-    impactBps: Math.round(dir * input.slope * (fillE6 / SCALE) * 10_000),
-    limitedBy,
+    impactBps: Math.round(((lastPriceE4 - input.touchE4) / input.touchE4) * 10_000),
   };
 }
 

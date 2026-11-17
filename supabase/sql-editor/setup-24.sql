@@ -806,18 +806,52 @@ $$;
 -- Bug: "I sold for over 100k and got 50k." The order sheet showed quantity x bid (96.000 EUR), the server filled
 -- along the player-impact price path (ADR-126): 1 % per 1.000 EUR for a penny stock, so 96.000 EUR moved the price
 -- by 96 % and the average fill was 52 % of the bid (58.877,58 shares at 0,8489 EUR = 49.981 EUR). Nothing capped it.
--- Fix:
--- 1. market_order_plan(): the one fill plan (src/lib/sim/order-fill.ts). The last share of a market order moves the
---    price at most trading.priceImpact.maxImpactBpsPerOrder (15 %) and, for player stocks, stays inside the daily
---    band (ADR-170). Amounts are solved along the price path. Whatever is beyond is not executed and reported.
+-- Fix (the owner also wants no size limit: "So viel kaufen und verkaufen, wie man mag"):
+-- 1. market_order_plan(): the one fill plan (src/lib/sim/order-fill.ts). The n-th share moves the price by
+--    min(a x n, maxTickReturnBps): small orders pay half their move as before (ADR-126), but no order can push the
+--    price further than one tick can move it, so a large order fills completely at a fair price (at most 10 % from
+--    the quote, 96.000 EUR above: average -9,5 % instead of -48 %). No share of a player stock fills outside the
+--    daily band (ADR-170). Amounts are solved along the price path.
 -- 2. quote_order(): read-only preview with exactly this plan plus fee and the capital gains tax (FIFO lots, loss pot).
--- 3. place_order(): market orders fill exactly the plan (limited_by, unfilled_quantity_e6, impact_bps in the result);
---    nothing fills -> order_impact_limit / price_band_limit. Limit orders are unchanged.
+-- 3. place_order(): market orders fill exactly the plan; trading.maxOrderQuantity is only a technical bound now.
+--    Limit orders are unchanged.
 -- Idempotent: runs unchanged as supabase/updates/20261204007800_order_fill_preview.sql.
 
 -- ---------------------------------------------------------------------------
 -- A. The fill plan (mirrors planMarketOrder in src/lib/sim/order-fill.ts)
 -- ---------------------------------------------------------------------------
+-- n-th share moves the price by min(a x n, maxMove); maxMove = trading.maxTickReturnBps (what one tick can move).
+-- Summed move of the first x shares: x <= k = maxMove / a: a x^2 / 2, else maxMove x - maxMove k / 2.
+create or replace function public.order_move_integral(p_x double precision, p_a double precision, p_m double precision)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $function$
+  select case when p_a <= 0 then 0
+              when p_x <= p_m / p_a then p_a * p_x * p_x / 2
+              else p_m * p_x - p_m * (p_m / p_a) / 2 end;
+$function$;
+
+-- average fill price (e4) of p_q (e6) shares along that path, inside the band, at least the minimum price
+create or replace function public.market_order_avg_e4(
+  p_touch bigint, p_dir integer, p_a double precision, p_pos double precision, p_m double precision,
+  p_q bigint, p_lo bigint, p_hi bigint, p_min bigint)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $function$
+  -- the band only stops a move away from the quote: a sale never fills above the bid, a buy never below the ask
+  select greatest(p_min, case when p_dir < 0 then least(p_touch, greatest(coalesce(p_lo, x.p), x.p))
+                              else greatest(p_touch, least(coalesce(p_hi, x.p), x.p)) end)
+    from (select case when p_q <= 0 then p_touch
+                      else round(p_touch * (1 + p_dir
+                             * (public.order_move_integral(p_pos + p_q / 1000000.0, p_a, p_m)
+                                - public.order_move_integral(p_pos, p_a, p_m)) / (p_q / 1000000.0)))::bigint
+                 end as p) x;
+$function$;
+
 create or replace function public.market_order_plan(
   p_security_id  uuid,
   p_side         public.order_side,
@@ -832,7 +866,6 @@ set search_path = ''
 as $function$
 declare
   v_trading   jsonb := coalesce(public.config_jsonb('trading'), '{}'::jsonb);
-  v_scale     double precision := greatest(1, public.cfg_num(v_trading, '{quantityScale}', 1000000));
   s           public.securities;
   v_bid       bigint;
   v_ask       bigint;
@@ -845,22 +878,19 @@ declare
   v_pos       double precision;
   v_fee       bigint;
   v_min_price bigint;
-  v_cap       double precision;
+  v_m         double precision;
   v_band      double precision;
-  v_bound     double precision;
-  v_band_e4   double precision;
-  v_by        text := 'impact';
-  v_req       bigint;
-  v_max       bigint;
-  v_fill      bigint;
+  v_lo        bigint;
+  v_hi        bigint;
+  v_q         bigint;
   v_avg       bigint;
   v_lastp     bigint;
   v_gross     bigint := 0;
-  v_tc        double precision;
-  qa          double precision;
-  qb          double precision;
-  v_disc      double precision;
-  v_q         double precision;
+  v_target    bigint;
+  b_lo        bigint;
+  b_hi        bigint;
+  b_mid       bigint;
+  i           integer := 0;
 begin
   select * into s from public.securities where id = p_security_id;
   select q.bid_e4, q.ask_e4, q.prev_close_e4, q.last_price_e4 into v_bid, v_ask, v_prev, v_last
@@ -872,7 +902,7 @@ begin
   v_pending   := coalesce(v_pending, 0);
   v_fee       := greatest(0, public.cfg_num(v_trading, '{orderFeeCents}', 100))::bigint;
   v_min_price := greatest(1, public.cfg_num(v_trading, '{minPriceE4}', 1))::bigint;
-  v_cap       := greatest(0, public.cfg_num(v_trading, '{priceImpact,maxImpactBpsPerOrder}', 1500)) / 10000.0;
+  v_m         := greatest(0, public.cfg_num(v_trading, '{maxTickReturnBps}', 1000)) / 10000.0;
   v_a         := public.cfg_num(v_trading, '{priceImpact,impactBpsPerDepth}', 100) / 10000.0
                  / public.security_depth(s.id, public.market_session_at(public.game_now()) = 'regular');
   if p_side = 'buy' then
@@ -888,82 +918,61 @@ begin
                                                coalesce((select c.tier::text from public.companies c where c.id = s.company_id), 'midcap')],
                                          2500000)));
   end if;
-
-  -- quantity: given, or solved along the price path for the amount
-  if p_quantity_e6 is not null then
-    v_req := p_quantity_e6;
-  else
-    v_tc := v_touch / 100.0;                 -- cents per whole share
-    qa := v_a / 2 * v_tc;
-    if p_side = 'buy' then
-      qb := v_tc * (1 + v_a * v_pos);
-      v_q := case when qa > 0 then (-qb + sqrt(qb * qb + 4 * qa * greatest(0, p_amount_cents - v_fee))) / (2 * qa)
-                  else greatest(0, p_amount_cents - v_fee) / qb end;
-      v_req := greatest(0, floor(v_q * v_scale))::bigint;
-      if v_req > 0 then
-        -- never more than the amount: the average price is rounded to 0,0001 EUR
-        v_avg := greatest(v_min_price, round(v_touch * (1 + v_a * (v_pos + v_req / v_scale / 2)))::bigint);
-        v_gross := public.value_cents(v_req, v_avg);
-        if v_gross > p_amount_cents - v_fee then
-          v_req := floor(v_req::double precision * (p_amount_cents - v_fee) / v_gross)::bigint;
-        end if;
-      end if;
-    else
-      qb := v_tc * (1 - v_a * v_pos);
-      if qa <= 0 then
-        v_q := p_amount_cents / qb;
-      else
-        v_disc := qb * qb - 4 * qa * p_amount_cents;
-        v_q := case when v_disc >= 0 then (qb - sqrt(v_disc)) / (2 * qa) else qb / (2 * qa) end;
-      end if;
-      v_req := greatest(0, ceil(v_q * v_scale))::bigint;
-    end if;
-  end if;
-
-  -- how far the last share may move the price: the cap, the daily band of player stocks, the minimum price
-  v_bound := v_touch * (1 + v_dir * v_cap);
-  v_band  := greatest(0, public.cfg_num(v_trading, '{playerStocks,dailyBandBps}', 0)) / 10000.0;
+  -- ADR-170: no share of a player stock fills outside the daily band
+  v_band := greatest(0, public.cfg_num(v_trading, '{playerStocks,dailyBandBps}', 0)) / 10000.0;
   if s.kind = 'stock' and v_band > 0
      and exists (select 1 from public.player_companies pc where pc.company_id = s.company_id) then
-    v_band_e4 := case when v_dir > 0 then ceil(coalesce(v_prev, v_last, v_touch) * (1 + v_band))
-                      else floor(coalesce(v_prev, v_last, v_touch) / (1 + v_band)) end;
-    if (v_dir > 0 and v_band_e4 < v_bound) or (v_dir < 0 and v_band_e4 > v_bound) then
-      v_bound := v_band_e4;
-      v_by := 'band';
-    end if;
+    v_hi := ceil(coalesce(v_prev, v_last, v_touch) * (1 + v_band))::bigint;
+    v_lo := floor(coalesce(v_prev, v_last, v_touch) / (1 + v_band))::bigint;
   end if;
-  if v_dir < 0 and v_min_price > v_bound then
-    v_bound := v_min_price;
-  end if;
-  if v_a <= 0 then
-    v_max := v_req;
-  else
-    v_max := greatest(0, floor((v_dir * (v_bound / v_touch - 1) / v_a - v_pos) * v_scale))::bigint;
-  end if;
-  v_fill := least(v_req, v_max);
 
-  if v_fill > 0 then
-    v_avg   := greatest(v_min_price, round(v_touch * (1 + v_dir * v_a * (v_pos + v_fill / v_scale / 2)))::bigint);
-    v_gross := public.value_cents(v_fill, v_avg);
+  -- quantity: given, or the largest (buy) / smallest (sell) one whose gross matches the amount (bisection)
+  if p_quantity_e6 is not null then
+    v_q := p_quantity_e6;
   else
-    v_avg   := v_touch;
-    v_gross := 0;
+    v_target := case when p_side = 'buy' then p_amount_cents - v_fee else p_amount_cents end;
+    b_lo := 0;
+    b_hi := ceil(v_target * 100000000.0
+                 / greatest(1, least(case when p_side = 'buy' then v_touch else v_touch * (1 - v_m) end,
+                                     coalesce(v_lo, v_touch))))::bigint + 1;
+    if v_target <= 0 then
+      b_hi := 0;
+    end if;
+    while b_hi - b_lo > 1 and i < 200 loop
+      b_mid := (b_lo + b_hi) / 2;
+      if public.value_cents(b_mid, public.market_order_avg_e4(v_touch, v_dir, v_a, v_pos, v_m, b_mid, v_lo, v_hi, v_min_price))
+         <= v_target then
+        b_lo := b_mid;
+      else
+        b_hi := b_mid;
+      end if;
+      i := i + 1;
+    end loop;
+    v_q := case when p_side = 'buy' or b_lo = 0 then b_lo
+                when public.value_cents(b_lo, public.market_order_avg_e4(v_touch, v_dir, v_a, v_pos, v_m, b_lo, v_lo, v_hi, v_min_price)) >= v_target then b_lo
+                else b_hi end;
   end if;
-  v_lastp := greatest(v_min_price, round(v_touch * (1 + v_dir * v_a * (v_pos + v_fill / v_scale)))::bigint);
+
+  v_avg := public.market_order_avg_e4(v_touch, v_dir, v_a, v_pos, v_m, v_q, v_lo, v_hi, v_min_price);
+  if v_q > 0 then
+    v_gross := public.value_cents(v_q, v_avg);
+  end if;
+  v_lastp := round(v_touch * (1 + v_dir * least(v_a * (v_pos + v_q / 1000000.0), v_m)))::bigint;
+  v_lastp := greatest(v_min_price, case when v_dir < 0 then least(v_touch, greatest(coalesce(v_lo, v_lastp), v_lastp))
+                                       else greatest(v_touch, least(coalesce(v_hi, v_lastp), v_lastp)) end);
 
   return jsonb_build_object(
     'touch_e4',              v_touch,
-    'requested_quantity_e6', v_req,
-    'fill_quantity_e6',      v_fill,
-    'unfilled_quantity_e6',  v_req - v_fill,
+    'requested_quantity_e6', v_q,
+    'fill_quantity_e6',      v_q,
+    'unfilled_quantity_e6',  0,
     'avg_price_e4',          v_avg,
     'last_price_e4',         v_lastp,
     'gross_cents',           v_gross,
-    'fee_cents',             case when v_fill > 0 then v_fee else 0 end,
+    'fee_cents',             case when v_q > 0 then v_fee else 0 end,
     'slippage_bps',          round(abs(v_avg - v_touch)::double precision / v_touch * 10000)::integer,
-    'impact_bps',            round(v_dir * v_a * (v_fill / v_scale) * 10000)::integer,
-    'limited_by',            case when v_fill < v_req then v_by end,
-    'max_quantity_e6',       v_max);
+    'impact_bps',            round((v_lastp - v_touch)::double precision / v_touch * 10000)::integer,
+    'limited_by',            null);
 end;
 $function$;
 
@@ -1015,7 +1024,17 @@ begin
   if v_plan is null then
     perform public.api_error('not_tradable');
   end if;
+  -- ADR-153: a buy gets at most the free shares, as place_order does
+  if v_side = 'buy' and s.kind = 'stock' and public.security_free_float_e6(s.id) is not null
+     and (v_plan ->> 'fill_quantity_e6')::bigint > greatest(0, public.security_free_float_e6(s.id)) then
+    v_fill := (v_plan ->> 'requested_quantity_e6')::bigint;
+    v_plan := public.market_order_plan(s.id, v_side, greatest(0, public.security_free_float_e6(s.id)), null)
+              || jsonb_build_object('requested_quantity_e6', v_fill,
+                                    'unfilled_quantity_e6', v_fill - greatest(0, public.security_free_float_e6(s.id)),
+                                    'limited_by', 'supply');
+  end if;
   v_fill  := (v_plan ->> 'fill_quantity_e6')::bigint;
+  v_fee   := (v_plan ->> 'fee_cents')::bigint;
   v_gross := (v_plan ->> 'gross_cents')::bigint;
   v_fee   := (v_plan ->> 'fee_cents')::bigint;
 
@@ -1114,6 +1133,7 @@ declare
   v_prof       public.profiles;
   v_min_price  bigint;
   v_plan       jsonb;
+  v_requested  bigint;
 begin
   v_player := public.require_player();
   if p_request_id is null then
@@ -1231,6 +1251,7 @@ begin
   else
     v_qty := p_quantity_e6;
   end if;
+  v_requested := v_qty;
 
   if v_qty < 1 then
     perform public.api_error('order_too_small');
@@ -1273,17 +1294,10 @@ begin
 
   -- how much executes now ---------------------------------------------------------
   if v_type = 'market' then
-    -- ADR-189: the fill is exactly the plan the preview (quote_order) showed: the last share moves the price at
-    -- most priceImpact.maxImpactBpsPerOrder and stays inside the daily band of player stocks; the rest of a
-    -- market order is not executed and reported (limited_by, unfilled_quantity_e6).
+    -- ADR-189: the fill is exactly the plan the preview (quote_order) showed, for any quantity
     v_plan := public.market_order_plan(s.id, v_side, v_qty, null);
-    v_fill_qty := (v_plan ->> 'fill_quantity_e6')::bigint;
+    v_fill_qty := v_qty;
     v_fill_price := (v_plan ->> 'avg_price_e4')::bigint;
-    if v_fill_qty < 1 then
-      perform public.api_error(case when v_plan ->> 'limited_by' = 'band' then 'price_band_limit'
-                                    else 'order_impact_limit' end);
-    end if;
-    v_qty := v_fill_qty;
   elsif v_side = 'buy' and v_touch <= v_limit then
     if v_touch * (1 + v_a * (v_pos + v_qty / v_scale)) <= v_limit then
       v_fill_qty := v_qty;
@@ -1386,9 +1400,10 @@ begin
     'type',               o.type,
     'limit_price_e4',     o.limit_price_e4,
     'amount_cents',       p_amount_cents,
-    'requested_quantity_e6', coalesce((v_plan ->> 'requested_quantity_e6')::bigint, o.quantity_e6),
-    'unfilled_quantity_e6',  coalesce((v_plan ->> 'requested_quantity_e6')::bigint - o.quantity_e6, 0),
-    'limited_by',            v_plan ->> 'limited_by',
+    'requested_quantity_e6', coalesce(v_requested, o.quantity_e6),
+    'unfilled_quantity_e6',  case when v_type = 'market' then greatest(0, v_requested - o.quantity_e6) else 0 end,
+    -- only the stock supply (ADR-153) can make a market order smaller than asked
+    'limited_by',            case when v_type = 'market' and v_requested > o.quantity_e6 then 'supply' end,
     'impact_bps',            coalesce((v_plan ->> 'impact_bps')::integer, 0)));
 end;
 $function$;
