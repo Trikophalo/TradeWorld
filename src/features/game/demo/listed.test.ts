@@ -136,7 +136,9 @@ describe("demo: listed companies (ADR-167)", () => {
     await expectError(() => s.engine.companyInvest("a", "nope"), "item_unknown");
     const before = s.company.cashCents;
     let l = await s.engine.companyInvest("b", "r_quality_1");
-    expect(before - s.company.cashCents).toBe(120_000);
+    // ADR-215: 3 hours of the reference profit (at least 200 EUR/h), never the revenue or the value
+    expect(before - s.company.cashCents).toBe(60_000);
+    expect(l.researchStarted).toBe(1);
     expect(l.items.find((i) => i.key === "r_quality_1")!.status).toBe("running");
     expect(l.effects.qualityBps).toBe(0);
     await expectError(() => s.engine.companyInvest("c", "r_quality_1"), "item_running");
@@ -147,6 +149,17 @@ describe("demo: listed companies (ADR-167)", () => {
     expect(l.hour.qualityAdd).toBeCloseTo(0.03, 9);
     expect(s.counters.listed_research).toBe(1);
     expect(l.items.find((i) => i.key === "r_quality_2")!.missing).toEqual([]);
+    // Sparforschung: half the price, three times the time; only for research
+    const slow = l.items.find((i) => i.key === "r_brand_1")!;
+    expect(slow.slowCostCents).toBe(Math.floor(slow.costCents / 2));
+    expect(slow.slowHours).toBe(3);
+    await expectError(() => s.engine.companyInvest("d", "p_second", true), "invalid_argument");
+    const cash = s.company.cashCents;
+    l = await s.engine.companyInvest("e", "r_brand_1", true);
+    expect(cash - s.company.cashCents).toBe(slow.slowCostCents);
+    s.advance(HOUR + 1);
+    l = (await s.engine.listedCompany())!;
+    expect(l.items.find((i) => i.key === "r_brand_1")!.status).toBe("running");
   });
 
   it("benefits lift the mood, cost by the hour and pause when the cash is gone", async () => {
@@ -284,7 +297,7 @@ describe("demo: listed companies (ADR-167)", () => {
     s.company.cashCents = 10_000_000;
     await expectError(() => s.engine.companyInvest("b", "p_second"), "budget_reserved");
     const l = await s.engine.companyInvest("c", "r_quality_1");
-    expect(l.reservedCents).toBe(10_000_000 - 120_000);
+    expect(l.reservedCents).toBe(10_000_000 - 60_000);
     await expectError(() => s.engine.proposeBoardMotion("d", null, { kind: "withdraw_ban", days: 2 }), "board_limit");
     s.advance(7 * HOUR);
     board = await s.engine.proposeBoardMotion("e", null, { kind: "payout_cap", bps: 1_000, days: 3 });

@@ -99,6 +99,7 @@ import { cn } from "@/lib/utils";
 import { CriticBadge } from "@/features/artworks/components/artwork-card";
 import type { Artwork } from "@/features/game/types";
 import { ToplistShowcase } from "@/features/rich-list/components/toplist-showcase";
+import { ResearchPriceFacts } from "@/features/company/listed/catalogue";
 
 const COLOR_GROUPS = [
   { title: "Flächen", tokens: ["bg-0", "bg-1", "bg-2", "bg-3"] },
@@ -1492,6 +1493,22 @@ export function Showcase() {
 
       <Section id="toplists" title="Ranglisten: Bewertung, Pfeile, Vermögensteile (ADR-203)">
         <ToplistShowcase />
+      </Section>
+
+      <Section id="research-price" title="Forschungspreis in Gewinnstunden (ADR-215)">
+        <div className="grid gap-3 lg:grid-cols-3">
+          {[
+            { label: "leistbar jetzt", cost: 1_400_000, spend: 2_000_000, profit: 100_000 },
+            { label: "leistbar in Tagen", cost: 4_000_000, spend: 1_000_000, profit: 50_000 },
+            { label: "ohne Gewinn", cost: 500_000, spend: 0, profit: -10_000 },
+          ].map((d) => (
+            <Demo key={d.label} label={`ResearchPriceFacts: ${d.label}`}>
+              <dl className="w-full space-y-1.5 rounded-md bg-surface-2 px-3 py-3 text-sm">
+                <ResearchPriceFacts costCents={d.cost} spendableCents={d.spend} avgProfitCents={d.profit} />
+              </dl>
+            </Demo>
+          ))}
+        </div>
       </Section>
 
       <Section id="critic" title="Kritiker-Urteil für NFTs (ADR-181)">

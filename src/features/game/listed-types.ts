@@ -24,6 +24,9 @@ export interface ListedItemState {
   cooldownUntil: string | null;
   /** Price of the next level now. */
   costCents: number;
+  /** Research only (ADR-215): price and duration of the slow "Sparforschung"; null for other kinds. */
+  slowCostCents: number | null;
+  slowHours: number | null;
   /** Running cost per hour at the current (or first) level. */
   upkeepCents: number;
   /** Requirements that are not met yet (item keys). */
@@ -144,6 +147,12 @@ export interface ListedCompany {
   freeCashCents: number;
   /** Average revenue per hour the prices are derived from. */
   refRevenueCents: number;
+  /** ADR-215: average profit per hour research is priced from (at least the minimum). */
+  refProfitCents: number;
+  /** Raw average profit per hour of the same window (may be negative): for "how many hours of profit". */
+  avgProfitCents: number;
+  /** Research steps started so far (each makes the next one a little dearer). */
+  researchStarted: number;
   headcount: number;
   founderPayoutBps: number;
   reputation: {
@@ -290,8 +299,11 @@ export interface CompanyBoard {
 export interface ListedEngine {
   /** The own listed company; null while the company is private. */
   listedCompany(): Promise<ListedCompany | null>;
-  /** Buys or starts an item: research, product, region, machine level, acquisition, licence, benefit or action. */
-  companyInvest(requestId: string, key: string): Promise<ListedCompany>;
+  /**
+   * Buys or starts an item: research, product, region, machine level, acquisition, licence, benefit or action.
+   * `slow`: research only, the cheaper and longer "Sparforschung" (ADR-215).
+   */
+  companyInvest(requestId: string, key: string, slow?: boolean): Promise<ListedCompany>;
   /** Retires a product, region, licence or benefit. */
   companyInvestStop(requestId: string, key: string): Promise<ListedCompany>;
   declareDividend(

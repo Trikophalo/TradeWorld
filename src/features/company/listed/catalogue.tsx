@@ -21,8 +21,10 @@ import {
   effectChips,
   itemPhase,
   joinCatalogue,
+  researchPrice,
   researchTree,
   type CatalogueEntry,
+  type HourSpan,
   type ItemPhase,
 } from "./view";
 
@@ -110,6 +112,50 @@ function spendable(listed: ListedCompany, entry: CatalogueEntry): number {
   return Math.max(0, listed.freeCashCents) + budget;
 }
 
+type ItemsT = ReturnType<typeof useTranslations<"hq.items">>;
+const spanText = (t: ItemsT, span: HourSpan, dative = false) =>
+  t(dative ? "spanDat" : "spanNom", { unit: span.unit, value: span.unit === "lessHour" ? 0 : span.value });
+
+/**
+ * What a research price means (ADR-215): how many hours or days of the average profit it is, and when the company
+ * can pay it at that profit. Two rows for the item sheet's price list.
+ */
+export function ResearchPriceFacts({
+  costCents,
+  spendableCents,
+  avgProfitCents,
+}: {
+  costCents: number;
+  spendableCents: number;
+  avgProfitCents: number;
+}) {
+  const t = useTranslations("hq.items");
+  const p = researchPrice(costCents, spendableCents, avgProfitCents);
+  return (
+    <>
+      <Row
+        label={t("profitWorth")}
+        value={p.profit ? t("profitValue", { span: spanText(t, p.profit) }) : t("noProfit")}
+      />
+      <Row
+        label={t("affordable")}
+        value={
+          <span
+            data-testid="research-affordable"
+            className={cn(p.affordable === "now" ? "text-gain" : p.affordable === null ? "text-loss" : "text-fg-1")}
+          >
+            {p.affordable === "now"
+              ? t("affordableNow")
+              : p.affordable === null
+                ? t("affordableNever")
+                : t("affordableIn", { span: spanText(t, p.affordable, true) })}
+          </span>
+        }
+      />
+    </>
+  );
+}
+
 /** One item in full: description, effect, price, running cost, requirements; buying and retiring happen here. */
 function ItemSheet({
   entry,
@@ -138,13 +184,21 @@ function ItemSheet({
   const budget = listed.budgets.find((b) => b.purpose === item.purpose)?.amountCents ?? 0;
   const nextLevel = state.level + 1;
   const isAction = item.kind === "action";
+  const isResearch = item.kind === "research";
+  const slowCost = isResearch ? state.slowCostCents : null;
+  const slowAffordable = slowCost !== null && slowCost <= spendable(listed, e);
+  const slowRules = BALANCE.listed.research.slow;
 
-  const buy = async () => {
-    const ok = await action.run("buy", () => engine.companyInvest(crypto.randomUUID(), item.key), {
-      title: name,
-      done: t(isAction ? "used" : item.hours > 0 ? "started" : "bought", { name }),
-      detail: formatMoney(state.costCents, { whole: true }),
-    });
+  const buy = async (slow = false) => {
+    const ok = await action.run(
+      slow ? "slow" : "buy",
+      () => engine.companyInvest(crypto.randomUUID(), item.key, slow),
+      {
+        title: name,
+        done: t(isAction ? "used" : item.hours > 0 ? "started" : "bought", { name }),
+        detail: formatMoney(slow && slowCost !== null ? slowCost : state.costCents, { whole: true }),
+      },
+    );
     if (ok) onClose();
   };
   const stop = async () => {
@@ -184,6 +238,18 @@ function ItemSheet({
               )}
             </Button>
           )}
+          {buyable && isResearch && slowCost !== null && (
+            <Button
+              block
+              variant="secondary"
+              state={action.state("slow")}
+              disabled={!slowAffordable || action.busy !== null}
+              onClick={() => void buy(true)}
+              data-testid="item-buy-slow"
+            >
+              {t("slowFor", { amount: money(slowCost) })}
+            </Button>
+          )}
           {canStopItem(e) && (
             <HoldButton tone="loss" onConfirm={() => void stop()} disabled={action.busy !== null} className="w-full">
               <span data-testid="item-stop">{t("stopHold")}</span>
@@ -221,7 +287,20 @@ function ItemSheet({
               value={t("perHeadHour", { amount: formatMoney(item.upkeepPerHeadCents), heads: listed.headcount })}
             />
           ) : null}
+          {isResearch && buyable && (
+            <ResearchPriceFacts
+              costCents={state.costCents}
+              spendableCents={spendable(listed, e)}
+              avgProfitCents={listed.avgProfitCents}
+            />
+          )}
           <Row label={t("duration")} value={item.hours > 0 ? t("hours", { hours: item.hours }) : t("instant")} />
+          {isResearch && buyable && slowCost !== null && (
+            <Row
+              label={t("slowRow")}
+              value={t("slowValue", { amount: money(slowCost), hours: state.slowHours ?? item.hours })}
+            />
+          )}
           {item.cooldownHours ? <Row label={t("cooldown")} value={t("hours", { hours: item.cooldownHours })} /> : null}
           {phase === "running" && state.readyAt && (
             <Row label={t("readyIn")} value={<ServerCountdown at={state.readyAt} className="text-info" />} />
@@ -248,6 +327,16 @@ function ItemSheet({
         )}
         {canStopItem(e) && (
           <p className="text-xs text-pretty text-fg-3">{t(item.kind === "benefit" ? "stopBenefit" : "stopNote")}</p>
+        )}
+        {isResearch && buyable && (
+          <p className="text-xs text-pretty text-fg-3" data-testid="research-price-note">
+            {t("researchPriceNote", {
+              hours: BALANCE.listed.research.refProfit.windowHours,
+              max: BALANCE.listed.research.maxProfitHours,
+              pct: Math.round(slowRules.costBps / 100),
+              factor: slowRules.hoursFactor,
+            })}
+          </p>
         )}
         {(item.kind === "research" || item.kind === "machine" || item.kind === "acquisition") && (
           <p className="text-xs text-pretty text-fg-3">{t("forever")}</p>

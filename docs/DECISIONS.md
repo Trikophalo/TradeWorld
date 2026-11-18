@@ -5620,3 +5620,42 @@ immer). Die Demo zeigt keine Marktkräfte. Tests: `src/lib/sim/market-forces.tes
 (Formeln wie in TS; eine Spieleraktie mehr als verdoppelt sich an einem Tag und fällt danach unter die Hälfte; eine
 Aktie zum Dreifachen ihres Werts zieht in zehn Stunden viele dämpfende Kräfte, eine ruhige kaum eine; eine Kraft
 bewegt Kurs und Stimmung, nicht den fairen Wert; Geld-Invariante).
+
+## ADR-215: Forschung kostet Gewinnstunden, nicht Größe — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Die Forschung kostet derzeit mehr mit dem Firmenwert, aber irgendwann ist es unmöglich
+weiter zu forschen, weil der Unternehmenswert viel stärker steigt als der Gewinn. Es muss irgendwie möglich sein,
+Forschung zu betreiben, ohne 10 Tage warten zu müssen.“
+
+**Befund.** Gemeint ist der Forschungsbaum börsennotierter Firmen (Controlling → Wachstum → Forschung, ADR-167). Die
+Fertigkeiten (ADR-194) haben feste Preise. Ein Forschungsschritt kostete max(Untergrenze, 6 / 18 / 48 / 120 ×
+Referenzumsatz je Stunde). Nicht der Börsenwert, aber der Umsatz wächst mit der Größe, während die Marge durch die
+Reibung aus ADR-209 von rund 45 % auf 14 % fällt. Im Wachstumsmodell (`src/lib/sim/growth.ts`) kostete die vierte
+Stufe bei 10 Mio. € Firmenwert 9,7 Tage, bei 1 Mrd. € 35,6 Tage Gewinn; schon Stufe 3 brauchte 4 bis 14 Tage.
+
+**Entscheidung.**
+
+- **Preis aus dem Gewinn.** Bezugsgewinn G = Schnitt des Betriebsgewinns (`player_company_hours.profit_cents`) der
+  letzten 48 Stunden, mindestens 200 €/h. Preis = min(40 × G, max(Untergrenze, h × G × (1 + 2,5 % × n))) mit h = 3 /
+  8 / 16 / 28 Stunden je Stufe, Untergrenze 500 / 1.500 / 4.000 / 10.000 € und n = schon begonnene Forschungen. Der
+  Deckel gilt vor der Untergrenze: Kein Schritt kostet mehr als 40 Stunden Gewinn (unter zwei Tagen). Abnehmender
+  Ertrag kommt nur noch aus der Stufe und der Zahl der Forschungen, nicht aus Firmenwert, Börsenwert oder Umsatz.
+- **Sparforschung.** Jeder Schritt lässt sich für 50 % des Preises mit dreifacher Dauer starten (`company_invest(…,
+p_slow => true)`, nur Forschung). Wer knapp bei Kasse ist, forscht langsamer statt gar nicht.
+- **Anzeige.** Das Blatt eines Forschungsschritts zeigt Preis, „Entspricht ≈ 14 Std. Gewinn“, „Leistbar jetzt / in
+  etwa 2 Tagen / erst mit Gewinn“ (freie Kasse plus Budget, danach der Durchschnittsgewinn) und die Sparforschung mit
+  Preis und Dauer. `listed_state` liefert dafür `ref_profit_cents`, `avg_profit_cents`, `research_started` und je
+  Forschung `slow_cost_cents`, `slow_hours`.
+
+**Gemessen** (Tabelle in `docs/BALANCING.md`): bei 1 Mrd. € kostet Stufe 4 jetzt 3,43 Mio. € = 40 Stunden Gewinn
+(vorher 73,3 Mio. € = 35,6 Tage), Stufe 3 22 Stunden (vorher 14,2 Tage); der ganze Baum rund 22 statt rund 450 Tage
+Gewinn. Kleine Börsenfirmen zahlen ebenfalls weniger (Stufe 3 bei 1 Mio. €: 22 Stunden statt 5,9 Tage).
+
+**Folgen.** Forschung ist bei jeder Größe in höchstens zwei Tagen Gewinn bezahlbar und wird mit jedem Schritt etwas
+teurer. Ein Gründer, der den Gewinn zwei Tage drückt, spart wenig: Der Verlust kostet mehr als der Rabatt. Verworfen:
+Forschungspunkte aus Aufgaben (eigene Währung, mehr Bedienung), ein Abschlag über den Börsenwert (der Preis hing nie am
+Kurs; der Umsatz war das Problem), dieselbe Umstellung für Produkte und Regionen (der Eigentümer nannte die Forschung;
+sie bleiben vorerst beim Referenzumsatz). Tests: `src/lib/sim/listed.test.ts`, `src/features/company/listed/view.test.ts`,
+`src/features/game/demo/listed.test.ts`, SQL `a3_listed_company.sql` (gleiche Zahlen wie TS) und
+`f3_research_cost.sql` (Preis aus 48 Gewinnstunden, 50-facher Börsenwert und Umsatz ändern nichts, jeder Schritt in
+zwei Tagen Gewinn bezahlbar, Sparforschung, Idempotenz, Geld-Invariante).

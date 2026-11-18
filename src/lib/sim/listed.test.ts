@@ -3,6 +3,12 @@ import { BALANCE } from "../../config/balance.ts";
 import { LISTED_ITEMS, OPERATING_CATEGORIES } from "../../config/listed.ts";
 import {
   advisorWageCents,
+  affordableInHours,
+  avgProfitCents,
+  profitHoursOf,
+  refProfitCents,
+  researchCostCents,
+  researchHours,
   progressiveTaxCents,
   aiFloatVote,
   aiWorkerQuits,
@@ -73,9 +79,9 @@ describe("listed companies: the catalogue (ADR-167)", () => {
     expect(LISTED_ITEMS.filter((i) => i.kind === "benefit").length).toBeGreaterThanOrEqual(12);
   });
 
-  it("research gets expensive at the top, benefits cost per head", () => {
-    const tiers = [1, 2, 3, 4].map((t) => itemCostCents(item(`r_quality_${t}`), 0, 500_000, 10));
-    expect(tiers).toEqual([3_000_000, 9_000_000, 24_000_000, 60_000_000]);
+  it("research gets dearer by tier, benefits cost per head", () => {
+    const tiers = [1, 2, 3, 4].map((t) => researchCostCents(item(`r_quality_${t}`), 500_000, 0));
+    expect(tiers).toEqual([1_500_000, 4_000_000, 8_000_000, 14_000_000]);
     for (const i of LISTED_ITEMS.filter((x) => x.kind === "benefit")) {
       expect(i.upkeepPerHeadCents, i.key).toBeGreaterThan(0);
       expect(i.effects.satisfaction, i.key).toBeGreaterThan(0);
@@ -86,8 +92,7 @@ describe("listed companies: the catalogue (ADR-167)", () => {
     expect(refRevenueCents([])).toBe(20_000);
     expect(refRevenueCents([100_000, 200_001])).toBe(150_001);
     expect(refRevenueCents(Array<number>(30).fill(1_000).concat(Array<number>(24).fill(90_000)))).toBe(90_000);
-    expect(itemCostCents(item("r_quality_3"), 0, 100_000, 3)).toBe(4_800_000);
-    expect(itemCostCents(item("r_quality_3"), 0, 20_000, 3)).toBe(2_500_000);
+    expect(itemCostCents(item("p_premium"), 0, 100_000, 3)).toBe(3_000_000);
     expect(itemCostCents(item("m_machines"), 2, 35_000, 3)).toBe(896_000);
     expect(itemCostCents(item("x_teamevent"), 0, 35_000, 7)).toBe(72_000);
     expect(itemCostCents(item("x_teamevent"), 0, 35_000, 0)).toBe(36_000);
@@ -95,6 +100,54 @@ describe("listed companies: the catalogue (ADR-167)", () => {
     expect(itemUpkeepCents(item("m_machines"), 3, 123_456, 5)).toBe(1_851);
     expect(itemUpkeepCents(item("b_obstkorb"), 1, 123_456, 20)).toBe(800);
     expect(itemUpkeepCents(item("r_quality_1"), 1, 123_456, 20)).toBe(0);
+  });
+
+  it("research is priced from the earnings (ADR-215, SQL)", () => {
+    expect(refProfitCents([])).toBe(20_000);
+    expect(avgProfitCents([])).toBe(0);
+    expect(avgProfitCents([-50_000, 10_000])).toBe(-20_000);
+    expect(refProfitCents([-50_000, 10_000])).toBe(20_000);
+    // only the last 48 hours count
+    expect(refProfitCents(Array<number>(30).fill(1_000).concat(Array<number>(48).fill(90_000)))).toBe(90_000);
+    expect(researchCostCents(item("r_quality_3"), 100_000, 0)).toBe(1_600_000);
+    expect(researchCostCents(item("r_quality_3"), 20_000, 0)).toBe(400_000);
+    // the cap wins over the floor: never more than 40 hours of profit
+    expect(researchCostCents(item("r_quality_4"), 20_000, 0)).toBe(800_000);
+    expect(researchCostCents(item("r_quality_4"), 1_000_000, 27)).toBe(40_000_000);
+    // level growth: +2.5 % per research step started so far
+    expect(researchCostCents(item("r_quality_2"), 123_457, 3)).toBe(1_061_730);
+    expect(researchCostCents(item("r_quality_2"), 123_457, 3, true)).toBe(530_865);
+    expect(researchHours(item("r_quality_4"))).toBe(24);
+    expect(researchHours(item("r_quality_4"), true)).toBe(72);
+  });
+
+  it("research never costs more than two days of profit, whatever the revenue or the value", () => {
+    const r = BALANCE.listed.research;
+    expect(r.maxProfitHours).toBeLessThanOrEqual(48);
+    for (const profit of [20_000, 250_000, 1_670_000, 11_450_000, 8_587_000, 100_000_000]) {
+      for (const i of LISTED_ITEMS.filter((x) => x.kind === "research")) {
+        for (const started of [0, 10, 27]) {
+          const cost = researchCostCents(i, profit, started);
+          expect(cost, `${i.key} @ ${profit}`).toBeLessThanOrEqual(r.maxProfitHours * profit);
+          expect(cost).toBeGreaterThan(0);
+        }
+      }
+    }
+    // diminishing returns: the higher the tier and the more research done, the dearer (at the same profit)
+    const p = 1_000_000;
+    expect(researchCostCents(item("r_brand_1"), p, 0)).toBeLessThan(researchCostCents(item("r_brand_2"), p, 0));
+    expect(researchCostCents(item("r_brand_2"), p, 0)).toBeLessThan(researchCostCents(item("r_brand_2"), p, 10));
+    // research items carry no revenue price any more
+    for (const i of LISTED_ITEMS.filter((x) => x.kind === "research")) expect(i.costHours + i.minCostCents).toBe(0);
+  });
+
+  it("how much profit a price is and when it is affordable", () => {
+    expect(profitHoursOf(1_000_000, 100_000)).toBe(10);
+    expect(profitHoursOf(1_000_000, 0)).toBeNull();
+    expect(affordableInHours(500, 800, 100)).toBe(0);
+    expect(affordableInHours(1_000, -50, 100)).toBe(10);
+    expect(affordableInHours(1_050, 0, 100)).toBe(11);
+    expect(affordableInHours(1_050, 0, -100)).toBeNull();
   });
 
   it("requirements, levels and re-buying", () => {

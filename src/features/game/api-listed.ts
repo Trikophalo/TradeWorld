@@ -73,6 +73,9 @@ const listedSchema = z.object({
   reserved_cents: z.number(),
   free_cash_cents: z.number(),
   ref_revenue_cents: z.number(),
+  ref_profit_cents: z.number(),
+  avg_profit_cents: z.number(),
+  research_started: z.number(),
   headcount: z.number(),
   founder_payout_bps: z.number(),
   reputation: z.object({
@@ -115,6 +118,8 @@ const listedSchema = z.object({
       ready_at: z.string().nullable(),
       cooldown_until: z.string().nullable(),
       cost_cents: z.number(),
+      slow_cost_cents: z.number().nullable(),
+      slow_hours: z.number().nullable(),
       upkeep_cents: z.number(),
       missing: z.array(z.string()),
     }),
@@ -333,6 +338,9 @@ export function toListed(r: z.infer<typeof listedSchema>): ListedCompany {
     reservedCents: r.reserved_cents,
     freeCashCents: r.free_cash_cents,
     refRevenueCents: r.ref_revenue_cents,
+    refProfitCents: r.ref_profit_cents,
+    avgProfitCents: r.avg_profit_cents,
+    researchStarted: r.research_started,
     headcount: r.headcount,
     founderPayoutBps: r.founder_payout_bps,
     reputation: {
@@ -374,6 +382,8 @@ export function toListed(r: z.infer<typeof listedSchema>): ListedCompany {
       readyAt: i.ready_at,
       cooldownUntil: i.cooldown_until,
       costCents: i.cost_cents,
+      slowCostCents: i.slow_cost_cents,
+      slowHours: i.slow_hours,
       upkeepCents: i.upkeep_cents,
       missing: i.missing,
     })),
@@ -544,8 +554,10 @@ export const liveListedEngine: ListedEngine = {
     const r = await rpc("get_listed_company", {}, getListedSchema);
     return r.listed ? toListed(r.listed) : null;
   },
-  async companyInvest(requestId, key) {
-    return toListed((await rpc("company_invest", { p_request_id: requestId, p_key: key }, stateSchema)).listed);
+  async companyInvest(requestId, key, slow = false) {
+    return toListed(
+      (await rpc("company_invest", { p_request_id: requestId, p_key: key, p_slow: slow }, stateSchema)).listed,
+    );
   },
   async companyInvestStop(requestId, key) {
     return toListed((await rpc("company_invest_stop", { p_request_id: requestId, p_key: key }, stateSchema)).listed);

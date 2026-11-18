@@ -7907,7 +7907,7 @@ gilt nur, solange `companies.phase = 'listed'` und die Spielerfirma aktiv ist (`
 | RPC                                                         | Antwort                                                      | Fehler                                                                                               |
 | ----------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | `get_listed_company()`                                      | `{listed: LISTED \| null}` (null bei privater Firma)         | `company_not_found`                                                                                  |
-| `company_invest(request_id, key)`                           | `{listed}`                                                   | `not_listed`, `item_unknown`, `item_locked`, `item_running`, `budget_reserved`, `insufficient_funds` |
+| `company_invest(request_id, key, slow)`                     | `{listed}` (ADR-215: `slow` nur Forschung)                   | `not_listed`, `item_unknown`, `item_locked`, `item_running`, `budget_reserved`, `insufficient_funds` |
 | `company_invest_stop(request_id, key)`                      | `{listed}` (Produkt, Region, Lizenz, Benefit)                | `item_unknown`, `item_locked`                                                                        |
 | `company_declare_dividend(request_id, total_cents)`         | `{listed, dividend}`                                         | `invalid_argument`, `dividend_limit`, `insufficient_funds`                                           |
 | `company_books_close(request_id, answers text[], pay bool)` | `{listed, period, paid_cents}`                               | `books_nothing`                                                                                      |
@@ -8597,3 +8597,18 @@ Keine neue Tabelle. Alles intern (nur `service_role` bzw. Trigger), Spieler kön
   `scheduled` → `aired`): Zeilen erfundener Zuschauer in `news_show_messages` (`player_id` null, `bot_name`), darunter
   Umfragen vom Konto `newsShow.fresh.chat.polls.host`. Neue Schlüssel in `news_show_used`: `t:<md5>` (Überleitung),
   `c:<md5>` (Chatzeile, Umfrage).
+
+## Nachtrag: Forschung nach Gewinn (ADR-215, Migration `20261204011000_research_cost.sql`)
+
+Keine neue Tabelle.
+
+- RPC `company_invest(request_id, key, slow boolean default false)` ersetzt `company_invest(request_id, key)` (Aufrufe
+  mit zwei Argumenten gehen weiter). Forschung kostet `listed_research_cost(...)`; `slow = true` (nur Forschung, sonst
+  `invalid_argument`) kostet `research.slow.costBps` des Preises und dauert `research.slow.hoursFactor`-mal so lange;
+  die Buchung trägt dann `metadata.slow = true`.
+- `listed_state` / `get_listed_company`: neu `ref_profit_cents` (Bezugsgewinn), `avg_profit_cents` (roher Schnitt, kann
+  negativ sein), `research_started`; je Posten `slow_cost_cents` und `slow_hours` (nur Forschung, sonst `null`);
+  `cost_cents` einer Forschung kommt aus dem Gewinn.
+- Intern: `listed_avg_profit(company)`, `listed_ref_profit(company)` (48 Stunden `player_company_hours.profit_cents`,
+  mindestens `research.refProfit.minCents`), `listed_research_started(company)` (Forschung `running` oder fertig),
+  `listed_research_cost(item, ref_profit, started, slow)` (wie `researchCostCents` in TS).

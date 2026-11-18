@@ -8,6 +8,7 @@ import type {
   ListedItemState,
   TaxPeriod,
 } from "@/features/game/listed-types";
+import { affordableInHours, profitHoursOf } from "@/lib/sim/listed";
 
 /*
  * Pure helpers of the listed-company pages (ADR-167, UI): what is due, how the research tree is laid out, how an
@@ -124,6 +125,35 @@ export function canStopItem(e: CatalogueEntry): boolean {
     ["product", "region", "licence", "benefit"].includes(e.item.kind) &&
     (e.state.status === "active" || e.state.status === "paused")
   );
+}
+
+/** A span of hours as it reads: under 1 hour, whole hours up to two days, then days with one decimal. */
+export type HourSpan = { unit: "lessHour" } | { unit: "hours"; value: number } | { unit: "days"; value: number };
+
+export function hourSpan(hours: number): HourSpan {
+  if (hours < 1) return { unit: "lessHour" };
+  if (hours < 48) return { unit: "hours", value: Math.round(hours) };
+  return { unit: "days", value: Math.round((hours / 24) * 10) / 10 };
+}
+
+export interface ResearchPrice {
+  /** The price in hours of the average profit (null without profit). */
+  profit: HourSpan | null;
+  /** When it can be paid from what may be spent now plus the profit: "now", a span, or null = only with profit. */
+  affordable: "now" | HourSpan | null;
+}
+
+/**
+ * What a research price means for the company (ADR-215): how many hours or days of its average profit it is and
+ * when the company can afford it at that profit.
+ */
+export function researchPrice(costCents: number, spendableCents: number, avgProfitCents: number): ResearchPrice {
+  const share = profitHoursOf(costCents, avgProfitCents);
+  const wait = affordableInHours(costCents, spendableCents, avgProfitCents);
+  return {
+    profit: share === null ? null : hourSpan(share),
+    affordable: wait === null ? null : wait === 0 ? "now" : hourSpan(wait),
+  };
 }
 
 /** Running costs per hour against the reference revenue, in bps (0 without revenue). */

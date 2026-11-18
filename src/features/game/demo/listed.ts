@@ -25,7 +25,11 @@ import {
   missingRequirements,
   payoutRatioBps,
   pickReceipts,
+  avgProfitCents,
+  refProfitCents,
   refRevenueCents,
+  researchCostCents,
+  researchHours,
   reputationEffect,
   reputationTarget,
   satisfactionEffect,
@@ -248,6 +252,14 @@ export function createListedEngine(host: ListedHost) {
   const freeCash = (company: DemoCompanyState, l: DemoListedState) =>
     company.cashCents - company.unpaidCents - reserved(l);
   const ref = (l: DemoListedState) => refRevenueCents(l.window.map((h) => h.revenueCents));
+  // ADR-215: research from the earnings. The demo keeps the hours of the reputation window (24 h), not 48.
+  const profits = (l: DemoListedState) => l.window.map((h) => h.profitCents);
+  const researchStarted = (l: DemoListedState) =>
+    Object.entries(l.items).filter(
+      ([key, i]) =>
+        itemByKey(key)?.kind === "research" &&
+        (((i.status === "active" || i.status === "paused") && i.level > 0) || i.status === "running"),
+    ).length;
   const heads = (company: DemoCompanyState) => company.aiWorkers;
 
   function book(
@@ -992,6 +1004,8 @@ export function createListedEngine(host: ListedHost) {
     const now = host.now();
     const fx = sumEffects(owned(l));
     const r = ref(l);
+    const rp = refProfitCents(profits(l));
+    const started = researchStarted(l);
     const sat = satisfactionEffect(l.satisfaction);
     const rep = reputationEffect(l.reputation);
     const sh = shares(company);
@@ -1007,6 +1021,9 @@ export function createListedEngine(host: ListedHost) {
       reservedCents: reserved(l),
       freeCashCents: free,
       refRevenueCents: r,
+      refProfitCents: rp,
+      avgProfitCents: avgProfitCents(profits(l)),
+      researchStarted: started,
       headcount: heads(company),
       founderPayoutBps: company.founderPayoutBps ?? 0,
       reputation: {
@@ -1051,7 +1068,12 @@ export function createListedEngine(host: ListedHost) {
           maxLevel: item.maxLevel ?? 1,
           readyAt: has ? iso(mine.readyAt) : null,
           cooldownUntil: cooldown !== null && cooldown > now ? iso(cooldown) : null,
-          costCents: itemCostCents(item, has && item.kind !== "action" ? mine.level : 0, r, heads(company)),
+          costCents:
+            item.kind === "research"
+              ? researchCostCents(item, rp, started)
+              : itemCostCents(item, has && item.kind !== "action" ? mine.level : 0, r, heads(company)),
+          slowCostCents: item.kind === "research" ? researchCostCents(item, rp, started, true) : null,
+          slowHours: item.kind === "research" ? researchHours(item, true) : null,
           upkeepCents: itemUpkeepCents(item, Math.max(1, has ? mine.level : 1), r, heads(company)),
           missing: missingRequirements(item, list),
         };
@@ -1109,10 +1131,11 @@ export function createListedEngine(host: ListedHost) {
       return view(company, l);
     },
 
-    companyInvest: (requestId, key) =>
+    companyInvest: (requestId, key, slow = false) =>
       mutate(requestId, (company, l) => {
         const item = itemByKey(key);
         if (!item) throw new GameError("item_unknown");
+        if (slow && item.kind !== "research") throw new GameError("invalid_argument");
         const now = host.now();
         const mine = l.items[key];
         const has = !!mine && (mine.status === "active" || mine.status === "paused") && mine.level > 0;
@@ -1122,7 +1145,10 @@ export function createListedEngine(host: ListedHost) {
             throw new GameError("item_running");
         } else if (mine?.readyAt || (has && mine.level >= (item.maxLevel ?? 1))) throw new GameError("item_running");
         const level = has && item.kind !== "action" ? mine.level : 0;
-        const cost = itemCostCents(item, level, ref(l), heads(company));
+        const cost =
+          item.kind === "research"
+            ? researchCostCents(item, refProfitCents(profits(l)), researchStarted(l), slow)
+            : itemCostCents(item, level, ref(l), heads(company));
         const budget = l.budgets[item.purpose] ?? 0;
         const plain = company.cashCents - company.unpaidCents;
         if (cost > plain - (reserved(l) - budget))
@@ -1138,7 +1164,7 @@ export function createListedEngine(host: ListedHost) {
           l.items[key] = {
             status: has ? mine.status : "running",
             level,
-            readyAt: now + item.hours * HOUR,
+            readyAt: now + (item.kind === "research" ? researchHours(item, slow) : item.hours) * HOUR,
             lastUsedAt: null,
           };
         } else {
