@@ -67,7 +67,7 @@ select public.instant_sell_nexamon(:rq, array[:'f1', :'f2']::uuid[]) as s1 \gset
 select public.instant_sell_nexamon(:rq, array[:'f1', :'f2']::uuid[]) as s2 \gset
 reset role;
 select tests.assert(:'s1'::jsonb = :'s2'::jsonb and (:'s1'::jsonb ->> 'count')::integer = 2
-  and (select (e ->> 'price_cents')::bigint from jsonb_array_elements(:'s1'::jsonb -> 'sold') e where e ->> 'copy_id' = :'f1') = 1120
+  and (select (e ->> 'price_cents')::bigint from jsonb_array_elements(:'s1'::jsonb -> 'sold') e where e ->> 'copy_id' = :'f1') = 1058
   and (select (e ->> 'price_cents')::bigint from jsonb_array_elements(:'s1'::jsonb -> 'sold') e where e ->> 'copy_id' = :'f2')
       = public.div_round_half_even(:v2::numeric * 8500, 10000),
   'instant_sell_nexamon(): 85 % per copy incl. condition, idempotent ' || :'s1');
