@@ -7741,6 +7741,17 @@ battle, price)`. Fehler `sealed_pack_unknown` NX290. `account_wipe` löscht die 
   Battle-JSON zusätzlich: `mode`, `size`, `packs`, `seats: [{seat, player, is_me, cards, cents}]`, `my_seat`,
   `winner_seat`; Lobby zusätzlich `open_battles` (mit `invited`), Live-Zeilen `players`. Fehler NX311
   `nexamon_battle_full`, NX312 `nexamon_battle_joined`.
+- **Pack-Battle-Modi (ADR-205, Migration 9700):** `nexamon_battles.reverse` („Umgekehrt“: der niedrigste Wert gewinnt),
+  `twist` („Twist“: nach jedem Pack werden die Haufen permutiert), `twist_seed`, `twists` (eine Permutation je Pack,
+  `[[perm Pack 1], …]`, Platz i übernimmt den Haufen von Platz `perm[i]`); Check `nexamon_battles_variant_check`: nur
+  `multi` trägt Modi. `nexamon_battle_seats.score_cents`: der Wert, der entschieden hat (Haufen nach allen Twists).
+  RPC jetzt `create_nexamon_pack_battle(p_request_id, p_sets, p_size, p_invite default '{}', p_reverse default false,
+p_twist default false)` (die Fassung mit vier Argumenten ist ersetzt, Aufrufe mit vier Argumenten gehen weiter).
+  Intern: `nexamon_battle_twist_perm(seed, round, n)`, `nexamon_pack_battle_piles(seats, twists, packs, upto)`,
+  `nexamon_pack_battle_decide(seats, seed, reverse)`, `nexamon_battle_mode_label`. Battle-JSON zusätzlich `reverse`,
+  `twist`, `twists` (nur die von der Uhr erreichten), `twist_ms`, `twist_seed` (ab der Entscheidung),
+  `seats[].score_cents`; Live-Zeilen `reverse`, `twist`; Feed `nexamon_battle_won`/`_big` und Benachrichtigungen mit
+  `reverse`, `twist`. Geldflüsse unverändert.
 - **`nexamon_value_points`** (intern): Wertverlauf, letzter Wert je Stunde mit Änderung (PK `card_key, at`), 60 Tage.
 - **`nexamon_set_state`** (intern): je Set `ai_packs_at` (bis wann die KI-Booster geöffnet sind), `ai_packs_opened`,
   `player_packs_opened`. **`nexamon_meta`** (intern, eine Zeile): Hash des zuletzt gespiegelten Katalogs; `peak_scaled_at` merkt

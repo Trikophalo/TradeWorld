@@ -4777,3 +4777,46 @@ Mint-Gradings, eine reine 10 also 35 %. Die anderen Zustände bleiben unverände
 (`premiumBps.mint`, 12 %) bleibt; wer eine Mint-Karte zieht, gradet sie lieber, als sie roh an die KI zu verkaufen.
 Mehr 10er bringen mehr Slabs mit hohem Wert in Umlauf; Marktwert und KI-Käufe für Slabs (`gradePremiumBps`) bleiben
 und sind zu beobachten.
+
+## ADR-205: Pack-Battle-Modi „Umgekehrt“ und „Twist“ — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer wünscht mehr Optionen im Pack Battle (ADR-192): „Eine Einstellung, bei der der Spieler mit
+den schlechtesten Pulls gewinnt“ und einen Twist-Modus: „Nach jedem Pack wird der ganze ausgepackte Wert eines Spielers
+zufällig mit einem anderen getauscht, reines Chaos, ein Glücksspiel im Glücksspiel.“ Außerdem sollen die letzten zwei
+Karten jedes Packs in der Live-Ansicht spannender aufgehen.
+
+**Entscheidung.**
+
+- _Umgekehrt (`reverse`):_ Der niedrigste Gesamtwert gewinnt. Gleichstand gespiegelt: unter den Niedrigsten gewinnt,
+  wessen seltenste Karte am wenigsten selten ist, dann der Münzwurf `coin_seed % Anzahl` in Sitzreihenfolge.
+- _Twist (`twist`):_ Jeder Platz hält einen „Haufen“. Pack für Pack legt jeder seine eigenen Karten dieses Packs auf
+  seinen Haufen, danach werden die Haufen aller Plätze zufällig permutiert: Platz i übernimmt den Haufen von Platz
+  `perm[i]` (die Karten wandern für den Seltenheits-Gleichstand mit). Das gilt nach jedem Pack, auch nach dem letzten.
+  Entschieden wird über die Haufen; der Gewinner bekommt weiter alle Karten aller Plätze, gezogen bleibt gezogen
+  (Anzeige: groß der gehaltene Wert, klein „gezogen …“).
+- _Zufall:_ Uniform über alle n! Reihenfolgen, auch „nichts bewegt sich“ (bei zwei Spielern also ein Münzwurf je Pack,
+  die Ansicht zeigt dann „Kein Tausch“). Eigener Seed `twist_seed` (random() beim Start); die Permutation von Runde k:
+  `x = (seed mod (2³¹−1) + k · 7919) mod (2³¹−1)`, dreimal `x = x · 48271 mod (2³¹−1)`, `x mod n!` als Lehmer-Code
+  (`nexamon_battle_twist_perm` = `twistPermutation`, gleiche Testvektoren in TS und SQL). Alle Twists werden beim Start
+  in `twists` gespeichert; reproduzierbar aus dem Seed, der ab der Entscheidung sichtbar ist.
+- _Beides zusammen:_ erlaubt; nach allen Twists gewinnt der niedrigste Haufen.
+- _Gemeinsame Uhr:_ Ein Twist-Battle spielt nach jedem Pack, eine Kartenzeit nach dessen letzter Karte,
+  `packBattle.twistMs` (3,2 s) lang den Twist, dann reißt das nächste Pack. Karte g zeigt bei
+  `start + p · tear + (g−1) · slot + (p−1) · twist` (p = Pack), der Twist nach Pack k bei
+  `start + k · (tear + 5 · slot) + (k−1) · twist`. Der Server gibt Karten und Twists erst `leadMs` vorher heraus
+  (`nexamon_battle_json`), alle Clients spielen im Gleichschritt.
+- _Geld:_ Einsatz, Treuhand, Start und Rückbuchungen bleiben wie ADR-192; Modi ändern keinen Betrag.
+- _Oberfläche:_ Zwei Schalter „Twist“ und „Umgekehrt“ im Eröffnen-Sheet mit Regeltext; Badges in Lobby, Banner,
+  Live-Liste und Battle-Kopf; Einladung und Startnachricht nennen den Modus („· Modus: Twist + Umgekehrt“), der Feed
+  hängt ihn an. In der Live-Ansicht erscheint nach jedem Pack „Twist!“ mit den Tauschen („Lena ↔ Max“, bei Ringen
+  „Lena → Max → Ida → Lena“), die Plätze wackeln, die Werte kippen um und zeigen „von Max“. Rangliste und Summen
+  nach gehaltenem Wert, bei Umgekehrt aufsteigend.
+- _Spannung bei den letzten zwei Karten:_ `battleRevealTier`: Glühen für jede der letzten zwei Karten, Blitz ab Rare,
+  Wackeln ab Ultra, Funken ab Prisma; die letzte Karte eines Packs eine Stufe stärker. Dazu ein Wertzähler unter der
+  Karte und ab Stufe 3 der Ton `battleImpact`. Eigenständig in der Battle-Ansicht (`battle-reveal-fx.tsx`), getrennt
+  vom `RareReveal` der Pack-Öffnung; nur `transform`/`opacity`, bei reduzierter Bewegung nur Glühen und Wert.
+
+**Folgen.** Ein Twist-Battle dauert je Pack 3,2 s länger. Die Lockstep-Prüfungen in `c9_pack_battle_multi.sql` und
+`d7_battle_modes.sql` rechnen die erwartete Kartenzahl aus `server_time` und `starts_at` derselben Antwort und
+hängen so nicht mehr an der Maschinenlast. Test `supabase/tests/d7_battle_modes.sql`, Formeln in
+`src/lib/sim/nexamon-battle.ts` (Tests `nexamon-battle-modes.test.ts`).
