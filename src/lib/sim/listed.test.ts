@@ -3,6 +3,7 @@ import { BALANCE } from "../../config/balance.ts";
 import { LISTED_ITEMS, OPERATING_CATEGORIES } from "../../config/listed.ts";
 import {
   advisorWageCents,
+  progressiveTaxCents,
   aiFloatVote,
   aiWorkerQuits,
   boardDecided,
@@ -483,7 +484,24 @@ describe("listed companies: books and taxes", () => {
   });
 
   it("the advisor costs by the hour", () => {
-    expect(advisorWageCents(20_000)).toBe(4_000);
-    expect(advisorWageCents(1_000_000)).toBe(10_000);
+    expect(advisorWageCents(20_000)).toBe(6_000);
+    // ADR-209: the rate grows exponentially with every tenfold revenue (× 2.4), at most 30 %
+    expect(advisorWageCents(100_000)).toBe(6_000);
+    expect(advisorWageCents(1_000_000)).toBe(36_000);
+    expect(advisorWageCents(10_000_000)).toBe(864_000);
+    expect(advisorWageCents(1_000_000_000)).toBe(300_000_000);
+  });
+
+  it("taxes rise progressively with the profit per day, independent of the period length (ADR-209)", () => {
+    // small: only the base rate
+    expect(progressiveTaxCents(2_400_000, 1_500, 24)).toBe(360_000);
+    // 500 000 € a day: 15 % + 2 % on the part above 100 000 €
+    expect(progressiveTaxCents(50_000_000, 1_500, 24)).toBe(7_500_000 + 800_000);
+    // the same profit rate over half a day pays the same share
+    expect(progressiveTaxCents(25_000_000, 1_500, 12)).toBe((7_500_000 + 800_000) / 2);
+    expect(progressiveTaxCents(0, 1_500, 24)).toBe(0);
+    // books close with the brackets when the period length is known
+    expect(booksTax(60_000_000, 10_000_000, 0, 1_500, 0, 24).taxCents).toBe(7_500_000 + 800_000);
+    expect(booksTax(60_000_000, 10_000_000, 0, 1_500, 0).taxCents).toBe(7_500_000);
   });
 });

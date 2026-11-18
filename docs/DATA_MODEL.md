@@ -8499,3 +8499,29 @@ Migration `20261204008400_company_tasks_sturdy.sql`, Test `supabase/tests/e3_com
 - Klone (ADR-206): `get_company_tasks().people[].is_clone`; `delegate_company_task` und `set_job_supervisor` lehnen
   Klone ab (`task_not_allowed`). Der Client blendet Klone in der Aufgabenliste aus und lässt Aufgaben unbekannter
   Spiele weg, statt die ganze Antwort zu verwerfen.
+
+## Größe, Risiken, Versicherung, Lobby (ADR-209, Migration `20261204010100_macro_events.sql`)
+
+- `player_companies.insurance_level` (0..2, Index in `game_config.macro.insurance.levels`), `insurance_prev_level`
+  (die Stufe, die während der Wartezeit noch deckt), `insurance_changed_at`, `lobby_level` (0..5).
+- Weltkarten-Vertrag (ADR-208): `company_country(uuid) → text`, `country_cfg(text) → jsonb`,
+  `company_is_market_leader(uuid) → boolean` werden als neutrale Stubs nur angelegt, wenn sie fehlen.
+- Trigger auf `player_company_events`: `macro_event_snapshot` (BEFORE INSERT) schreibt `insuredShare`, `leaderShare`
+  und den Lobby-Bonus der Lobby-Schritte in `definition`; `macro_lobby_win` (AFTER UPDATE OF status) hebt
+  `lobby_level` bei einer gewonnenen Lobby-Strategie und schreibt die Firmen-News `lobby_level` (`{event_id, archetype,
+level}`).
+- Neu definiert: `company_event_modifiers` (Deckung), `company_event_hour_effect` (× Reibung, Feld `friction`),
+  `company_event_unit_cents` (ab 20 Mio. € mindestens `unitRevenueHours` × Ø Stundenumsatz), `company_event_roll`
+  (Größe, Land, Lobby über `company_event_pick_sized`), `listed_advisor_wage` (exponentiell), `listed_books_do` und
+  `listed_books_preview` (Steuerstufen über `company_tax_progressive_cents`, Grundsatz `macro_tax_rate_bps`;
+  `company_tax_periods.rate_bps` ist der effektive Satz, die Vorschau hat zusätzlich `brackets`).
+- Intern: `macro_cfg`, `macro_size_decades`, `macro_friction(wert, versicherung) → {demand_factor,
+extra_cost_share}`, `macro_country_factor`, `macro_weight`, `macro_company_country`, `macro_coverage`,
+  `macro_ref_revenue`, `company_risks_json`.
+
+### RPCs
+
+| RPC                                            | Wer     | Antwort                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_company_risks()`                          | Gründer | `{company_id, worth_cents, decades, event_pivot_cents, friction_pivot_cents, saturation_bps, overhead_bps, chance_per_day_bps, crisis_share_bps, unit_cents, exposure[{archetype, bps, insurable, risk}], upcoming[{archetype, from_cents}], ref_revenue_cents, insurance{level, coverage_bps, changed_at, full_from, levels[]}, lobby{level, max, bonus_bps, political_cut_bps, leader}, country}` |
+| `set_company_insurance(p_request_id, p_level)` | Gründer | wie `get_company_risks`; Fehler `invalid_argument`; idempotent je `request_id`                                                                                                                                                                                                                                                                                                                      |

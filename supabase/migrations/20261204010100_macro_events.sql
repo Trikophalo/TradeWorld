@@ -1,0 +1,901 @@
+-- =============================================================================
+-- NEXA · 10100 · Size, risk and the world outside (ADR-209)
+-- =============================================================================
+-- Mirrors src/lib/sim/macro.ts (saturationFactor, overheadShare, frictionModifiers, combineModifiers, sizeDecades,
+-- sizedChancePerDay, sizedChanceShare, sizedSeverityUniform, countryFactor, sizedWeight, sizeUnitCents,
+-- effectiveCoverage, eventSnapshot), eventModifiers of src/lib/sim/company-events.ts (insurance and leader share) and
+-- advisorWageCents / progressiveTaxCents of src/lib/sim/listed.ts. Values: game_config "macro" (src/config/macro.ts),
+-- "companyEvents" (15 external archetypes) and "listed" (taxes.brackets, taxes.advisor).
+--
+-- * World map contract (ADR-208): company_country(uuid), country_cfg(text) and company_is_market_leader(uuid) are
+--   created as neutral stubs only when the world migration is missing; without a headquarters every factor is 1.
+-- * player_companies: insurance_level / insurance_prev_level / insurance_changed_at, lobby_level.
+-- * Hooks instead of copies where possible:
+--   - player_company_events BEFORE INSERT: snapshot of insurance coverage, lobby bonus and market-leader share into
+--     the event's definition (every way an event starts: daily roll, tax audit, tests).
+--   - player_company_events AFTER UPDATE: a won lobby strategy ("lobby…") raises the lobby level.
+--   - company_event_hour_effect (only caller: player_company_close_hour) returns the event modifiers times the size
+--     friction (saturation, overhead, insurance premium), extra costs capped. close_hour stays untouched.
+-- * Redefined (latest versions copied): company_event_modifiers (m4h), company_event_unit_cents (0700: + revenue share),
+--   company_event_roll (m4h: size, country and lobby), listed_advisor_wage (5400: exponential), listed_books_do and
+--   listed_books_preview (5410: progressive brackets, world tax rate when present).
+-- * RPCs: get_company_risks (the "Risiken" card), set_company_insurance.
+-- Idempotent: runs unchanged as supabase/updates/20261204010100_macro_events.sql.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. World map contract (ADR-208): neutral stubs when that migration is not there
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if to_regprocedure('public.company_country(uuid)') is null then
+    execute $f$create function public.company_country(p_company uuid) returns text language sql stable
+              security definer set search_path = '' as 'select null::text'$f$;
+    execute 'revoke all on function public.company_country(uuid) from public, anon, authenticated';
+  end if;
+  if to_regprocedure('public.country_cfg(text)') is null then
+    execute $f$create function public.country_cfg(p_country text) returns jsonb language sql stable
+              security definer set search_path = '' as 'select null::jsonb'$f$;
+    execute 'revoke all on function public.country_cfg(text) from public, anon, authenticated';
+  end if;
+  if to_regprocedure('public.company_is_market_leader(uuid)') is null then
+    execute $f$create function public.company_is_market_leader(p_company uuid) returns boolean language sql stable
+              security definer set search_path = '' as 'select false'$f$;
+    execute 'revoke all on function public.company_is_market_leader(uuid) from public, anon, authenticated';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- B. Schema
+-- ---------------------------------------------------------------------------
+alter table public.player_companies add column if not exists insurance_level smallint not null default 0;
+alter table public.player_companies add column if not exists insurance_prev_level smallint not null default 0;
+alter table public.player_companies add column if not exists insurance_changed_at timestamptz;
+alter table public.player_companies add column if not exists lobby_level smallint not null default 0;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'player_companies_insurance_level_chk'
+                    and conrelid = 'public.player_companies'::regclass) then
+    alter table public.player_companies add constraint player_companies_insurance_level_chk
+      check (insurance_level between 0 and 9 and insurance_prev_level between 0 and 9 and lobby_level between 0 and 99);
+  end if;
+end;
+$$;
+comment on column public.player_companies.insurance_level is
+  'Insurance against disasters and cyber attacks (ADR-209): index into game_config macro.insurance.levels; premium as a '
+  'share of the own revenue every hour, coverage fixed when an event starts.';
+comment on column public.player_companies.lobby_level is
+  'Lobby level (ADR-209): +1 for every won lobby strategy, raises lobby step chances and lowers political events.';
+
+-- ---------------------------------------------------------------------------
+-- C. Formulas (src/lib/sim/macro.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.macro_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('macro'), '{}'::jsonb);
+$$;
+
+-- sizeDecades: log10(value / pivot), 0..maxDecades
+create or replace function public.macro_size_decades(p_worth bigint)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when coalesce(p_worth, 0) <= public.cfg_num(c, '{events,worthPivotCents}', 2000000000) then 0
+              else least(public.cfg_num(c, '{events,maxDecades}', 3),
+                         log(p_worth::numeric / public.cfg_num(c, '{events,worthPivotCents}', 2000000000)::numeric)::double precision) end
+    from (select public.macro_cfg() as c) x;
+$$;
+
+-- frictionModifiers: {demand_factor, extra_cost_share} of size and insurance
+create or replace function public.macro_friction(p_worth bigint, p_insurance integer)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'demand_factor', case when coalesce(p_worth, 0) <= y.pivot then 1.0
+                          else power(y.pivot / p_worth::double precision, 1 - public.cfg_num(y.c, '{friction,saturationExponent}', 0.4)) end,
+    'extra_cost_share',
+      (case when coalesce(p_worth, 0) <= y.pivot then 0
+            else least(public.cfg_num(y.c, '{friction,overheadMaxBps}', 4000),
+                       public.cfg_num(y.c, '{friction,overheadPerDecadeBps}', 1500) * log(p_worth::numeric / y.pivot::numeric)::double precision) end
+       + public.cfg_num(y.c, array['insurance', 'levels', greatest(0, least(coalesce(p_insurance, 0), y.n - 1))::text, 'premiumBps'], 0)) / 10000.0)
+    from (select c, public.cfg_num(c, '{friction,worthPivotCents}', 3000000000) as pivot,
+                 greatest(1, jsonb_array_length(coalesce(c #> '{insurance,levels}', '[{}]'::jsonb))) as n
+            from (select public.macro_cfg() as c) z) y;
+$$;
+
+-- countryFactor: country risk of the headquarters on an archetype's weight (1 without headquarters)
+create or replace function public.macro_country_factor(p_arch jsonb, p_country jsonb)
+returns double precision
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  c      jsonb := coalesce(public.macro_cfg() -> 'country', '{}'::jsonb);
+  v_risk text := p_arch ->> 'risk';
+  v_kinds jsonb := '[]'::jsonb;
+  d      jsonb;
+  k      text;
+begin
+  if p_country is null or jsonb_typeof(p_country) <> 'object' or v_risk is null then
+    return 1;
+  end if;
+  if v_risk = 'political' then
+    return 1 + public.cfg_num(c, '{politicalBoost}', 2) * least(1, greatest(0, public.cfg_num(p_country, '{politicalRisk}', 0) / 100));
+  elsif v_risk = 'tariff' then
+    return 1 + public.cfg_num(c, '{tariffBoost}', 2) * least(1, greatest(0, public.cfg_num(p_country, '{tariffExposure}', 0) / 100));
+  elsif v_risk = 'war' then
+    return 1 + public.cfg_num(c, '{warBoost}', 3) * least(1, greatest(0, public.cfg_num(p_country, '{warRisk}', 0) / 100));
+  elsif v_risk = 'image' then
+    return 1 + public.cfg_num(c, '{imageBoost}', 1) * least(1, greatest(0, -public.cfg_num(p_country, '{imageBps}', 0) / 10000));
+  elsif v_risk = 'disaster' then
+    if jsonb_typeof(p_country -> 'disasterRisk') is distinct from 'array' or jsonb_array_length(p_country -> 'disasterRisk') = 0 then
+      return 1;
+    end if;
+    for d in select x from jsonb_array_elements(p_country -> 'disasterRisk') x loop
+      k := case jsonb_typeof(d) when 'string' then d #>> '{}' else coalesce(d ->> 'kind', d ->> 'key') end;
+      continue when k is null;
+      v_kinds := v_kinds || coalesce(c #> array['disasterMap', k], jsonb_build_array(k));
+    end loop;
+    return case when v_kinds ? (p_arch ->> 'key') then public.cfg_num(c, '{disasterListed}', 2.5)
+                else public.cfg_num(c, '{disasterOther}', 0.4) end;
+  end if;
+  return 1;
+end;
+$$;
+
+-- sizedWeight: internal archetypes unchanged; external ones from minWorthCents, × size × country × lobby (political)
+create or replace function public.macro_weight(p_arch jsonb, p_worth bigint, p_country jsonb, p_lobby integer)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when coalesce((p_arch ->> 'external')::boolean, false) is not true then greatest(0, public.cfg_num(p_arch, '{weight}', 0))
+    when coalesce(p_worth, 0) < public.cfg_num(p_arch, '{minWorthCents}', 0) then 0
+    else greatest(0, public.cfg_num(p_arch, '{weight}', 0))
+         * (1 + public.cfg_num(m, '{events,externalBoostPerDecade}', 1) * public.macro_size_decades(p_worth))
+         * public.macro_country_factor(p_arch, p_country)
+         * case when p_arch ->> 'risk' = 'political'
+                then greatest(0, 1 - least(greatest(coalesce(p_lobby, 0), 0), public.cfg_num(m, '{lobby,maxLevel}', 5))
+                                     * public.cfg_num(m, '{lobby,politicalCutPerLevel}', 0.12))
+                else 1 end
+  end
+    from (select public.macro_cfg() as m) x;
+$$;
+
+-- The country config of a company's headquarters (null without)
+create or replace function public.macro_company_country(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when public.company_country(p_company) is null then null
+              else public.country_cfg(public.company_country(p_company)) end;
+$$;
+
+-- pickArchetype with the size context (catalog order)
+create or replace function public.company_event_pick_sized(p_u double precision, p_sector text, p_polarity text,
+                                                           p_worth bigint, p_country jsonb, p_lobby integer)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_total double precision := 0;
+  v_x     double precision;
+  r       record;
+  v_last  jsonb;
+begin
+  select coalesce(sum(public.macro_weight(t.x, p_worth, p_country, p_lobby)), 0) into v_total
+    from jsonb_array_elements(coalesce(public.company_events_cfg() -> 'archetypes', '[]'::jsonb)) t(x)
+   where t.x ->> 'polarity' = p_polarity
+     and (jsonb_typeof(t.x -> 'sectors') is distinct from 'array' or t.x -> 'sectors' ? p_sector);
+  if v_total <= 0 then
+    return null;
+  end if;
+  v_x := least(greatest(coalesce(p_u, 0), 0), 0.999999) * v_total;
+  for r in
+    select t.x, public.macro_weight(t.x, p_worth, p_country, p_lobby) as w
+      from jsonb_array_elements(coalesce(public.company_events_cfg() -> 'archetypes', '[]'::jsonb)) with ordinality t(x, ord)
+     where t.x ->> 'polarity' = p_polarity
+       and (jsonb_typeof(t.x -> 'sectors') is distinct from 'array' or t.x -> 'sectors' ? p_sector)
+     order by t.ord
+  loop
+    continue when r.w <= 0;
+    v_x := v_x - r.w;
+    if v_x < 0 then
+      return r.x;
+    end if;
+    v_last := r.x;
+  end loop;
+  return v_last;
+end;
+$$;
+
+-- pickArchetype without size (m4h signature): the pick of a small company, never an external event
+create or replace function public.company_event_pick(p_u double precision, p_sector text, p_polarity text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.company_event_pick_sized(p_u, p_sector, p_polarity, 0, null, 0);
+$$;
+
+-- effectiveCoverage of a company right now (insurance coverage 0..1)
+create or replace function public.macro_coverage(p_company uuid, p_at timestamptz default null)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.cfg_num(m, array['insurance', 'levels',
+           greatest(0, least(case when pc.insurance_changed_at is null
+                                       or pc.insurance_changed_at
+                                          + make_interval(secs => public.cfg_num(m, '{insurance,changeWaitHours}', 12) * 3600)
+                                          <= coalesce(p_at, public.game_now())
+                                  then pc.insurance_level
+                                  else least(pc.insurance_level, pc.insurance_prev_level) end,
+                             jsonb_array_length(coalesce(m #> '{insurance,levels}', '[{}]'::jsonb)) - 1))::text, 'coverage'], 0)
+    from public.player_companies pc, (select public.macro_cfg() as m) x
+   where pc.company_id = p_company;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Event hooks: snapshot at the start, lobby level on a win
+-- ---------------------------------------------------------------------------
+-- eventSnapshot: insurance coverage (insurable crises), lobby bonus on lobby steps, market-leader share (political)
+create or replace function public.macro_event_snapshot_trg()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m       jsonb := public.macro_cfg();
+  v_def   jsonb := new.definition;
+  v_lobby integer;
+  v_bonus integer;
+  v_lead  double precision := 0;
+  v_strats jsonb;
+begin
+  if v_def is null or new.polarity <> 'crisis' then
+    return new;
+  end if;
+  if coalesce((v_def ->> 'insurable')::boolean, false) then
+    v_def := v_def || jsonb_build_object('insuredShare', least(1, greatest(0, coalesce(public.macro_coverage(new.company_id, new.started_at), 0))));
+  end if;
+  select pc.lobby_level into v_lobby from public.player_companies pc where pc.company_id = new.company_id;
+  v_bonus := (least(greatest(coalesce(v_lobby, 0), 0), public.cfg_num(m, '{lobby,maxLevel}', 5))
+              * public.cfg_num(m, '{lobby,successBpsPerLevel}', 350))::integer;
+  if v_bonus > 0 and jsonb_typeof(v_def -> 'strategies') = 'array' then
+    select jsonb_agg(case when s ->> 'key' like 'lobby%' and jsonb_typeof(s -> 'steps') = 'array'
+                          then jsonb_set(s, '{steps}', (select coalesce(jsonb_agg(st || jsonb_build_object('baseBps',
+                                                                 greatest((st ->> 'baseBps')::integer, least(9500, (st ->> 'baseBps')::integer + v_bonus)))
+                                                                 order by o), '[]'::jsonb)
+                                                          from jsonb_array_elements(s -> 'steps') with ordinality q(st, o)))
+                          else s end order by ord)
+      into v_strats
+      from jsonb_array_elements(v_def -> 'strategies') with ordinality t(s, ord);
+    v_def := jsonb_set(v_def, '{strategies}', v_strats);
+  end if;
+  if v_def ->> 'risk' = 'political' and coalesce(public.company_is_market_leader(new.company_id), false) then
+    v_lead := least(1, greatest(0, coalesce((select (g.value #>> '{lobby,politicalImpactReductionBps}')::double precision
+                                               from public.game_config g where g.key = 'world'), 3000) / 10000));
+    v_def := v_def || jsonb_build_object('leaderShare', v_lead);
+  end if;
+  new.definition := v_def;
+  return new;
+end;
+$$;
+drop trigger if exists macro_event_snapshot on public.player_company_events;
+create trigger macro_event_snapshot before insert on public.player_company_events
+  for each row execute function public.macro_event_snapshot_trg();
+
+-- A won lobby strategy raises the lobby level (at most lobby.maxLevel)
+create or replace function public.macro_lobby_win_trg()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status = 'solved' and old.status is distinct from 'solved' and new.polarity = 'crisis'
+     and coalesce(new.strategy, '') like 'lobby%' then
+    update public.player_companies
+       set lobby_level = least(public.cfg_num(public.macro_cfg(), '{lobby,maxLevel}', 5)::integer, lobby_level + 1)
+     where company_id = new.company_id;
+    perform public.company_news_add(new.company_id, 'lobby_level',
+      jsonb_build_object('event_id', new.id, 'archetype', new.archetype,
+                         'level', (select pc.lobby_level from public.player_companies pc where pc.company_id = new.company_id)));
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists macro_lobby_win on public.player_company_events;
+create trigger macro_lobby_win after update of status on public.player_company_events
+  for each row execute function public.macro_lobby_win_trg();
+
+-- ---------------------------------------------------------------------------
+-- E. The hour: event modifiers with insurance and leader share, times the size friction
+-- ---------------------------------------------------------------------------
+-- eventModifiers (copied from m4h): the effect shrinks by the insured and the leader share
+create or replace function public.company_event_modifiers(p_def jsonb, p_severity integer, p_phase text, p_mitigation double precision,
+                                                          p_capacity_hit double precision default 0)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg   jsonb := public.company_events_cfg();
+  v_scale double precision;
+  v_share double precision := 0;
+  v_s     double precision;
+  v_m     double precision := least(1, greatest(0, coalesce(p_mitigation, 0)));
+  v_cover double precision := 0;
+begin
+  v_scale := public.cfg_num(v_cfg, array['severityScale', (p_severity - 1)::text],
+                            case p_severity when 1 then 1 when 2 then 1.7 else 2.5 end);
+  if p_def ->> 'polarity' = 'crisis' then
+    if p_phase = 'open' then
+      v_share := public.cfg_num(v_cfg, '{preDeadlineShare}', 0.25) * (1 - v_m);
+    elsif p_phase = 'in_force' then
+      v_share := 1 - v_m;
+    end if;
+    -- ADR-209: insurance and market leadership take their share (fixed when the event started)
+    v_cover := 1 - (1 - least(1, greatest(0, public.cfg_num(p_def, '{insuredShare}', 0))))
+                 * (1 - least(1, greatest(0, public.cfg_num(p_def, '{leaderShare}', 0))));
+  elsif p_phase = 'in_force' then
+    v_share := v_m;
+  end if;
+  v_s := v_share * v_scale * (1 - v_cover);
+  return jsonb_build_object(
+    'demand_factor', greatest(0.05, 1 + public.cfg_num(p_def, '{effect,demand}', 0) * v_s),
+    'capacity_factor', greatest(0.05, (1 + public.cfg_num(p_def, '{effect,capacity}', 0) * v_s)
+                                      * (1 - least(0.9, greatest(0, coalesce(p_capacity_hit, 0))))),
+    'extra_cost_share', public.cfg_num(p_def, '{effect,cost}', 0) * v_s);
+end;
+$$;
+
+-- The effect on one operating hour (copied from m4h) times the size friction (combineModifiers)
+create or replace function public.company_event_hour_effect(p_company uuid, p_from timestamptz, p_to timestamptz)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  e       public.player_company_events;
+  v_hit   double precision;
+  v_phase text;
+  v_ev    jsonb := jsonb_build_object('event_id', null, 'demand_factor', 1, 'capacity_factor', 1, 'extra_cost_share', 0);
+  v_fr    jsonb;
+begin
+  select * into e from public.player_company_events ev
+   where ev.company_id = p_company and ev.started_at < p_to
+   order by ev.started_at desc limit 1;
+  if e.id is not null then
+    v_phase := public.company_event_phase(e.polarity, public.cfg_num(e.definition, '{lastsHours}', 0), e.deadline_at,
+                                          e.resolved_at, p_from);
+    select coalesce(sum(s.capacity_hit * extract(epoch from (least(s.ends_at, p_to) - greatest(s.started_at, p_from)))
+                        / greatest(1, extract(epoch from (p_to - p_from)))), 0)
+      into v_hit
+      from public.company_event_steps s
+     where s.event_id = e.id and s.capacity_hit > 0 and s.started_at < p_to and s.ends_at > p_from;
+    if v_phase <> 'over' or v_hit > 0 then
+      v_ev := public.company_event_modifiers(e.definition, e.severity, v_phase, e.mitigation, v_hit)
+              || jsonb_build_object('event_id', e.id);
+    end if;
+  end if;
+  -- ADR-209: saturation, overhead and the insurance premium of the company's size
+  v_fr := public.macro_friction(public.company_worth_cents(p_company),
+                                (select pc.insurance_level from public.player_companies pc where pc.company_id = p_company));
+  return v_ev || jsonb_build_object(
+    'demand_factor', (v_ev ->> 'demand_factor')::double precision * (v_fr ->> 'demand_factor')::double precision,
+    'extra_cost_share', least(public.cfg_num(public.macro_cfg(), '{maxExtraCostShare}', 0.6),
+                              (v_ev ->> 'extra_cost_share')::double precision + (v_fr ->> 'extra_cost_share')::double precision),
+    'friction', v_fr);
+end;
+$$;
+
+-- Average revenue per operating hour of the last 24 hours
+create or replace function public.macro_ref_revenue(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(round(avg(h.revenue_cents))::bigint, 0)
+    from (select x.revenue_cents from public.player_company_hours x where x.company_id = p_company
+           order by x.hour_start desc limit 24) h;
+$$;
+
+-- costUnitCents (copied from 0700), sizeUnitCents: above the event pivot at least unitRevenueHours of the hourly
+-- revenue; the crisis_manager discount stays
+create or replace function public.company_event_unit_cents(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select y.u - public.apply_bps(y.u, public.company_upgrade_bps(p_company, 'crisis_manager'))
+    from (select greatest(public.cfg_num(c, '{costUnit,minUnitCents}', 20000)::bigint,
+                          round(public.company_fixed_cost_cents(pc.tier, pc.expansion_level)::numeric
+                                * public.cfg_num(c, '{costUnit,unitShareOfFixed}', 0.5)::numeric)::bigint,
+                          case when public.macro_size_decades(public.company_worth_cents(p_company)) > 0
+                               then round(public.macro_ref_revenue(p_company)::numeric
+                                          * public.cfg_num(public.macro_cfg(), '{events,unitRevenueHours}', 0.25)::numeric)::bigint
+                               else 0 end) as u
+            from public.player_companies pc, (select public.company_events_cfg() as c) x
+           where pc.company_id = p_company) y;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. The daily roll (copied from m4h) with size, country and lobby
+-- ---------------------------------------------------------------------------
+create or replace function public.company_event_roll(p_company uuid, p_now timestamptz default null, p_u double precision[] default null)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now    timestamptz := coalesce(p_now, public.game_now());
+  v_cfg    jsonb := public.company_events_cfg();
+  m        jsonb := public.macro_cfg();
+  v_day    date := (coalesce(p_now, public.game_now()) at time zone 'Europe/Berlin')::date;
+  v_u      double precision[] := coalesce(p_u, array[random(), random(), random(), random()]);
+  c        public.companies;
+  v_last   timestamptz;
+  v_arch   jsonb;
+  v_id     uuid;
+  v_worth  bigint;
+  v_dec    double precision;
+  v_chance double precision;
+  v_share  double precision;
+  v_sev    double precision;
+  v_lobby  integer;
+begin
+  if jsonb_typeof(v_cfg -> 'archetypes') is distinct from 'array'
+     or not exists (select 1 from public.player_companies pc where pc.company_id = p_company and pc.status = 'active') then
+    return null;
+  end if;
+  insert into public.company_event_rolls (company_id, berlin_day, rolled_at) values (p_company, v_day, v_now)
+  on conflict (company_id, berlin_day) do nothing;
+  if not found then
+    return null;
+  end if;
+  select * into c from public.companies where id = p_company;
+  select max(ev.started_at) into v_last from public.player_company_events ev where ev.company_id = p_company;
+  -- ADR-209: sizedChancePerDay, sizedChanceShare, sizedSeverityUniform
+  v_worth := coalesce(public.company_worth_cents(p_company), 0);
+  v_dec := public.macro_size_decades(v_worth);
+  v_chance := public.cfg_num(v_cfg, '{chancePerDay}', 0.6);
+  v_share := public.cfg_num(v_cfg, '{chanceShare}', 0.4);
+  v_sev := v_u[4];
+  if v_dec > 0 then
+    v_chance := greatest(v_chance, least(public.cfg_num(m, '{events,maxChancePerDay}', 0.95),
+                                         v_chance + public.cfg_num(m, '{events,chancePerDayPerDecade}', 0.2) * v_dec));
+    v_share := least(v_share, greatest(public.cfg_num(m, '{events,minChanceShare}', 0.15),
+                                       v_share - public.cfg_num(m, '{events,chanceShareCutPerDecade}', 0.08) * v_dec));
+    v_sev := 1 - power(1 - least(1, greatest(0, v_sev)), 1 + public.cfg_num(m, '{events,severityPowerPerDecade}', 0.6) * v_dec);
+  end if;
+  if exists (select 1 from public.player_company_events ev where ev.company_id = p_company and ev.status not in ('over', 'expired'))
+     or extract(epoch from (v_now - c.founded_at)) / 3600 < public.cfg_num(v_cfg, '{minAgeHours}', 6)
+     or (v_last is not null and extract(epoch from (v_now - v_last)) / 3600 < public.cfg_num(v_cfg, '{minGapHours}', 22))
+     or v_u[1] >= v_chance then
+    return null;
+  end if;
+  select pc.lobby_level into v_lobby from public.player_companies pc where pc.company_id = p_company;
+  v_arch := public.company_event_pick_sized(v_u[3], c.sector_key, case when v_u[2] < v_share then 'chance' else 'crisis' end,
+                                            v_worth, public.macro_company_country(p_company), v_lobby);
+  if v_arch is null then
+    return null;
+  end if;
+  v_id := public.company_event_start(p_company, v_arch ->> 'key', public.company_event_severity(v_sev), v_now);
+  update public.company_event_rolls set event_id = v_id where company_id = p_company and berlin_day = v_day;
+  return v_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- G. Taxes: progressive brackets, exponential advisor
+-- ---------------------------------------------------------------------------
+-- advisorWageCents: max(minWage, rate × reference revenue), rate × growthPerDecade per tenfold revenue above the pivot
+create or replace function public.listed_advisor_wage(p_ref bigint)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select greatest(public.cfg_num(a, '{minWageCentsPerHour}', 6000)::bigint,
+                  round(greatest(0, coalesce(p_ref, 0))::numeric
+                        * (case when coalesce(p_ref, 0) <= public.cfg_num(a, '{pivotCentsPerHour}', 100000)
+                                then public.cfg_num(a, '{revenueBps}', 150)
+                                else least(public.cfg_num(a, '{maxRevenueBps}', 3000),
+                                           public.cfg_num(a, '{revenueBps}', 150)
+                                           * power(public.cfg_num(a, '{growthPerDecade}', 2.4),
+                                                   log(p_ref::numeric / public.cfg_num(a, '{pivotCentsPerHour}', 100000)::numeric)::double precision)) end)::numeric
+                        / 10000)::bigint)
+    from (select coalesce(public.listed_cfg() #> '{taxes,advisor}', '{}'::jsonb) as a) x;
+$$;
+
+-- progressiveTaxCents: rate on all, extraBps on the part above each bracket (per day, scaled to the period), rounded down
+create or replace function public.company_tax_progressive_cents(p_taxable bigint, p_rate integer, p_hours double precision)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select floor((greatest(0, coalesce(p_taxable, 0))::numeric * coalesce(p_rate, 0)
+                + coalesce((select sum(greatest(0, greatest(0, coalesce(p_taxable, 0))::numeric
+                                                   - (b ->> 'fromCentsPerDay')::numeric * (greatest(1, coalesce(p_hours, 24)) / 24.0)::numeric)
+                                       * (b ->> 'extraBps')::numeric)
+                              from jsonb_array_elements(coalesce(public.listed_cfg() #> '{taxes,brackets}', '[]'::jsonb)) b), 0))
+               / 10000)::bigint;
+$$;
+
+-- The base rate: the world map's blended country rate when present (ADR-208), else the listed rate; research on top
+create or replace function public.macro_tax_rate_bps(p_company uuid)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if to_regprocedure('public.world_tax_rate_bps(uuid)') is not null then
+    return greatest(public.cfg_num(public.listed_cfg(), '{taxes,minRateBps}', 800),
+                    public.world_tax_rate_bps(p_company) + public.cfg_num(public.listed_effects(p_company), '{taxRateBps}', 0))::integer;
+  end if;
+  return public.listed_tax_rate_bps(p_company);
+end;
+$$;
+
+-- The open bookkeeping period as the founder sees it (copied from 5410): the estimate uses the brackets
+create or replace function public.listed_books_preview(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.listed_cfg();
+  l       public.listed_companies;
+  s       jsonb;
+  v_rev   bigint;
+  v_costs bigint;
+  v_hours double precision;
+  v_today date := (now() at time zone 'Europe/Berlin')::date;
+  v_done  boolean;
+  v_rate  integer := public.macro_tax_rate_bps(p_company);
+begin
+  select * into l from public.listed_companies where company_id = p_company;
+  s := public.listed_period_sums(p_company, l.books_until, now());
+  v_rev := (s ->> 'revenue_cents')::bigint;
+  v_costs := (s ->> 'costs_cents')::bigint;
+  v_hours := extract(epoch from (now() - l.books_until)) / 3600.0;
+  v_done := l.books_day is not null and l.books_day >= v_today;
+  return jsonb_build_object(
+    'period_start', l.books_until,
+    'revenue_cents', v_rev,
+    'costs_cents', v_costs,
+    'profit_cents', v_rev - v_costs,
+    'by_category', s -> 'by_category',
+    'loss_carry_cents', l.loss_carry_cents,
+    'rate_bps', v_rate,
+    'estimated_tax_cents', public.company_tax_progressive_cents(greatest(0, v_rev - v_costs - l.loss_carry_cents), v_rate, v_hours),
+    'brackets', coalesce(cfg #> '{taxes,brackets}', '[]'::jsonb),
+    'receipts', (select coalesce(jsonb_agg(r - 'category' order by (r ->> 'id')::integer), '[]'::jsonb)
+                   from jsonb_array_elements(public.listed_books_receipts(p_company, l.books_until)) r),
+    'receipt_categories', coalesce(cfg #> '{taxes,receiptCategories}', '[]'::jsonb),
+    'can_close', v_rev > 0 and not v_done,
+    'done_today', v_done,
+    'hours_open', round(v_hours::numeric, 2),
+    'stage', case when v_rev <= 0 then 'none'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) then 'estimate'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) then 'late'
+                  when v_hours >= public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) then 'reminder'
+                  else 'open' end,
+    'reminder_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,reminderAfterHours}', 30) * 3600),
+    'late_fee_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,lateFeeAfterHours}', 42) * 3600),
+    'estimate_at', l.books_until + make_interval(secs => public.cfg_num(cfg, '{taxes,estimateAfterHours}', 60) * 3600),
+    'streak', l.books_streak,
+    'last_day', l.books_day);
+end;
+$$;
+
+-- Closes the open period (copied from 5410): the gross tax with the progressive brackets; rate_bps stores the
+-- effective rate of the period
+create or replace function public.listed_books_do(p_company uuid, p_by text, p_correct integer)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.listed_cfg();
+  l        public.listed_companies;
+  s        jsonb;
+  v_rev    bigint;
+  v_costs  bigint;
+  v_profit bigint;
+  v_rate   integer := public.macro_tax_rate_bps(p_company);
+  v_hours  double precision;
+  v_carry  bigint;
+  v_used   bigint := 0;
+  v_tax_on bigint := 0;
+  v_gross  bigint := 0;
+  v_disc   bigint := 0;
+  v_tax    bigint := 0;
+  v_pen    bigint := 0;
+  v_bps    integer;
+  v_today  date := (now() at time zone 'Europe/Berlin')::date;
+  v_streak integer;
+  v_id     bigint;
+  v_owner  uuid;
+begin
+  select * into l from public.listed_companies where company_id = p_company for update;
+  if l.company_id is null then
+    return null;
+  end if;
+  s := public.listed_period_sums(p_company, l.books_until, now());
+  v_rev := (s ->> 'revenue_cents')::bigint;
+  v_costs := (s ->> 'costs_cents')::bigint;
+  v_profit := v_rev - v_costs;
+  v_carry := l.loss_carry_cents;
+  v_hours := extract(epoch from (now() - l.books_until)) / 3600.0;
+  if p_by = 'finanzamt' then
+    -- estimateTax: at least a margin on the revenue, no loss carried, a surcharge on the tax
+    v_tax_on := greatest(v_profit, (v_rev * public.cfg_num(cfg, '{taxes,estimate,marginBps}', 2500)::bigint) / 10000, 0);
+    v_tax := public.company_tax_progressive_cents(v_tax_on, v_rate, v_hours);
+    v_pen := (v_tax * public.cfg_num(cfg, '{taxes,estimate,surchargeBps}', 2500)::bigint) / 10000;
+    v_gross := v_tax;
+  elsif v_profit <= 0 then
+    v_carry := v_carry - v_profit;
+  else
+    -- booksTax: the carried loss first, the tax rounded down (with brackets), the discount off the tax
+    v_used := least(v_carry, v_profit);
+    v_tax_on := v_profit - v_used;
+    v_carry := v_carry - v_used;
+    v_gross := public.company_tax_progressive_cents(v_tax_on, v_rate, v_hours);
+    v_bps := case when p_by = 'advisor' then public.cfg_num(cfg, '{taxes,advisor,discountBps}', 800)::integer
+                  when coalesce(p_correct, 0) >= public.cfg_num(cfg, '{taxes,check,receipts}', 3)
+                  then public.cfg_num(cfg, '{taxes,check,discountBps}', 500)::integer else 0 end;
+    v_disc := (v_gross * v_bps) / 10000;
+    v_tax := v_gross - v_disc;
+  end if;
+  if v_tax_on > 0 then
+    v_rate := greatest(v_rate, round(v_gross::numeric * 10000 / v_tax_on)::integer);
+  end if;
+  insert into public.company_tax_periods (company_id, kind, period_start, period_end, revenue_cents, costs_cents, profit_cents,
+                                          loss_used_cents, taxable_cents, rate_bps, discount_cents, tax_cents, penalty_cents, status,
+                                          closed_by, check_correct, due_at, paid_at)
+  values (p_company, 'books', l.books_until, now(), v_rev, v_costs, v_profit, v_used, v_tax_on, v_rate, v_disc, v_tax, v_pen,
+          case when v_tax + v_pen = 0 then 'paid' else 'due' end, p_by, p_correct,
+          now() + make_interval(secs => public.cfg_num(cfg, '{taxes,payWithinHours}', 24) * 3600),
+          case when v_tax + v_pen = 0 then now() end)
+  returning id into v_id;
+  v_streak := case when p_by = 'finanzamt' then 0
+                   when l.books_day = v_today then greatest(1, l.books_streak)
+                   when l.books_day = v_today - 1 then l.books_streak + 1 else 1 end;
+  update public.listed_companies
+     set books_until = now(), books_day = v_today, books_stage = 0, loss_carry_cents = v_carry, books_streak = v_streak
+   where company_id = p_company;
+  if p_by <> 'finanzamt' then
+    select pc.founder_id into v_owner from public.player_companies pc where pc.company_id = p_company;
+    perform public.mission_event(v_owner, 'books_done', 1, v_id::text);
+    perform public.mission_event(v_owner, 'books_streak', v_streak, v_id::text);
+  end if;
+  return v_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- H. RPCs: risks overview, insurance
+-- ---------------------------------------------------------------------------
+create or replace function public.company_risks_json(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  m        jsonb := public.macro_cfg();
+  ce       jsonb := public.company_events_cfg();
+  pc       public.player_companies;
+  c        public.companies;
+  v_worth  bigint;
+  v_dec    double precision;
+  v_chance double precision;
+  v_share  double precision;
+  v_country jsonb;
+  v_total  double precision;
+  v_fr     jsonb;
+  v_ref    bigint;
+  v_levels jsonb;
+  v_exp    jsonb;
+  v_next   jsonb;
+  v_wait   timestamptz;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into c from public.companies where id = p_company;
+  if pc.company_id is null then
+    return null;
+  end if;
+  v_worth := coalesce(public.company_worth_cents(p_company), 0);
+  v_dec := public.macro_size_decades(v_worth);
+  v_chance := public.cfg_num(ce, '{chancePerDay}', 0.6);
+  v_share := public.cfg_num(ce, '{chanceShare}', 0.4);
+  if v_dec > 0 then
+    v_chance := greatest(v_chance, least(public.cfg_num(m, '{events,maxChancePerDay}', 0.95),
+                                         v_chance + public.cfg_num(m, '{events,chancePerDayPerDecade}', 0.2) * v_dec));
+    v_share := least(v_share, greatest(public.cfg_num(m, '{events,minChanceShare}', 0.15),
+                                       v_share - public.cfg_num(m, '{events,chanceShareCutPerDecade}', 0.08) * v_dec));
+  end if;
+  v_country := public.macro_company_country(p_company);
+  select coalesce(sum(public.macro_weight(t.x, v_worth, v_country, pc.lobby_level)), 0) into v_total
+    from jsonb_array_elements(coalesce(ce -> 'archetypes', '[]'::jsonb)) t(x)
+   where t.x ->> 'polarity' = 'crisis'
+     and (jsonb_typeof(t.x -> 'sectors') is distinct from 'array' or t.x -> 'sectors' ? c.sector_key);
+  -- daily probability of every external archetype (bps), most likely first
+  select coalesce(jsonb_agg(jsonb_build_object('archetype', q.k, 'bps', q.bps, 'insurable', q.ins, 'risk', q.risk)
+                            order by q.bps desc, q.k), '[]'::jsonb)
+    into v_exp
+    from (select t.x ->> 'key' as k, coalesce((t.x ->> 'insurable')::boolean, false) as ins, t.x ->> 'risk' as risk,
+                 round(case when v_total > 0 then v_chance * (1 - v_share) * public.macro_weight(t.x, v_worth, v_country, pc.lobby_level) / v_total
+                            else 0 end * 10000)::integer as bps
+            from jsonb_array_elements(coalesce(ce -> 'archetypes', '[]'::jsonb)) t(x)
+           where coalesce((t.x ->> 'external')::boolean, false)
+             and (jsonb_typeof(t.x -> 'sectors') is distinct from 'array' or t.x -> 'sectors' ? c.sector_key)) q
+   where q.bps > 0;
+  -- external events still to come with growth
+  select coalesce(jsonb_agg(jsonb_build_object('archetype', t.x ->> 'key', 'from_cents', (t.x ->> 'minWorthCents')::bigint)
+                            order by (t.x ->> 'minWorthCents')::bigint, t.x ->> 'key'), '[]'::jsonb)
+    into v_next
+    from jsonb_array_elements(coalesce(ce -> 'archetypes', '[]'::jsonb)) t(x)
+   where coalesce((t.x ->> 'external')::boolean, false) and coalesce((t.x ->> 'minWorthCents')::bigint, 0) > v_worth;
+  v_fr := public.macro_friction(v_worth, 0);
+  select coalesce(round(avg(h.revenue_cents))::bigint, 0) into v_ref
+    from (select x.revenue_cents from public.player_company_hours x where x.company_id = p_company
+           order by x.hour_start desc limit 24) h;
+  select coalesce(jsonb_agg(jsonb_build_object('level', (o - 1)::integer, 'key', lv ->> 'key',
+                                               'coverage_bps', round(public.cfg_num(lv, '{coverage}', 0) * 10000)::integer,
+                                               'premium_bps', public.cfg_num(lv, '{premiumBps}', 0)::integer,
+                                               'premium_cents_per_hour', (v_ref * public.cfg_num(lv, '{premiumBps}', 0)::bigint) / 10000)
+                            order by o), '[]'::jsonb)
+    into v_levels
+    from jsonb_array_elements(coalesce(m #> '{insurance,levels}', '[]'::jsonb)) with ordinality t(lv, o);
+  v_wait := case when pc.insurance_changed_at is null then null
+                 else pc.insurance_changed_at + make_interval(secs => public.cfg_num(m, '{insurance,changeWaitHours}', 12) * 3600) end;
+  return jsonb_build_object(
+    'company_id', p_company,
+    'worth_cents', v_worth,
+    'decades', round(v_dec::numeric, 3)::double precision,
+    'event_pivot_cents', public.cfg_num(m, '{events,worthPivotCents}', 2000000000)::bigint,
+    'friction_pivot_cents', public.cfg_num(m, '{friction,worthPivotCents}', 3000000000)::bigint,
+    'saturation_bps', round((v_fr ->> 'demand_factor')::numeric * 10000)::integer,
+    'overhead_bps', round((v_fr ->> 'extra_cost_share')::numeric * 10000)::integer,
+    'chance_per_day_bps', round(v_chance * 10000)::integer,
+    'crisis_share_bps', round((1 - v_share) * 10000)::integer,
+    'unit_cents', public.company_event_unit_cents(p_company),
+    'exposure', v_exp,
+    'upcoming', v_next,
+    'ref_revenue_cents', v_ref,
+    'insurance', jsonb_build_object(
+      'level', pc.insurance_level,
+      'coverage_bps', round(coalesce(public.macro_coverage(p_company), 0) * 10000)::integer,
+      'changed_at', pc.insurance_changed_at,
+      'full_from', case when v_wait is not null and v_wait > public.game_now() then v_wait end,
+      'levels', v_levels),
+    'lobby', jsonb_build_object(
+      'level', pc.lobby_level,
+      'max', public.cfg_num(m, '{lobby,maxLevel}', 5)::integer,
+      'bonus_bps', (least(pc.lobby_level, public.cfg_num(m, '{lobby,maxLevel}', 5)) * public.cfg_num(m, '{lobby,successBpsPerLevel}', 350))::integer,
+      'political_cut_bps', round(least(1, least(pc.lobby_level, public.cfg_num(m, '{lobby,maxLevel}', 5))
+                                          * public.cfg_num(m, '{lobby,politicalCutPerLevel}', 0.12)) * 10000)::integer,
+      'leader', coalesce(public.company_is_market_leader(p_company), false)),
+    'country', case when v_country is null then null
+                    else jsonb_build_object('key', public.company_country(p_company), 'name', v_country ->> 'name') end);
+end;
+$$;
+
+create or replace function public.get_company_risks()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return public.company_risks_json(public.require_own_company());
+end;
+$$;
+comment on function public.get_company_risks() is
+  'RPC (founder): the risks of the own company (ADR-209): value, size friction, daily event chance, exposure to every '
+  'external event, insurance and lobby.';
+
+create or replace function public.set_company_insurance(p_request_id uuid, p_level integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_max     integer;
+begin
+  v_company := public.require_own_company();
+  v_player := public.require_player();
+  v_max := jsonb_array_length(coalesce(public.macro_cfg() #> '{insurance,levels}', '[{}]'::jsonb)) - 1;
+  if p_request_id is null or p_level is null or p_level < 0 or p_level > v_max then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'set_company_insurance');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  update public.player_companies
+     -- the level that covers right now (a change inside the wait keeps the lower one)
+     set insurance_prev_level = case when insurance_level = p_level then insurance_prev_level
+                                     when insurance_changed_at is null
+                                          or insurance_changed_at + make_interval(secs => public.cfg_num(public.macro_cfg(), '{insurance,changeWaitHours}', 12) * 3600)
+                                             <= public.game_now()
+                                     then insurance_level
+                                     else least(insurance_level, insurance_prev_level) end,
+         insurance_changed_at = case when insurance_level = p_level then insurance_changed_at else public.game_now() end,
+         insurance_level = p_level
+   where company_id = v_company;
+  return public.request_complete(v_player, p_request_id, public.company_risks_json(v_company));
+end;
+$$;
+comment on function public.set_company_insurance(uuid, integer) is
+  'RPC (founder): insurance level against disasters and cyber attacks (ADR-209). Premium every hour as a share of the '
+  'own revenue; a higher level covers events only after insurance.changeWaitHours.';
+
+-- ---------------------------------------------------------------------------
+-- I. Grants
+-- ---------------------------------------------------------------------------
+revoke all on function public.macro_cfg(), public.macro_size_decades(bigint), public.macro_friction(bigint, integer),
+  public.macro_country_factor(jsonb, jsonb), public.macro_weight(jsonb, bigint, jsonb, integer),
+  public.macro_company_country(uuid), public.company_event_pick_sized(double precision, text, text, bigint, jsonb, integer),
+  public.macro_coverage(uuid, timestamptz), public.macro_event_snapshot_trg(), public.macro_lobby_win_trg(),
+  public.company_tax_progressive_cents(bigint, integer, double precision), public.macro_tax_rate_bps(uuid),
+  public.company_risks_json(uuid), public.macro_ref_revenue(uuid)
+  from public, anon, authenticated;
+revoke all on function public.get_company_risks(), public.set_company_insurance(uuid, integer) from public, anon;
+grant execute on function public.get_company_risks(), public.set_company_insurance(uuid, integer) to authenticated;

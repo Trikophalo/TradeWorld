@@ -128,7 +128,9 @@ select tests.assert(
                    'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision']
           -- Weltkarte (ADR-208)
           || array['get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
-                   'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee']) x),
+                   'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee']
+          -- risks and insurance of the own company (ADR-209)
+          || array['get_company_risks', 'set_company_insurance']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

@@ -4046,6 +4046,440 @@
           "meeting": "Treffen",
           "integrate": "Systeme verbinden"
         }
+      },
+      "political_decision": {
+        "name": "Politische Entscheidung",
+        "headlines": [
+          "Parlament beschließt neue {rule}: {company} unter Zugzwang",
+          "Regierung zielt mit {rule} auf Konzerne wie {company}",
+          "Neue {rule} kommt – Lobbyisten von {company} schärfen die Bleistifte"
+        ],
+        "bodies": [
+          "Die Politik hat {company} ins Visier genommen: Eine neue {rule} macht {product} teurer und schreckt Kunden ab. Wer groß ist, wird gern reguliert.",
+          "In der Hauptstadt wird eine {rule} durchgewunken, die vor allem große Anbieter von {product} trifft. Mit genug Einfluss lässt sich noch etwas drehen – Einfluss kostet aber."
+        ],
+        "strategies": {
+          "lobby_campaign": "Große Lobby-Kampagne",
+          "comply": "Regeln umsetzen",
+          "accept": "Hinnehmen"
+        },
+        "strategyText": {
+          "lobby_campaign": "Denkfabrik, Bündnis, Medien, Anhörung: vier teure Schritte mit Risiko. Klappt alles, kippt die Regel, und deine Lobby wird stärker.",
+          "comply": "Eine Compliance-Abteilung aufbauen und prüfen lassen. Sicher, aber nur ein Teil des Schadens ist weg.",
+          "accept": "Die {rule} einfach mittragen."
+        },
+        "steps": {
+          "think_tank": "Denkfabrik beauftragen",
+          "coalition": "Branchenbündnis schmieden",
+          "media": "Medienkampagne fahren",
+          "hearing": "Anhörung im Parlament",
+          "compliance_team": "Compliance-Team aufbauen",
+          "audit": "Prüfung bestehen"
+        }
+      },
+      "tariffs": {
+        "name": "Zölle aus dem Ausland",
+        "headlines": [
+          "Nachbarland verhängt Strafzoll auf {product}",
+          "Zollhammer: {company} verliert Exportkunden",
+          "Handelsstreit trifft {company} – {product} an der Grenze teurer"
+        ],
+        "bodies": [
+          "Ein wichtiges Exportland erhebt plötzlich Zölle auf {product}. Ein Teil der Kunden von {company} springt ab, der Rest zahlt nur widerwillig.",
+          "Im Handelsstreit zwischen zwei Regierungen gerät {company} zwischen die Fronten. Die Ware bleibt am Zoll hängen, die Kosten steigen."
+        ],
+        "strategies": {
+          "local_production": "Vor Ort produzieren",
+          "lobby": "Gegen die Zölle lobbyieren",
+          "pass_on": "Preise erhöhen",
+          "accept": "Hinnehmen"
+        },
+        "strategyText": {
+          "local_production": "Einen Standort im Ausland suchen und ein Werk bauen. Teuer, bindet Kapazität, umgeht die Zölle aber ganz.",
+          "lobby": "Über den Branchenverband verhandeln. Klappt es, fallen die meisten Zölle weg.",
+          "pass_on": "Die Zölle auf die Kunden umlegen. Halbiert den Schaden.",
+          "accept": "Die Zölle zahlen und abwarten."
+        },
+        "steps": {
+          "site_search": "Standort im Ausland suchen",
+          "build_plant": "Werk bauen",
+          "trade_association": "Branchenverband einschalten",
+          "negotiation": "Verhandlungen mit der Regierung",
+          "price_talk": "Preisgespräche mit Händlern"
+        }
+      },
+      "earthquake": {
+        "name": "Erdbeben",
+        "headlines": [
+          "Erdbeben legt Werk von {company} lahm",
+          "Beben in {place}: {company} zählt die Schäden",
+          "Risse in den Hallen – {company} stoppt die Produktion von {product}"
+        ],
+        "bodies": [
+          "Ein starkes Erdbeben hat Teile der Anlagen von {company} beschädigt. Verletzt wurde niemand, aber die Produktion von {product} steht zu großen Teilen still, und die Reparatur kostet.",
+          "Nach dem Beben prüfen Gutachter die Hallen von {company}. Bis alles wieder läuft, fehlt Kapazität. Eine Versicherung zahlt jetzt einen großen Teil."
+        ],
+        "strategies": {
+          "rebuild": "Schnell wieder aufbauen",
+          "backup_site": "Ausweichstandort",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "rebuild": "Schäden prüfen, reparieren, wieder hochfahren. Drei Schritte, danach ist alles wie vorher.",
+          "backup_site": "Eine Halle anderswo mieten und umziehen. Schneller, aber nicht ganz so gut.",
+          "accept": "Mit halber Kraft weitermachen, bis sich alles von selbst sortiert."
+        },
+        "steps": {
+          "assess": "Schäden begutachten",
+          "repair": "Reparieren",
+          "reopen": "Produktion hochfahren",
+          "rent_site": "Ausweichhalle mieten",
+          "move": "Umziehen"
+        }
+      },
+      "tsunami": {
+        "name": "Tsunami",
+        "headlines": [
+          "Flutwelle trifft Küstenwerk von {company}",
+          "Tsunami-Schäden: {company} verliert Hafen und Lager",
+          "Nach der Welle: {company} muss {product} neu organisieren"
+        ],
+        "bodies": [
+          "Eine Flutwelle hat das Küstenwerk und das Hafenlager von {company} schwer beschädigt. Die Belegschaft ist in Sicherheit, doch ein großer Teil der Kapazität fehlt.",
+          "Nach dem Tsunami steht das Wasser in den Hallen von {company}. Ohne Wiederaufbau oder Ausweichstandort bleibt die Lieferung von {product} lange knapp."
+        ],
+        "strategies": {
+          "rebuild": "Schnell wieder aufbauen",
+          "backup_site": "Ausweichstandort",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "rebuild": "Schäden prüfen, reparieren, wieder hochfahren. Drei Schritte, danach ist alles wie vorher.",
+          "backup_site": "Weg von der Küste: eine Halle im Landesinneren mieten und umziehen.",
+          "accept": "Mit dem weiterarbeiten, was übrig ist."
+        },
+        "steps": {
+          "assess": "Schäden begutachten",
+          "repair": "Trocknen und reparieren",
+          "reopen": "Produktion hochfahren",
+          "rent_site": "Halle im Landesinneren mieten",
+          "move": "Umziehen"
+        }
+      },
+      "flood": {
+        "name": "Überschwemmung",
+        "headlines": [
+          "Hochwasser in {place}: Keller von {company} vollgelaufen",
+          "Land unter bei {company} – Lager für {product} geflutet",
+          "Überschwemmung bremst {company} aus"
+        ],
+        "bodies": [
+          "Nach tagelangem Regen steht das Lager von {company} unter Wasser. Maschinen und Vorräte sind beschädigt, die Produktion von {product} läuft nur noch teilweise.",
+          "Das Hochwasser zieht ab, die Schäden bleiben: {company} muss trocknen, reparieren und Ware ersetzen. Gut versichert ist halb gewonnen."
+        ],
+        "strategies": {
+          "rebuild": "Aufräumen und reparieren",
+          "backup_site": "Ausweichstandort",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "rebuild": "Schäden prüfen, reparieren, wieder hochfahren. Drei Schritte, danach ist alles wie vorher.",
+          "backup_site": "Eine trockene Halle mieten und umziehen.",
+          "accept": "Abwarten, bis das Wasser weg ist."
+        },
+        "steps": {
+          "assess": "Schäden begutachten",
+          "repair": "Trocknen und reparieren",
+          "reopen": "Produktion hochfahren",
+          "rent_site": "Trockene Halle mieten",
+          "move": "Umziehen"
+        }
+      },
+      "wildfire": {
+        "name": "Waldbrand",
+        "headlines": [
+          "Waldbrand bei {place}: {company} evakuiert Werk",
+          "Rauch über den Hallen von {company}",
+          "Feuer zerstört Lager – {product} wird knapp"
+        ],
+        "bodies": [
+          "Ein Waldbrand hat das Gelände von {company} erreicht. Die Feuerwehr konnte das Hauptgebäude retten, Lager und Zufahrten sind aber beschädigt.",
+          "Wegen des Waldbrands musste {company} das Werk räumen. Bis alles wieder steht, fehlt Kapazität, und die Kunden von {product} warten."
+        ],
+        "strategies": {
+          "rebuild": "Schnell wieder aufbauen",
+          "backup_site": "Ausweichstandort",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "rebuild": "Schäden prüfen, reparieren, wieder hochfahren. Drei Schritte, danach ist alles wie vorher.",
+          "backup_site": "Eine Halle weit weg vom Wald mieten und umziehen.",
+          "accept": "Abwarten, bis der Rauch abgezogen ist."
+        },
+        "steps": {
+          "assess": "Schäden begutachten",
+          "repair": "Wiederaufbauen",
+          "reopen": "Produktion hochfahren",
+          "rent_site": "Ausweichhalle mieten",
+          "move": "Umziehen"
+        }
+      },
+      "pandemic": {
+        "name": "Krankheitswelle",
+        "headlines": [
+          "Grippewelle legt Belegschaft von {company} flach",
+          "Krankheitswelle: {company} fehlen die Leute",
+          "Halbe Mannschaft im Bett – {company} kämpft um {product}"
+        ],
+        "bodies": [
+          "Eine heftige Krankheitswelle geht durchs Land. Bei {company} fehlt ein Viertel der Leute, und die Kunden kaufen vorsichtiger ein.",
+          "Volle Wartezimmer, leere Büros: {company} kann {product} nur noch eingeschränkt liefern. Mit Homeoffice und Gesundheitsprogramm lässt sich viel retten."
+        ],
+        "strategies": {
+          "remote_work": "Homeoffice und Schichten",
+          "health_program": "Gesundheitsprogramm",
+          "accept": "Durchhalten"
+        },
+        "strategyText": {
+          "remote_work": "Laptops für alle und neue Schichtpläne. Danach läuft der Betrieb fast normal.",
+          "health_program": "Tests und eine Impfaktion für das Team. Die meisten bleiben gesund.",
+          "accept": "Durchhalten, bis die Welle abebbt."
+        },
+        "steps": {
+          "laptops": "Laptops verteilen",
+          "shifts": "Schichtpläne umstellen",
+          "tests": "Tests organisieren",
+          "vaccination_drive": "Impfaktion im Betrieb"
+        }
+      },
+      "shitstorm": {
+        "name": "Shitstorm",
+        "headlines": [
+          "Shitstorm gegen {company}: Das Netz kocht",
+          "#Boykott{company} trendet – wegen {product}",
+          "Ein Video, eine Million Wutkommentare: {company} im Kreuzfeuer"
+        ],
+        "bodies": [
+          "Ein missverständlicher Werbespot von {company} geht viral – leider im falschen Sinn. Unter jedem Beitrag stehen Tausende Kommentare, die Kundschaft zögert.",
+          "Ein Influencer hat {product} von {company} öffentlich verrissen, und alle machen mit. Wer jetzt schweigt, verliert Kunden; wer falsch antwortet, noch mehr."
+        ],
+        "strategies": {
+          "apology_tour": "Entschuldigungstour",
+          "counter_campaign": "Gegendarstellung",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "apology_tour": "Zuhören, sich ehrlich entschuldigen und Kunden entschädigen. Drei Schritte, danach ist der Ruf gerettet.",
+          "counter_campaign": "Mit Fakten dagegenhalten. Wirkt nur zum Teil, das Netz liebt seine Empörung.",
+          "accept": "Warten, bis das Internet das nächste Thema findet."
+        },
+        "steps": {
+          "listen": "Kritik sammeln",
+          "apology": "Öffentliche Entschuldigung",
+          "make_good": "Kunden entschädigen",
+          "fact_check": "Faktencheck veröffentlichen"
+        }
+      },
+      "war_conflict": {
+        "name": "Konflikt in der Region",
+        "headlines": [
+          "Grenzkonflikt kappt Lieferwege von {company}",
+          "Unruhen in der Region: {company} zieht Personal ab",
+          "Konflikt im Nachbarland trifft {company} hart"
+        ],
+        "bodies": [
+          "Ein bewaffneter Konflikt in der Region sperrt Handelswege. {company} bekommt Material nur noch über Umwege, Kunden halten sich zurück, Versicherer verlangen Risikoaufschläge.",
+          "Die Lage in der Region spitzt sich zu. {company} muss entscheiden: neue Routen aufbauen oder sich aus dem Gebiet zurückziehen."
+        ],
+        "strategies": {
+          "reroute": "Lieferwege umlegen",
+          "withdraw": "Rückzug",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "reroute": "Risiken analysieren, neue Routen aufbauen, Vorräte sichern. Teuer, aber danach läuft es weiter.",
+          "withdraw": "Das Geschäft in der Region geordnet aufgeben und abschreiben.",
+          "accept": "Hoffen, dass sich die Lage bald beruhigt."
+        },
+        "steps": {
+          "risk_analysis": "Risikoanalyse",
+          "new_routes": "Neue Lieferwege aufbauen",
+          "secure_stock": "Vorräte sichern",
+          "exit_plan": "Rückzugsplan erstellen",
+          "write_off": "Abschreiben"
+        }
+      },
+      "commodity_crunch": {
+        "name": "Rohstoffknappheit",
+        "headlines": [
+          "{input} wird weltweit knapp – {company} bangt um Nachschub",
+          "Lieferkettenkrise: {company} wartet auf {input}",
+          "Preise für {input} explodieren"
+        ],
+        "bodies": [
+          "Auf dem Weltmarkt ist {input} kaum noch zu bekommen. {company} kann weniger {product} herstellen, und was es gibt, kostet viel mehr.",
+          "Leere Containerschiffe, volle Häfen: Die Lieferketten stocken. {company} braucht langfristige Verträge oder einen Ersatz für {input}."
+        ],
+        "strategies": {
+          "long_term_contracts": "Langfristige Verträge",
+          "substitute": "Ersatzstoff",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "long_term_contracts": "Markt sondieren, Preise absichern, feste Verträge schließen. Danach ist der Nachschub sicher.",
+          "substitute": "Im Labor einen Ersatz für {input} finden und die Produktion umstellen.",
+          "accept": "Teuer einkaufen, was zu bekommen ist."
+        },
+        "steps": {
+          "market_scan": "Weltmarkt sondieren",
+          "hedge": "Preise absichern",
+          "contract": "Lieferverträge schließen",
+          "research_sub": "Ersatzstoff entwickeln",
+          "retool": "Produktion umstellen"
+        }
+      },
+      "cyber_attack": {
+        "name": "Cyberangriff",
+        "headlines": [
+          "Hacker legen Systeme von {company} lahm",
+          "Erpressungstrojaner bei {company}: Bildschirme zeigen nur noch einen Totenkopf",
+          "Cyberangriff: {company} arbeitet wieder mit Zettel und Stift"
+        ],
+        "bodies": [
+          "Unbekannte haben die Server von {company} verschlüsselt. Bestellungen für {product} hängen fest, die Produktion läuft nur noch von Hand.",
+          "Ein Angriff aus dem Netz trifft {company}: Warenwirtschaft und Kasse sind offline. Die IT arbeitet die Nacht durch, eine Cyber-Versicherung zahlt jetzt mit."
+        ],
+        "strategies": {
+          "incident_response": "Notfallteam",
+          "backup_restore": "Backups einspielen",
+          "accept": "Abwarten"
+        },
+        "strategyText": {
+          "incident_response": "Systeme abschotten, wiederherstellen, härten. Danach ist alles sicherer als vorher.",
+          "backup_restore": "Die letzte Sicherung einspielen. Geht schnell, aber ein Teil der Daten fehlt.",
+          "accept": "Mit Zettel und Stift weitermachen."
+        },
+        "steps": {
+          "isolate": "Systeme abschotten",
+          "restore": "Systeme wiederherstellen",
+          "harden": "Sicherheit verstärken",
+          "backups": "Backups einspielen"
+        }
+      },
+      "antitrust": {
+        "name": "Kartellverfahren",
+        "headlines": [
+          "Kartellamt prüft die Marktmacht von {company}",
+          "Zu groß? Wettbewerbshüter nehmen {company} ins Visier",
+          "Kartellverfahren gegen {company} eröffnet"
+        ],
+        "bodies": [
+          "Das Kartellamt findet, {company} beherrsche den Markt für {product} zu sehr. Drohende Auflagen schrecken Kunden ab, die Anwälte kosten ein Vermögen.",
+          "Weil {company} so groß geworden ist, prüfen die Wettbewerbshüter jede Bewegung. Kämpfen, kooperieren oder einen Teil verkaufen?"
+        ],
+        "strategies": {
+          "fight": "Vor Gericht kämpfen",
+          "cooperate": "Mit dem Amt kooperieren",
+          "divest": "Sparte verkaufen",
+          "accept": "Hinnehmen"
+        },
+        "strategyText": {
+          "fight": "Top-Kanzlei, Gutachten, Prozess. Teuer und riskant, aber wer gewinnt, behält alles.",
+          "cooperate": "Akten offenlegen und Auflagen anbieten. Der größte Teil des Schadens fällt weg.",
+          "divest": "Eine Sparte verkaufen, damit das Amt Ruhe gibt.",
+          "accept": "Die Auflagen tragen."
+        },
+        "steps": {
+          "top_lawyers": "Top-Kanzlei beauftragen",
+          "economists": "Wirtschaftsgutachten",
+          "court": "Prozess",
+          "disclose_files": "Akten offenlegen",
+          "remedies": "Auflagen umsetzen",
+          "sell_unit": "Sparte verkaufen"
+        }
+      },
+      "union_strike": {
+        "name": "Streik der Gewerkschaft",
+        "headlines": [
+          "Gewerkschaft ruft zum Streik bei {company} auf",
+          "Bänder stehen still: Großstreik bei {company}",
+          "Tarifstreit eskaliert – {company} ohne Belegschaft"
+        ],
+        "bodies": [
+          "Die Gewerkschaft fordert mehr Lohn für alle bei {company} und hat zum Streik aufgerufen. Fast die Hälfte der Kapazität fehlt.",
+          "Vor den Toren von {company} stehen Streikposten mit Trillerpfeifen. Ohne Einigung wird kaum {product} geliefert."
+        ],
+        "strategies": {
+          "collective_bargaining": "Tarifverhandlung",
+          "mediation": "Schlichtung",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "collective_bargaining": "Gespräche, ein ordentliches Angebot, Unterschrift. Danach ist der Betriebsfrieden zurück.",
+          "mediation": "Einen Schlichter holen. Der größte Teil des Ärgers ist schnell vorbei.",
+          "accept": "Warten, bis die Streikkasse leer ist."
+        },
+        "steps": {
+          "talks": "Gespräche aufnehmen",
+          "offer": "Tarifangebot machen",
+          "sign": "Tarifvertrag unterschreiben",
+          "mediator": "Schlichtung"
+        }
+      },
+      "currency_crisis": {
+        "name": "Währungskrise",
+        "headlines": [
+          "Währungssturz: Auslandskunden von {company} können nicht mehr zahlen",
+          "Wechselkurse spielen verrückt – {company} verliert Marge",
+          "Währungskrise trifft den Export von {company}"
+        ],
+        "bodies": [
+          "In wichtigen Absatzländern verliert die Währung über Nacht ein Drittel ihres Werts. Für die Kunden von {company} wird {product} plötzlich sehr teuer.",
+          "Die Finanzabteilung von {company} rechnet jede Stunde neu: Wechselkurse fressen die Marge. Absichern oder Preise anpassen?"
+        ],
+        "strategies": {
+          "hedging": "Währung absichern",
+          "local_pricing": "Preise vor Ort anpassen",
+          "accept": "Hinnehmen"
+        },
+        "strategyText": {
+          "hedging": "Treasury-Analyse und Absicherungsgeschäfte. Danach sind die Kurse egal.",
+          "local_pricing": "Preise in jedem Land neu festlegen. Rettet einen Teil der Marge.",
+          "accept": "Die Verluste tragen."
+        },
+        "steps": {
+          "treasury_analysis": "Treasury-Analyse",
+          "currency_hedge": "Währung absichern",
+          "reprice": "Preise neu festlegen"
+        }
+      },
+      "energy_shock": {
+        "name": "Energiepreisschock",
+        "headlines": [
+          "Strompreis verdreifacht sich – {company} stöhnt",
+          "Energieschock: Produktion von {product} wird teuer",
+          "{company} zahlt mehr für Strom als für Personal"
+        ],
+        "bodies": [
+          "Die Energiepreise sind explodiert. Für {company} wird jede Einheit {product} spürbar teurer, die Marge schmilzt.",
+          "Die Stromrechnung von {company} hat eine Stelle mehr als sonst. Sparen oder selbst erzeugen: Beides kostet erst einmal."
+        ],
+        "strategies": {
+          "efficiency": "Energie sparen",
+          "own_power": "Eigener Strom",
+          "accept": "Zahlen"
+        },
+        "strategyText": {
+          "efficiency": "Energieberatung und neue Anlagen. Danach braucht die Produktion viel weniger Strom.",
+          "own_power": "Ein eigener Solarpark und ein Netzvertrag. Fast unabhängig vom Strompreis.",
+          "accept": "Die hohen Preise zahlen."
+        },
+        "steps": {
+          "energy_audit": "Energieberatung",
+          "retrofit": "Anlagen modernisieren",
+          "solar_park": "Solarpark bauen",
+          "grid_deal": "Netzvertrag schließen"
+        }
       }
     },
     "effects": {
@@ -4055,7 +4489,10 @@
     },
     "progress": "Abgewendet",
     "demoTrigger": "Demo: Lage auslösen",
-    "demoFinish": "Demo: Schritt sofort beenden"
+    "demoTriggerExternal": "Demo: Ereignis von außen",
+    "demoFinish": "Demo: Schritt sofort beenden",
+    "external": "Von außen",
+    "insurable": "Versicherbar"
   },
   "companyNews": {
     "title": "Firmen-News",
@@ -4095,7 +4532,11 @@
       "task_missed": ["{task}"],
       "pitch_success": ["{outcome}"],
       "pitch_failure": ["{outcome}"],
-      "pitch_backfire": ["{outcome}"]
+      "pitch_backfire": ["{outcome}"],
+      "lobby_level": [
+        "Die Lobby von {company} gewinnt an Einfluss (Stufe {level}).",
+        "In der Hauptstadt hört man jetzt öfter auf {company}: Lobby-Stufe {level}."
+      ]
     },
     "more": "Alle Meldungen",
     "less": "Weniger anzeigen"
@@ -10442,7 +10883,8 @@
           "budget": "Günstig",
           "normal": "Normal",
           "premium": "Premium"
-        }
+        },
+        "risks": "Wie groß deine Firma ist, was von außen droht, Versicherung und Lobby. Ab vielen Millionen wird jeder Schritt schwerer."
       }
     },
     "restrictions": {
@@ -10957,7 +11399,8 @@
         "staff-team": "Team & Plätze",
         "staff-mood": "Stimmung",
         "staff-value": "Wert des Teams",
-        "skills": "Fertigkeiten"
+        "skills": "Fertigkeiten",
+        "risks": "Risiken"
       }
     },
     "groupCards": {
@@ -11773,5 +12216,46 @@
       "ready": "Weltkarte offen",
       "locked": "{pct} % bis zur Weltkarte"
     }
+  },
+  "risks": {
+    "title": "Risiken",
+    "intro": "Kleine Firmen wachsen schnell. Je größer deine Firma wird, desto satter ist der Markt, desto mehr kostet die Verwaltung und desto öfter trifft sie etwas von außen: Politik, Zölle, Katastrophen, Streiks.",
+    "empty": "Die Risiken lassen sich gerade nicht laden.",
+    "worth": "Firmenwert",
+    "chance": "Lage pro Tag",
+    "crisisShare": "davon {pct} % Krisen",
+    "saturation": "Marktsättigung",
+    "saturationNote": "weniger Nachfrage",
+    "overhead": "Verwaltung",
+    "overheadNote": "vom Umsatz",
+    "smallHint": "Noch spürt deine Firma ihre Größe nicht. Ab {from} Firmenwert wird Wachstum mühsamer.",
+    "bigHint": "Große Firmen zahlen für jede Reaktion mehr: Eine Kosteneinheit kostet jetzt {unit}.",
+    "insuranceTitle": "Versicherung",
+    "insuranceText": "Versichert gegen Erdbeben, Tsunami, Überschwemmung, Waldbrand und Cyberangriffe. Die Prämie geht jede Stunde vom Umsatz ab. Eine höhere Stufe gilt erst nach einer Wartezeit, Nachkaufen nach dem Beben klappt also nicht.",
+    "coverageNow": "Deckt jetzt {pct} %",
+    "coverage": "Übernimmt vom Schaden",
+    "premium": "Prämie pro Stunde",
+    "premiumNote": "{pct} % vom Umsatz",
+    "waiting": "Volle Deckung in",
+    "apply": "Versicherung ändern",
+    "current": "Aktuelle Stufe",
+    "saved": "Versicherung geändert",
+    "levels": {
+      "none": "Keine",
+      "basic": "Basis",
+      "full": "Voll"
+    },
+    "lobbyTitle": "Lobby",
+    "lobbyLevel": "Stufe {level} von {max}",
+    "lobbyNone": "Noch keine Lobby. Jede gewonnene Lobby-Kampagne gegen eine politische Krise macht die nächste leichter.",
+    "lobbyEffect": "Lobby-Schritte gelingen um {bonus} Prozentpunkte öfter, politische Krisen kommen {cut} % seltener.",
+    "leader": "Marktführer",
+    "exposureTitle": "Was von außen droht",
+    "exposureNone": "Ereignisse von außen treffen erst Firmen ab {from} Firmenwert.",
+    "perDay": "{pct} % / Tag",
+    "insurable": "Versicherbar",
+    "upcoming": "Mit mehr Wert kommt dazu: {list}.",
+    "country": "Hauptsitz: {name}. Das Land bestimmt, was wahrscheinlicher ist.",
+    "noCountry": "Kein Hauptsitz gewählt: Länderrisiken zählen neutral."
   }
 }

@@ -19,6 +19,7 @@ import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { NEWS_PROMO_RPC_SCHEMAS, liveNewsPromoEngine } from "./api-news-promos";
 import { TOPLIST_RPC_SCHEMAS, liveToplistEngine } from "./api-toplists";
+import { MACRO_RPC_SCHEMAS, liveMacroEngine } from "./api-macro";
 import { COMPANY_SKILLS_RPC_SCHEMAS, liveCompanySkillsEngine } from "./api-company-skills";
 import { VAULT_RPC_SCHEMAS, liveVaultEngine } from "./api-vault";
 import { TALENT_RPC_SCHEMAS, liveTalentEngine } from "./api-talents";
@@ -522,6 +523,7 @@ export const RPC_SCHEMAS = {
   ...CAREER_RPC_SCHEMAS,
   ...NEWS_PROMO_RPC_SCHEMAS,
   ...TOPLIST_RPC_SCHEMAS,
+  ...MACRO_RPC_SCHEMAS,
   ...COMPANY_SKILLS_RPC_SCHEMAS,
   ...VAULT_RPC_SCHEMAS,
   ...TALENT_RPC_SCHEMAS,
@@ -568,6 +570,7 @@ export const liveEngine: GameEngine = {
   ...liveNewsShowEngine,
   ...liveNewsPromoEngine,
   ...liveToplistEngine,
+  ...liveMacroEngine,
   ...liveCompanySkillsEngine,
   ...liveVaultEngine,
   ...liveTalentEngine,

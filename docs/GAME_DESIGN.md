@@ -1023,3 +1023,16 @@ Einkauf, Controlling, Buchhaltung, Wissenschaft, Qualität, Recht, Personal). We
 gute Talente heben Umsatz und Aktie stark, solange sie zufrieden sind, und kündigen sonst. Talente anderer
 Spielerfirmen lassen sich abwerben, der Chef kann 15 Minuten nachbessern. Talente stehen über den KI-Kräften; ab
 Senior werden sie auf Wunsch Mit-Geschäftsführung und entscheiden in festen Grenzen selbst.
+
+## Nachtrag: Größe hat ihren Preis (ADR-209)
+
+Kleine Firmen wachsen wie bisher. Ab etwa 20 bis 30 Mio. € Firmenwert wird jeder weitere Schritt schwerer: Der Markt
+wird satter, die Verwaltung frisst einen Teil des Umsatzes, und die Welt draußen meldet sich öfter und härter.
+Fünfzehn Ereignisse von außen (Politik, Zölle, Erdbeben, Tsunami, Überschwemmung, Waldbrand, Krankheitswelle,
+Shitstorm, Konflikt in der Region, Rohstoffknappheit, Cyberangriff, Kartellverfahren, Streik, Währungskrise,
+Energiepreisschock) laufen im bekannten Krisensystem: Frist, Strategien mit Schritten, die Geld, Zeit, Leute und
+Know-how kosten und scheitern können, Aussitzen als Option. Gegen Katastrophen hilft eine Versicherung als laufende
+Kosten, gegen Politik eine wachsende Lobby. Das Land des Hauptsitzes (Weltkarte, ADR-208) verschiebt, was droht.
+Börsenfirmen zahlen auf große Tagesgewinne in Stufen mehr Steuer, und der Steuerberater wird mit dem Umsatz so teuer,
+dass sich die eigenen Bücher lohnen. Milliarden bleiben möglich, nur nicht nebenbei. Kein Ereignis treibt eine gut
+geführte Firma allein in die Pleite; Humor nur über Spielgeschehen.

@@ -588,8 +588,28 @@ export const LISTED_RULES = {
     enforcementBps: 1_000,
     /** The small check when closing the books: receipts to sort, tax discount when all are right. */
     check: { receipts: 3, discountBps: 500 },
-    /** Tax advisor: hourly wage max(minWage, revenueBps of the reference revenue); books and payment on time. */
-    advisor: { minWageCentsPerHour: 4_000, revenueBps: 100, discountBps: 800 },
+    /**
+     * ADR-209: progressive brackets on top of the rate. The part of the taxable profit above fromCentsPerDay (scaled to
+     * the length of the bookkeeping period, so closing more often changes nothing) pays extraBps more.
+     */
+    brackets: [
+      { fromCentsPerDay: 10_000_000, extraBps: 200 },
+      { fromCentsPerDay: 100_000_000, extraBps: 500 },
+      { fromCentsPerDay: 1_000_000_000, extraBps: 800 },
+    ],
+    /**
+     * Tax advisor: hourly wage max(minWage, rate × reference revenue); books and payment on time. ADR-209: the rate
+     * grows exponentially with the size: revenueBps up to pivotCentsPerHour, then × growthPerDecade for every tenfold
+     * reference revenue, at most maxRevenueBps. Doing the books yourself pays off more the bigger the company.
+     */
+    advisor: {
+      minWageCentsPerHour: 6_000,
+      revenueBps: 150,
+      discountBps: 800,
+      pivotCentsPerHour: 100_000,
+      growthPerDecade: 2.4,
+      maxRevenueBps: 3_000,
+    },
     auditArchetype: "tax_audit",
     receipts: [
       { key: "customer_invoice", category: "revenue" },

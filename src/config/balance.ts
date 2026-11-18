@@ -14,6 +14,7 @@ import { BATTLE_RULES } from "./battles.ts";
 import { NEXAMON_RULES } from "./nexamon-rules.ts";
 import { LISTED_RULES } from "./listed.ts";
 import { COUNTRIES, WORLD_RULES, type CountryConfig } from "./countries.ts";
+import { MACRO, type MacroConfig } from "./macro.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -982,6 +983,8 @@ export interface BalanceConfig {
   /** Listed player companies (ADR-167): research, benefits, board, taxes; values in listed.ts. */
   readonly listed: typeof LISTED_RULES;
   readonly world: typeof WORLD_RULES & { readonly countries: readonly CountryConfig[] };
+  /** Size, risk and external events (ADR-209), values in macro.ts. */
+  readonly macro: MacroConfig;
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -2945,6 +2948,7 @@ export const BALANCE = {
   listed: LISTED_RULES,
   /** Weltkarte, Standorte, Tochterfirmen und Länder-Lobby (ADR-208). */
   world: { ...WORLD_RULES, countries: COUNTRIES },
+  macro: MACRO,
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,

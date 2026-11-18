@@ -34,7 +34,7 @@ export const COMPANY_GROUPS = {
   "group-offer": { tab: "controlling", panes: ["profit", "business"] },
   "group-marketing": { tab: "controlling", panes: ["marketing", "moves"] },
   "group-money": { tab: "controlling", panes: ["money", "capital", "dividends"] },
-  "group-growth": { tab: "controlling", panes: ["expansion", "skills", "research", "growth"] },
+  "group-growth": { tab: "controlling", panes: ["expansion", "skills", "risks", "research", "growth"] },
   "group-brand": { tab: "controlling", panes: [] },
   // Mitarbeiter
   todo: { tab: "staff", panes: [] },
@@ -142,6 +142,7 @@ const SECTIONS = {
   growth: { tab: "controlling", section: "growth" },
   // Fertigkeiten (ADR-194)
   skills: { tab: "controlling", section: "skills" },
+  risks: { tab: "controlling", section: "risks" },
   "company-skills": { tab: "controlling", section: "skills", target: "company-skills" },
   // Marke & Firma
   "group-brand": { tab: "controlling", section: "group-brand" },

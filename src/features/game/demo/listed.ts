@@ -519,7 +519,7 @@ export function createListedEngine(host: ListedHost) {
     };
     let period: TaxPeriod;
     if (by === "finanzamt") {
-      const e = estimateTax(s.revenueCents, s.costsCents, rate);
+      const e = estimateTax(s.revenueCents, s.costsCents, rate, cfg, (now - l.booksUntil) / HOUR);
       period = {
         ...base,
         lossUsedCents: 0,
@@ -537,6 +537,7 @@ export function createListedEngine(host: ListedHost) {
         l.lossCarryCents,
         rate,
         booksDiscountBps(correct, by === "advisor"),
+        (now - l.booksUntil) / HOUR,
       );
       l.lossCarryCents = b.lossCarryCents;
       period = {

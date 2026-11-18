@@ -67,7 +67,7 @@ select tests.assert(
   and public.listed_item_upkeep(public.listed_item('m_machines'), 3, 123456, 5) = 1851
   and public.listed_item_upkeep(public.listed_item('b_obstkorb'), 1, 123456, 20) = 800
   and public.listed_item_upkeep(public.listed_item('r_quality_1'), 1, 123456, 20) = 0
-  and public.listed_advisor_wage(20000) = 4000 and public.listed_advisor_wage(1000000) = 10000,
+  and public.listed_advisor_wage(20000) = 6000 and public.listed_advisor_wage(1000000) = 36000,
   'LISTED: prices and running costs follow the reference revenue exactly as in TypeScript');
 
 select public.listed_satisfaction_target(11, 9000, 10000, 1.2, 2, true, 6, 6500, 1000) as st \gset
