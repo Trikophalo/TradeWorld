@@ -12,20 +12,19 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 // ------------------------------------------------------------------ friction of the hour
 
 /**
- * Demand factor from market saturation: 1 up to the pivot, above it the market counts as
- * pivot × (market / pivot)^exponent, so the factor is (pivot / market)^(1 − exponent).
+ * Demand factor from market saturation by company value: 1 up to the pivot, above it (pivot / value)^(1 − exponent).
  */
-export function saturationFactor(marketAnnualCents: number, cfg: MacroConfig = MACRO): number {
-  const { marketPivotCents: pivot, saturationExponent: e } = cfg.friction;
-  if (!(marketAnnualCents > pivot)) return 1;
-  return Math.pow(pivot / marketAnnualCents, 1 - e);
+export function saturationFactor(worthCents: number, cfg: MacroConfig = MACRO): number {
+  const { worthPivotCents: pivot, saturationExponent: e } = cfg.friction;
+  if (!(worthCents > pivot)) return 1;
+  return Math.pow(pivot / worthCents, 1 - e);
 }
 
-/** Overhead (bureaucracy) as a share of the revenue: perDecade × log10(market / pivot), capped; 0 up to the pivot. */
-export function overheadShare(marketAnnualCents: number, cfg: MacroConfig = MACRO): number {
-  const { marketPivotCents: pivot, overheadPerDecadeBps, overheadMaxBps } = cfg.friction;
-  if (!(marketAnnualCents > pivot)) return 0;
-  return Math.min(overheadMaxBps, overheadPerDecadeBps * Math.log10(marketAnnualCents / pivot)) / 10_000;
+/** Overhead (bureaucracy) as a share of the revenue: perDecade × log10(value / pivot), capped; 0 up to the pivot. */
+export function overheadShare(worthCents: number, cfg: MacroConfig = MACRO): number {
+  const { worthPivotCents: pivot, overheadPerDecadeBps, overheadMaxBps } = cfg.friction;
+  if (!(worthCents > pivot)) return 0;
+  return Math.min(overheadMaxBps, overheadPerDecadeBps * Math.log10(worthCents / pivot)) / 10_000;
 }
 
 /** Insurance level 0..n: coverage of insurable damage and premium as a share of the own revenue. */
@@ -41,14 +40,10 @@ export interface FrictionModifiers {
 }
 
 /** What size and insurance do to an hour (on top of a running event's modifiers). */
-export function frictionModifiers(
-  marketAnnualCents: number,
-  insurance: number,
-  cfg: MacroConfig = MACRO,
-): FrictionModifiers {
+export function frictionModifiers(worthCents: number, insurance: number, cfg: MacroConfig = MACRO): FrictionModifiers {
   return {
-    demandFactor: saturationFactor(marketAnnualCents, cfg),
-    extraCostShare: overheadShare(marketAnnualCents, cfg) + insuranceLevel(insurance, cfg).premiumBps / 10_000,
+    demandFactor: saturationFactor(worthCents, cfg),
+    extraCostShare: overheadShare(worthCents, cfg) + insuranceLevel(insurance, cfg).premiumBps / 10_000,
   };
 }
 
@@ -227,7 +222,10 @@ export function eventSnapshot(
       : {}),
     strategies: archetype.strategies.map((s) =>
       isLobbyStrategy(s.key) && bonus > 0
-        ? { ...s, steps: s.steps.map((st) => ({ ...st, baseBps: Math.max(st.baseBps, Math.min(9_500, st.baseBps + bonus)) })) }
+        ? {
+            ...s,
+            steps: s.steps.map((st) => ({ ...st, baseBps: Math.max(st.baseBps, Math.min(9_500, st.baseBps + bonus)) })),
+          }
         : s,
     ),
   };

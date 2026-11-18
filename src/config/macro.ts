@@ -9,16 +9,15 @@
  */
 export const MACRO = {
   /**
-   * Friction on the effective market of a company (niche × legal form × expansion, cents per game year). Below the
-   * pivot nothing changes. Above it the demand saturates: the market counts as pivot × (market / pivot)^exponent;
-   * and overhead (bureaucracy, compliance, coordination) costs perDecadeBps of the revenue per tenfold market, at
-   * most maxBps.
+   * Friction by company value (company_worth_cents, ADR-203). Below the pivot nothing changes. Above it the market
+   * saturates (demand × (pivot / value)^(1 − exponent): new customers get ever harder to win) and overhead
+   * (bureaucracy, compliance, coordination) costs perDecadeBps of the revenue per tenfold value, at most maxBps.
    */
   friction: {
-    marketPivotCents: 1_500_000_000,
-    saturationExponent: 0.55,
-    overheadPerDecadeBps: 500,
-    overheadMaxBps: 1_800,
+    worthPivotCents: 3_000_000_000,
+    saturationExponent: 0.4,
+    overheadPerDecadeBps: 1_500,
+    overheadMaxBps: 4_000,
   },
   /**
    * External events scale with the company value (company_worth_cents). decades = log10(value / pivot), 0 below
@@ -36,7 +35,7 @@ export const MACRO = {
     externalBoostPerDecade: 1,
     /** One cost unit of a response step is at least this share of the company value (bps), so lobbying a billion-euro
      * group is not paid from petty cash. Below ~10 Mio. € the old unit (fixed costs) is larger. */
-    unitWorthBps: 4,
+    unitWorthBps: 12,
     /** News show (Mr. Doodle Dangle): external events of at least this severity and company value are a topic. */
     newsMinSeverity: 2,
     newsMinWorthCents: 5_000_000_000,
