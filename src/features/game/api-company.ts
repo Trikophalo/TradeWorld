@@ -286,6 +286,17 @@ const companySchema = z.object({
     .default([]),
   // ADR-203: the value Top-Unternehmen and the net worth count
   worth: worthSchema.nullable().default(null),
+  // ADR-213: the withdrawal rhythm
+  withdraw: z
+    .object({
+      interval_hours: num,
+      last_at: iso.nullable(),
+      next_at: iso.nullable(),
+      issue_locked_cents: num,
+      issue_locked_until: iso.nullable(),
+    })
+    .nullable()
+    .default(null),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -659,6 +670,15 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
     expansionCostCents: c.expansion_cost_cents,
     marketFactor: c.market_factor,
     founderPayoutBps: c.founder_payout_bps,
+    withdraw: c.withdraw
+      ? {
+          intervalHours: c.withdraw.interval_hours,
+          lastAt: c.withdraw.last_at,
+          nextAt: c.withdraw.next_at,
+          issueLockedCents: c.withdraw.issue_locked_cents,
+          issueLockedUntil: c.withdraw.issue_locked_until,
+        }
+      : null,
     strengths: c.strengths
       ? {
           scores: c.strengths.scores,

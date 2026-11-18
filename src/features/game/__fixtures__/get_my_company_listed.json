@@ -1,24 +1,24 @@
 {
   "company": {
-    "id": "d8d89684-e002-4710-87c3-4da7632857ff",
+    "id": "049202e3-210f-4ffb-9a3c-a6f81281c64f",
     "idea": "Werkzeuge für Bastler",
     "live": {
-      "last_hour_at": "2026-11-18T00:00:00+00:00",
+      "last_hour_at": "2026-11-18T12:00:00+00:00",
       "pay_factor_bps": 10000,
-      "today_profit_cents": 8189,
-      "today_revenue_cents": 53090,
+      "today_profit_cents": 13450,
+      "today_revenue_cents": 102927,
       "fixed_per_hour_cents": 2500,
-      "quarter_profit_cents": 15574,
-      "demand_per_hour_cents": 4287,
-      "profit_per_hour_cents": 8189,
-      "quarter_revenue_cents": 105287,
-      "revenue_per_hour_cents": 53090,
+      "quarter_profit_cents": 13450,
+      "demand_per_hour_cents": 2460,
+      "profit_per_hour_cents": 6956,
+      "quarter_revenue_cents": 102927,
+      "revenue_per_hour_cents": 51720,
       "ai_wages_per_hour_cents": 3000,
       "capacity_per_hour_cents": 199500,
       "marketing_per_hour_cents": 4167,
       "today_founder_payout_cents": 0,
       "founder_payout_per_hour_cents": 0,
-      "contract_revenue_per_hour_cents": 48803
+      "contract_revenue_per_hour_cents": 49260
     },
     "logo": {
       "grid": [
@@ -46,12 +46,12 @@
     "color": "#2266cc",
     "hours": [
       {
-        "hour_start": "2026-11-17T22:00:00+00:00",
+        "hour_start": "2026-11-18T10:00:00+00:00",
         "reputation": 49.87,
         "campaign_id": null,
-        "demand_cents": 3096,
-        "profit_cents": 7385,
-        "revenue_cents": 52197,
+        "demand_cents": 1776,
+        "profit_cents": 6494,
+        "revenue_cents": 51207,
         "capacity_cents": 199500,
         "ai_utilization_bps": 0,
         "stake_payout_cents": 0,
@@ -61,17 +61,17 @@
         "strength_bonus_cents": 0,
         "supply_revenue_cents": 0,
         "supply_fee_paid_cents": 0,
-        "contract_revenue_cents": 49101,
+        "contract_revenue_cents": 49431,
         "player_wages_paid_cents": 0,
         "supply_fee_income_cents": 0
       },
       {
-        "hour_start": "2026-11-17T23:00:00+00:00",
+        "hour_start": "2026-11-18T11:00:00+00:00",
         "reputation": 49.74,
         "campaign_id": null,
-        "demand_cents": 4287,
-        "profit_cents": 8189,
-        "revenue_cents": 53090,
+        "demand_cents": 2460,
+        "profit_cents": 6956,
+        "revenue_cents": 51720,
         "capacity_cents": 199500,
         "ai_utilization_bps": 0,
         "stake_payout_cents": 0,
@@ -81,7 +81,7 @@
         "strength_bonus_cents": 0,
         "supply_revenue_cents": 0,
         "supply_fee_paid_cents": 0,
-        "contract_revenue_cents": 48803,
+        "contract_revenue_cents": 49260,
         "player_wages_paid_cents": 0,
         "supply_fee_income_cents": 0
       }
@@ -92,7 +92,7 @@
       "cents": 100000000,
       "shares": 1000000,
       "price_e4": 10000,
-      "company_value_cents": 21113959
+      "company_value_cents": 21111835
     },
     "banner": {
       "grid": [
@@ -139,7 +139,7 @@
         "reached": false
       }
     ],
-    "history": [{ "label": "J1 Q2", "profit_cents": 0, "revenue_cents": 0 }],
+    "history": [{ "label": "J4 Q4", "profit_cents": 0, "revenue_cents": 0 }],
     "listing": {
       "offer": null,
       "status": "listed",
@@ -150,22 +150,29 @@
     },
     "campaign": null,
     "distress": false,
+    "withdraw": {
+      "last_at": "2026-11-18T12:19:38.391634+00:00",
+      "next_at": "2026-11-18T18:19:38.391634+00:00",
+      "interval_hours": 6,
+      "issue_locked_cents": 20000000,
+      "issue_locked_until": "2026-11-21T12:19:39.399276+00:00"
+    },
     "employees": 1,
     "headcount": 4,
     "strengths": {
       "next": { "at": 50, "bps": 200 },
       "hours": 2,
-      "scores": { "team": 3.96, "margin": 2.34, "finance": 0.29, "quality": 1.05, "delivery": 3.96, "awareness": 3.5 },
-      "overall": 2.52,
+      "scores": { "team": 3.96, "margin": 2.07, "finance": 0.29, "quality": 1.05, "delivery": 3.96, "awareness": 3.5 },
+      "overall": 2.47,
       "reward_bps": 0,
       "close_error": null
     },
     "ai_workers": 3,
     "can_expand": true,
-    "cash_cents": 21113959,
-    "founded_at": "2026-11-18T00:26:01.561043+00:00",
+    "cash_cents": 21111835,
+    "founded_at": "2026-11-18T12:19:38.028665+00:00",
     "reputation": {
-      "at": "2026-11-17T23:00:00+00:00",
+      "at": "2026-11-18T11:00:00+00:00",
       "value": 49.74,
       "target": 48.32,
       "drivers": {
@@ -178,8 +185,8 @@
         "delivery": 0
       },
       "history": [
-        { "value": 49.87, "target": 48.32, "hour_start": "2026-11-17T22:00:00+00:00" },
-        { "value": 49.74, "target": 48.32, "hour_start": "2026-11-17T23:00:00+00:00" }
+        { "value": 49.87, "target": 48.32, "hour_start": "2026-11-18T10:00:00+00:00" },
+        { "value": 49.74, "target": 48.32, "hour_start": "2026-11-18T11:00:00+00:00" }
       ],
       "demand_factor": 1.0
     },
@@ -188,9 +195,9 @@
     "price_level": "normal",
     "product_key": "security_software",
     "quality_bps": 2660,
-    "value_cents": 21113959,
+    "value_cents": 21111835,
     "last_quarter": {
-      "label": "J1 Q2",
+      "label": "J4 Q4",
       "cogs_cents": 0,
       "bonus_cents": 0,
       "fixed_cents": 0,
@@ -211,7 +218,7 @@
     "max_employees": 100,
     "open_postings": 1,
     "training_from": 5,
-    "campaign_costs": { "tv": 77200, "flyer": 20000, "online": 25700 },
+    "campaign_costs": { "tv": 44300, "flyer": 20000, "online": 20000 },
     "capacity_cents": 3465000,
     "close_warnings": [],
     "full_time_from": 5,
@@ -219,14 +226,14 @@
     "pay_factor_bps": 10000,
     "expansion_level": 0,
     "founder_has_job": false,
-    "next_quarter_at": "2026-11-18T01:00:00+00:00",
+    "next_quarter_at": "2026-11-18T13:00:00+00:00",
     "quarters_active": 1,
     "ai_worker_skills": ["it_networks"],
     "distress_quarters": 0,
-    "estimate_low_cents": 30080163,
+    "estimate_low_cents": 14785486,
     "founder_payout_bps": 0,
     "upgrade_cost_cents": null,
-    "estimate_high_cents": 363040613,
+    "estimate_high_cents": 505416412,
     "ai_worker_cost_cents": 72000,
     "can_capital_increase": true,
     "expansion_cost_cents": 10000000,

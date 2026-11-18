@@ -8526,3 +8526,12 @@ extra_cost_share}`, `macro_country_factor`, `macro_weight`, `macro_company_count
 | ---------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_company_risks()`                          | Gründer | `{company_id, worth_cents, decades, event_pivot_cents, friction_pivot_cents, saturation_bps, overhead_bps, chance_per_day_bps, crisis_share_bps, unit_cents, exposure[{archetype, bps, insurable, risk}], upcoming[{archetype, from_cents}], ref_revenue_cents, insurance{level, coverage_bps, changed_at, full_from, levels[]}, lobby{level, max, bonus_bps, political_cut_bps, leader}, country}` |
 | `set_company_insurance(p_request_id, p_level)` | Gründer | wie `get_company_risks`; Fehler `invalid_argument`; idempotent je `request_id`                                                                                                                                                                                                                                                                                                                      |
+
+## Entnahme-Rhythmus (ADR-213, Migration `20261204010700_withdraw_interval.sql`)
+
+- `player_companies.last_withdraw_at timestamptz` (null bis zur ersten Entnahme), gesetzt von `company_withdraw()`.
+- `company_withdraw(p_request_id, p_amount_cents)`: zusätzlich höchstens einmal je `startups.withdrawIntervalHours`
+  (6 h), sonst `withdraw_cooldown` (NX213); geprüft nach Betrag, Ratsverbot, Budget und Ausgabesperre.
+- Intern: `company_withdraw_next_at(uuid) → timestamptz` (null = jetzt erlaubt), `company_withdraw_json(uuid)`.
+- `company_state()` (also `get_my_company()` und alle Firmen-RPCs) hat `withdraw {interval_hours, last_at, next_at,
+issue_locked_cents, issue_locked_until}`.

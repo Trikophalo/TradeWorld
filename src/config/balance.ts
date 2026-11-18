@@ -1593,6 +1593,11 @@ export interface StartupsConfig {
   /** Redrawing the logo later (ADR-200): price paid from the company cash, at most once per cooldown. */
   readonly logoRedrawCents: number;
   readonly logoRedrawCooldownHours: number;
+  /**
+   * Withdrawing money from the own company (ADR-213): at most once every this many hours. The automatic founder
+   * payout (ADR-086) and dividends do not count.
+   */
+  readonly withdrawIntervalHours: number;
   /** Pixel banner above the company page (ADR-078): width × height, can be redrawn any time. */
   readonly banner: { readonly width: number; readonly height: number; readonly maxColors: number };
   /** Hidden market size of the niche: Pareto, P(> x) = (min / x)^alpha. */
@@ -2822,6 +2827,7 @@ export const BALANCE = {
     logo: { size: 16, maxColors: 16, reportsToHide: 3 },
     logoRedrawCents: 5_000_000,
     logoRedrawCooldownHours: 24,
+    withdrawIntervalHours: 6,
     banner: { width: 48, height: 12, maxColors: 16 },
     // P(> 50.000 €) ≈ 40 %, P(> 1 Mio. €) ≈ 7 %, P(> 50 Mio. €) ≈ 0.8 %, P(> 1 Mrd. €) ≈ 0.14 % (ECONOMY.md 6.2).
     potential: { minAnnualCents: 100_000, maxAnnualCents: 200_000_000_000, paretoAlpha: 0.57 },

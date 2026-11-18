@@ -1972,6 +1972,18 @@ export interface LogoRedrawInfo {
   availableAt: string | null;
 }
 
+/** When the founder may take money out of the own company again (ADR-213). */
+export interface CompanyWithdrawRhythm {
+  /** One withdrawal every this many hours (`startups.withdrawIntervalHours`). */
+  intervalHours: number;
+  lastAt: string | null;
+  /** Next possible withdrawal; null when allowed now. */
+  nextAt: string | null;
+  /** Listed companies (ADR-170): issue proceeds that cannot be withdrawn yet, and until when. */
+  issueLockedCents: number;
+  issueLockedUntil: string | null;
+}
+
 export interface MyCompany {
   id: string;
   name: string;
@@ -2049,6 +2061,8 @@ export interface MyCompany {
   worth: CompanyWorth | null;
   /** Share of every profitable hour paid to the founder automatically (ADR-086). */
   founderPayoutBps: number;
+  /** Withdrawal rhythm (ADR-213); null on servers before 10700. */
+  withdraw: CompanyWithdrawRhythm | null;
   /**
    * Strengths (ADR-176): six slow scores the server moves every closed hour, the revenue bonus they pay and the last
    * failure of the hourly close; null on servers before 6600.
@@ -2611,6 +2625,8 @@ export const GAME_ERROR_KEYS = [
   "insider_cooldown",
   "capital_increase_cooldown",
   "issue_proceeds_locked",
+  // ADR-213
+  "withdraw_cooldown",
   // ADR-177
   "sealed_pack_unknown",
   // ADR-193

@@ -76,6 +76,7 @@ import {
   type GameEngine,
   type GameErrorKey,
   type LogoRedrawInfo,
+  type CompanyWithdrawRhythm,
   type MyCompany,
   type Offer,
 } from "../types";
@@ -205,6 +206,8 @@ export interface DemoCompanyState {
   expansionLevel?: number;
   /** Automatic CEO payout share (ADR-086), default 0. */
   founderPayoutBps?: number;
+  /** Last manual withdrawal (ADR-213, epoch ms); the next one is withdrawIntervalHours later. */
+  lastWithdrawAt?: number;
   /** Crises, chances and news (ADR-091). */
   events?: DemoCompanyEventsState;
   /** Marketing campaign (ADR-097). */
@@ -297,6 +300,19 @@ export const productKeyOf = (company: Pick<DemoCompanyState, "sector" | "product
 
 const smallBusiness = () => companyCfg.tiers.find((t) => t.id === "small_business")!;
 
+/** The withdrawal rhythm of a demo company (ADR-213), as company_withdraw_json() returns it. */
+function withdrawRhythm(company: DemoCompanyState, now: number): CompanyWithdrawRhythm {
+  const hours = BALANCE.startups.withdrawIntervalHours;
+  const last = company.lastWithdrawAt ?? null;
+  const next = last === null ? null : last + hours * 3_600_000;
+  return {
+    intervalHours: hours,
+    lastAt: last === null ? null : new Date(last).toISOString(),
+    nextAt: next !== null && next > now ? new Date(next).toISOString() : null,
+    issueLockedCents: 0,
+    issueLockedUntil: null,
+  };
+}
 export function foundingCostCents(tier: StartupTier): number {
   if (tier === "gmbh") return startups.gmbh.foundingCostCents;
   return tier === "garage" ? startups.garage.foundingCostCents : smallBusiness().foundingCostCents;
@@ -916,6 +932,7 @@ export function createCompanyEngine(host: CompanyHost) {
       closeWarnings: [],
       worth: worthOf(company),
       founderPayoutBps: company.founderPayoutBps ?? 0,
+      withdraw: withdrawRhythm(company, Date.now()),
       strengths: demoStrengths(company),
       campaign: campaignView(company),
       campaignCosts: campaignCosts(company, valueCents(company)),
@@ -1195,8 +1212,11 @@ export function createCompanyEngine(host: CompanyHost) {
         if (!Number.isInteger(amountCents) || amountCents <= 0) throw new GameError("invalid_argument");
         host.listed?.withdraw(company, amountCents);
         if (amountCents > company.cashCents - company.unpaidCents) throw new GameError("insufficient_funds");
+        // ADR-213: one withdrawal every withdrawIntervalHours, checked last like on the server
+        if (withdrawRhythm(company, Date.now()).nextAt !== null) throw new GameError("withdraw_cooldown");
         company.cashCents -= amountCents;
         host.addCash(amountCents);
+        company.lastWithdrawAt = Date.now();
         host.listed?.withdrawn(company, amountCents);
       }),
 

@@ -556,6 +556,10 @@ select public.board_vote(gen_random_uuid(), :mid2, true) -> 'board' as m2f \gset
 select public.get_listed_company() -> 'listed' as l2 \gset
 select tests.throws_key(format($$select public.company_withdraw(gen_random_uuid(), %s)$$, :cc4::bigint), 'budget_reserved',
   'company_withdraw(): money earmarked by the board cannot be withdrawn');
+reset role;
+-- ADR-213: the first withdrawal above was more than 6 hours ago
+update public.player_companies set last_withdraw_at = public.game_now() - interval '7 hours' where company_id = :'co';
+select tests.login_as('authenticated', :f);
 select public.company_withdraw(gen_random_uuid(), :cc4::bigint - 5000000) is not null as ok \gset
 select tests.throws_key($$select public.company_withdraw(gen_random_uuid(), 1)$$, 'budget_reserved',
   'company_withdraw(): nothing free is left, only the budget');

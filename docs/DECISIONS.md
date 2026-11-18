@@ -5420,3 +5420,36 @@ wirkt. Online, TV und größere Firmen zahlen den normalen Preis; ein billigerer
 mit großem Markt wird ein gutes Geschäft, das ist gewollt: Er hebt Nachfrage und Bekanntheit nur 24 Stunden lang, und
 mit dem Wachstum (Kleinunternehmen und 1 Mio. € Wert) fällt der Deckel weg. Tests: `src/lib/sim/campaigns.test.ts`,
 SQL `e9_flyer_cap.sql`.
+
+## ADR-213: Entnahme aus der Firma alle 6 Stunden — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Man soll Geld aus der Firma alle 6 Stunden entnehmen können.“ Die Untersuchung ergab:
+`company_withdraw()` (m3c, m3d, ergänzt in 20261204005400 und 20261204006100) kannte **keine** Zeitregel, keinen
+Tagesdeckel und keine Zahl pro Tag. Eine Entnahme scheiterte nur an Geld, das nicht frei ist, oder am Geschäftsrat:
+
+- offene Rechnungen bleiben in der Firma (ADR-083, Fehler `insufficient_funds`);
+- Börsenfirmen: Entnahmeverbot des Geschäftsrats (ADR-167, `withdraw_blocked`, in der Kasse mit Zähler angezeigt);
+  vom Rat zweckgebundenes Geld (ADR-167, `budget_reserved`, als „frei“ angezeigt);
+- Börsenfirmen: Geld aus Börsengang oder Kapitalerhöhung bleibt `issueProceedsLockHours` (72 h) in der Firma
+  (ADR-170, `issue_proceeds_locked`). Diese Sperre zeigte die Oberfläche **nicht**: Der Betrag „Alles“ enthielt das
+  gesperrte Geld, die Entnahme scheiterte erst beim Server. Das war der wahrscheinliche Grund für den Eindruck,
+  Entnehmen gehe nicht.
+- Die Insiderregel (24 h, ADR-170) sperrt nach einer Entnahme nur den **Kauf** der eigenen Aktie, nicht die Entnahme.
+  Die automatische Auszahlung (ADR-086) hat keine eigene Sperre.
+
+**Entscheidung.** Der 6-Stunden-Rhythmus wird die gewollte Regel: Nach einer erfolgreichen Entnahme geht die nächste
+erst `startups.withdrawIntervalHours` (6) Stunden später (Spielzeit `game_now()`), sonst Fehler `withdraw_cooldown`
+(NX213). Die Prüfung kommt zuletzt, ein zu großer Betrag nennt also weiter seinen Grund. Automatische Auszahlung,
+Dividenden und Einzahlungen zählen nicht. Verbot, Budgets, Ausgabesperre und offene Rechnungen bleiben unverändert.
+
+- Server (Migration 20261204010700): Spalte `player_companies.last_withdraw_at`; `company_withdraw()` als volle Kopie
+  mit der Regel; `company_withdraw_next_at()` und `company_withdraw_json()` (intern); `company_state()` liefert
+  `withdraw {interval_hours, last_at, next_at, issue_locked_cents, issue_locked_until}`.
+- Client: Die Firmenkasse zeigt „Nächste Entnahme in …“ mit Zähler, sonst „Entnahme jetzt möglich · alle 6 Stunden“;
+  der Knopf „Entnehmen“ ist während der Pause aus und nennt die Restzeit. Gesperrte Ausgabegelder werden mit Restzeit
+  angezeigt und vom entnehmbaren Betrag abgezogen (`src/features/company/withdraw.ts`). Der Demo-Modus prüft dieselbe
+  Regel.
+
+**Folgen.** Höchstens vier Entnahmen am Tag; wer laufend Geld will, nutzt die automatische Auszahlung. Jeder Gründer
+hat seinen eigenen Rhythmus. Tests: `src/features/company/withdraw.test.ts`, SQL `f1_withdraw_interval.sql`
+(`verify_local.sh` führt jetzt auch `f[0-9]*.sql` aus).
