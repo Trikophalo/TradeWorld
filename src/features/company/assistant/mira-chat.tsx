@@ -30,6 +30,7 @@ import { COMPANY_MOVES_KEY } from "../components/company-moves";
 import { COMPANY_AUTOPILOT_KEY, useCompanyAutopilot } from "../components/autopilot-card";
 import { INTERVIEW_KEY } from "../components/interview-card";
 import { COMPANY_SKILLS_KEY } from "../components/company-skills";
+import { COMPANY_TALENTS_KEY } from "../components/talents";
 import type { CompanySection } from "../tabs";
 import {
   aiTurn,
@@ -182,6 +183,14 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
     refetchInterval: 60_000,
     enabled: founder && skillsOn,
   });
+  // ADR-199: empty Stellen and unhappy talents
+  const talentsOn = useDisclosed("companyTalents");
+  const talents = useQuery({
+    queryKey: COMPANY_TALENTS_KEY,
+    queryFn: () => engine.companyTalents(),
+    refetchInterval: 60_000,
+    enabled: founder && talentsOn,
+  });
   const now = useClock();
   return useMemo(() => {
     // The founder's Mira also needs the moves and the orders before she speaks.
@@ -212,6 +221,7 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
       autopilot: founder ? (autopilot.data ?? null) : null,
       interview: founder && interviews ? (interview.data?.interview ?? null) : null,
       skills: founder && skillsOn ? (skills.data ?? null) : null,
+      talents: founder && talentsOn ? (talents.data ?? null) : null,
       // a minute is precise enough for deadlines, and keeps the briefing ids stable
       now: Math.floor(now / 60_000) * 60_000,
     };
@@ -230,6 +240,8 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
     interviews,
     skills.data,
     skillsOn,
+    talents.data,
+    talentsOn,
     now,
   ]);
 }

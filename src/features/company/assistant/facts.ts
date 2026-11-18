@@ -138,6 +138,8 @@ export interface CompanyFacts {
    * training, affordable), or null.
    */
   skills: { levels: number; learnable: { key: string; costCents: number } | null } | null;
+  /** ADR-199: empty Stellen and unhappy talents. */
+  talents: { vacant: number; unhappy: number; firstVacant: string | null } | null;
   listed: {
     satisfaction: number;
     zone: "green" | "yellow" | "red";
@@ -453,6 +455,13 @@ export function companyFacts(state: MiraState, cfg: BalanceConfig = BALANCE): Co
       state.interview && state.interview.status === "requested" && Date.parse(state.interview.expiresAt) > now
         ? { expiresAt: state.interview.expiresAt }
         : null,
+    talents: state.talents
+      ? {
+          vacant: state.talents.seats.filter((s) => !s.talent).length,
+          unhappy: state.talents.seats.filter((s) => s.talent?.warned).length,
+          firstVacant: state.talents.seats.find((s) => !s.talent)?.role ?? null,
+        }
+      : null,
     skills: state.skills
       ? {
           levels: state.skills.skills.reduce((a, s) => a + s.level, 0),
@@ -549,6 +558,8 @@ export function factsForClaude(f: CompanyFacts): Record<string, string | number 
     interview_wartet: f.interview !== null,
     fertigkeiten_stufen: f.skills?.levels ?? null,
     fertigkeit_lernbar: f.skills?.learnable?.key ?? null,
+    stellen_unbesetzt: f.talents?.vacant ?? null,
+    talente_unzufrieden: f.talents?.unhappy ?? null,
     zufriedenheit: f.listed?.satisfaction ?? null,
     steuer_faellig_eur: f.listed ? euro(f.listed.taxDueCents) : null,
     buecher_offen: f.listed?.booksOpen ?? null,

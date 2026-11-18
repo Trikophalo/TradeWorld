@@ -454,6 +454,20 @@ export const COMPANY_RPC_SCHEMAS = {
         supervisor: z.string().nullable().default(null),
       }),
     ),
+    talents: z
+      .array(
+        z.object({
+          key: z.string(),
+          first_name: z.string(),
+          last_name: z.string(),
+          avatar_key: z.string(),
+          role: z.string(),
+          tier: num,
+          is_coceo: z.boolean(),
+          since: iso.nullable().default(null),
+        }),
+      )
+      .default([]),
     ai_workers: num,
     ai_worker_skills: z.array(z.string()).default([]),
   }),
@@ -924,6 +938,16 @@ export const liveCompanyEngine: CompanyEngine = {
         since: m.since,
         isMe: m.is_me,
         supervisor: m.supervisor,
+      })),
+      talents: r.talents.map((x) => ({
+        key: x.key,
+        firstName: x.first_name,
+        lastName: x.last_name,
+        avatarKey: x.avatar_key,
+        role: x.role,
+        tier: x.tier,
+        isCoCeo: x.is_coceo,
+        since: x.since,
       })),
       aiWorkers: r.ai_workers,
       aiWorkerSkills: r.ai_worker_skills,

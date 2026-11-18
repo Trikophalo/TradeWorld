@@ -116,6 +116,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Talente und 15 Stellen (ADR-199):** Deine Firma hat jetzt 15 Stellen von Vertrieb bis Betriebsarzt. Im Talentmarkt warten 660 Fachleute mit Namen, Persönlichkeit und Forderungen: Erfüllst du Lohn, Benefits, Ruf und Co., fangen sie an und heben Umsatz und Aktie deutlich, solange sie zufrieden sind. Talente anderer Spieler kannst du abwerben (der Chef hat 15 Minuten zum Nachbessern), gute Talente machst du zur Mit-Geschäftsführung, die selbst entscheidet. Im Organigramm stehen Talente über den KI-Kräften.
+
 - **Pack Battles mit Modi (ADR-205):** Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder „Umgekehrt“ (wer am wenigsten zieht, gewinnt alle Karten). Lobby, Einladung, Live-Ansicht und Feed zeigen den Modus. Die letzten zwei Karten jedes Packs leuchten, blitzen und wackeln je nach Seltenheit, mit Wertzähler.
 
 - **Dein Klon und bessere Jobs (ADR-206):** Ab Level 20 erschaffst du im Job-Tab einmalig einen Klon (25 000 €). Er bewirbt sich bei anderen Firmen und arbeitet dort zusätzlich, auch wenn du eine eigene Firma führst; der Lohn geht auf dein Konto. Viele Skills zahlen sich jetzt richtig aus: bis zum Dreifachen des Stufenlohns statt höchstens das 1,5-Fache. Ab Senior bekommst du einen Teil vom Gewinn deines Arbeitgebers (0,5 % bis 5 %) und für gute Arbeit ab und zu Mitarbeiteraktien. Das Jobportal zeigt das alles je Stelle, Gründer können ihren Anzeigen Extras mitgeben.

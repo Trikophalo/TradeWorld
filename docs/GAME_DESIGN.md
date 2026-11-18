@@ -1003,3 +1003,12 @@ Planung. Entschiedene Fragen wandern als ADR nach `DECISIONS.md`.
 | 22  | **Auslöser und Umfang des Spielerbankrotts.** Was passiert mit eigener Firma, Anleihen und Statussymbolen?                                                                                                                     | Bankrott tritt ein, wenn nach einer Liquidation das Konto negativ ist und Wertpapiere und Statussymbole den Fehlbetrag nicht decken. Diese werden zwangsverkauft, die Restschuld wird erlassen, der Spieler erhält 2.500 € (ADR-011). Anteile an der eigenen Firma werden zuletzt verwertet. Level, XP und Erfolge bleiben. | M7          |
 | 23  | **Spieler-Mitarbeiter und doppelte Produktivität.** Muss der Spieler dafür aktiv sein?                                                                                                                                         | Die doppelte Produktivität gilt passiv, solange das Arbeitsverhältnis besteht. Arbeitsaufgaben und Führungsentscheidungen bringen zusätzliche Wirkung. So hängt keine Firma daran, dass ein Mitspieler online ist.                                                                                                          | M5          |
 | 24  | **Level 30 bis 50 liegen außerhalb der Meilensteine M0 bis M8.** Optionen, Übernahmen, Holding und Hall of Fame sind in keinem Meilenstein enthalten.                                                                          | Die Freischalttabelle zeigt diese Stufen als „kommt später“. Umsetzung nach dem Freundestest v1, siehe `ROADMAP.md`.                                                                                                                                                                                                        | nach M8     |
+
+## Nachtrag: Talente und Mit-Geschäftsführung (ADR-199)
+
+Neben KI-Kräften und Spielern gibt es Talente: vom Spiel erzeugte Fachleute mit Namen, Persönlichkeit und Forderungen.
+Jede Firma hat 15 Stellen (Vertrieb, Marketing, Kundenservice, Strategie, Produktion, Logistik, IT, Betriebsarzt,
+Einkauf, Controlling, Buchhaltung, Wissenschaft, Qualität, Recht, Personal). Wer die Forderungen erfüllt, stellt ein;
+gute Talente heben Umsatz und Aktie stark, solange sie zufrieden sind, und kündigen sonst. Talente anderer
+Spielerfirmen lassen sich abwerben, der Chef kann 15 Minuten nachbessern. Talente stehen über den KI-Kräften; ab
+Senior werden sie auf Wunsch Mit-Geschäftsführung und entscheiden in festen Grenzen selbst.

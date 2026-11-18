@@ -14,6 +14,7 @@ import type {
   CompanyMoves,
   CompanyPitch,
   CompanySkillsState,
+  CompanyTalentsState,
   CompanyTask,
   CompanyTasks,
   MyCompany,
@@ -127,6 +128,8 @@ export interface MiraState {
   interview?: CompanyInterview | null;
   /** Fertigkeiten of the company (ADR-194). */
   skills?: CompanySkillsState | null;
+  /** Stellen & Talente (ADR-199). */
+  talents?: CompanyTalentsState | null;
   now: number;
 }
 

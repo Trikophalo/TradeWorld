@@ -184,7 +184,10 @@ select tests.assert(
            'get_clone', 'create_clone', 'clone_apply_for_job', 'clone_sign_contract', 'clone_quit_job',
            'clone_cancel_quit', 'clone_request_raise', 'clone_request_promotion', 'set_job_posting_perks',
            -- the own net worth in parts (ADR-203)
-           'get_my_net_worth']
+           'get_my_net_worth',
+           -- Talente and Mit-Geschaeftsfuehrung (ADR-199)
+           'get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
+           'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')
