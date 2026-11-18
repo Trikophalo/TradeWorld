@@ -72,6 +72,9 @@ select tests.assert(
 select public.set_company_strategy(gen_random_uuid(), 'normal', true) is not null as ok \gset
 reset role;
 select tests.company_of(:a) as aco \gset
+-- pin the hidden niche (a Pareto draw at founding): campaign prices follow its demand, and a heavy-tail draw made
+-- the flyer in E. unaffordable in some runs
+update public.player_companies set potential_annual_cents = 3000000 where company_id = :'aco';
 -- an AG expands too (the tier after an IPO)
 select tests.assert(public.company_can_expand('gmbh') and public.company_can_expand('ag')
   and not public.company_can_expand('small_business') and not public.company_can_expand('garage'),
