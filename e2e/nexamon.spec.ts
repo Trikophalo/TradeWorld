@@ -129,6 +129,8 @@ test("buy a pack, open it card by card, and find the cards in the collection", a
   for (let i = 0; i < 5; i++) {
     await expect(opening).toHaveAttribute("data-index", String(i));
     await page.waitForTimeout(350);
+    // ADR-204: a big pull in the last two slots charges up first; a key would only cut the wait short
+    await expect(opening.getByTestId("pack-stack")).toHaveAttribute("data-charging", "false", { timeout: 5_000 });
     await page.keyboard.press("ArrowRight");
   }
   await expect(opening).toHaveAttribute("data-phase", "summary");

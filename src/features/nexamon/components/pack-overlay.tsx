@@ -30,6 +30,7 @@ import { CardThumb } from "./card-face";
 import { TiltPack } from "./pack";
 import { PackOpening } from "./pack-opening";
 import { InstantSell } from "./instant-sell";
+import { MultiPackSummary } from "./pack-summary";
 import { BuySealedButton } from "./sealed-packs";
 import { LiveWatchers } from "../live/live-watchers";
 import { useSetRelease } from "./release";
@@ -52,6 +53,8 @@ export interface PackOverlayProps {
   onSkipAll?: () => void;
   /** The pack is that summary of several packs: shown as a summary only. */
   summaryOnly?: boolean;
+  /** ADR-204: the packs of that summary one by one (per-pack totals); without it the summary is one pack. */
+  summaryPacks?: readonly NexamonPackResult[];
   buyState: ButtonState;
   onClose: () => void;
   /** The summary is showing (all cards pulled away or skipped). */
@@ -80,6 +83,7 @@ export function PackOverlay({
   onNext,
   onSkipAll,
   summaryOnly = false,
+  summaryPacks,
 }: PackOverlayProps) {
   const t = useTranslations("nexamon");
   const tc = useTranslations("nexamonCards");
@@ -244,13 +248,10 @@ export function PackOverlay({
               {pack && stage !== "preview" && (
                 <div className="flex min-h-full flex-col items-center justify-center px-4 py-6">
                   {summaryOnly ? (
-                    <div className="flex w-full flex-col items-center gap-3">
-                      <p className="font-pixel text-sm text-fg-1 uppercase" data-testid="pack-all-title">
-                        {t("opening.allTitle", { count: series?.total ?? 1 })}
-                      </p>
-                      <Summary pack={pack} thumbs>
+                    <div className="flex w-full flex-col items-center gap-3 self-stretch">
+                      <MultiPackSummary packs={summaryPacks && summaryPacks.length > 0 ? summaryPacks : [pack]}>
                         <Actions>{again}</Actions>
-                      </Summary>
+                      </MultiPackSummary>
                     </div>
                   ) : skipped ? (
                     <Summary pack={pack} thumbs>
@@ -264,6 +265,8 @@ export function PackOverlay({
                       scale={desktop ? 4 : 3}
                       onComplete={finish}
                       onReveal={(_, index) => setRevealed({ id: pack.packId, n: index + 1 })}
+                      pullValueOf={(_, index) => pack.cards[index]?.valueCents}
+                      packPriceCents={pack.priceCents}
                       className="max-w-3xl"
                     >
                       <Summary pack={pack}>

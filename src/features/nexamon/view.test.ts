@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BALANCE } from "@/config/balance";
 import { NEXAMON_CARDS } from "@/config/nexamon";
-import type { NexamonCardStats, NexamonCopy, NexamonListing, PlayerNexamonCard } from "@/features/game/nexamon-types";
+import type {
+  NexamonCardStats,
+  NexamonCopy,
+  NexamonListing,
+  NexamonPull,
+  PlayerNexamonCard,
+} from "@/features/game/nexamon-types";
 import {
   binderEntries,
   buyableListings,
@@ -36,6 +42,7 @@ import {
   sortCopiesBestFirst,
   splitGraded,
   suggestedPriceCents,
+  summarizePacks,
   tileMoney,
 } from "./view";
 
@@ -508,5 +515,68 @@ describe("profileBinder", () => {
     ]);
     expect(groups[0]!.entries.map((e) => e.card.number)).toEqual(first.map((x) => x.number));
     expect(groups[0]!.entries.filter((e) => e.owned !== null)).toHaveLength(2);
+  });
+});
+
+describe("summarizePacks (ADR-204)", () => {
+  const pull = (copyId: string, rarity: NexamonPull["rarity"], valueCents: number, isNew = false): NexamonPull => ({
+    slot: 1,
+    copyId,
+    cardKey: "me-001",
+    rarity,
+    condition: "mint",
+    isNew,
+    serial: 1,
+    population: 1,
+    valueCents,
+  });
+  const packs = [
+    {
+      packId: "a",
+      set: "mystic_energy" as const,
+      priceCents: 1_000,
+      packsOpened: 1,
+      cards: [pull("1", "common", 50), pull("2", "legendary", 9_000, true)],
+    },
+    {
+      packId: "b",
+      set: "mystic_energy" as const,
+      priceCents: 1_000,
+      packsOpened: 2,
+      cards: [pull("3", "rare", 300), pull("4", "common", 50, true)],
+    },
+  ];
+
+  it("adds up worth, price and profit", () => {
+    const s = summarizePacks(packs);
+    expect(s.valueCents).toBe(9_400);
+    expect(s.paidCents).toBe(2_000);
+    expect(s.profitCents).toBe(7_400);
+    expect(s.returnBps).toBe(37_000);
+    expect(s.count).toBe(4);
+    expect(s.fresh).toBe(2);
+  });
+
+  it("sorts every pull by value and picks the best hits", () => {
+    const s = summarizePacks(packs);
+    expect(s.sorted.map((c) => c.copyId)).toEqual(["2", "3", "1", "4"]);
+    expect(s.best.map((c) => c.copyId)).toEqual(["2", "3"]);
+    expect(s.rarities.map((r) => [r.rarity, r.count])).toEqual([
+      ["legendary", 1],
+      ["rare", 1],
+      ["common", 2],
+    ]);
+  });
+
+  it("keeps a total per pack", () => {
+    const s = summarizePacks(packs);
+    expect(s.packs.map((p) => [p.index, p.valueCents, p.profitCents, p.best?.copyId])).toEqual([
+      [1, 9_050, 8_050, "2"],
+      [2, 350, -650, "3"],
+    ]);
+  });
+
+  it("an empty summary pays nothing back", () => {
+    expect(summarizePacks([]).returnBps).toBe(0);
   });
 });

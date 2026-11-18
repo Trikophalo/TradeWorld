@@ -9726,7 +9726,10 @@
         "good": "Starke Note!",
         "ten": "Gem Mint: die 10!",
         "black": "Black Label!!!"
-      }
+      },
+      "holdTen": "Das sieht nach Gem Mint aus …",
+      "holdBlack": "Moment. Da ist noch mehr …",
+      "valueFactor": "Wert {factor}"
     },
     "profile": {
       "title": "Collectibles",
@@ -9794,7 +9797,19 @@
       "more": "und {n} weitere",
       "cardTitle": "Account-Bonus",
       "cardHint": "Solange du eine Kopie besitzt, die nicht im Markt steht. Slab ab 9: x1,5, Black Label: x2.",
-      "missingTag": "Bonus fehlt dir noch"
+      "missingTag": "Bonus fehlt dir noch",
+      "activeKinds": "{n} von {total} Bonus-Arten aktiv",
+      "ruleShow": "So zählen Boni",
+      "ruleHide": "Regel ausblenden",
+      "capShort": "max. {cap}",
+      "diminishedShort": "Summe {raw}, gedeckelt",
+      "next": "Als Nächstes",
+      "nextEmptyTitle": "Noch keine Sammlung angefangen",
+      "nextEmptyText": "Sobald du Karten eines Sets hast, siehst du hier, welche Sammlung du als Nächstes schaffen kannst.",
+      "showMissingCards": "Bonus-Karten, die dir fehlen ({n})",
+      "hideMissingCards": "Fehlende Bonus-Karten ausblenden",
+      "setsTitle": "Sammlungen je Set",
+      "collectionsDone": "Sammlungen"
     },
     "hype": {
       "marker": "Hype",
@@ -9877,6 +9892,34 @@
       "buyLater": "Kaufen und später öffnen ({price})",
       "buyFailed": "Kauf hat nicht geklappt",
       "bought": "{set} liegt bei „Ungeöffnete Booster“"
+    },
+    "rareReveal": {
+      "tier1": "Treffer!",
+      "tier2": "Großer Treffer!",
+      "tier3": "Riesentreffer!",
+      "tier4": "Jackpot!",
+      "value": "Wert dieser Karte: {value}",
+      "charging": "Da kommt etwas Großes …",
+      "announce": "{rarity} aufgedeckt!"
+    },
+    "multi": {
+      "title": "{count, plural, one {# Pack aufgedeckt} other {Alle # Packs}}",
+      "line": "Gezogen {worth} · bezahlt {paid}",
+      "up": "{pct} im Plus",
+      "down": "{pct} im Minus",
+      "worth": "Wert",
+      "cards": "Karten",
+      "fresh": "Neu",
+      "best": "Deine besten Treffer",
+      "all": "Alle Karten",
+      "sorted": "nach Wert sortiert",
+      "filter": "Nach Seltenheit filtern",
+      "filterAll": "Alle {count}",
+      "emptyTitle": "Keine Karte dieser Seltenheit",
+      "emptyText": "Wähl oben eine andere Seltenheit.",
+      "perPack": "Wert je Pack",
+      "packN": "Pack {n}",
+      "tile": "{name}, Wert {value}"
     }
   },
   "hq": {

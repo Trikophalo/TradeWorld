@@ -4777,3 +4777,45 @@ Mint-Gradings, eine reine 10 also 35 %. Die anderen Zustände bleiben unverände
 (`premiumBps.mint`, 12 %) bleibt; wer eine Mint-Karte zieht, gradet sie lieber, als sie roh an die KI zu verkaufen.
 Mehr 10er bringen mehr Slabs mit hohem Wert in Umlauf; Marktwert und KI-Käufe für Slabs (`gradePremiumBps`) bleiben
 und sind zu beobachten.
+
+## ADR-204: Große Momente bei Packs und ASP, Ergebnis vieler Packs, neuer Boni-Tab — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer wünscht vier Dinge an der Sammelkarten-Oberfläche: Der Tab „Boni“ ist eine lange Liste
+und soll übersichtlicher werden, ohne dass etwas verloren geht. Sind die letzten zwei Karten eines selbst geöffneten
+Packs sehr selten, soll das Aufdecken ein echter Dopamin-Moment sein. Das Ergebnis von zehn auf einmal aufgedeckten
+Packs verlangt viel Scrollen, bis man den Gesamtwert sieht. Und das Paket von ASP soll beim Öffnen deutlich mehr
+Spannung aufbauen, vor allem bei einer 10 und dem Black Label. Alles ist reine Oberfläche; der Server bleibt unberührt.
+
+**Entscheidung.**
+
+- **`RareReveal`** (`src/features/nexamon/components/rare-reveal.tsx`) ist ein wiederverwendbarer Baustein (auch für
+  die Ansicht der Pack Battles): Die Karte liegt verdeckt, ihr Glanz in der Farbe der Seltenheit schimmert heraus;
+  sobald `play` wahr wird, bebt sie immer stärker, Glanz und ein neuer 8-Bit-Klang (`revealCharge`, „pnpm sounds“)
+  steigen an, dann dreht sie sich um: Blitz über den ganzen Bildschirm (`ScreenFlash`), Pixel-Konfetti in den Farben
+  der Seltenheit, ein Banner und der Wert, der hochzählt (`useRollUp`), dazu Vibration (`jackpot`). Die Stufe
+  (`revealTier`): Ultra/Titanium 1, Prisma/Diamond 2, Legendary 3, One of One/Uranium 4; eine Karte im Wert von
+  mindestens zehn Packs (`BIG_PULL_FACTOR`) steigt eine Stufe. Aufladen 0,75 s bis 2,1 s. Common und Rare bleiben
+  beim bisherigen Aufdecken. Das sind Darstellungswerte, keine Spielwerte, daher in `lib.ts` statt `balance.ts`.
+- **Pack-Opening:** Nur die letzten zwei Plätze bekommen den großen Moment (`finaleSlots`). Die Karte darüber
+  gleitet langsamer weg; während des Aufladens wirft ein Wischen oder eine Taste die Karte nicht, sondern kürzt das
+  Warten ab. Der Glanz des Stapels und der One-of-One-Moment folgen nach dem Umdrehen.
+- **ASP-Paket:** Der Slab steigt verdeckt auf und dreht sich zum Zählen um; ein Scanner läuft über das verdeckte
+  Etikett, jeder Schritt lässt den Slab zucken (ab 8,5 auch Vibration). Ist die Note erreicht, hält das Etikett den
+  Atem an: bei einer 10 1,4 s mit Herzschlag und Aufladeklang, beim Black Label 2,8 s, während der ganze Bildschirm
+  schwarz wird. Danach: 9/9,5 Funken, 10 goldener Blitz und Konfetti in zwei Wellen, Black Label weißer Lichtstreif,
+  ein Sturm aus schwarz-goldenem Konfetti in drei Wellen, zwei Blitze und der große Stempel. Der Wert zählt vom
+  rohen Kartenwert zum Slab hoch („Wert ×3,2“). „Überspringen“ steht schon vor dem Aufreißen bereit.
+- **Viele Packs („Alle aufdecken“):** `MultiPackSummary` zeigt oben, beim Scrollen festgeheftet, Gewinn oder
+  Verlust groß in Grün oder Rot, Wert, Preis, Karten und Neue; darunter die drei besten Treffer, alle Karten als
+  kompaktes Raster nach Wert (Filter je Seltenheit), den Wert je Pack zum Aufklappen und den Sofortverkauf
+  (ADR-196) für alle Karten. Die Berechnung steckt in `summarizePacks` (`view.ts`, getestet).
+- **Boni:** Ringe für die sieben Bonus-Arten gegen ihre Grenze (Gold, wenn gedeckelt), die Regel zum Aufklappen,
+  „Als Nächstes“ mit den drei Sammlungen, die am nächsten am Ziel sind (samt fehlender Karten), die aktiven
+  Bonus-Karten und auf Wunsch die fehlenden, darunter jedes Set zusammengeklappt (das mit dem meisten Fortschritt
+  offen) mit Set komplett, Master-Set und den Typ-Sammlungen als Kacheln mit Ring.
+- Mit reduzierter Bewegung (System oder Einstellung „Animationen“) entfallen Beben, Blitz, Konfetti und Abdunkeln;
+  Karte und Note stehen sofort da, Banner und Wert ohne Hochzählen. Es bewegen sich nur `transform` und `opacity`.
+
+**Folgen.** Ein großer Treffer kostet in den letzten zwei Plätzen 0,75 bis 2,1 s mehr, ein ASP-Ergebnis bis zu
+rund 1,5 s mehr; beides lässt sich abkürzen. Die Pack-Battle-Ansicht kann `RareReveal` mit `play` und `valueCents`
+einbinden. Die Übertragung großer Züge an Zuschauer (ADR-172) bleibt unverändert.

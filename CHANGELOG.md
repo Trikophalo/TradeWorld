@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Mehr Nervenkitzel bei Packs und ASP (ADR-204):** Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti, Banner und hochzählendem Wert um; One of Ones und Uranium am größten. Auch das ASP-Paket baut mehr Spannung auf: Der Slab kommt verdeckt, ein Scanner läuft über die Note, eine 10 explodiert in Gold, ein Black Label verdunkelt den ganzen Bildschirm. Zehn Packs auf einmal zeigen oben groß Gewinn oder Verlust, darunter die besten Treffer und alle Karten kompakt nach Wert mit Filter. Der Tab „Boni“ ist neu geordnet: Ringe je Bonus-Art, „Als Nächstes“ und aufklappbare Sets.
+
 - **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro Stunde); die Preise steigen von 3.000 € bis rund 259.500 €.
 
 - **KI kauft auch teure Karten (ADR-195):** Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab. Bis 15 % über Wert klappt es nur manchmal, eher bei beliebten Karten; darüber nie.

@@ -11,7 +11,14 @@ import {
 } from "@/config/nexamon";
 import type { NexamonCondition } from "@/config/nexamon-rules";
 import { formatMoney, formatMoneyShort } from "@/lib/format";
-import type { NexamonCardStats, NexamonCopy, NexamonListing, PlayerNexamonCard } from "@/features/game/nexamon-types";
+import type {
+  NexamonCardStats,
+  NexamonCopy,
+  NexamonListing,
+  NexamonPackResult,
+  NexamonPull,
+  PlayerNexamonCard,
+} from "@/features/game/nexamon-types";
 import {
   NEXAMON_BLACK_LABEL_GRADE,
   nexamonConditionBps,
@@ -619,3 +626,81 @@ export function bulkSelectBelow(groups: readonly BulkGroup[], belowCents: number
 /** The sets by pack price, cheapest first (shop, market set picker; new sets fall into place by their price). */
 export const setsByPackPrice = (): NexamonSetKey[] =>
   [...NEXAMON_SETS].sort((a, b) => cfg.sets[a].packPriceCents - cfg.sets[b].packPriceCents);
+
+// ----------------------------------------------------------------------------------------------- pack summary
+
+/** One pack of a summary of several (ADR-204): its pulls, worth and result against its price. */
+export interface PackSummaryPack {
+  packId: string;
+  /** 1-based number within the summary. */
+  index: number;
+  pulls: readonly NexamonPull[];
+  valueCents: number;
+  priceCents: number;
+  profitCents: number;
+  /** The best pull of the pack (highest value). */
+  best: NexamonPull | null;
+}
+
+export interface PackSummary {
+  valueCents: number;
+  paidCents: number;
+  profitCents: number;
+  /** Profit against the price in bps (0 when nothing was paid). */
+  returnBps: number;
+  count: number;
+  fresh: number;
+  /** Every pull, best first: value, then rarity, then slot order. */
+  sorted: readonly NexamonPull[];
+  /** The best hits (rare or better), at most `bestCount`, best first. */
+  best: readonly NexamonPull[];
+  /** How many pulls of each rarity, best rarity first; only rarities that were pulled. */
+  rarities: readonly { rarity: NexamonRarity; count: number; valueCents: number }[];
+  packs: readonly PackSummaryPack[];
+}
+
+const bestFirst = (a: NexamonPull, b: NexamonPull) =>
+  b.valueCents - a.valueCents || NEXAMON_RARITY_RANK[b.rarity] - NEXAMON_RARITY_RANK[a.rarity];
+
+/** ADR-204: the result screen of several packs at once: totals first, best hits, every card by value, per pack. */
+export function summarizePacks(packs: readonly NexamonPackResult[], bestCount = 3): PackSummary {
+  const all = packs.flatMap((p) => p.cards);
+  const valueCents = all.reduce((sum, c) => sum + c.valueCents, 0);
+  const paidCents = packs.reduce((sum, p) => sum + p.priceCents, 0);
+  const sorted = all
+    .map((pull, i) => ({ pull, i }))
+    .sort((a, b) => bestFirst(a.pull, b.pull) || a.i - b.i)
+    .map(({ pull }) => pull);
+  const byRarity = new Map<NexamonRarity, { count: number; valueCents: number }>();
+  for (const pull of all) {
+    const entry = byRarity.get(pull.rarity) ?? { count: 0, valueCents: 0 };
+    entry.count += 1;
+    entry.valueCents += pull.valueCents;
+    byRarity.set(pull.rarity, entry);
+  }
+  return {
+    valueCents,
+    paidCents,
+    profitCents: valueCents - paidCents,
+    returnBps: paidCents > 0 ? Math.round(((valueCents - paidCents) * 10_000) / paidCents) : 0,
+    count: all.length,
+    fresh: all.filter((c) => c.isNew).length,
+    sorted,
+    best: sorted.filter((c) => NEXAMON_RARITY_RANK[c.rarity] >= NEXAMON_RARITY_RANK.rare).slice(0, bestCount),
+    rarities: [...byRarity.entries()]
+      .map(([rarity, entry]) => ({ rarity, ...entry }))
+      .sort((a, b) => NEXAMON_RARITY_RANK[b.rarity] - NEXAMON_RARITY_RANK[a.rarity] || b.valueCents - a.valueCents),
+    packs: packs.map((p, i) => {
+      const value = p.cards.reduce((sum, c) => sum + c.valueCents, 0);
+      return {
+        packId: p.packId,
+        index: i + 1,
+        pulls: p.cards,
+        valueCents: value,
+        priceCents: p.priceCents,
+        profitCents: value - p.priceCents,
+        best: [...p.cards].sort(bestFirst)[0] ?? null,
+      };
+    }),
+  };
+}

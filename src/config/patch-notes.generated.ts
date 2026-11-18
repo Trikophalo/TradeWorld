@@ -618,6 +618,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Grundeinkommen stark ausbaubar",
         text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-7357c84e",
+        title: "Mehr Nervenkitzel bei Packs und ASP",
+        text: "Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti…",
+      },
     ],
   },
   {

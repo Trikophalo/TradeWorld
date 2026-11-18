@@ -390,3 +390,24 @@
   filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.5));
   animation: nexamon-twinkle 0.8s var(--ease-in-out) infinite alternate;
 }
+
+/* ADR-204: the white light that sweeps over the screen after a Black Label, and the scanner over the ASP label. */
+.nexamon-light-sweep {
+  background-image: linear-gradient(
+    100deg,
+    rgb(255 255 255 / 0) 0%,
+    rgb(255 255 255 / 0.15) 30%,
+    rgb(255 255 255 / 0.95) 50%,
+    rgb(255 255 255 / 0.15) 70%,
+    rgb(255 255 255 / 0) 100%
+  );
+}
+.nexamon-scan-line {
+  background-image: linear-gradient(
+    180deg,
+    rgb(120 230 255 / 0) 0%,
+    rgb(120 230 255 / 0.55) 50%,
+    rgb(255 255 255 / 0.9) 56%,
+    rgb(120 230 255 / 0) 100%
+  );
+}

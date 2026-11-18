@@ -20,7 +20,49 @@ import {
   swipeOutcome,
   TEAR_DISTANCE,
   tearProgress,
+  finaleSlots,
+  revealTier,
+  REVEAL_CHARGE_MS,
+  REVEAL_PARTICLES,
 } from "./lib";
+
+describe("rare reveal (ADR-204)", () => {
+  it("scales with the rarity and leaves commons and rares alone", () => {
+    expect(revealTier("common")).toBe(0);
+    expect(revealTier("rare")).toBe(0);
+    expect(revealTier("iron")).toBe(0);
+    expect(revealTier("ultra")).toBe(1);
+    expect(revealTier("titanium")).toBe(1);
+    expect(revealTier("prisma")).toBe(2);
+    expect(revealTier("diamond")).toBe(2);
+    expect(revealTier("legendary")).toBe(3);
+    expect(revealTier("one_of_one")).toBe(4);
+    expect(revealTier("uranium")).toBe(4);
+  });
+
+  it("climbs one step for a pull worth ten packs, never above the chase", () => {
+    expect(revealTier("ultra", 9_999, 1_000)).toBe(1);
+    expect(revealTier("ultra", 10_000, 1_000)).toBe(2);
+    expect(revealTier("legendary", 50_000, 1_000)).toBe(4);
+    expect(revealTier("one_of_one", 50_000, 1_000)).toBe(4);
+    expect(revealTier("rare", 50_000, 1_000)).toBe(0);
+    expect(revealTier("ultra", 50_000, 0)).toBe(1);
+  });
+
+  it("only the last two slots get the finale", () => {
+    expect(finaleSlots(["legendary", "common", "common", "ultra", "prisma"])).toEqual([0, 0, 0, 1, 2]);
+    expect(finaleSlots(["common", "common", "common", "rare", "common"])).toEqual([0, 0, 0, 0, 0]);
+    expect(finaleSlots(["common", "ultra"], (i) => (i === 1 ? 20_000 : 0), 1_000)).toEqual([0, 2]);
+  });
+
+  it("bigger tiers wait and celebrate longer", () => {
+    for (const tier of [1, 2, 3] as const) {
+      const up = (tier + 1) as 2 | 3 | 4;
+      expect(REVEAL_CHARGE_MS[up]).toBeGreaterThan(REVEAL_CHARGE_MS[tier]);
+      expect(REVEAL_PARTICLES[up]).toBeGreaterThan(REVEAL_PARTICLES[tier]);
+    }
+  });
+});
 
 describe("card numbers and serials", () => {
   it("pads the number and the set size to three digits", () => {
