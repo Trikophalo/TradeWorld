@@ -9,11 +9,15 @@
  * origin, religion, gender, sexuality, disability or the looks of real people, no slurs, nothing sexual, no
  * self-harm, no violence against real people, no real tragedies. Invented people and institutions only (Oberamtsrat
  * Griesgram of the Finanzamt Nexa-Mitte is one of them); real public figures stay in the "ramble" script.
- * Pure data, no imports (part of BALANCE).
+ * Season three (ADR-210) adds the topics of news-topics-fresh.ts: Weltkarte, events from outside, Talente, clones,
+ * toplists and more.
+ * Pure data (part of BALANCE).
  */
-export const NEWS_TOPIC_GROUPS = ["cards", "tax", "corp", "person", "odd"] as const;
+import { NEWS_TOPIC_GROUPS_FRESH, NEWS_TOPICS_FRESH } from "./news-topics-fresh.ts";
 
-export const NEWS_TOPICS = {
+export const NEWS_TOPIC_GROUPS = ["cards", "tax", "corp", "person", "odd", ...NEWS_TOPIC_GROUPS_FRESH] as const;
+
+const NEWS_TOPICS_BASE = {
   // ------------------------------------------------------------------ collectibles (Nexamon, ADR-165)
   cardPull: {
     group: "cards",
@@ -1529,6 +1533,8 @@ export const NEWS_TOPICS = {
     ],
   },
 } as const;
+
+export const NEWS_TOPICS = { ...NEWS_TOPICS_BASE, ...NEWS_TOPICS_FRESH } as const;
 
 export type NewsTopicKey = keyof typeof NEWS_TOPICS;
 export type NewsTopicGroup = (typeof NEWS_TOPIC_GROUPS)[number];

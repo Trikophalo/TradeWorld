@@ -57,28 +57,34 @@ export interface ScriptPick {
 }
 
 /**
- * Picks a frame and a reason for a kind: the combination used longest ago (never used first), among those the reason
- * used longest ago, then by chance. `used` lists remembered keys, oldest first (also "r:<kind>:<reason>" entries).
+ * Picks a frame and a reason for a kind. First the pair whose frame and reason did not air in the last shows
+ * (`recent`, keys "f:<kind>:<frame>" and "r:<kind>:<reason>", ADR-210), then the combination used longest ago (never
+ * used first), among those the reason used longest ago, then by chance. `used` lists remembered keys, oldest first
+ * (also "r:<kind>:<reason>" entries).
  */
 export function pickScript(
   kind: NewsShowTextKey,
   used: readonly string[],
   rng: () => number,
   rules: Rules = NEWS_SHOW_RULES,
+  recent: ReadonlySet<string> = new Set(),
 ): ScriptPick {
   const kit = rules.texts[kind];
   const age = (key: string) => {
     const i = used.lastIndexOf(key);
     return i < 0 ? -1 : i; // -1 = never used, best
   };
-  let best: { f: number; r: number; combo: number; reason: number; tie: number } | null = null;
+  let best: { f: number; r: number; fresh: number; combo: number; reason: number; tie: number } | null = null;
   for (let f = 0; f < kit.frames.length; f++) {
     for (let r = 0; r < kit.reasons.length; r++) {
-      const c = { f, r, combo: age(`${kind}:${f}:${r}`), reason: age(`r:${kind}:${r}`), tie: rng() };
+      const fresh = (recent.has(`f:${kind}:${f}`) ? 1 : 0) + (recent.has(`r:${kind}:${r}`) ? 1 : 0);
+      const c = { f, r, fresh, combo: age(`${kind}:${f}:${r}`), reason: age(`r:${kind}:${r}`), tie: rng() };
       if (
         !best ||
-        c.combo < best.combo ||
-        (c.combo === best.combo && (c.reason < best.reason || (c.reason === best.reason && c.tie < best.tie)))
+        c.fresh < best.fresh ||
+        (c.fresh === best.fresh &&
+          (c.combo < best.combo ||
+            (c.combo === best.combo && (c.reason < best.reason || (c.reason === best.reason && c.tie < best.tie)))))
       )
         best = c;
     }
@@ -93,10 +99,10 @@ export function pickScript(
   };
 }
 
-/** The keys to remember after a pick. */
+/** The keys to remember after a pick (the frame key "f:<kind>:<frame>" since ADR-210). */
 export function usedKeys(pick: ScriptPick): string[] {
-  const [kind, , reason] = pick.key.split(":");
-  return [pick.key, `r:${kind}:${reason}`];
+  const [kind, frame, reason] = pick.key.split(":");
+  return [pick.key, `r:${kind}:${reason}`, `f:${kind}:${frame}`];
 }
 
 /** "12,4 %" from basis points, always positive (the direction is in the text). */

@@ -60,6 +60,7 @@ import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { introShot } from "./intro";
 import { IntroMontage } from "./intro-montage";
+import { episodeVariant } from "./variants";
 import { MOOD_REACTION, segmentMood, speechDelayMs } from "./mood";
 
 export { ANCHOR_MOODS, type AnchorMood } from "@/components/pixel/news-art";
@@ -121,6 +122,11 @@ export interface NewsStudioProps {
   viewers?: number;
   /** Replay of an old show: a "Wiederholung" badge instead of LIVE. */
   replay?: boolean;
+  /**
+   * The show's number (`showEpisode`, the hour it started in): picks its tagline and its goodbye (ADR-210). Left out,
+   * the classic ones.
+   */
+  episode?: number | null;
   className?: string;
 }
 
@@ -706,6 +712,7 @@ export function NewsStudio({
   introMs = BALANCE.newsShow.introSeconds * 1000,
   viewers,
   replay = false,
+  episode = null,
   className,
 }: NewsStudioProps): JSX.Element {
   const t = useTranslations("newsStudio");
@@ -724,7 +731,11 @@ export function NewsStudio({
   // Server texts name amounts in euros; the player may have chosen another sign (ADR-113).
   const script = useMemo(() => (segment ? localizeMoneyDeep(segment) : null), [segment]);
   const story = mode === "live" ? script : null;
-  const speech = mode === "live" ? (story?.text ?? "") : mode === "outro" ? (script?.text ?? t("outro")) : "";
+  // ADR-210: every show has its own tagline and goodbye, the same for every viewer
+  const goodbye = episodeVariant(t.raw("outros") as { headline: string; text: string }[], episode);
+  const tagline = episodeVariant(t.raw("introTaglines") as string[], episode);
+  const speech =
+    mode === "live" ? (story?.text ?? "") : mode === "outro" ? (script?.text ?? goodbye?.text ?? t("outro")) : "";
   const chars = useMemo(() => Array.from(speech), [speech]);
   const total = chars.length;
   // ---- how he takes it: a short reaction first, then he reads
@@ -912,7 +923,7 @@ export function NewsStudio({
         {t("kinds.outro")}
       </Chip>
     );
-    bannerLine = script?.headline ?? t("outroHeadline");
+    bannerLine = script?.headline ?? goodbye?.headline ?? t("outroHeadline");
   } else if (mode === "off") {
     bannerChip = <Chip tone="info">{t("noSignal")}</Chip>;
     bannerLine = t("show");
@@ -1203,6 +1214,7 @@ export function NewsStudio({
                         wide={wide}
                         reduced={reduced}
                         wave={reduced || beat % 2 === 0 ? 0 : 1}
+                        tagline={tagline}
                       />
                     )}
                   </>

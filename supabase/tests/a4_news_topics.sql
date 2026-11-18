@@ -43,7 +43,7 @@ as $$ select coalesce(p_seg ->> 'headline', '') || ' | ' || coalesce(p_seg ->> '
 
 -- A. config: the topics, a script and moods for each, the card names
 select tests.assert(
-  (select (g.value #>> '{topics,count}')::int = 3 and (g.value ->> 'maxSegments')::int = 12
+  (select (g.value #>> '{topics,count}')::int >= 3 and (g.value ->> 'maxSegments')::int = 12
           and jsonb_array_length(g.value #> '{topics,ords}') >= (g.value #>> '{topics,count}')::int
           and (select count(*) from jsonb_object_keys(g.value #> '{topics,list}')) >= 40
           and not exists (
@@ -51,8 +51,8 @@ select tests.assert(
                  where jsonb_array_length(coalesce(g.value #> array['texts', t.key, 'frames'], '[]'::jsonb)) < 3
                     or jsonb_array_length(coalesce(g.value #> array['texts', t.key, 'reasons'], '[]'::jsonb)) < 6
                     or jsonb_array_length(coalesce(g.value #> array['moods', t.key], '[]'::jsonb)) < 1
-                    or t.value ->> 'group' not in ('cards', 'tax', 'corp', 'person', 'odd')
-                    or t.value ->> 'kind' not in ('cards', 'tax', 'corp', 'gossip', 'ramble')
+                    or t.value ->> 'group' not in ('cards', 'tax', 'corp', 'person', 'odd', 'world', 'talent', 'rank')
+                    or t.value ->> 'kind' not in ('cards', 'tax', 'corp', 'gossip', 'ramble', 'world')
                     or (t.value ->> 'weight')::int <= 0)
      from public.game_config g where g.key = 'newsShow')
   and (select count(*) from jsonb_object_keys((select value from public.game_config where key = 'nexamon_names')))

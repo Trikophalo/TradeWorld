@@ -15,6 +15,7 @@
  */
 import { NEWS_RAMBLE_EXTRA, NEWS_TOPICS } from "./news-topics.ts";
 import { NEWS_RUNNING_GAGS } from "./running-gags.ts";
+import { NEWS_FRESH, NEWS_RAMBLE_FRESH, NEWS_SCRIPT_EXTRA } from "./news-fresh.ts";
 
 type Topics = typeof NEWS_TOPICS;
 const topicKeys = Object.keys(NEWS_TOPICS) as (keyof Topics)[];
@@ -105,6 +106,7 @@ export const NEWS_SHOW_RULES = {
         "Nadine Krüger",
         "Wolfgang Stratmann",
         "Tamara Nowak",
+        ...NEWS_FRESH.chat.names,
       ],
       lines: {
         angry: [
@@ -158,6 +160,11 @@ export const NEWS_SHOW_RULES = {
       },
     },
   },
+  /**
+   * Season three (ADR-210): segues, names for {event}, {role}, {skill} and {tier}, the thresholds of the new topics,
+   * no repeats within `noRepeatShows` shows, and the chat that reacts to the segment on air (lines, polls, emotes).
+   */
+  fresh: NEWS_FRESH,
   /** Running gags (ADR-179): stories that come back every show while their player company exists. */
   runningGags: NEWS_RUNNING_GAGS,
   /**
@@ -253,8 +260,8 @@ export const NEWS_SHOW_RULES = {
    */
   topics: {
     /** 0 switches the topics off. */
-    count: 3,
-    ords: [25, 45, 65],
+    count: 4,
+    ords: [25, 45, 65, 72],
     /** Facts from this many hours back count ("heute"). */
     windowHours: 24,
     hushMoneyCents: 10_000,
@@ -373,6 +380,7 @@ export const NEWS_SHOW_RULES = {
         "Der Markt sagt danke, du Geldautomat auf zwei Beinen.",
         "So verbrennt man Geld, Kinder. Bitte nicht nachmachen, außer es ist seins.",
         "Für so ein Depot muss man sich schon am frühen Morgen Mühe geben.",
+        ...NEWS_SCRIPT_EXTRA.loser,
       ],
     },
     winner: {
@@ -401,6 +409,7 @@ export const NEWS_SHOW_RULES = {
         "Neid ist die ehrlichste Form der Anerkennung, also bitte sehr.",
         "Man munkelt von einem Pakt mit dem Teufel, der Teufel dementiert.",
         "Wer jetzt um einen Kredit bittet, wird ausgelacht. Zu Recht.",
+        ...NEWS_SCRIPT_EXTRA.winner,
       ],
     },
     scandal: {
@@ -445,6 +454,7 @@ export const NEWS_SHOW_RULES = {
         "Ein Mitarbeiter hat die gesamte Kundendatei alphabetisch nach Vornamen des Haustiers sortiert.",
         "Die Kaffeekasse war die einzige Abteilung mit Gewinn.",
         "Auf dem Firmenparkplatz wurde ein illegales Bobbycar-Rennen ausgehoben.",
+        ...NEWS_SCRIPT_EXTRA.scandal,
       ],
     },
     hype: {
@@ -473,6 +483,7 @@ export const NEWS_SHOW_RULES = {
         "Selbst die Praktikanten wurden heute um Autogramme gebeten.",
         "Ein Bürgermeister hat spontan eine Straße danach benannt.",
         "Sogar die Steuerprüfung kam privat vorbei, um einzukaufen.",
+        ...NEWS_SCRIPT_EXTRA.hype,
       ],
     },
     stockUp: {
@@ -508,6 +519,7 @@ export const NEWS_SHOW_RULES = {
         "Eine Brieftaube hat einen Großauftrag überbracht.",
         "Im Keller wurde Öl gefunden, es war zwar Salatöl, aber die Stimmung ist prächtig.",
         "Der Praktikant hat aus Versehen ein Patent angemeldet.",
+        ...NEWS_SCRIPT_EXTRA.stockUp,
       ],
     },
     stockDown: {
@@ -543,6 +555,7 @@ export const NEWS_SHOW_RULES = {
         "Der Chef hat den Jahresbericht als Gedicht vorgetragen. Es reimte sich nicht.",
         "Im Werk wurde drei Wochen lang das falsche Produkt gebaut, niemandem fiel es auf.",
         "Die Firma hat ihren größten Kunden geghostet.",
+        ...NEWS_SCRIPT_EXTRA.stockDown,
       ],
     },
     sectorUp: {
@@ -565,6 +578,7 @@ export const NEWS_SHOW_RULES = {
         "Ein Schulkind hat in einem Referat behauptet, das sei die Zukunft.",
         "Die Konkurrenzbranche hat geschlossen verschlafen.",
         "Angeblich ist das jetzt wieder modern, sagt jemand, der es wissen muss.",
+        ...NEWS_SCRIPT_EXTRA.sectorUp,
       ],
     },
     sectorDown: {
@@ -587,6 +601,7 @@ export const NEWS_SHOW_RULES = {
         "Das wichtigste Fachmagazin hat versehentlich einen Nachruf gedruckt.",
         "Ein Orakel aus dem Frühstücksfernsehen hat den Daumen gesenkt.",
         "Jemand hat laut gefragt, wofür man das eigentlich braucht.",
+        ...NEWS_SCRIPT_EXTRA.sectorDown,
       ],
     },
     tasksUp: {
@@ -607,6 +622,7 @@ export const NEWS_SHOW_RULES = {
         "Ein Feiertag wurde abgesagt, alle haben Langeweile und Bargeld.",
         "Die Leute haben gemerkt, dass Sparen keinen Spaß macht.",
         "Ein Lottogewinner verteilt Geld in der Fußgängerzone.",
+        ...NEWS_SCRIPT_EXTRA.tasksUp,
       ],
     },
     tasksDown: {
@@ -627,6 +643,7 @@ export const NEWS_SHOW_RULES = {
         "Die Kundschaft hat ihre Geldbeutel verlegt, und zwar alle gleichzeitig.",
         "Ein Sparfuchs hat ein Buch geschrieben, leider ist es gut.",
         "Es regnet, und niemand hat Lust auf irgendwas.",
+        ...NEWS_SCRIPT_EXTRA.tasksDown,
       ],
     },
     tip: {
@@ -687,6 +704,7 @@ export const NEWS_SHOW_RULES = {
         "Die Verwandtschaft tut ab heute so, als kenne sie dich nicht.",
         "Hut ab, so konsequent scheitert sonst nur die Bahn.",
         "Ich würde ja helfen, aber dann hätte ich nichts mehr zu lachen.",
+        ...NEWS_SCRIPT_EXTRA.gossipBad,
       ],
     },
     gossipGood: {
@@ -715,6 +733,7 @@ export const NEWS_SHOW_RULES = {
         "Genieß es, nächste Woche lachen wir wieder über dich.",
         "So, und jetzt alle anderen: Schämt euch.",
         "Das musste auch mal gesagt werden, ich fühle mich schon ganz schmutzig.",
+        ...NEWS_SCRIPT_EXTRA.gossipGood,
       ],
     },
     nftSale: {
@@ -743,6 +762,7 @@ export const NEWS_SHOW_RULES = {
         "Das Bild hat sechzehn mal sechzehn Pixel. Ich habe nachgezählt, ich hatte Zeit.",
         "Immerhin kann man es nicht fallen lassen.",
         "Die Künstlerseele jubelt, der Geldbeutel des Käufers ruft die Polizei.",
+        ...NEWS_SCRIPT_EXTRA.nftSale,
       ],
     },
     ramble: {
@@ -778,6 +798,7 @@ export const NEWS_SHOW_RULES = {
         "Dieter Bohlen hat meinen Schnurrbart bewertet. Es reicht nicht für den Recall.",
         "Günther Jauch hat mich angerufen, ich war der Telefonjoker. Ich wusste es nicht.",
         ...NEWS_RAMBLE_EXTRA,
+        ...NEWS_RAMBLE_FRESH,
       ],
     },
     rambleInvest: {
@@ -822,6 +843,7 @@ export const NEWS_SHOW_RULES = {
         "Kein Skandal, keine Pleite, nicht einmal ein kleiner Betrug.",
         "Die Redaktion hat drei Stunden gesucht und nur eine verlorene Socke gefunden.",
         "Selbst die Gerüchteküche hat heute Ruhetag.",
+        ...NEWS_SCRIPT_EXTRA.filler,
       ],
     },
   },
