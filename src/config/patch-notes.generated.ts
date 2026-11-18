@@ -1003,6 +1003,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Flyer für kleine Firmen: Solange deine Firma eine Garage ist oder weniger als 1 Mio. € wert, kostet die Flyer-Kampagne höchstens 2.000 €.",
       },
       {
+        id: "m0-fundament-9298c771",
+        title: null,
+        text: "Entnahmen aus der Firma: Du kannst alle 6 Stunden Geld entnehmen.",
+      },
+      {
         id: "m0-fundament-f6048448",
         title: null,
         text: "Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen), das Mausrad und zwei Finger zoomen…",

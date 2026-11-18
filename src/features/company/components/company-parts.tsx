@@ -4,7 +4,7 @@ import { AwarenessMeter } from "@/features/company/awareness/awareness-meter";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
-import { COMPANY_BUILDINGS, UI_ICONS } from "@/components/pixel/art";
+import { ALARM_CLOCK, COMPANY_BUILDINGS, UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,6 +28,7 @@ import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { InfoTip } from "./firm-layout";
 import { useCompanyRefresh } from "../hooks";
+import { withdrawableCents, withdrawBlock } from "../withdraw";
 import { netProfit } from "./headquarters";
 
 /*
@@ -483,9 +484,7 @@ function MoneySheet({
     setState("idle");
   }
   const deposit = shown !== "withdraw";
-  const available = deposit
-    ? privateCents
-    : Math.max(0, Math.min(company.cashCents - company.unpaidCents, freeCashCents ?? Number.MAX_SAFE_INTEGER));
+  const available = deposit ? privateCents : withdrawableCents(company, freeCashCents);
   const cents = parseEuroCents(text) ?? 0;
   const tooMuch = cents > available;
   const after = {
@@ -580,6 +579,11 @@ function MoneySheet({
         {!deposit && company.unpaidCents > 0 && (
           <p className="text-xs text-warn">{t("withdrawUnpaid", { amount: money(company.unpaidCents) })}</p>
         )}
+        {!deposit && company.withdraw && (
+          <p className="text-xs text-pretty text-fg-3" data-testid="withdraw-rhythm">
+            {t("withdrawRhythm", { hours: company.withdraw.intervalHours })}
+          </p>
+        )}
       </div>
     </Sheet>
   );
@@ -606,8 +610,17 @@ export function TreasuryCard({
   const now = useServerClock();
   const [mode, setMode] = useState<"deposit" | "withdraw" | null>(null);
   const live = company.live;
-  const blockedUntil = restrictions?.withdrawBlockUntil ?? null;
-  const blocked = blockedUntil !== null && now !== null && Date.parse(blockedUntil) > now;
+  const rhythm = company.withdraw;
+  // ADR-213: the board's ban (ADR-167) or the pause after the last withdrawal
+  const block = withdrawBlock(rhythm, restrictions?.withdrawBlockUntil ?? null, now);
+  const left = (until: string) => formatCountdown((Date.parse(until) - (now ?? Date.parse(until))) / 1000);
+  const issueLocked =
+    rhythm &&
+    rhythm.issueLockedCents > 0 &&
+    rhythm.issueLockedUntil !== null &&
+    (now ?? 0) < Date.parse(rhythm.issueLockedUntil)
+      ? { cents: rhythm.issueLockedCents, until: rhythm.issueLockedUntil }
+      : null;
   return (
     <Panel title={t("treasuryTitle")}>
       <div data-testid="treasury">
@@ -630,9 +643,31 @@ export function TreasuryCard({
           {th("freeLine", { free: money(freeCashCents), reserved: money(reservedCents) })}
         </p>
       )}
-      {blocked && blockedUntil && (
+      {block?.reason === "board" && (
         <p className="rounded-md bg-warn-soft px-3 py-2 text-sm text-pretty text-warn" data-testid="withdraw-blocked">
-          {th("withdrawBlocked", { time: formatCountdown((Date.parse(blockedUntil) - (now ?? 0)) / 1000) })}
+          {th("withdrawBlocked", { time: left(block.until) })}
+        </p>
+      )}
+      {block?.reason === "interval" && rhythm && (
+        <div className="flex items-start gap-2 rounded-md bg-info-soft px-3 py-2 text-info" data-testid="withdraw-next">
+          <PixelIcon {...ALARM_CLOCK} scale={2} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="nums text-sm font-semibold">{t("withdrawNext", { time: left(block.until) })}</p>
+            <p className="text-xs text-pretty opacity-90">{t("withdrawRhythm", { hours: rhythm.intervalHours })}</p>
+          </div>
+        </div>
+      )}
+      {!block && rhythm && (
+        <p className="text-xs text-fg-3" data-testid="withdraw-ready">
+          {t("withdrawReady", { hours: rhythm.intervalHours })}
+        </p>
+      )}
+      {issueLocked && (
+        <p
+          className="rounded-md bg-info-soft px-3 py-2 nums text-sm text-pretty text-info"
+          data-testid="withdraw-issue-locked"
+        >
+          {t("withdrawIssueLocked", { amount: money(issueLocked.cents), time: left(issueLocked.until) })}
         </p>
       )}
       <div className="grid grid-cols-2 gap-2">
@@ -646,9 +681,10 @@ export function TreasuryCard({
         <MoneyButton
           icon="↑"
           label={t("withdraw")}
-          hint={t("withdrawShort")}
+          hint={block?.reason === "interval" ? t("withdrawNextShort", { time: left(block.until) }) : t("withdrawShort")}
           onClick={() => setMode("withdraw")}
-          disabled={blocked}
+          disabled={block !== null}
+          testId="withdraw-button"
         />
       </div>
       <MoneySheet mode={mode} company={company} freeCashCents={freeCashCents} onClose={() => setMode(null)} />
@@ -663,6 +699,7 @@ function MoneyButton({
   onClick,
   primary,
   disabled,
+  testId,
 }: {
   icon: string;
   label: string;
@@ -670,10 +707,12 @@ function MoneyButton({
   onClick: () => void;
   primary?: boolean;
   disabled?: boolean;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
+      data-testid={testId}
       disabled={disabled}
       onClick={() => {
         haptic("tap");

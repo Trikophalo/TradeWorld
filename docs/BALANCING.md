@@ -1838,3 +1838,9 @@ mindestens das 2,2-Fache fest).
 
 Der Berater spart 8 % der Steuer, der eigene Belegcheck 5 %. Für die mittlere Firma kostet der Berater am Tag
 8.640 €, er spart gegenüber dem Belegcheck 2.490 €; ab dort machen kluge Gründer die Bücher selbst.
+
+## Nachtrag: Entnahme-Rhythmus (ADR-213)
+
+| Wert                             | Stand | Wirkung                                                         |
+| -------------------------------- | ----- | --------------------------------------------------------------- |
+| `startups.withdrawIntervalHours` | 6 h   | Pause nach einer Entnahme aus der Firma; Auszahlung zählt nicht |

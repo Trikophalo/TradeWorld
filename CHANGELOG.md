@@ -8,6 +8,8 @@ Erste, navigierbare Fassung ohne Spiellogik.
   das Mausrad und zwei Finger zoomen nur noch die Karte statt die Seite zu scrollen, jedes Land hat seine richtige
   Flagge, alle Kennzahl-Kacheln sind gleich groß, und neue Kacheln zeigen Fixkosten und variable Kosten je Stunde mit
   Aufschlüsselung, woher sie kommen.
+- Entnahmen aus der Firma: Du kannst alle 6 Stunden Geld entnehmen. Die Firmenkasse zeigt mit Zähler, wann die
+  nächste Entnahme geht, und bei Börsenfirmen, wie viel Geld aus dem Börsengang noch gesperrt ist.
 - Flyer für kleine Firmen: Solange deine Firma eine Garage ist oder weniger als 1 Mio. € wert, kostet die
   Flyer-Kampagne höchstens 2.000 €. So kann sich jede neue Garage ihre erste Kampagne leisten, auch mit großem Markt.
 - Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der
