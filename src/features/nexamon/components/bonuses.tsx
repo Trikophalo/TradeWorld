@@ -212,7 +212,7 @@ export function BonusesView() {
                 </Ring>
                 <span className="text-xs font-medium text-fg-1">{t(`kinds.${total.kind}`)}</span>
                 <span className={cn("nums text-sm font-semibold", on ? "text-gain" : "text-fg-3")}>
-                  +{formatBps(total.effectiveBps)}
+                  {formatBps(total.effectiveBps)}
                 </span>
                 <span className="nums text-2xs text-fg-3">{t("capShort", { cap: formatBps(total.capBps) })}</span>
                 {/* the long form for screen readers and the tests: "1,5 % von max. 5 %" */}

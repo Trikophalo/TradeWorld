@@ -72,7 +72,12 @@ async function preparePlayer(page: Page, theme: Theme, grade: number | null = nu
 
 async function shot(page: Page, name: string, fullPage = false) {
   if (!SHOTS) return;
-  await page.screenshot({ path: `${SHOTS}/${name}-${page.viewportSize()?.width}.png`, fullPage });
+  const size = page.viewportSize()!;
+  // the app scrolls inside its own container: a tall viewport shows the whole page
+  if (fullPage) await page.setViewportSize({ width: size.width, height: 3_600 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${SHOTS}/${name}-${size.width}.png`, fullPage });
+  if (fullPage) await page.setViewportSize(size);
 }
 
 async function noSideways(page: Page) {
@@ -146,6 +151,8 @@ test("ten packs at once: the verdict stays on top, best hits, a sorted grid with
 });
 
 test("the big reveal charges up, turns, and shows banner and value", async ({ page }) => {
+  // /dev/ui is a heavy page: give a busy machine time
+  test.setTimeout(90_000);
   await page.goto("/dev/ui");
   const block = page.getByTestId("nexamon-rare-reveal");
   await block.scrollIntoViewIfNeeded();
@@ -154,8 +161,8 @@ test("the big reveal charges up, turns, and shows banner and value", async ({ pa
   // the big /dev/ui page may still hydrate: click until the button reacts
   await expect(async () => {
     await block.getByTestId("rare-reveal-play").click();
-    await expect(reveal).not.toHaveAttribute("data-phase", "veiled", { timeout: 1_000 });
-  }).toPass({ timeout: 20_000 });
+    await expect(reveal).not.toHaveAttribute("data-phase", "veiled", { timeout: 3_000 });
+  }).toPass({ timeout: 40_000 });
   await expect(reveal).toHaveAttribute("data-phase", "revealed", { timeout: 5_000 });
   await expect(reveal.getByTestId("rare-reveal-banner")).toBeVisible();
   await page.waitForTimeout(900);

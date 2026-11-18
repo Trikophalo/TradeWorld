@@ -46,13 +46,7 @@ export function Shop({
   /** The bought pack on the table (always of the selected set). */
   const [pack, setPack] = useState<NexamonPackResult | null>(null);
   /** ADR-182: packs bought at once, opened one after another; `at` is the one on the table. */
-  const [series, setSeries] = useState<{
-    packs: NexamonPackResult[];
-    at: number;
-    all: boolean;
-    /** ADR-204: the first pack of the summary of all the rest. */
-    from?: number;
-  } | null>(null);
+  const [series, setSeries] = useState<{ packs: NexamonPackResult[]; at: number; all: boolean } | null>(null);
   const action = useNexamonAction();
   // ADR-193: a running pack sale; the server charges the same reduced price
   const { promo } = useNewsPromo();
@@ -89,7 +83,7 @@ export function Shop({
   const skipAll = () => {
     if (!series) return;
     const rest = series.packs.slice(series.at);
-    setSeries({ ...series, all: true, from: series.at });
+    setSeries({ ...series, all: true });
     setPending(null);
     setPack({
       packId: `all-${rest[0]!.packId}`,
@@ -227,7 +221,8 @@ export function Shop({
         onNext={series && !series.all ? next : undefined}
         onSkipAll={series && !series.all ? skipAll : undefined}
         summaryOnly={series?.all ?? false}
-        summaryPacks={series?.all ? series.packs.slice(series.from ?? 0) : undefined}
+        // ADR-204: the summary counts every pack of the purchase, also those opened by hand before
+        summaryPacks={series?.all ? series.packs : undefined}
         buyState={action.state}
         onFinished={() => setPending(null)}
         oneOfOnes={overview?.oneOfOnes}

@@ -9765,7 +9765,7 @@
       }
     },
     "bonuses": {
-      "tag": "+{bps} {kind}",
+      "tag": "{bps} {kind}",
       "active": "aktiv",
       "inactive": "nicht aktiv: du hast keine Kopie außerhalb des Markts",
       "kinds": {
@@ -9782,7 +9782,7 @@
         "master": "Master-Set"
       },
       "typeCollection": "Typ-Sammlung {type}",
-      "everyKind": "+{bps} auf jeden Bonus",
+      "everyKind": "{bps} auf jeden Bonus",
       "totals": "Deine Karten-Boni",
       "totalsHint": "Jede Bonus-Karte zählt einmal, solange du sie besitzt und nicht im Markt anbietest. Ein Slab ab 9 bringt das 1,5-Fache, ein Black Label das Doppelte. Viele Boni einer Art zählen ab der Hälfte der Grenze nur noch halb.",
       "ofCap": "{value} von max. {cap}",
@@ -9905,8 +9905,7 @@
     "multi": {
       "title": "{count, plural, one {# Pack aufgedeckt} other {Alle # Packs}}",
       "line": "Gezogen {worth} · bezahlt {paid}",
-      "up": "{pct} im Plus",
-      "down": "{pct} im Minus",
+      "return": "{pct} gegenüber dem Preis",
       "worth": "Wert",
       "cards": "Karten",
       "fresh": "Neu",

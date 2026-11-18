@@ -249,7 +249,10 @@ export function PackOverlay({
                 <div className="flex min-h-full flex-col items-center justify-center px-4 py-6">
                   {summaryOnly ? (
                     <div className="flex w-full flex-col items-center gap-3 self-stretch">
-                      <MultiPackSummary packs={summaryPacks && summaryPacks.length > 0 ? summaryPacks : [pack]}>
+                      <MultiPackSummary
+                        packs={summaryPacks && summaryPacks.length > 0 ? summaryPacks : [pack]}
+                        instantItems={pack.cards}
+                      >
                         <Actions>{again}</Actions>
                       </MultiPackSummary>
                     </div>

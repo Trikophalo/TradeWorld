@@ -18,7 +18,7 @@ import { isHit } from "../lib";
 import { summarizePacks } from "../view";
 import { RarityBadge } from "./badges";
 import { CardThumb } from "./card-face";
-import { InstantSell } from "./instant-sell";
+import { InstantSell, type InstantSellItem } from "./instant-sell";
 import "./nexamon.css";
 
 type RarityFilter = "all" | NexamonRarity;
@@ -28,14 +28,23 @@ type RarityFilter = "all" | NexamonRarity;
  * (worth against price, big and green or red), then the best hits, every card in a compact grid by value with a
  * rarity filter, the totals per pack (folded), and the instant sale of ADR-196 for all fresh pulls.
  */
-export function MultiPackSummary({ packs, children }: { packs: readonly NexamonPackResult[]; children?: ReactNode }) {
+export function MultiPackSummary({
+  packs,
+  instantItems,
+  children,
+}: {
+  packs: readonly NexamonPackResult[];
+  /** What the instant sale offers (ADR-196); default every pull. Packs seen one by one before had their own offer. */
+  instantItems?: readonly InstantSellItem[];
+  children?: ReactNode;
+}) {
   const t = useTranslations("nexamon.multi");
   const summary = useMemo(() => summarizePacks(packs), [packs]);
   const [filter, setFilter] = useState<RarityFilter>("all");
   const [perPack, setPerPack] = useState(false);
   const shown = filter === "all" ? summary.sorted : summary.sorted.filter((c) => c.rarity === filter);
   const up = summary.profitCents >= 0;
-  const items = useMemo(() => packs.flatMap((p) => p.cards), [packs]);
+  const items = useMemo(() => instantItems ?? packs.flatMap((p) => p.cards), [instantItems, packs]);
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-4" data-testid="pack-result" data-multi="true">
@@ -65,7 +74,7 @@ export function MultiPackSummary({ packs, children }: { packs: readonly NexamonP
               {formatMoney(summary.profitCents, { sign: true })}
             </p>
             <p className={cn("mt-1 nums text-xs font-medium", up ? "text-gain" : "text-loss")}>
-              {t(up ? "up" : "down", { pct: formatBps(Math.abs(summary.returnBps)) })}
+              {t("return", { pct: formatBps(summary.returnBps) })}
             </p>
           </div>
         </div>

@@ -394,7 +394,8 @@ export function PackOpening({
   );
   const [landed, setLanded] = useState(-1);
   const revealRef = useRef<RareRevealControl | null>(null);
-  const charging = phase === "stack" && (finale[index] ?? 0) > 0 && landed < index;
+  // with reduced motion a finale turns at once: nothing to wait for
+  const charging = !reduced && phase === "stack" && (finale[index] ?? 0) > 0 && landed < index;
 
   useEffect(() => {
     const pending = timers.current;
