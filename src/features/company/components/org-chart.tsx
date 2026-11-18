@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BALANCE } from "@/config/balance";
 import { engine } from "@/features/game/store";
-import type { CareerTier, CompanyOrg, MyJob, OrgPerson } from "@/features/game/types";
+import type { CareerTier, CompanyOrg, MyJob, OrgPerson, OrgTalent } from "@/features/game/types";
 import { SPRING, STAGGER } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useFloorLooks } from "../hooks";
@@ -67,7 +67,7 @@ export function OrgView({ org, title, links = true }: { org: CompanyOrg; title: 
   const reduced = useReducedMotion();
   const levels = orgLevels(org);
   const boss = bossLevelIndex(levels);
-  const total = 1 + org.members.length + org.aiWorkers;
+  const total = 1 + org.members.length + org.talents.length + org.aiWorkers;
 
   return (
     <Card padding="lg" className="space-y-4 overflow-hidden" data-testid="org-chart">
@@ -104,6 +104,30 @@ export function OrgView({ org, title, links = true }: { org: CompanyOrg; title: 
             </ul>
           </motion.li>
         ))}
+        {org.talents.length > 0 && (
+          <motion.li
+            initial={reduced ? false : { opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...SPRING.smooth, delay: reduced ? 0 : levels.length * STAGGER * 2 }}
+            className="flex w-full flex-col items-center"
+            data-level="talents"
+          >
+            <span aria-hidden className="h-4 w-0.5 bg-line-2" />
+            <p className="mb-1.5 label-pixel text-fg-3">{t("talents")}</p>
+            <ul className="flex flex-wrap justify-center gap-2">
+              {org.talents.slice(0, ROW_MAX * 2).map((talent) => (
+                <li key={talent.key}>
+                  <TalentCard talent={talent} />
+                </li>
+              ))}
+              {org.talents.length > ROW_MAX * 2 && (
+                <li className="grid place-items-center rounded-md border border-dashed border-line-2 px-3 text-sm text-fg-3">
+                  {t("more", { count: org.talents.length - ROW_MAX * 2 })}
+                </li>
+              )}
+            </ul>
+          </motion.li>
+        )}
         {org.aiWorkers > 0 && (
           <li className="flex w-full flex-col items-center" data-level="ai">
             <span aria-hidden className="h-4 w-0.5 bg-line-2" />
@@ -186,6 +210,37 @@ function PersonCard({
   );
 }
 
+/** A talent in the org chart (ADR-199): portrait, name, Stelle; Mit-Geschäftsführer marked. */
+function TalentCard({ talent }: { talent: OrgTalent }) {
+  const t = useTranslations("org");
+  const tl = useTranslations("talents");
+  const name = `${talent.firstName} ${talent.lastName}`;
+  return (
+    <div
+      className={cn(
+        "relative flex w-28 flex-col items-center gap-1 rounded-lg border px-2 py-2 text-center",
+        talent.isCoCeo ? "border-gold/60 bg-surface-2" : "border-line-1 bg-surface-1",
+      )}
+      data-testid="org-talent"
+      data-coceo={talent.isCoCeo}
+    >
+      {talent.isCoCeo && (
+        <span className="absolute -top-2 rounded-xs bg-gold px-1.5 font-pixel text-2xs text-on-accent uppercase">
+          {tl("seat.coceo")}
+        </span>
+      )}
+      <Avatar avatarKey={talent.avatarKey} size="xs" />
+      <span className="w-full truncate text-xs font-medium text-fg-1">{name}</span>
+      <span className="w-full truncate text-2xs text-fg-3">
+        {t("talentRole", {
+          role: tl(`roles.${talent.role}` as "roles.sales"),
+          tier: tl(`tiers.${talent.tier}` as "tiers.0"),
+        })}
+      </span>
+    </div>
+  );
+}
+
 /**
  * AI employers have no players to show: a simple chain from the AI board down to the player, with the AI boss one
  * rank above (ADR-104).
@@ -213,6 +268,7 @@ export function AiOrgChart({ job, nickname, avatarKey }: { job: MyJob; nickname:
         : []),
       { nickname, tag: null, avatarKey, tier: job.tier, title: null, since: job.startedAt, isMe: true },
     ],
+    talents: [],
     aiWorkers: 6,
     aiWorkerSkills: [],
   };

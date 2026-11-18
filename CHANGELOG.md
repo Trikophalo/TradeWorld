@@ -6,6 +6,8 @@ Erste, navigierbare Fassung ohne Spiellogik.
 
 - Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der
   Firmenkasse neu, höchstens einmal am Tag. Das neue Logo erscheint sofort überall und in den Neuigkeiten.
+- Weltkarte: Ab 10 Mio. € Firmenwert setzt du deine Firma im neuen Tab „Standort“ in eines von 22 Ländern, baust die
+  Zentrale bis zum Mega-Campus aus, gründest Tochterfirmen und wirst als größte Firma im Land Marktführer.
 - Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines
   Packs bleibt gleich.
 - Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.
@@ -117,6 +119,14 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Münze am Guthaben hüpft bei jeder Änderung.
 
 ## Startseite, Währung zur Wahl, Freundescode
+
+- **Mehr Nervenkitzel bei Packs und ASP (ADR-204):** Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti, Banner und hochzählendem Wert um; One of Ones und Uranium am größten. Auch das ASP-Paket baut mehr Spannung auf: Der Slab kommt verdeckt, ein Scanner läuft über die Note, eine 10 explodiert in Gold, ein Black Label verdunkelt den ganzen Bildschirm. Zehn Packs auf einmal zeigen oben groß Gewinn oder Verlust, darunter die besten Treffer und alle Karten kompakt nach Wert mit Filter. Der Tab „Boni“ ist neu geordnet: Ringe je Bonus-Art, „Als Nächstes“ und aufklappbare Sets.
+
+- **Schneller aufsteigen, abwechslungsreichere Missionen (ADR-202):** Jedes Level ab Level 2 braucht 20 % weniger XP, Missionen bringen mit dem Level mehr XP: Ein aktiver Spieler steigt etwa 1,3- bis 1,4-mal so schnell auf, niemand verliert ein Level. 52 neue Missionen für Krypto, Short-Positionen, Merkliste, Nexamon (Packs, ASP, Sofortverkauf, Markt, Pack Battles), NFTs, News-Aktionen, Werbekampagnen, Firmen-Fertigkeiten, Verbesserungen, Arbeitsaufgaben, Tagesbelohnung und Feed. Dieselbe Mission kommt nicht ständig wieder, neu freigeschaltete Bereiche kommen öfter dran, und jede Mission ist machbar: Wird eine unmöglich (zum Beispiel ohne Firma), ersetzt sie sich selbst. Einmal am Tag kannst du eine einzelne Mission kostenlos tauschen.
+
+- **Der Tresor wächst mit dir (ADR-201):** Das Grundeinkommen im Tresor steigt mit jedem Level um 8 % (bis Level 40, dann das 4,12-Fache), ab Level 5 gibt es Festgeld: Geld für 1, 3 oder 7 Tage anlegen, bis 25.000 € je Level, mit 1,5 %, 5 % oder 14 % Zinsen aus der Staatskasse. Der geöffnete Tresor zeigt Schritt für Schritt, was er bringt und womit er mehr bringt. Die Gruppen der Verbesserungen lassen sich auf- und zuklappen und zeigen zugeklappt, wie viel gekauft ist und was die nächste Stufe kostet.
+
+- **Talente und 15 Stellen (ADR-199):** Deine Firma hat jetzt 15 Stellen von Vertrieb bis Betriebsarzt. Im Talentmarkt warten 660 Fachleute mit Namen, Persönlichkeit und Forderungen: Erfüllst du Lohn, Benefits, Ruf und Co., fangen sie an und heben Umsatz und Aktie deutlich, solange sie zufrieden sind. Talente anderer Spieler kannst du abwerben (der Chef hat 15 Minuten zum Nachbessern), gute Talente machst du zur Mit-Geschäftsführung, die selbst entscheidet. Im Organigramm stehen Talente über den KI-Kräften.
 
 - **Pack Battles mit Modi (ADR-205):** Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder „Umgekehrt“ (wer am wenigsten zieht, gewinnt alle Karten). Lobby, Einladung, Live-Ansicht und Feed zeigen den Modus. Die letzten zwei Karten jedes Packs leuchten, blitzen und wackeln je nach Seltenheit, mit Wertzähler.
 

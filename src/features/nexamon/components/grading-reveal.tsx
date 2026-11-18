@@ -13,7 +13,7 @@ import {
   SLAB_LABEL,
   SLAB_SIZE,
 } from "@/components/pixel/nexamon-pack";
-import { burstConfetti } from "@/components/ui/effects";
+import { burstConfetti, pixelSparks } from "@/components/ui/effects";
 import { formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
@@ -34,6 +34,7 @@ import { formatChance, formatFactor } from "../view";
 import { PackFoil, PackSheen } from "./pack";
 import { GradeChip } from "./parts";
 import { PixelCanvas } from "./pixel-canvas";
+import { ScreenFlash, useRollUp } from "./rare-reveal";
 import { NexamonSlab } from "./slab";
 import "./nexamon.css";
 
@@ -55,7 +56,16 @@ const TEAR_MS = 560;
 /** The slab rises while the drum rolls. */
 const RISE_MS = 1_500;
 /** The breath between the last number and the uncovered label; the Black Label holds it longest. */
-const HOLD_MS: Record<GradeTier, number> = { low: 450, good: 650, ten: 900, black: 1_700 };
+const HOLD_MS: Record<GradeTier, number> = { low: 450, good: 700, ten: 1_400, black: 2_800 };
+/** ADR-204: how long the value rolls up from the raw card to the slab once the label is off. */
+const ROLL_MS: Record<GradeTier, number> = { low: 0, good: 700, ten: 1_300, black: 2_000 };
+/** ADR-204: confetti of the result, in the colours of the label (palette data). */
+const RESULT_COLORS: Record<GradeTier, readonly string[]> = {
+  low: ["var(--fg-2)"],
+  good: ["rgb(255 240 170)", "rgb(255 190 60)", "var(--accent)", "rgb(255 255 255)"],
+  ten: ["rgb(255 214 94)", "rgb(255 170 30)", "var(--gold)", "rgb(255 255 255)"],
+  black: ["var(--black-label)", "var(--gold)", "var(--on-black-label)", "rgb(255 255 255)", "var(--black-label-edge)"],
+};
 
 /** The sealed ASP package as a still picture: for lists of slabs that wait to be opened. */
 export const GradingPack = memo(function GradingPack({
@@ -133,6 +143,9 @@ export function GradeReveal({
   const top = gradeNumber(grade);
   const [phase, setPhase] = useState<GradeRevealPhase>("sealed");
   const [count, setCount] = useState(0);
+  /** ADR-204: the count reached the top and the label holds its breath (the longest for the Black Label). */
+  const [holding, setHolding] = useState(false);
+  const [flash, setFlash] = useState(0);
   const timers = useRef<number[]>([]);
   const stage = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -168,13 +181,29 @@ export function GradeReveal({
     done.current = true;
     clear();
     setCount(top);
+    setHolding(false);
     setPhase("result");
     stopSound("gradeDrum");
+    stopSound("revealCharge", 80);
     if (sound) void playSound(RESULT_SOUND[tier]);
-    haptic(tier === "low" ? "tap" : "success");
-    if (stage.current && (tier === "ten" || tier === "black")) {
-      burstConfetti(stage.current, tier === "black" ? 48 : 32);
-      if (tier === "black") later(700, () => stage.current && burstConfetti(stage.current, 40));
+    haptic(tier === "low" ? "tap" : tier === "good" ? "success" : "jackpot");
+    const el = stage.current;
+    const colors = RESULT_COLORS[tier];
+    if (el && tier === "good") {
+      const box = el.getBoundingClientRect();
+      pixelSparks({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, colors[0], 12);
+      burstConfetti(el, 14, colors, 0.8);
+    }
+    if (el && (tier === "ten" || tier === "black")) {
+      // ADR-204: a flash over the screen, confetti in waves (a storm for the Black Label)
+      setFlash((n) => n + 1);
+      burstConfetti(el, tier === "black" ? 64 : 40, colors, tier === "black" ? 1.8 : 1.4);
+      later(260, () => stage.current && burstConfetti(stage.current, tier === "black" ? 56 : 28, colors, 2.2));
+      if (tier === "black") {
+        later(700, () => stage.current && burstConfetti(stage.current, 72, colors, 2.8));
+        later(1_150, () => setFlash((n) => n + 1));
+        later(1_150, () => haptic("jackpot"));
+      }
     }
     onResult?.();
   }, [clear, later, onResult, sound, tier, top]);
@@ -188,14 +217,27 @@ export function GradeReveal({
   const countFrom = (step: number) => {
     const value = GRADE_STEPS[step - 1];
     if (value === undefined || value > top) {
+      // ADR-204: the label holds its breath; a 10 and the Black Label charge up while the screen darkens
+      setHolding(true);
+      if (tier === "ten" || tier === "black") {
+        if (sound) void playSound("revealCharge", 1, { rate: tier === "black" ? 0.75 : 1.05 });
+        for (let beat = 1; beat * 450 < HOLD_MS[tier]; beat++) later(beat * 450, () => haptic("tap"));
+      }
       later(HOLD_MS[tier], finish);
       return;
     }
     later(gradeStepPauseMs(step), () => {
       setCount(value);
       if (sound) void playSound("gradeTick", 1, { rate: 0.8 + step * 0.075 });
+      if (step >= 7) haptic("tap");
       countFrom(step + 1);
     });
+  };
+
+  /** "Überspringen" is there from the start: before the package is even open it goes straight to the result. */
+  const skipAll = () => {
+    if (phase === "sealed") onOpen?.();
+    finish();
   };
 
   const open = (byHand = false) => {
@@ -262,14 +304,61 @@ export function GradeReveal({
   // How far the light has built up: with the rise, then with every counted step.
   const heat = phase === "rising" ? 0.25 : phase === "counting" ? 0.3 + (count / 10) * 0.7 : phase === "result" ? 1 : 0;
   const l = SLAB_LABEL;
+  const rawValue = valueCents !== undefined ? Math.round((valueCents * rawFactor) / Math.max(1, factor)) : 0;
+  const roll = useRollUp(valueCents ?? 0, {
+    run: phase === "result" && valueCents !== undefined,
+    ms: ROLL_MS[tier],
+    from: Math.min(rawValue, valueCents ?? 0),
+    sound,
+    delayMs: DURATION.slow * 1000,
+  });
+  // the slab kicks with every counted step, harder towards the top
+  const kick = phase === "counting" && !reduced ? Math.max(0.5, (count / 10) ** 2 * 2.5 * u) : 0;
+  const blackout = !reduced && tier === "black" && (holding || phase === "result");
 
   return (
     <div
       data-testid="grade-reveal"
       data-phase={phase}
       data-tier={phase === "result" ? tier : undefined}
+      data-holding={holding}
       className={cn("flex w-full flex-col items-center gap-3", className)}
     >
+      {/* ADR-204: the Black Label takes the light of the whole screen before it lands, then a white light sweeps. */}
+      <AnimatePresence>
+        {blackout && (
+          <motion.div
+            key="blackout"
+            aria-hidden
+            data-testid="grade-blackout"
+            className="pointer-events-none fixed inset-0 overflow-hidden bg-black-label"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: phase === "result" ? [0.92, 0.92, 0] : 0.92 }}
+            exit={{ opacity: 0 }}
+            transition={
+              phase === "result"
+                ? { duration: 2.6, times: [0, 0.55, 1], ease: EASE.inOut }
+                : { duration: HOLD_MS.black / 2000, ease: EASE.in }
+            }
+          >
+            {phase === "result" && (
+              <motion.div
+                className="nexamon-light-sweep absolute inset-y-0 left-0 w-1/2"
+                initial={{ x: "-110%" }}
+                animate={{ x: "220%" }}
+                transition={{ duration: DURATION.slower * 2.2, ease: EASE.inOut, delay: DURATION.fast }}
+              />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <ScreenFlash
+        flashKey={flash}
+        glow={tier === "black" ? "nexamon-glow-black" : "nexamon-glow-legendary"}
+        strength={tier === "black" ? 0.95 : 0.8}
+        seconds={DURATION.slower * (tier === "black" ? 3 : 2.2)}
+        testId="grade-flash"
+      />
       <div
         ref={stage}
         className="relative flex w-full items-center justify-center overflow-hidden"
@@ -403,7 +492,13 @@ export function GradeReveal({
             }
           >
             {/* Hidden from assistive technology until the label is uncovered: the slab knows its grade. */}
-            <div aria-hidden={covered}>
+            {/* ADR-204: face down while it rises, it turns for the count and kicks with every step. */}
+            <motion.div
+              aria-hidden={covered}
+              key={phase === "counting" ? `kick-${count}` : "still"}
+              animate={kick > 0 ? { x: [0, -kick, kick, 0], rotate: [0, -kick / 6, kick / 6, 0] } : { x: 0, rotate: 0 }}
+              transition={{ duration: DURATION.base, ease: EASE.out }}
+            >
               <NexamonSlab
                 card={card}
                 art={art}
@@ -412,8 +507,9 @@ export function GradeReveal({
                 scale={u}
                 tilt={false}
                 flippable={false}
+                side={phase === "rising" && !reduced ? "back" : "front"}
               />
-            </div>
+            </motion.div>
             {/* The cover over the label: it slides off when the grade is on the table. */}
             <motion.div
               aria-hidden
@@ -432,6 +528,17 @@ export function GradeReveal({
               transition={{ duration: reduced ? DURATION.base : DURATION.slower, ease: EASE.in }}
             >
               {t("reveal.cover")}
+              {/* ADR-204: the scanner runs over the label while the grade counts, faster towards the top */}
+              {phase === "counting" && !reduced && (
+                <motion.span
+                  aria-hidden
+                  data-testid="grade-scan"
+                  className="nexamon-scan-line absolute inset-x-0 top-0 h-1/3"
+                  initial={{ y: "-100%" }}
+                  animate={{ y: "300%" }}
+                  transition={{ duration: Math.max(0.35, 1.1 - count * 0.07), ease: "linear", repeat: Infinity }}
+                />
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -440,14 +547,26 @@ export function GradeReveal({
         {phase === "counting" && (
           <div className="pointer-events-none absolute inset-x-0 top-1 flex justify-center" aria-hidden>
             <motion.span
-              key={count}
+              key={holding ? "hold" : count}
               data-testid="grade-count"
               initial={{ scale: 1.5, opacity: 0.4 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={SPRING.bouncy}
+              animate={
+                holding && !reduced && (tier === "ten" || tier === "black")
+                  ? { scale: [1, 1.16, 1, 1.1, 1], opacity: 1 }
+                  : { scale: 1, opacity: 1 }
+              }
+              transition={
+                holding && (tier === "ten" || tier === "black")
+                  ? { duration: 0.9, ease: EASE.inOut, repeat: Infinity }
+                  : SPRING.bouncy
+              }
               className={cn(
                 "rounded-md px-4 py-1 font-pixel nums text-4xl shadow-2",
-                tier === "black" && count >= top ? "bg-black-label text-on-black-label" : "bg-surface-1 text-fg-1",
+                tier === "black" && count >= top
+                  ? "bg-black-label text-on-black-label"
+                  : count >= 9
+                    ? "border-2 border-gold bg-surface-1 text-gold"
+                    : "bg-surface-1 text-fg-1",
               )}
             >
               {count === 0 ? "…" : formatGrade(count)}
@@ -468,10 +587,10 @@ export function GradeReveal({
             <motion.p
               aria-hidden
               data-testid="black-label-stamp"
-              className="pointer-events-none absolute top-2 border-2 border-black-label-edge bg-black-label px-3 py-1 font-pixel text-lg text-on-black-label uppercase shadow-3"
-              initial={{ scale: 3, opacity: 0, rotate: -8 }}
+              className="pointer-events-none absolute top-2 border-2 border-gold bg-black-label px-4 py-1.5 font-pixel text-2xl text-on-black-label uppercase shadow-3 lg:text-3xl"
+              initial={{ scale: 4, opacity: 0, rotate: -12 }}
               animate={{ scale: 1, opacity: 1, rotate: -4 }}
-              transition={SPRING.bouncy}
+              transition={{ ...SPRING.bouncy, delay: DURATION.slow }}
             >
               {t("blackLabel.short")}
             </motion.p>
@@ -500,11 +619,25 @@ export function GradeReveal({
             >
               {t("reveal.openButton")}
             </button>
+            <button
+              type="button"
+              onClick={skipAll}
+              data-testid="grade-skip"
+              className="mt-2 ml-1 h-9 rounded-sm px-3 text-xs font-medium text-fg-2 focus-ring transition-colors duration-fast hover:bg-surface-2 hover:text-fg-1 active:scale-[0.98]"
+            >
+              {t("reveal.skip")}
+            </button>
           </>
         )}
         {(phase === "tearing" || phase === "rising" || phase === "counting") && (
           <>
-            <p className="label-pixel text-fg-2">{phase === "counting" ? t("reveal.counting") : t("reveal.rising")}</p>
+            <p className="label-pixel text-fg-2">
+              {holding
+                ? t(tier === "black" ? "reveal.holdBlack" : tier === "ten" ? "reveal.holdTen" : "reveal.counting")
+                : phase === "counting"
+                  ? t("reveal.counting")
+                  : t("reveal.rising")}
+            </p>
             <button
               type="button"
               onClick={finish}
@@ -529,8 +662,24 @@ export function GradeReveal({
             <p className="font-pixel text-sm text-fg-1 uppercase">{t(`reveal.tier.${tier}`)}</p>
             <GradeChip grade={grade} />
             {valueCents !== undefined && (
-              <p className="nums text-lg font-semibold text-fg-1" data-testid="grade-value">
-                {formatMoney(valueCents)}
+              <p className="flex items-baseline gap-2" data-testid="grade-value-row">
+                <motion.span
+                  className={cn(
+                    "nums text-lg font-semibold",
+                    tier === "ten" || tier === "black" ? "text-gold" : "text-fg-1",
+                  )}
+                  data-testid="grade-value"
+                  data-done={roll.done}
+                  animate={roll.done && !reduced && tier !== "low" ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                  transition={{ duration: DURATION.slow, ease: EASE.out }}
+                >
+                  {formatMoney(roll.value)}
+                </motion.span>
+                {factor > rawFactor && (
+                  <span className="rounded-xs bg-surface-2 px-1.5 py-0.5 nums text-xs font-semibold text-gain">
+                    {t("reveal.valueFactor", { factor: formatFactor(factor) })}
+                  </span>
+                )}
               </p>
             )}
             <p className={cn("nums text-xs", factor > rawFactor ? "text-gain" : "text-loss")}>

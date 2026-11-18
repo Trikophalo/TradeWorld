@@ -3,8 +3,8 @@
  * `vaultCapHours` of income; everything beyond is lost.
  */
 import { BALANCE } from "../../config/balance.ts";
-import type { EconomyConfig } from "../../config/balance.ts";
-import { ZERO } from "./money.ts";
+import type { EconomyConfig, VaultConfig, VaultDepositTerm } from "../../config/balance.ts";
+import { BPS_DENOMINATOR, divRoundHalfEven, ZERO } from "./money.ts";
 
 const MS_PER_HOUR = 3_600_000;
 
@@ -49,4 +49,67 @@ export function salaryAccruedCents(
   const remainingMs = Math.max(0, paidHoursPerDayCap * MS_PER_HOUR - Math.max(0, paidMsToday));
   const paidMs = Math.min(Math.max(0, Math.floor(elapsedMs)), remainingMs);
   return { cents: (salaryCentsPerHour * BigInt(paidMs)) / BigInt(MS_PER_HOUR), paidMs };
+}
+
+// ------------------------------------------------------------------ the vault grows with the player (ADR-201)
+
+/** Level bonus of the vault income in bps: 10 000 + levelBonusBps for every level above 1, up to the max level. */
+export function vaultLevelFactorBps(level: number, cfg: VaultConfig = BALANCE.vault): number {
+  const counted = Math.min(Math.max(1, Math.floor(level)), cfg.levelBonusMaxLevel);
+  return 10_000 + cfg.levelBonusBps * (counted - 1);
+}
+
+/**
+ * Vault income per hour before the treasury factor: the basic income with the upgrades times the level bonus,
+ * rounded half even (as `vault_status` does).
+ */
+export function vaultRateCentsPerHour(
+  incomeCentsPerHour: number,
+  level: number,
+  cfg: VaultConfig = BALANCE.vault,
+): number {
+  const scaled = divRoundHalfEven(
+    BigInt(Math.round(incomeCentsPerHour)) * BigInt(vaultLevelFactorBps(level, cfg)),
+    BPS_DENOMINATOR,
+  );
+  return Number(scaled);
+}
+
+/** All open deposits of a player together hold at most this. */
+export function vaultDepositCapCents(level: number, cfg: VaultConfig = BALANCE.vault): number {
+  return Math.max(0, Math.floor(level)) * cfg.deposits.capCentsPerLevel;
+}
+
+/** The term with this many days, or null if there is none. */
+export function vaultDepositTerm(days: number, cfg: VaultConfig = BALANCE.vault): VaultDepositTerm | null {
+  return cfg.deposits.terms.find((term) => term.days === days) ?? null;
+}
+
+/** Interest of a deposit at maturity: amount × rate × treasury factor, rounded half even once. */
+export function vaultDepositInterestCents(amountCents: bigint, rateBps: number, factorBps = 10_000): bigint {
+  if (amountCents <= ZERO || rateBps <= 0 || factorBps <= 0) return ZERO;
+  return divRoundHalfEven(amountCents * BigInt(rateBps) * BigInt(factorBps), BPS_DENOMINATOR * BPS_DENOMINATOR);
+}
+
+export type VaultDepositCheck = "ok" | "level" | "term" | "too_small" | "cash" | "cap" | "max_open";
+
+/** Why a new deposit is refused, in the order the server checks it. */
+export function vaultDepositCheck(
+  input: {
+    readonly level: number;
+    readonly amountCents: number;
+    readonly days: number;
+    readonly cashCents: number;
+    readonly openCents: number;
+    readonly openCount: number;
+  },
+  cfg: VaultConfig = BALANCE.vault,
+): VaultDepositCheck {
+  if (input.level < cfg.deposits.minLevel) return "level";
+  if (!vaultDepositTerm(input.days, cfg)) return "term";
+  if (input.amountCents < cfg.deposits.minCents) return "too_small";
+  if (input.openCount >= cfg.deposits.maxOpen) return "max_open";
+  if (input.openCents + input.amountCents > vaultDepositCapCents(input.level, cfg)) return "cap";
+  if (input.amountCents > input.cashCents) return "cash";
+  return "ok";
 }

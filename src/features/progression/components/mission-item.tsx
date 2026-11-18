@@ -25,12 +25,27 @@ function progressLabel(mission: Mission): string {
   return `${formatInteger(mission.progress)} / ${formatInteger(mission.target)}`;
 }
 
-/** One mission with progress, XP reward and a claim button once it is done. */
-export function MissionItem({ mission, compact = false }: { mission: Mission; compact?: boolean }) {
+/**
+ * One mission with progress, XP reward and a claim button once it is done. `skippable` (quick, daily, weekly) shows
+ * the daily free skip (ADR-202) while it is available.
+ */
+export function MissionItem({
+  mission,
+  compact = false,
+  skippable = false,
+}: {
+  mission: Mission;
+  compact?: boolean;
+  skippable?: boolean;
+}) {
   const t = useTranslations("missions");
   const errorText = useGameErrorText();
   const claim = useGame((state) => state.claimMission);
+  const skipMission = useGame((state) => state.skipMission);
+  const skipAvailable = useGame((state) => state.missionSkip?.available ?? false);
   const [state, setState] = useState<ButtonState>("idle");
+  const [skipState, setSkipState] = useState<ButtonState>("idle");
+  const canSkip = skippable && !compact && mission.status === "active" && (skipAvailable || skipState !== "idle");
   const anchor = useRef<HTMLDivElement>(null);
   const done = mission.status === "completed";
   const claimed = mission.status === "claimed";
@@ -49,6 +64,20 @@ export function MissionItem({ mission, compact = false }: { mission: Mission; co
     } catch (error) {
       setState("idle");
       toast.error(t("claimFailed"), errorText(error));
+    }
+  };
+
+  const onSkip = async () => {
+    setSkipState("loading");
+    try {
+      await skipMission(mission.id);
+      setSkipState("success");
+      haptic("success");
+      void playSound("success");
+      toast.success(t("skip.doneTitle"), t("skip.doneText"), { silent: true });
+    } catch (error) {
+      setSkipState("idle");
+      toast.error(t("skip.failed"), errorText(error));
     }
   };
 
@@ -93,6 +122,22 @@ export function MissionItem({ mission, compact = false }: { mission: Mission; co
           <div className="mt-1.5 flex items-center gap-2">
             <Progress value={mission.progress / mission.target} label={mission.title} size="sm" className="flex-1" />
             <span className="nums text-xs text-fg-3">{progressLabel(mission)}</span>
+            {canSkip && (
+              <Button
+                size="sm"
+                variant="ghost"
+                state={skipState}
+                className="-my-1.5 h-7 px-2"
+                aria-label={t("skip.label", { title: mission.title })}
+                onClick={() => {
+                  void playSound("tap");
+                  void onSkip();
+                }}
+                data-testid="mission-skip"
+              >
+                {t("skip.button")}
+              </Button>
+            )}
           </div>
         )}
       </div>

@@ -20,6 +20,9 @@ import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { NEWS_PROMO_RPC_SCHEMAS, liveNewsPromoEngine } from "./api-news-promos";
 import { TOPLIST_RPC_SCHEMAS, liveToplistEngine } from "./api-toplists";
 import { COMPANY_SKILLS_RPC_SCHEMAS, liveCompanySkillsEngine } from "./api-company-skills";
+import { VAULT_RPC_SCHEMAS, liveVaultEngine } from "./api-vault";
+import { TALENT_RPC_SCHEMAS, liveTalentEngine } from "./api-talents";
+import { liveWorldEngine, WORLD_RPC_SCHEMAS } from "./api-world";
 import { INTERVIEW_RPC_SCHEMAS, liveInterviewEngine } from "./api-interviews";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
@@ -150,6 +153,10 @@ const portfolioSchema = z.object({
     last_claimed_at: iso.nullable(),
     full_at: iso,
     server_time: iso,
+    // ADR-201 (older servers send none of these)
+    income_cents_per_hour: num.optional(),
+    level_factor_bps: num.default(10_000),
+    cap_hours: num.optional(),
   }),
   positions: z.array(
     z.object({
@@ -257,6 +264,9 @@ const missionsSchema = z.object({
   // ADR-166: one swap of the open missions per Berlin day
   reset_available: z.boolean().default(false),
   next_reset_at: iso.nullable().default(null),
+  // ADR-202: one free skip of a single mission per Berlin day
+  skip_available: z.boolean().default(false),
+  next_skip_at: iso.nullable().default(null),
   groups: z.array(
     z.object({
       kind: z.enum(["quick", "daily", "weekly", "milestone"]),
@@ -295,6 +305,7 @@ const mapMissions = (r: z.infer<typeof missionsSchema>): MissionsState => ({
     })),
   })),
   reset: { available: r.reset_available, nextAt: r.next_reset_at },
+  skip: { available: r.skip_available, nextAt: r.next_skip_at },
 });
 
 const checkInSchema = z.object({
@@ -503,6 +514,7 @@ export const RPC_SCHEMAS = {
   delete_account: z.object({ ok: z.literal(true) }),
   get_my_missions: missionsSchema,
   reset_missions: missionsSchema,
+  skip_mission: missionsSchema,
   claim_mission: progressSchema,
   daily_check_in: checkInSchema,
   track_event: z.object({ ok: z.boolean() }),
@@ -511,6 +523,9 @@ export const RPC_SCHEMAS = {
   ...NEWS_PROMO_RPC_SCHEMAS,
   ...TOPLIST_RPC_SCHEMAS,
   ...COMPANY_SKILLS_RPC_SCHEMAS,
+  ...VAULT_RPC_SCHEMAS,
+  ...TALENT_RPC_SCHEMAS,
+  ...WORLD_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
@@ -554,6 +569,9 @@ export const liveEngine: GameEngine = {
   ...liveNewsPromoEngine,
   ...liveToplistEngine,
   ...liveCompanySkillsEngine,
+  ...liveVaultEngine,
+  ...liveTalentEngine,
+  ...liveWorldEngine,
   ...liveInterviewEngine,
   ...liveBattleEngine,
   ...liveNexamonEngine,
@@ -806,6 +824,11 @@ export const liveEngine: GameEngine = {
         lastClaimedAt: p.vault.last_claimed_at,
         fullAt: p.vault.full_at,
         serverTime: p.vault.server_time,
+        incomeCentsPerHour: p.vault.income_cents_per_hour ?? p.vault.rate_cents_per_hour,
+        levelFactorBps: p.vault.level_factor_bps,
+        capHours:
+          p.vault.cap_hours ??
+          (p.vault.rate_cents_per_hour > 0 ? Math.round(p.vault.cap_cents / p.vault.rate_cents_per_hour) : 0),
       },
       positions: p.positions.map((x) => ({
         ticker: x.ticker,
@@ -971,6 +994,10 @@ export const liveEngine: GameEngine = {
 
   async resetMissions(requestId) {
     return mapMissions(await rpc("reset_missions", { p_request_id: requestId }, missionsSchema));
+  },
+
+  async skipMission(requestId, missionId) {
+    return mapMissions(await rpc("skip_mission", { p_request_id: requestId, p_mission_id: missionId }, missionsSchema));
   },
 
   async claimMission(requestId, missionId) {

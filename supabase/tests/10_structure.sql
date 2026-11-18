@@ -159,6 +159,8 @@ select tests.assert(
            'buy_nexamon_packs', 'create_nexamon_pack_battle', 'join_nexamon_pack_battle',
            -- mission reset (ADR-166)
            'reset_missions',
+           -- single mission skip (ADR-202)
+           'skip_mission',
            -- listed companies (ADR-167)
            'get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
            'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
@@ -180,13 +182,21 @@ select tests.assert(
            'get_news_promo', 'file_news_tax_return',
            -- Fertigkeiten of player companies (ADR-194)
            'get_company_skills', 'learn_company_skill',
+           -- Festgeld in the vault (ADR-201)
+           'get_vault_deposits', 'open_vault_deposit', 'close_vault_deposit',
            -- clone, job perks (ADR-206)
            'get_clone', 'create_clone', 'clone_apply_for_job', 'clone_sign_contract', 'clone_quit_job',
            'clone_cancel_quit', 'clone_request_raise', 'clone_request_promotion', 'set_job_posting_perks',
            -- the own net worth in parts (ADR-203)
            'get_my_net_worth',
            -- redraw the company logo (ADR-200)
-           'redraw_company_logo', 'get_logo_redraw']
+           'redraw_company_logo', 'get_logo_redraw',
+           -- Talente and Mit-Geschaeftsfuehrung (ADR-199)
+           'get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
+           'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision',
+           -- Weltkarte (ADR-208)
+           'get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
+           'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

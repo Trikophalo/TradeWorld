@@ -727,6 +727,14 @@ select public.get_upgrades();
 select public.buy_upgrade(gen_random_uuid(), 'vault');
 \o :fixture_dir/get_upgrades_bought.json
 select public.get_upgrades();
+-- ADR-201: Festgeld in the vault (level 5)
+\o :fixture_dir/open_vault_deposit.json
+select public.open_vault_deposit(gen_random_uuid(), 200000, 7);
+\o :fixture_dir/get_vault_deposits.json
+select public.get_vault_deposits();
+\o :fixture_dir/close_vault_deposit.json
+select public.close_vault_deposit(gen_random_uuid(),
+  (select (public.get_vault_deposits() -> 'deposits' -> 0 ->> 'id')::bigint));
 \o
 select x ->> 'id' as fx_ipost from jsonb_array_elements(public.get_job_board() -> 'postings') x
  where x ->> 'tier' = 'intern' and (x ->> 'eligible')::boolean and (x -> 'company' ->> 'is_ai')::boolean
@@ -815,6 +823,10 @@ reset role;
 select tests.login_as('authenticated', :fx_da);
 select public.found_company(gen_random_uuid(), 'Fixture Lieferwerk', 'Teile auf Abruf', 'tech', '#3355aa', 'garage') is not null as ok \gset
 select company_id as fx_dco from public.player_companies where founder_id = :fx_da and status = 'active' \gset
+-- pin the hidden niche (a Pareto draw): the flyer price follows its demand, a heavy-tail draw made it unaffordable
+reset role;
+update public.player_companies set potential_annual_cents = 3000000 where company_id = :'fx_dco';
+select tests.login_as('authenticated', :fx_da);
 \o :fixture_dir/start_campaign.json
 select public.start_campaign(gen_random_uuid(), :'fx_dco', 'flyer');
 \o :fixture_dir/get_my_company_campaign.json
@@ -1572,6 +1584,16 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.reset_missions(gen_random_uuid());
 \o
 reset role;
+-- ADR-202: and skips one of the new ones
+select m.id as fx_skip from public.player_missions m
+ where m.player_id = :p and m.status = 'active' and m.kind in ('quick', 'daily', 'weekly')
+   and (m.expires_at is null or m.expires_at > public.game_now())
+ order by m.kind = 'quick' desc, m.draw_seq desc limit 1 \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/skip_mission.json
+select public.skip_mission(gen_random_uuid(), :'fx_skip');
+\o
+reset role;
 
 -- Company fixes (5300): a small business upgraded to GmbH with closed hours, a 16-colour banner, a running campaign
 -- and a resting business move
@@ -1585,6 +1607,7 @@ select public.upgrade_company(gen_random_uuid()) is not null as ok \gset
 select public.company_deposit(gen_random_uuid(), 30000000) is not null as ok \gset
 reset role;
 select company_id as fx_uco from public.player_companies where founder_id = :fx_u \gset
+update public.player_companies set potential_annual_cents = 3000000 where company_id = :'fx_uco';  -- pinned niche (see M4j)
 update public.player_companies set last_hour_at = date_trunc('hour', public.game_now()) - interval '3 hours' where company_id = :'fx_uco';
 select public.player_companies_run_due() is not null as ok \gset
 select tests.login_as('authenticated', :fx_u) is null as ok \gset
@@ -1704,6 +1727,39 @@ select public.learn_company_skill(gen_random_uuid(), 'data_analysis');
 \o
 reset role;
 
+-- Weltkarte (ADR-208) ------------------------------------------------------------------------------------------------
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_world_unplaced.json
+select public.get_world();
+\o
+reset role;
+select tests.set_company_cash(:'fx_npco', 20000000000);
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/world_place_hq.json
+select public.world_place_hq(gen_random_uuid(), 'de');
+\o :fixture_dir/world_upgrade_hq.json
+select public.world_upgrade_hq(gen_random_uuid());
+\o :fixture_dir/world_open_subsidiary.json
+select public.world_open_subsidiary(gen_random_uuid(), 'vn');
+\o :fixture_dir/world_image_campaign.json
+select public.world_image_campaign(gen_random_uuid(), 'vn');
+\o :fixture_dir/world_save_hq_style.json
+select public.world_save_hq_style(gen_random_uuid(), '{"wall": 2, "roof": 4, "sign": 1, "roofKind": "antenna", "deco": "trees", "flag": true}');
+\o :fixture_dir/world_set_location_fee.json
+select public.world_set_location_fee(gen_random_uuid(), 100);
+\o
+reset role;
+update public.company_locations set placed_at = public.game_now() - interval '8 days' where company_id = :'fx_npco';
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/world_relocate_hq.json
+select public.world_relocate_hq(gen_random_uuid(), 'fr');
+\o :fixture_dir/world_close_subsidiary.json
+select public.world_close_subsidiary(gen_random_uuid(), 'vn');
+\o :fixture_dir/get_world.json
+select public.get_world();
+\o
+reset role;
+
 -- Clone and job perks (ADR-206) --------------------------------------------------------------------------------------
 \set fx_cl '''f1f1f1f1-0000-4000-8000-0000000002a1'''
 update public.invite_codes set max_uses = max_uses + 1 where code = 'M1-TESTS';
@@ -1758,3 +1814,46 @@ select public.redraw_company_logo(gen_random_uuid(), :'fx_lrco', '{"palette": ["
 select public.get_logo_redraw(:'fx_lrco');
 \o
 reset role;
+
+-- Talente (ADR-199) --------------------------------------------------------------------------------------------------
+select public.talents_ensure() >= 0 as ok \gset
+update public.game_config set value = jsonb_set(value, '{market,shareBps}', '10000') where key = 'talents';
+select company_id as fx_tco from public.player_companies where founder_id = :fx_g and status = 'active' limit 1 \gset
+select company_id as fx_tother from public.player_companies where founder_id <> :fx_g and status = 'active' limit 1 \gset
+select tests.set_company_cash(:'fx_tco', 50000000);
+select talent_key as fx_tj, wage_demand_cents as fx_tj_wage, benefit_demands as fx_tj_ben
+  from public.talents where role_key = 'sales' and tier = 0 and company_id is null and resting_until is null order by talent_key limit 1 \gset
+select talent_key as fx_tc, wage_demand_cents as fx_tc_wage from public.talents
+ where role_key = 'strategy' and tier = 2 and company_id is null order by talent_key limit 1 \gset
+select talent_key as fx_tp, wage_demand_cents as fx_tp_wage from public.talents
+ where role_key = 'it' and tier = 0 and company_id is null order by talent_key limit 1 \gset
+select public.talent_hire_into(:'fx_tc', :'fx_tco', :fx_tc_wage::bigint, (select benefit_demands from public.talents where talent_key = :'fx_tc'), public.game_now());
+select public.talent_hire_into(:'fx_tp', :'fx_tco', :fx_tp_wage::bigint, (select benefit_demands from public.talents where talent_key = :'fx_tp'), public.game_now());
+insert into public.talent_offers (talent_key, from_company, to_company, wage_cents, benefits, cost_cents, expires_at)
+values (:'fx_tp', :'fx_tother', :'fx_tco', :fx_tp_wage::bigint + 1000, (select benefit_demands from public.talents where talent_key = :'fx_tp'),
+        :fx_tp_wage::bigint + 1000, public.game_now() + interval '10 minutes') returning id as fx_toffer \gset
+insert into public.talent_events (company_id, talent_key, kind, payload, reversible)
+values (:'fx_tco', :'fx_tc', 'decision', '{"action":"autopilot_on","name":"Fixture","text":"hat den Autopiloten eingeschaltet."}', true)
+returning id as fx_tev \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_talent_market.json
+select public.get_talent_market('sales');
+\o :fixture_dir/talent_offer.json
+select public.talent_offer(gen_random_uuid(), :'fx_tj', :fx_tj_wage, :'fx_tj_ben');
+\o :fixture_dir/talent_coceo_appoint.json
+select public.talent_coceo_appoint(gen_random_uuid(), :'fx_tc', (ceil(:fx_tc_wage::numeric * 1.3 / 100) * 100 + 100)::bigint, 'decide', 100000);
+\o :fixture_dir/talent_coceo_set.json
+select public.talent_coceo_set(gen_random_uuid(), :'fx_tc', 'advise', 50000, false);
+\o :fixture_dir/get_company_talents.json
+select public.get_company_talents();
+\o :fixture_dir/talent_counter.json
+select public.talent_counter(gen_random_uuid(), :'fx_toffer', :fx_tp_wage::bigint + 2000, (select benefit_demands from public.talents where talent_key = :'fx_tp'));
+\o :fixture_dir/talent_undo_decision.json
+select public.talent_undo_decision(gen_random_uuid(), :fx_tev);
+\o :fixture_dir/talent_dismiss.json
+select public.talent_dismiss(gen_random_uuid(), :'fx_tj');
+\o :fixture_dir/get_company_org_talents.json
+select public.get_company_org(:'fx_tco');
+\o
+reset role;
+update public.game_config set value = jsonb_set(value, '{market,shareBps}', '6500') where key = 'talents';

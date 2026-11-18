@@ -47,6 +47,8 @@ und einzelne Testläufe der Simulation, nicht das Zusammenspiel mit echten Spiel
 | Wiedereinstieg nach Bankrott | 2 500 €, Status „Pleitegeier“ 3 Tage, Reputation −10 |
 | Grundeinkommen               | 100 € pro Stunde                                     |
 | Tresor                       | fasst 8 Stunden = 800 €                              |
+| Tresor: Level-Bonus          | +8 % Grundeinkommen je Level über 1, bis Level 40    |
+| Festgeld im Tresor           | ab Level 5, 25.000 € je Level, 1,5 / 5 / 14 %        |
 
 ### 1.3 Handel (`trading`)
 
@@ -193,7 +195,8 @@ Gehaltsverhandlung einmal je Woche: Erfolgschance 30 % plus 0,2 Punkte je Erfahr
 
 ### 1.9 Level (`progression`)
 
-`XP für Level n → n+1 = round(100 × n^1.5)`, höchstens Level 50. **Alpha-Bonus: `xpMultiplier` = 2**, alle XP
+`XP für Level n → n+1 = round(xpBase × n^1.5)` ab Level 2, Level 1 → 2 kostet 100 XP; `xpBase` ist 200 (ADR-202,
+vorher 250 nach ADR-055, ursprünglich 100). Levels sind endlos (ADR-039). Messung und Vergleich: Abschnitt 3.2. **Alpha-Bonus: `xpMultiplier` = 2**, alle XP
 zählen doppelt (Entscheidung des Auftraggebers). Die Tabelle zeigt die Grundwerte aus dem Prompt; verdoppelt wird
 genau einmal beim Gutschreiben (`scaledXp()`), die Levelkurve bleibt unverändert.
 
@@ -445,6 +448,48 @@ Daraus die Tage bis zum Level **mit Alpha-Bonus** (in Klammern ohne Bonus):
   **Vorschlag:** Gewinn-XP ebenfalls auf einen Tageswert begrenzen.
 - **Arbeits-XP läuft passiv.** 480 XP am Tag (mit Bonus 960) ohne Zutun sind ein Drittel der XP eines
   Gelegenheitsspielers. Das ist gewollt (Offline-Fortschritt), sollte aber bekannt sein.
+
+### 3.2 Messung ADR-202: Zeit bis zum Level für einen aktiven Spieler
+
+Die Tabellen oben stammen aus der ersten Kurve. Seitdem gelten ADR-055 (`xpBase` 250), ADR-142 (Missions-XP wachsen
+mit dem Level) und viele neue XP-Quellen. Gemessen wird mit `src/lib/sim/level-pace.ts` (Test daneben): Die XP eines
+aktiven Spielers je Tag werden aus der Konfiguration geschätzt und über die Kurve aufsummiert.
+
+Annahmen (`ACTIVE_PLAYER`): 14 Tage Login-Serie, 20 Trades, 100 Grund-XP aus Gewinnen, 8 Arbeitsstunden und
+4 Arbeitsaufgaben (ab dem ersten Job), 6 schnelle Missionen, alle täglichen und wöchentlichen Missionen,
+300 Grund-XP aus Meilensteinen (Missionen jeweils mit Level-Skalierung), 1 NFT am Tag (ab Level 4), ein Battle-Sieg
+alle vier Tage (1 600 Grund-XP), 72 XP aus dem Zuhause (ab Level 8), ein Gewinnquartal am Tag ab 4 Level nach der
+Garagenfirma. Alles mal Alpha-Bonus (×2).
+
+| Abschnitt  | vorher (Tage) | nachher (Tage) | Zeit      | Tempo     |
+| ---------- | ------------- | -------------- | --------- | --------- |
+| 1 → 5      | 0,51          | 0,40           | −21 %     | ×1,27     |
+| 5 → 10     | 2,22          | 1,67           | −25 %     | ×1,33     |
+| 10 → 20    | 8,81          | 6,43           | −27 %     | ×1,37     |
+| 20 → 30    | 14,36         | 10,23          | −29 %     | ×1,40     |
+| 30 → 40    | 19,06         | 13,40          | −30 %     | ×1,42     |
+| **1 → 40** | **45,0**      | **32,1**       | **−29 %** | **×1,40** |
+
+| Level            | 5     | 10     | 20      | 30      | 40      |
+| ---------------- | ----- | ------ | ------- | ------- | ------- |
+| XP gesamt vorher | 4 106 | 27 612 | 167 689 | 472 427 | 980 350 |
+| XP gesamt jetzt  | 3 305 | 22 109 | 134 172 | 377 962 | 784 299 |
+| XP am Tag vorher | 9 242 | 13 125 | 18 602  | 24 079  | 29 556  |
+| XP am Tag jetzt  | 9 680 | 14 111 | 20 683  | 27 256  | 33 755  |
+
+**Änderung:** `xpBase` 250 → 200 (jedes Level ab 2 braucht 20 % weniger XP) und `missionXpScalePerLevel`
+0,15 → 0,18 (Level 10: ×2,62 statt ×2,35, Level 30: ×6,22 statt ×5,35, die Kappe ×8 ab Level 40 statt 48). Zusammen
+steigt ein aktiver Spieler 1,3- bis 1,4-mal so schnell auf, am meisten in den späten Leveln, wo die Klage herkam.
+Die ersten Level bleiben fast gleich, sie waren schon am ersten Tag erreicht. Level 30 bleibt ein Ziel von gut zwei
+Wochen, Level 40 von einem Monat; nicht „zu leicht“ (Test: höchstens ×1,45 je Abschnitt).
+
+**Niemand verliert ein Level:** Die Gesamt-XP jedes Levels fallen nur (Test bis Level 500 und in SQL bis 120), die
+XP eines Spielers reichen also für sein Level oder mehr. Die Migration hebt jedes Profil auf das Level seiner XP
+(mit Skillpunkten und Freischaltungen) und senkt nie; `grant_xp` nimmt ohnehin `greatest(alt, neu)`.
+
+**Freischaltungen:** Sie hängen am Level, nicht an XP. Die Prüfungen nach ADR-115 und ADR-134 (letzte Stufe jeder
+Verbesserung spätestens mit Level 30, `minLevel` der Verbesserungen, `disclosure.ts`) gelten unverändert; sie kommen
+nur rund 30 % früher. Die Reihenfolge der Bereiche bleibt.
 
 ---
 
@@ -1611,6 +1656,35 @@ Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazitä
 −10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
 von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
 
+## Nachtrag: Der Tresor wächst mit dem Spieler, Festgeld (ADR-201)
+
+Werte in `BALANCE.vault`, Formeln in `src/lib/sim/vault.ts`.
+
+- **Level-Bonus:** Tresor-Rate = Grundeinkommen mit Verbesserungen × (1 + 8 % × (min(Level, 40) − 1)), einmal „half
+  even“ gerundet, danach der Staatskassen-Faktor. Level 5 ×1,32, Level 15 ×2,12, Level 30 ×3,32, Level 40 ×4,12.
+- **Festgeld:** 1 Tag 1,5 %, 3 Tage 5 %, 7 Tage 14 % (2 % am Tag), höchstens 25.000 € × Level in allen offenen Anlagen,
+  höchstens drei, ab 1.000 €. Zinsen = Betrag × Satz × Staatskassen-Faktor, „half even“, aus der Staatskasse. Vorzeitig
+  ohne Zinsen. Zum Vergleich: Depot im Erwartungswert etwa 7 % am Tag, mit Risiko.
+
+Tresor je Tag, vorher und nachher (alle Verbesserungen, die das Level erlaubt; zwei Leerungen = 24 Stunden; volle
+Staatskasse; ohne Nexamon-Bonus):
+
+| Level | Grundeinkommen | Tresor | Zinsen | vorher je Tag | nachher je Tag | Festgeld höchstens | Festgeld je Tag (7 Tage) | Tresor gesamt je Tag |
+| ----- | -------------- | ------ | ------ | ------------- | -------------- | ------------------ | ------------------------ | -------------------- |
+| 5     | 200 €/h        | 14 h   | +5 %   | 5.040 €       | 6.653 €        | 125.000 €          | bis 2.500 €              | bis 9.153 €          |
+| 15    | 450 €/h        | 28 h   | +20 %  | 12.960 €      | 27.475 €       | 375.000 €          | bis 7.500 €              | bis 34.975 €         |
+| 30    | 700 €/h        | 36 h   | +20 %  | 20.160 €      | 66.931 €       | 750.000 €          | bis 15.000 €             | bis 81.931 €         |
+
+Ohne Verbesserungen (8 Stunden, 16 Stunden am Tag): Level 5 2.112 €, Level 15 3.392 €, Level 30 5.312 € (vorher immer
+1.600 €).
+
+Einordnung: Auf Level 25 verdient ein Spieler laut Abschnitt 2.2 84.000 bis 182.000 € am Tag (Job 30.000 €). Der voll
+ausgebaute Tresor ist auf Level 30 damit eine der großen Einnahmequellen (etwa ein Drittel), nicht mehr 1 bis 2 %;
+ohne Verbesserungen bleibt er ein Sicherheitsnetz. Für die Staatskasse: vier Spieler auf Level 30 mit allem zusammen
+höchstens rund 330.000 € am Tag (0,13 % des Ziels von 250 Mio. €), der Faktor dämpft, wenn sie sich leert.
+Beobachten: Anteil der Tresor-Auszahlungen an den Quellen je Level, Füllstand der Staatskasse, Anteil des Festgelds am
+Bargeld später Spieler.
+
 ## Nachtrag: Titans Revenge – Diamond rauf, Uranium runter (ADR-207)
 
 `TITAN_REBALANCE_FACTOR` in `src/config/nexamon/titans-draft.ts`, auf die Startpreise nach `TITAN_VALUE_FACTOR` 1,125
@@ -1648,8 +1722,6 @@ Anzeigen bis +3 %, je Stunde zusammen höchstens 25 % des Gewinns); KI-Firmen au
 Leuten, höchstens der halbe Lohn. Aktien-Chance je Stunde Junior 1 %, Senior 3 %, Teamleitung 5 %, C-Level 8 %
 (Anzeigen bis +5 %), Paket 4 Stunden Lohn: Erwartung Senior + 12 % Lohn, C-Level + 32 %.
 
-> > > > > > > worktree-agent-ac7e74a95ed153787
-
 ## Nachtrag: Ranglisten (ADR-203)
 
 | Wert                              | Wert | Wirkung                                                                   |
@@ -1667,3 +1739,49 @@ Nexamon-Marktwert, `property.*`, Tresor).
 | ---------------------------------- | -------- | -------------------------------------------------------------- |
 | `startups.logoRedrawCents`         | 50.000 € | Preis aus der Firmenkasse, geht an die Staatskasse (Geldsenke) |
 | `startups.logoRedrawCooldownHours` | 24 h     | Pause zwischen zwei bezahlten Neuzeichnungen                   |
+
+## Talente (ADR-199)
+
+Werte in `src/config/talents.ts` (`TALENT_RULES`, `TALENT_ROLES`, `TALENT_TRAITS`), zur Laufzeit `game_config.talents`.
+
+| Wert                         | Junior | Profi  | Senior           | Experte | Legende |
+| ---------------------------- | ------ | ------ | ---------------- | ------- | ------- |
+| Lohn je Stunde (vor Stelle)  | 40 €   | 90 €   | 200 €            | 420 €   | 900 €   |
+| Wirkung (× Basis der Stelle) | 100 %  | 180 %  | 300 %            | 450 %   | 650 %   |
+| Anzahl je Stelle             | 14     | 12     | 10               | 6       | 2       |
+| Ruf mindestens               | 0      | 35     | 45               | 55      | 65      |
+| Bekanntheit mindestens       | 0 %    | 3 %    | 10 %             | 25 %    | 45 %    |
+| Rechtsform mindestens        | Garage | Garage | Kleinunternehmen | GmbH    | AG      |
+| Benefits mindestens          | 0      | 1      | 1                | 2       | 3       |
+
+Lohnfaktor der Stelle 80–130 %, Eigenschaften −5 … +25 %, Streuung ±10 %. Benefits (Anteil am Lohn): Homeoffice 2 %,
+Firmenwagen 15 %, Bonus 10 %, Weiterbildung 8 %, Mitspracherecht 0, Büro-Ausstattung 5 %, Fitness 4 %, Gleitzeit 0.
+Deckel: Nachfrage +35 %, Kapazität +35 %, Wareneinsatz −15 %, Fixkosten −25 %, Qualität +0,08, Bekanntheit
++0,006 je Stunde, Ruf +0,3 je Stunde, Moral +600 bps je Stunde. Abwerben: +15 % plus Loyalität, Nachbessern
+15 Minuten. Markt: 65 % der freien Talente je Tag, Pause 12 h, Kassendeckung 12 h. Mit-GF: höchstens 2, ab Senior
+(Führungskraft ab Profi), +30 % Lohn, Budget ≤ 100.000 € je Tag, Ereignis nach 30 Minuten, vorsichtig 50 % des
+Restbudgets.
+
+## Weltkarte und Standorte (ADR-208)
+
+`world` in `src/config/countries.ts`. Freischaltung ab 10 Mio. € Firmenwert.
+
+| Zentrale    | Preis      | Plätze | Nachfrage | einmalig Ruf / Bekanntheit / Zufriedenheit | Prestige |
+| ----------- | ---------- | ------ | --------- | ------------------------------------------ | -------- |
+| Bürogebäude | 1 Mio. €   | +5     | 0 %       | +1 / +1 % / +1                             | 1        |
+| Bürokomplex | 4 Mio. €   | +15    | +1 %      | +2 / +2 % / +2                             | 3        |
+| Campus      | 15 Mio. €  | +40    | +2 %      | +3 / +3 % / +3                             | 7        |
+| Tower       | 60 Mio. €  | +100   | +3 %      | +4 / +4 % / +4                             | 15       |
+| Mega-Campus | 250 Mio. € | +250   | +4 %      | +5 / +5 % / +5                             | 30       |
+
+Umzug 20 % des Investierten, mindestens 0,5 Mio. €, 7 Tage Pause. Tochterfirmen ab 50 Mio. € oder Bürokomplex,
+höchstens 4: Gründung 3 / 4,8 / 7,68 / 12,29 Mio. €, laufend 600 €/h (Start 1 800 €/h, 14 Tage Anlauf), Umsatzanteil
+15 % / 9 % / 5,4 % / 3,2 %, Marktbonus 5 % / 3 % / 1,8 % / 1,1 %. Image-Kampagne 0,5 % des Firmenwerts (mindestens
+200 000 €), +5 %, höchstens +30 %, −1 % am Tag, alle 12 h. Lobby: Gebühr bis 3 % des Stundenumsatzes, Änderung alle
+24 h, Marktführer ab 10 Mio. €, Steuerrabatt 10 %, politische Ereignisse −30 %.
+
+**Länder-Balance.** Punkte je Basispunkt Vorteil: Wareneinsatz 0,5, Arbeit 0,3, Nachfrage 1, Image 0,5, Steuern 0,2
+(gegen 25 %); Abzug je Risikopunkt Politik 4, Zölle 3, Konflikte 6, je Naturgefahr 120. Mittel ≈ 113 Punkte, alle 22
+Länder innerhalb ±312 (Grenze 400): China +307 (Produktion −16 %, Image −24 %), USA +297 (Nachfrage +20 %, Steuern 34 %),
+Deutschland +7 (Arbeit +25 %, Image +25 %), Schweiz −258 (Steuern 15 %, Arbeit +25 %), Irland −253 (Steuern 12,5 %,
+Nachfrage −5 %). Ein Land, das neue Werte bekommt, muss die Prüfung in `src/lib/sim/world.test.ts` bestehen.

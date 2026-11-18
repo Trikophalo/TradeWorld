@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ALARM_CLOCK,
   BEAR,
@@ -35,6 +35,7 @@ import {
 } from "@/components/pixel/art";
 import { PixelIcon, type PixelArt } from "@/components/pixel/pixel-icon";
 import { Card } from "@/components/ui/card";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
@@ -48,7 +49,9 @@ import { haptic } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { upgradeCheck, upgradeCostCents, upgradeStageLevel, upgradeValue } from "@/lib/sim/upgrades";
+import { foldsKey, useStoredFolds } from "@/lib/use-folds";
 import { cn } from "@/lib/utils";
+import { upgradeGroupSummary } from "../groups";
 import { useSetUpgrades, useUpgrades } from "../hooks";
 
 const ICONS: Record<UpgradeKey, PixelArt> = {
@@ -100,6 +103,8 @@ export function UpgradeShop() {
   const t = useTranslations("upgrades");
   const upgrades = useUpgrades();
   const cash = useGame((s) => s.portfolio?.cashCents ?? 0);
+  // The groups take their first open state from level and cash: wait for the portfolio as well.
+  const portfolioLoaded = useGame((s) => s.portfolio !== null);
 
   return (
     <div className="space-y-4">
@@ -110,33 +115,97 @@ export function UpgradeShop() {
         </p>
         <p className="w-full text-xs text-pretty text-fg-3">{t("moneyNote")}</p>
       </Card>
-      {upgrades.isPending ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {BALANCE.upgrades.order.map((key) => (
-            <Skeleton key={key} className="h-56 w-full rounded-xs" />
+      {upgrades.isPending || !portfolioLoaded ? (
+        <div className="space-y-3">
+          {BALANCE.upgrades.groups.map((group) => (
+            <Skeleton key={group.key} className="h-[4.5rem] w-full rounded-lg" />
           ))}
         </div>
       ) : (
-        BALANCE.upgrades.groups.map((group) => {
-          const bought = group.keys.reduce((sum, key) => sum + (upgrades.data?.levels[key] ?? 0), 0);
-          const total = group.keys.reduce((sum, key) => sum + BALANCE.upgrades[key].maxLevel, 0);
-          return (
-            <section key={group.key} className="space-y-3" data-testid={`upgrade-group-${group.key}`}>
-              <div className="flex items-baseline justify-between gap-3 px-1">
-                <h2 className="label-pixel text-fg-2">{t(`groups.${group.key}`)}</h2>
-                <p className="nums text-xs text-fg-3">{t("groupCount", { bought, total })}</p>
-              </div>
-              <ul className="grid gap-4 lg:grid-cols-2">
+        <UpgradeGroups levels={upgrades.data?.levels ?? {}} cash={cash} />
+      )}
+    </div>
+  );
+}
+
+const GROUP_ART = {
+  vault: VAULT_DOOR,
+  work: BRIEFCASE,
+  xp: TROPHIES.gold,
+  company: GEARS,
+  life: PALETTE,
+} as const satisfies Record<(typeof BALANCE.upgrades.groups)[number]["key"], PixelArt>;
+
+/**
+ * The groups fold open and closed (ADR-201): closed, a group says how much is bought and what the next stage costs.
+ * First visit: groups with something buyable now are open. The choice is remembered per player after the hydration.
+ */
+function UpgradeGroups({ levels, cash }: { levels: Partial<Record<UpgradeKey, number>>; cash: number }) {
+  const t = useTranslations("upgrades");
+  const playerLevel = useGame((s) => s.portfolio?.level ?? 1);
+  const nickname = useGame((s) => s.portfolio?.nickname ?? null);
+  const [stored, remember] = useStoredFolds(foldsKey("upgrades", nickname));
+  const summaries = BALANCE.upgrades.groups.map((group) => ({
+    group,
+    summary: upgradeGroupSummary(group.keys, levels, playerLevel, cash),
+  }));
+  // The default is taken once per visit, so buying the last affordable stage does not fold a group away.
+  const [defaults] = useState(() =>
+    Object.fromEntries(summaries.map(({ group, summary }) => [group.key, summary.buyable > 0])),
+  );
+  const [chosen, setChosen] = useState<Record<string, boolean>>({});
+
+  return (
+    <div className="space-y-3">
+      {summaries.map(({ group, summary }) => {
+        const open = chosen[group.key] ?? stored?.[group.key] ?? defaults[group.key] ?? false;
+        const next: ReactNode =
+          summary.nextCostCents !== null
+            ? t("groupNext", { price: formatMoney(summary.nextCostCents, { whole: true }) })
+            : summary.nextLevel !== null
+              ? t("groupNextLevel", { level: summary.nextLevel })
+              : t("groupMaxed");
+        return (
+          <div key={group.key} data-testid={`upgrade-group-${group.key}`} data-open={open}>
+            <CollapsibleSection
+              id={`upgrades-${group.key}`}
+              title={t(`groups.${group.key}`)}
+              summary={
+                <span className="nums">
+                  {t("groupSummary", { bought: summary.bought, total: summary.total })} · {next}
+                </span>
+              }
+              icon={
+                <PixelIcon
+                  {...GROUP_ART[group.key]}
+                  scale={Math.max(1, Math.floor(32 / GROUP_ART[group.key].grid[0]!.length))}
+                />
+              }
+              badge={
+                summary.buyable > 0 ? (
+                  <span className="rounded-pill bg-gain-soft px-2 py-0.5 nums text-2xs font-medium text-gain">
+                    {t("groupBuyable", { count: summary.buyable })}
+                  </span>
+                ) : undefined
+              }
+              open={open}
+              onOpenChange={(next) => {
+                haptic("tap");
+                setChosen((c) => ({ ...c, [group.key]: next }));
+                remember(group.key, next);
+              }}
+            >
+              <ul className="grid gap-4 pt-1 *:min-w-0 lg:grid-cols-2">
                 {group.keys.map((key) => (
                   <li key={key}>
-                    <UpgradeCard upgradeKey={key} level={upgrades.data?.levels[key] ?? 0} />
+                    <UpgradeCard upgradeKey={key} level={levels[key] ?? 0} />
                   </li>
                 ))}
               </ul>
-            </section>
-          );
-        })
-      )}
+            </CollapsibleSection>
+          </div>
+        );
+      })}
     </div>
   );
 }

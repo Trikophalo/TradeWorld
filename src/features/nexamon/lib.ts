@@ -92,6 +92,40 @@ export const rarityRank = (rarity: NexamonRarity): number => NEXAMON_RARITY_RANK
 /** Rare or better: these get the glow and the sound when a pack reveals them. */
 export const isHit = (rarity: NexamonRarity): boolean => rarityRank(rarity) >= rarityRank("rare");
 
+/**
+ * ADR-204: how big the reveal of a card in the last two slots of a pack is. 0 = the normal reveal (common, rare);
+ * 1 ultra/titanium, 2 prisma/diamond, 3 legendary, 4 the chase cards (One of One, uranium). A pull worth at least
+ * `BIG_PULL_FACTOR` times the pack price climbs one step (never above 4, never from 0).
+ */
+export type RevealTier = 0 | 1 | 2 | 3 | 4;
+export const BIG_PULL_FACTOR = 10;
+export function revealTier(rarity: NexamonRarity, valueCents?: number, packPriceCents?: number): RevealTier {
+  const rank = rarityRank(rarity);
+  const base = rank >= 5 ? 4 : rank >= 4 ? 3 : rank >= 3 ? 2 : rank >= 2 ? 1 : 0;
+  if (base === 0) return 0;
+  const big =
+    valueCents !== undefined && packPriceCents !== undefined && packPriceCents > 0
+      ? valueCents >= packPriceCents * BIG_PULL_FACTOR
+      : false;
+  return Math.min(4, base + (big ? 1 : 0)) as RevealTier;
+}
+
+/** Charge-up before the card turns, in ms: the bigger the pull, the longer the wait. */
+export const REVEAL_CHARGE_MS: Record<RevealTier, number> = { 0: 0, 1: 750, 2: 1_100, 3: 1_500, 4: 2_100 };
+/** How long the value rolls up after the card turned, in ms. */
+export const REVEAL_COUNT_MS: Record<RevealTier, number> = { 0: 0, 1: 700, 2: 900, 3: 1_200, 4: 1_600 };
+/** Pixel confetti of the reveal. */
+export const REVEAL_PARTICLES: Record<RevealTier, number> = { 0: 0, 1: 18, 2: 30, 3: 44, 4: 72 };
+
+/** The cards of a pack that get the big reveal: the last two slots, when they hold an ultra or better. */
+export function finaleSlots(
+  rarities: readonly NexamonRarity[],
+  valueAt?: (index: number) => number | undefined,
+  packPriceCents?: number,
+): RevealTier[] {
+  return rarities.map((rarity, i) => (i >= rarities.length - 2 ? revealTier(rarity, valueAt?.(i), packPriceCents) : 0));
+}
+
 /** Foil cards: everything but the commons. */
 export const hasFoil = isHit;
 

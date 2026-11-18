@@ -221,6 +221,8 @@ export function Shop({
         onNext={series && !series.all ? next : undefined}
         onSkipAll={series && !series.all ? skipAll : undefined}
         summaryOnly={series?.all ?? false}
+        // ADR-204: the summary counts every pack of the purchase, also those opened by hand before
+        summaryPacks={series?.all ? series.packs : undefined}
         buyState={action.state}
         onFinished={() => setPending(null)}
         oneOfOnes={overview?.oneOfOnes}

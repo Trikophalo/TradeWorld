@@ -180,8 +180,9 @@ test("a pack is opened and emptied by dragging the cards away", async ({ page })
     await dragTop(page, opening, i % 2 ? 190 : -190, -30);
     await expect(opening).toHaveAttribute("data-index", String(i));
   }
-  // The fourth card is a rare one: it glows; the last one is legendary.
+  // The fourth card is a rare one: it glows; the last one is legendary and gets the big reveal (ADR-204).
   await expect(log).toContainText("5: Aurodrak");
+  await expect(opening.getByTestId("rare-reveal")).toHaveAttribute("data-phase", "revealed", { timeout: 5_000 });
   await expect(opening.getByTestId("pack-glow").last()).toHaveAttribute("data-rarity", "legendary");
   await dragTop(page, opening, 0, -200);
   await expect(opening).toHaveAttribute("data-phase", "summary");
@@ -196,6 +197,8 @@ test("a pack is emptied with the keyboard", async ({ page }) => {
   const keys = ["ArrowRight", "ArrowLeft", "Space", "ArrowUp", "Enter"];
   for (const [i, key] of keys.entries()) {
     await expect(opening.getByTestId("pack-counter")).toHaveText(`Karte ${i + 1} von 5`);
+    // ADR-204: the legendary in the last slot charges up first; a key during the charge only cuts it short
+    await expect(stack).toHaveAttribute("data-charging", "false", { timeout: 5_000 });
     await page.keyboard.press(key);
     if (i < 4) await expect(opening).toHaveAttribute("data-index", String(i + 1));
   }

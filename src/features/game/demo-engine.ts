@@ -12,6 +12,8 @@ import { DEMO_COMPANIES, DEMO_INDEX, type DemoCompany } from "@/lib/demo/market"
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { withholdIncome } from "@/lib/sim/insolvency";
 import { planMarketOrder, type FillPlan } from "@/lib/sim/order-fill";
+import { drawMissions } from "@/lib/sim/mission-draw";
+import { createRng } from "@/lib/sim/rng";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
 import { needsFullTimeFounder } from "@/lib/sim/startup";
 import { popularityScore, viewCounts } from "@/lib/sim/popularity";
@@ -23,6 +25,7 @@ import {
   upgradeEffects,
   xpWithUpgrades,
 } from "@/lib/sim/upgrades";
+import { vaultLevelFactorBps, vaultRateCentsPerHour } from "@/lib/sim/vault";
 import type { UpgradeXpSource } from "@/config/upgrades";
 import {
   levelFromTotalXp,
@@ -39,6 +42,8 @@ import {
   missionXp,
   resetAvailableOn,
   resetStateOn,
+  skipAvailableOn,
+  skippable,
   splitForReset,
   type Metric,
   type MissionResetState,
@@ -60,6 +65,9 @@ import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/fl
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanySkillsEngine, type DemoCompanySkills } from "./demo/company-skills";
+import { createVaultDepositsEngine, initialVaultDeposits, type DemoVaultDepositsState } from "./demo/vault-deposits";
+import { createTalentsEngine, demoOrgTalents, type DemoTalents } from "./demo/talents";
+import { createWorldEngine, type DemoWorldState } from "./demo/world";
 import { createInterviewEngine, type DemoInterviewState } from "./demo/interviews";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
@@ -152,6 +160,11 @@ interface PlayerState {
   companyMoves?: DemoMoveRun[];
   /** Fertigkeiten of the demo company (ADR-194). */
   companySkills?: DemoCompanySkills;
+  /** Festgeld in the vault (ADR-201). */
+  vaultDeposits?: DemoVaultDepositsState;
+  talents?: DemoTalents;
+  /** Weltkarte: headquarters, subsidiaries, image (ADR-208). */
+  world?: DemoWorldState | null;
   companyTasks?: DemoTasksState;
   /** NEXA Nachrichten (ADR-150). */
   newsShow?: DemoNewsShowState;
@@ -200,6 +213,10 @@ interface PlayerState {
   missionSeq: number;
   /** ADR-166: the swaps of the current Berlin day. */
   missionReset?: MissionResetState;
+  /** ADR-202: today's free skip of one mission. */
+  missionSkip?: MissionResetState;
+  /** ADR-202: the latest quick, daily and weekly draws (for the draw without repeats). */
+  missionDraws?: { key: string; kind: MissionKind; atMs: number }[];
   checkInDay: string | null;
   streakDays: number;
   /** Avatar, skills, daily reward, jobs (demo/careers.ts). */
@@ -913,10 +930,16 @@ function demoCandles(ticker: string, interval: CandleInterval, limit: number): C
 
 // ------------------------------------------------------------------ portfolio and wealth
 
-/** Vault size and basic income with the upgrades (ADR-093). */
+/** Vault size and income with the upgrades (ADR-093) and the level bonus (ADR-201). */
 function vaultTerms() {
   const levels = p().upgrades ?? {};
-  return { capHours: upgradeEffects(levels).vaultCapHours, rate: basicIncomeCentsPerHour(levels) };
+  const incomeRate = basicIncomeCentsPerHour(levels);
+  return {
+    capHours: upgradeEffects(levels).vaultCapHours,
+    incomeRate,
+    levelFactorBps: vaultLevelFactorBps(level()),
+    rate: vaultRateCentsPerHour(incomeRate, level()),
+  };
 }
 
 /** Market value (bid) of the open stock and bond positions. */
@@ -966,6 +989,9 @@ function portfolioNow(): Portfolio {
       lastClaimedAt: new Date(pl.vaultClaimedAt).toISOString(),
       fullAt: new Date(pl.vaultClaimedAt + vt.capHours * HOUR).toISOString(),
       serverTime: new Date(now).toISOString(),
+      incomeCentsPerHour: vt.incomeRate,
+      levelFactorBps: vt.levelFactorBps,
+      capHours: vt.capHours,
     },
     positions,
     openOrders: pl.orders.map((order) => ({
@@ -1124,7 +1150,10 @@ function assignMissions(): void {
     milestone: progression.xpSources.milestoneMission.visible,
   };
   const means = { cashCents: pl.cashCents, tradableCents: pl.cashCents + holdingsValue() };
-  const rested = new Set(resetStateOn(pl.missionReset, berlinDay()).keys);
+  const rested = new Set([
+    ...resetStateOn(pl.missionReset, berlinDay()).keys,
+    ...resetStateOn(pl.missionSkip, berlinDay()).keys,
+  ]);
   // Drop expired daily and weekly missions and replaced quick ones.
   pl.missions = pl.missions.filter((mission) => {
     if (mission.kind === "daily" || mission.kind === "weekly") return mission.period === periodOf(mission.kind);
@@ -1141,10 +1170,16 @@ function assignMissions(): void {
       (t) =>
         t.kind === kind && availableFor(t, lvl) && !used.has(t.key) && !rested.has(t.key) && affordableFor(t, means),
     );
-    for (let i = current.length; i < limits[kind] && pool.length > 0; i++) {
-      // Quick missions rotate through the pool; the others take the next ones in order.
-      const pick = kind === "quick" ? pool.splice(pl.missionSeq % pool.length, 1)[0]! : pool.shift()!;
+    // ADR-202: quick, daily and weekly missions avoid repeats (same rules as the server); the story keeps its order
+    const picks =
+      kind === "milestone"
+        ? pool.slice(0, Math.max(0, limits[kind] - current.length))
+        : drawDemoMissions(pool, limits[kind] - current.length, kind);
+    for (const pick of picks) {
       pl.missionSeq += 1;
+      if (kind !== "milestone") {
+        pl.missionDraws = [...(pl.missionDraws ?? []), { key: pick.key, kind, atMs: Date.now() }].slice(-60);
+      }
       pl.missions.push({
         id: `mission-${pl.missionSeq}`,
         key: pick.key,
@@ -1154,11 +1189,37 @@ function assignMissions(): void {
         period: periodOf(kind),
       });
     }
-    // Quick missions whose pool ran dry start over.
-    if (kind === "quick" && pool.length === 0 && current.length < limits.quick) {
-      pl.missions = pl.missions.filter((mission) => mission.kind !== "quick" || mission.status !== "claimed");
-    }
   }
+}
+
+/** The tiered draw of ADR-202 over the demo catalogue (seeded by the mission counter, so it stays deterministic). */
+function drawDemoMissions(pool: readonly MissionTemplate[], count: number, kind: "quick" | "daily" | "weekly") {
+  const pl = p();
+  if (count <= 0) return [];
+  const history = (pl.missionDraws ?? []).filter((d) => d.kind === kind);
+  // a new player starts calmly: the very first missions of a kind follow the catalogue order
+  if (history.length === 0) return pool.slice(0, count);
+  const open = pl.missions.filter((mission) => mission.status === "active" || mission.status === "completed");
+  const rng = createRng(1_000 + pl.missionSeq);
+  return drawMissions(
+    pool.map((t) => ({
+      ...t,
+      weight: 100,
+      feature: t.requires !== undefined,
+      fromLevel: t.requires ? (unlockLevel(t.requires) ?? 1) : 1,
+    })),
+    count,
+    kind,
+    {
+      level: level(),
+      nowMs: Date.now(),
+      history,
+      openKeys: new Set(open.map((mission) => mission.key)),
+      openMetrics: new Set(open.map((mission) => template(mission.key).metric)),
+    },
+    progression.missionDraw,
+    () => rng.next(),
+  );
 }
 
 /** The missions with the state of the daily reset (ADR-166). */
@@ -1166,12 +1227,12 @@ function missionsState(): MissionsState {
   const groups = missionGroups();
   const today = berlinDay();
   const available = resetAvailableOn(p().missionReset, today);
+  const skip = skipAvailableOn(p().missionSkip, today);
+  const tomorrow = new Date(new Date(`${today}T00:00:00`).getTime() + DAY).toISOString();
   return {
     groups,
-    reset: {
-      available,
-      nextAt: available ? null : new Date(new Date(`${today}T00:00:00`).getTime() + DAY).toISOString(),
-    },
+    reset: { available, nextAt: available ? null : tomorrow },
+    skip: { available: skip, nextAt: skip ? null : tomorrow },
   };
 }
 
@@ -1714,6 +1775,23 @@ const companyMoves = createCompanyMovesEngine({
   random: () => Math.random(),
 });
 
+const vaultDeposits = createVaultDepositsEngine({
+  level,
+  cashCents: () => p().cashCents,
+  reserve: (cents) => {
+    p().cashCents -= cents;
+    p().reservedCents += cents;
+  },
+  income: (cents) => income(cents),
+  state: () => p().vaultDeposits ?? initialVaultDeposits(),
+  setState: (next) => {
+    p().vaultDeposits = next;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+});
+
 const companySkills = createCompanySkillsEngine({
   company: () => p().company ?? null,
   addCompanyCash: (cents) => {
@@ -1725,6 +1803,36 @@ const companySkills = createCompanySkillsEngine({
   state: () => p().companySkills ?? {},
   setState: (next) => {
     p().companySkills = next;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+});
+
+const talents = createTalentsEngine({
+  company: () => p().company ?? null,
+  state: () => p().talents ?? {},
+  setState: (next) => {
+    p().talents = next;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+});
+
+const world = createWorldEngine({
+  company: () => p().company ?? null,
+  worthCents: () => company.worth()?.cents ?? 0,
+  listed: () => p().company?.listing?.status === "listed",
+  nickname: () => p().nickname,
+  addCompanyCash: (cents) => {
+    const c = p().company;
+    if (c) c.cashCents += cents;
+    persist();
+  },
+  state: () => (p().company ? (p().world ?? null) : null),
+  setState: (next) => {
+    p().world = next;
     persist();
   },
   idempotent,
@@ -2021,6 +2129,9 @@ export const demoEngine: GameEngine = {
   ...protests,
   ...companyMoves,
   ...companySkills,
+  ...vaultDeposits,
+  ...talents,
+  ...world,
   ...companyTasks,
   ...pitches,
   // AI companies of the demo (ADR-125): facts from the start values, no players work there.
@@ -2109,6 +2220,10 @@ export const demoEngine: GameEngine = {
   ...deals.engine,
   ...crypto.engine,
   ...company.engine,
+  // The org chart shows the hired talents above the AI workers (ADR-199).
+  async companyOrg(companyId) {
+    return { ...(await company.engine.companyOrg(companyId)), talents: demoOrgTalents(p().talents ?? {}) };
+  },
   ...art.engine,
   ...home.engine,
   ...rentals.engine,
@@ -2647,6 +2762,23 @@ export const demoEngine: GameEngine = {
         const state = resetStateOn(pl.missionReset, today);
         pl.missionReset = { day: today, used: state.used + 1, keys: [...state.keys, ...removed.map((x) => x.key)] };
         pl.missions = kept;
+        return missionsState();
+      }),
+    ),
+
+  skipMission: (requestId, missionId) =>
+    delay(() =>
+      idempotent(requestId, () => {
+        const pl = p();
+        const today = berlinDay();
+        missionGroups(); // refresh progress and status
+        const mission = pl.missions.find((x) => x.id === missionId);
+        if (!mission) throw new GameError("mission_not_found");
+        if (!skippable(mission)) throw new GameError("mission_skip_invalid");
+        if (!skipAvailableOn(pl.missionSkip, today)) throw new GameError("mission_skip_used");
+        const state = resetStateOn(pl.missionSkip, today);
+        pl.missionSkip = { day: today, used: state.used + 1, keys: [...state.keys, mission.key] };
+        pl.missions = pl.missions.filter((x) => x !== mission);
         return missionsState();
       }),
     ),

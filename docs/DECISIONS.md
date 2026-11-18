@@ -4437,6 +4437,94 @@ entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awaren
 **Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
 Anzeige-Grenzen der Garage.
 
+## ADR-199: Talente – 15 Stellen, Talentmarkt, Abwerben und Mit-Geschäftsführung — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: „Man soll nun auch echte Leute mit Namen einstellen können statt KI, aber auch vom
+Spiel. Diese haben hohe Ansprüche, bringen aber auch hohen Umsatz. Man braucht jetzt weitere Branchen im Unternehmen …
+15 Stellen und jeweils einen Mitarbeitermarkt … man kann sie von anderen Spieler-Unternehmen abwerben … Wenn was
+nicht passt, kündigen sie.“ Nachtrag: „Die neuen Mitarbeiter stehen in der Hierarchie auch weiter oben als die KI und
+können auch Mit-Geschäftsführer werden und Entscheidungen treffen.“
+
+**Entscheidung.**
+
+- **Talente sind Spielfiguren, keine Spieler.** KI-Kräfte (ADR-180) und Spieler-Mitarbeiter (`player_jobs`) bleiben
+  unverändert. KI-Firmen beschäftigen keine Talente.
+- **15 Stellen, je eine pro Firma, ab der Gründung** (unabhängig von Rechtsform und Ausbau; bessere Talente verlangen
+  aber eine höhere Rechtsform). Unbesetzte Stellen stehen als Lücke im Raster.
+
+  | Stelle        | Wirkung (Junior → Legende, neutrale Persönlichkeit)  |
+  | ------------- | ---------------------------------------------------- |
+  | Vertrieb      | Nachfrage +3 … +19,5 %                               |
+  | Marketing     | Bekanntheit +0,12 … +0,78 Punkte je Stunde           |
+  | Kundenservice | Nachfrage +2 … +13 %                                 |
+  | Strategie     | Nachfrage +2,2 … +14,3 %                             |
+  | Produktion    | Kapazität +3 … +19,5 %                               |
+  | Logistik      | Kapazität +2 … +13 %                                 |
+  | IT            | Kapazität +2,2 … +14,3 %                             |
+  | Betriebsarzt  | Kapazität +1,5 … +9,75 % (weniger Krankheit, Stress) |
+  | Einkauf       | Wareneinsatz −1,2 … −7,8 %                           |
+  | Controlling   | Fixkosten −2,2 … −14,3 %                             |
+  | Buchhaltung   | Fixkosten −1,5 … −9,75 %                             |
+  | Wissenschaft  | Qualität +0,7 … +4,6 Punkte                          |
+  | Qualität      | Qualität +0,5 … +3,3 Punkte                          |
+  | Recht         | Ruf +0,04 … +0,26 je Stunde (weniger Skandale)       |
+  | Personal (HR) | Zufriedenheit aller anderen Talente +0,6 … +3,9 %/h  |
+
+  Deckel der Summe: Nachfrage +35 %, Kapazität +35 %, Wareneinsatz −15 %, Fixkosten −25 %, Qualität +8 Punkte,
+  Bekanntheit +0,6 Punkte/h, Ruf +0,3/h, Zufriedenheit +6 %/h. „Umsatz und Aktie steigen immens“: eine voll besetzte
+  Firma mit Spitzenleuten verdient ein Vielfaches, aber begrenzt; der Kurs folgt über den fairen Wert
+  (`listed_hour_after`), Bekanntheit nur über `company_awareness_add`, Ruf über `company_reputation_bump`.
+
+- **Talentmarkt:** 44 Talente je Stelle (660), deterministisch erzeugt (`src/config/talents.ts`, eigener LCG, kein
+  `Math.random`), eindeutige, erfundene deutsche Namen, Pixel-Porträt aus `avatars.ts`, zwei Eigenschaften aus 13
+  (Ehrgeizig, Loyal, Diva, Teamplayer, Workaholic, Nachteule, Familienmensch, Sportlich, Vorsichtig, Risikofreudig,
+  Führungskraft, Perfektionist, Idealist), Stufe Junior/Profi/Senior/Experte/Legende (14/12/10/6/2 je Stelle). Der Pool
+  geht mit `pnpm db:config` nach `game_config.talents.pool`; `talents_ensure()` legt die Zeilen an. Freie Talente sind
+  an einem Berliner Tag zu 65 % „auf dem Markt“ (Hash aus Schlüssel und Tag), Gekündigte machen 12 Stunden Pause.
+  Angestellte Talente sieht jeder mit Arbeitgeber.
+- **Forderungen:** Lohn je Stunde (Stufe × Stelle × Eigenschaften, ganze Euro), Benefits (Homeoffice, Firmenwagen,
+  Bonus, Weiterbildung, Mitspracherecht, Büro-Ausstattung – braucht Ausbau ≥ 1 –, Fitness, Gleitzeit; je Stufe 0–3
+  plus Wünsche der Eigenschaften), Ruf mindestens, Bekanntheit mindestens, Rechtsform mindestens (Senior
+  Kleinunternehmen, Experte GmbH, Legende AG) und eine freie Kasse für 12 Stunden Lohn und Benefits. Benefits kosten
+  einen Anteil des Lohns (0–15 %).
+- **Einstellen:** `talent_offer` prüft alle Forderungen (`talentOfferChecks`, dieselbe Liste live im Angebot).
+  Erfüllt → sofort angestellt, sonst `demands_not_met`. Eine Stelle hat genau ein Talent (`seat_taken`).
+- **Abwerben** (nur von Spielerfirmen): Das Angebot muss alle Forderungen erfüllen und die Stundenkosten des jetzigen
+  Vertrags um 15 % plus Loyalität der Eigenschaften (Loyal +25 %, Familienmensch +10 %, Diva −10 % …) übertreffen.
+  Dann entsteht ein offener Abwerbeversuch; der Chef bekommt eine Benachrichtigung und kann 15 Minuten nachbessern
+  (`talent_counter`: mindestens so teuer wie das Abwerbeangebot, Zufriedenheit +10 %). Sonst wechselt das Talent,
+  wenn der Abwerber alle Forderungen noch erfüllt und die Stelle frei ist. Je Talent ein Versuch zur Zeit.
+- **Jede volle Stunde seit Einstellung** (`talents_run_due`, Cron jede Minute): Lohn + Benefits über das Ledger
+  (Firmenkasse → Haushalte, Summe 0, offene Rechnungen zuerst); reicht die Kasse nicht, wird nichts gebucht und das
+  Talent wird unzufrieden. Zufriedenheit: +2,5 % wenn alles erfüllt, sonst −25 % (unbezahlt), −8 % (Ruf zu niedrig),
+  −4 % (Bekanntheit), −6 % (Benefits fehlen), mal Empfindlichkeit der Eigenschaften, plus HR. Unter 35 %: Warnung an den
+  Chef; bei 10 % Kündigung, die Wirkung endet sofort.
+- **Hierarchie:** Talente leiten ihre Stelle, KI-Kräfte berichten an sie (Anzeige im Stellenraster und Talentblatt).
+  Im Organigramm (ADR-104, `get_company_org`, für alle Spieler offen) stehen die Talente als eigene Ebene unter den
+  Spieler-Rängen und über den KI-Kräften, Mit-Geschäftsführer zuerst und markiert; gezeigt werden nur Name, Porträt,
+  Stelle und Stufe (kein Lohn, keine Zufriedenheit). Migration `20261204010200_talents_after_clone.sql` kopiert dafür
+  die letzte Fassung aus 0100 (Aufgaben); sie läuft nach Klon und Jobs (ADR-206, 9800/9810), deren neu geschriebene
+  Team- und Jobfunktionen keine Talent-Logik tragen.
+- **Mit-Geschäftsführung:** ab Senior (Führungskraft ab Profi), höchstens 2 je Firma, Lohn ≥ Forderung × 1,3 und
+  Mitspracherecht. Befugnis „Beraten“ (nur Empfehlungen) oder „Entscheiden“ mit Tagesbudget (≤ 100.000 €). Einmal je
+  Stunde: auf ein offenes Ereignis nach 30 Minuten eine Strategie wählen (vorsichtig = höchste Abmilderung,
+  risikofreudig = wenigste Schritte, sonst Abmilderung je Schritt), den bestehenden Autopiloten einschalten (ADR-180;
+  nicht erneut, wenn der Chef das zurückgenommen hat) und die günstigste lernbare Fertigkeit (ADR-194, gleiche Regeln
+  und Buchung) im Restbudget kaufen (vorsichtig: höchstens die Hälfte). Jede Entscheidung steht mit Namen im Verlauf,
+  in den Firmennachrichten und als Benachrichtigung; Strategie und Autopilot kann der Chef rückgängig machen
+  (`talent_undo_decision`), Käufe nicht. Preise, Marketing und Bewerbungen entscheidet die Mit-GF vorerst nicht.
+- **Schnittstelle:** `listed_hour_effect` (vollständige Kopie der Fassung aus 8300) multipliziert
+  `talents_hour_effect` ein; `player_company_close_hour` bleibt unangetastet. Die Mit-GF hängt am Haken
+  `talents_coceo_run` (8900 leer, 8910 befüllt).
+- **Oberfläche:** Mitarbeiter-Tab, Abschnitt „Stellen & Talente“ (Offenlegung `companyTalents`, Stufe 3) mit
+  Umschalter Stellen/Talentmarkt, Talentblatt, Angebotsblatt mit Live-Prüfung, Mit-GF-Einstellungen und Verlauf;
+  Kachel auf dem Dashboard; Mira nennt unzufriedene Talente und leere Stellen.
+
+**Folgen.** Neue Talente nur anhängen (Schlüssel bleiben). Mit vier Spielern konkurrieren alle um dieselben 660
+Talente; die 30 Legenden sind knapp und werden abgeworben. Talentlöhne stehen nicht in `player_company_hours`, sondern
+als eigene Buchung „Talent: Name“; der Gewinn der Stunde zeigt sie nicht. Die Demo kennt Markt, Einstellen und Mit-GF,
+aber keine Löhne, keine Zufriedenheit und kein Abwerben.
+
 ## ADR-195: KI-Sammler kaufen auch teure Karten zum Marktwert — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: „Die KI muss auch teure Karten zu Marktpreis kaufen.“ Angebote um 1,5 Mio. € zum
@@ -4778,6 +4866,127 @@ Mint-Gradings, eine reine 10 also 35 %. Die anderen Zustände bleiben unverände
 Mehr 10er bringen mehr Slabs mit hohem Wert in Umlauf; Marktwert und KI-Käufe für Slabs (`gradePremiumBps`) bleiben
 und sind zu beobachten.
 
+## ADR-202: Flachere Levelkurve, mehr Missions-XP, Missionen ohne Wiederholung und ohne Sackgasse — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Die XP-Kurve ist zu schwer, es dauert viel zu lange, aufzusteigen. Entweder mehr XP aus
+Missionen oder eine flachere Kurve, aber nicht ZU leicht.“ Und: „Mehr Abwechslung bei den Missionen, man bekommt
+sehr oft dieselben. Nie einen Spieler mit einer Mission festsetzen.“ Gemessen (`src/lib/sim/level-pace.ts`,
+docs/BALANCING.md 3.2) brauchte ein aktiver Spieler 45 Tage bis Level 40, davon 19 für 30 → 40. Missionen wurden
+gewichtet zufällig gezogen; nur offene und in den letzten 24 Stunden gezogene schnelle Missionen waren gesperrt,
+tägliche konnten jeden Tag wiederkommen. Unmöglich gewordene Missionen wurden nur bei schnellen Missionen und
+Meilensteinen ohne Fortschritt ersetzt.
+
+**Entscheidung.**
+
+1. **Kurve und Missions-XP:** `progression.xpBase` 250 → 200 (jedes Level ab 2 braucht 20 % weniger XP, Level 1 → 2
+   bleibt 100), `missionXpScalePerLevel` 0,15 → 0,18 (Kappe ×8 unverändert). Ein aktiver Spieler steigt je Abschnitt
+   1,27- (Level 1 → 5) bis 1,42-mal (30 → 40) so schnell auf, insgesamt ×1,40 (45 → 32 Tage bis Level 40). Der Test
+   hält jeden Abschnitt zwischen ×1,25 und ×1,45.
+2. **Niemand verliert ein Level:** Die Gesamt-XP jedes Levels fallen nur. `raise_levels_after_curve_change()` hebt
+   jedes Profil einmal auf das Level seiner XP, mit freien Skillpunkten und Freischaltungen, und senkt nie.
+   Freischaltungen, `minLevel` der Verbesserungen und die Prüfungen aus ADR-115/134 hängen am Level und bleiben;
+   sie kommen nur früher.
+3. **Ziehung ohne Wiederholung** (`progression.missionDraw`, SQL `missions_assign`, TypeScript
+   `src/lib/sim/mission-draw.ts` für die Demo): Eine Vorlage, die unter den letzten 12 (schnell), 9 (täglich) bzw.
+   6 (wöchentlich) Ziehungen ihrer Art ist, kommt nur, wenn sonst nichts machbar ist; danach kommen Vorlagen in der
+   Abkühlzeit (48 Stunden, 4 Tage, 3 Wochen), am liebsten frische. Zählt eine offene Mission schon dieselbe Metrik,
+   rutscht die Vorlage eine halbe Stufe nach hinten. Die Plätze werden so immer gefüllt. Innerhalb einer Stufe
+   gewichtet: Missionen freigeschalteter Bereiche ×1,5, eines in den letzten 5 Leveln freigeschalteten Bereichs
+   zusätzlich ×2,5. Jede Ziehung bekommt `draw_seq` und `drawn_at`.
+4. **Nie unmöglich:** Gezogen wird nur, was `mission_doable` erlaubt (Level, Freischaltung, Voraussetzung, Geld, Lage
+   der Welt). Offene Missionen werden bei jedem Blick geprüft: ohne Fortschritt ersetzt, sobald sie nicht mehr
+   machbar sind; mit Fortschritt, sobald die Voraussetzung fehlt (keine Firma, kein Job). Das gilt jetzt auch für
+   tägliche und wöchentliche Missionen. Meilensteine werden nur ohne Fortschritt ersetzt und dürfen später mit ihrem
+   Fortschritt wiederkommen.
+5. **Einzeltausch:** `skip_mission` tauscht einmal am Berliner Tag (`missionSkipsPerDay`) eine offene schnelle,
+   tägliche oder wöchentliche Mission kostenlos gegen eine andere, zusätzlich zum Neuwürfeln aller (ADR-166).
+   Meilensteine nicht.
+6. **52 neue Missionen** über die Metriken `crypto_trade`, `crypto_buy`, `crypto_distinct`, `crypto_created`,
+   `short_opened`, `watchlist_add`, `nexamon_quick_sold`, `nexamon_grading_sent`, `pack_battle_join`, `news_promo`,
+   `campaign_started`, `company_skill`, `upgrade_bought`, `work_task_done`, `daily_reward`, `feed_react` sowie die
+   bisher ungenutzten `art_painted` (Prägen), `nexamon_bought`, `nexamon_listed`. Gezählt wird über Trigger auf den
+   Tabellen, keine RPC wird umgeschrieben (auch nicht die Verbesserungen und der Tresor, die parallel umgebaut
+   werden). Zählungen, die nicht mit dem Level wachsen sollen (Kampagnen, Fertigkeiten, Verbesserungen, Packs),
+   tragen `params.fixedCount`.
+
+**Folgen.** Bei einem neuen Spieler auf Level 1 sind 27 schnelle Vorlagen machbar; im SQL-Test kommt über 120
+Ziehungen keine innerhalb von 12 Ziehungen wieder, über 12 Tage keine tägliche innerhalb von 3 Tagen. Ein Spieler auf
+Level 16 mit Firma bekommt in 120 Ziehungen über 50 verschiedene Vorlagen. Mehr XP und mehr erledigbare Missionen
+beschleunigen auch die Wirtschaft etwas (Missionen zahlen nur XP). Die Werte der Ziehung stehen in der
+Konfiguration; wird der Katalog kleiner als die Sperrliste, wiederholt sich die älteste Ziehung zuerst.
+
+## ADR-201: Der Tresor wächst mit dem Spieler, Festgeld, aufklappbare Verbesserungen — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: Der Tresor sei „im späteren Spiel nutzlos, die Beträge lächerlich klein“, und die
+Seite „Verbesserungen“ sei zu lang; die Gruppen sollen sich auf- und zuklappen lassen.
+
+**Befund.** Das Grundeinkommen war bisher fest 100 € je Stunde, verbesserbar über `income` (ADR-197, bis 700 €),
+`vault`/`vault_xl` (bis 36 Stunden) und `vault_interest` (+20 %), gedämpft vom Staatskassen-Faktor (ADR-041). Selbst
+voll ausgebaut bringt der Tresor auf Level 30 rund 20.000 € am Tag; ein Spieler auf Level 25 verdient dann aber 84.000
+bis 182.000 € am Tag (BALANCING 2.2), überwiegend aus Lohn und Depot. Ohne Verbesserungen sind es 1.600 bis 2.400 €
+am Tag, also 1 bis 2 %.
+
+**Entscheidung.** Zwei Hebel, die mit dem Fortschritt wachsen, ohne das geschlossene Geldsystem zu verlassen:
+
+1. **Level-Bonus** (`vault.levelBonusBps` 800, `vault.levelBonusMaxLevel` 40): Das Grundeinkommen im Tresor (mit den
+   Verbesserungen) steigt je Level über 1 um 8 %, bis Level 40 (×4,12); danach ändert es sich nicht mehr. Gerundet wird
+   einmal „half even“, der Staatskassen-Faktor kommt danach. `vault_status` rechnet es ein, `claim_vault`, Portfolio,
+   „Tresor voll“ und alle anderen Leser übernehmen es unverändert. Wer ein Level aufsteigt, bekommt die neue Rate
+   für alles, was gerade im Tresor liegt (wie bei der Staatskasse; die Verbesserung `income` dagegen rechnet beim Kauf
+   ab, ADR-093).
+2. **Festgeld im Tresor** (`vault.deposits`), ab Level 5: Bargeld für 1, 3 oder 7 Tage fest anlegen, Zinsen 1,5 %,
+   5 % oder 14 % (also 1,5 %, 1,67 % und 2 % am Tag). Alle offenen Anlagen zusammen höchstens 25.000 € × Level, höchstens
+   drei gleichzeitig, mindestens 1.000 €. Das Geld bleibt dem Spieler: Es liegt auf seinem Konto `player_reserve`
+   (zählt zum Vermögen und zur Geldmenge wie reservierte Orders). Bei Fälligkeit kommt es mit den Zinsen zurück; die
+   Zinsen zahlt die Staatskasse (× Staatskassen-Faktor, so weit sie das Geld hat, `state_pay_partial`; ein offener
+   Zwangskredit behält seinen Anteil ein). Vorzeitig auflösen geht jederzeit, dann ohne Zinsen. Fällige Anlagen holt
+   der Spieler selbst ab, Zinsen laufen danach nicht weiter. Ein Zurücksetzen des Kontos verwirft offene Anlagen (das
+   Geld ist mit `account_wipe` schon an die Staatskasse gegangen).
+
+Die Zinsen liegen bewusst unter dem erwarteten Depotertrag (etwa 7 % am Tag, BALANCING 2.1), sind aber sicher und
+gedeckelt: ein Platz für Geld, das gerade nicht arbeiten soll, kein Ersatz für die Börse. Keine Steuer auf die Zinsen
+(wie beim Grundeinkommen); der Deckel je Level hält sie klein gegen das Vermögen später Spieler.
+
+Nicht gewählt: Zinsen auf den Tresorinhalt (er ist höchstens 36 Stunden Grundeinkommen, Zinsen darauf wären winzig),
+Serien-Bonus für regelmäßiges Leeren (belohnt Pflicht statt Fortschritt), Bänder nach Vermögen (Reiche bekämen mehr
+Staatsgeld).
+
+**Zahlen** (alle Verbesserungen gekauft, die das Level erlaubt; zwei Leerungen am Tag, also 24 Stunden gezählt, wenn
+der Tresor mindestens 12 Stunden fasst; Staatskasse voll; ohne Nexamon-Bonus):
+
+| Level | Grundeinkommen | Tresor | Tresorzinsen | vorher je Stunde / Tag | nachher je Stunde / Tag | Festgeld höchstens | Festgeld je Tag (7 Tage) |
+| ----- | -------------- | ------ | ------------ | ---------------------- | ----------------------- | ------------------ | ------------------------ |
+| 5     | 200 €          | 14 h   | +5 %         | 200 € / 5.040 €        | 264 € / 6.653 €         | 125.000 €          | bis 2.500 €              |
+| 15    | 450 €          | 28 h   | +20 %        | 450 € / 12.960 €       | 954 € / 27.475 €        | 375.000 €          | bis 7.500 €              |
+| 30    | 700 €          | 36 h   | +20 %        | 700 € / 20.160 €       | 2.324 € / 66.931 €      | 750.000 €          | bis 15.000 €             |
+
+Ohne jede Verbesserung (8 Stunden, zwei Leerungen = 16 Stunden): Level 5 1.600 → 2.112 €, Level 15 1.600 → 3.392 €,
+Level 30 1.600 → 5.312 € am Tag.
+
+**Geldsystem.** Bei vier Spielern auf Level 30 mit vollem Ausbau und vollem Festgeld zahlt die Staatskasse höchstens
+rund 330.000 € am Tag, 0,13 % ihres Ziels von 250 Mio. €. Leert sie sich, sinken Grundeinkommen und Festgeld-Zinsen
+mit dem Faktor (bis 0,25), Zinsen werden nur gezahlt, so weit Geld da ist. Das Festgeld selbst schafft kein Geld: Es
+wandert nur zwischen zwei Konten des Spielers.
+
+**Oberfläche.** Der geöffnete Tresor zeigt unter den Einnahmequellen „Das bringt dein Tresor“: Grundeinkommen,
+Level-Bonus, gegebenenfalls Staatskasse, Rate im Tresor, voller Tresor, Tresorzinsen und „am Tag, wenn du rechtzeitig
+leerst“. Darunter „So bringt er mehr“: nächstes Level, die nächste Stufe von Grundeinkommen, Tresor, Panzertresor und
+Tresorzinsen (mit Gewinn je Stunde und Preis oder „ab Level …“, Link auf die Verbesserungen) und Festgeld. Ab Level 5
+(`disclosure.vaultDeposits`) folgt das Festgeld mit Betrag, Laufzeit, Vorschau, laufenden Anlagen, „Abholen“ und
+„Auflösen“ (gedrückt halten). Die Untertitelzeile nennt Rate und vollen Tresor.
+
+Die Seite „Verbesserungen“ zeigt die fünf Gruppen als aufklappbare Abschnitte (`CollapsibleSection`, Radix
+Collapsible, `aria-expanded`): zugeklappt „3/30 gekauft · nächste ab 4.000 €“ (oder „nächste ab Level …“, „alles
+gekauft“) und eine Marke „2 jetzt kaufbar“. Beim ersten Besuch sind die Gruppen offen, in denen jetzt etwas kaufbar
+ist; das bleibt für den Besuch so, auch wenn man die letzte bezahlbare Stufe kauft. Die eigene Wahl merkt sich der
+Browser je Spieler (`nexa-folds:upgrades:<name>`, erst nach der Hydration gelesen).
+
+**Technik.** Migration `20261204009300_vault_level_deposits.sql` (Kopie in `updates/`): `vault_level_factor_bps`,
+`vault_status` neu (neue Felder `income_cents_per_hour`, `level`, `level_factor_bps`, `cap_hours`), Tabelle
+`vault_deposits`, RPCs `get_vault_deposits`, `open_vault_deposit`, `close_vault_deposit`, Trigger auf
+`player_private.account_reset_at`. Formeln in `src/lib/sim/vault.ts` mit Tests, Demo in `demo/vault-deposits.ts`.
+SQL-Test `e0_vault_level_deposits.sql`.
+
 ## ADR-205: Pack-Battle-Modi „Umgekehrt“ und „Twist“ — `Entscheidung (Eigentümer)`
 
 **Kontext.** Der Eigentümer wünscht mehr Optionen im Pack Battle (ADR-192): „Eine Einstellung, bei der der Spieler mit
@@ -4994,3 +5203,104 @@ das Logo nach dem ersten Zeichnen fest (ADR-076); nur ein nach Meldungen ausgebl
 
 **Folgen.** Das Logo bleibt etwas Bleibendes (der Preis ist spürbar, aber für eine laufende Firma erreichbar), ein
 Fehlgriff ist nicht mehr für immer. Das erste Logo bleibt kostenlos.
+
+## ADR-204: Große Momente bei Packs und ASP, Ergebnis vieler Packs, neuer Boni-Tab — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer wünscht vier Dinge an der Sammelkarten-Oberfläche: Der Tab „Boni“ ist eine lange Liste
+und soll übersichtlicher werden, ohne dass etwas verloren geht. Sind die letzten zwei Karten eines selbst geöffneten
+Packs sehr selten, soll das Aufdecken ein echter Dopamin-Moment sein. Das Ergebnis von zehn auf einmal aufgedeckten
+Packs verlangt viel Scrollen, bis man den Gesamtwert sieht. Und das Paket von ASP soll beim Öffnen deutlich mehr
+Spannung aufbauen, vor allem bei einer 10 und dem Black Label. Alles ist reine Oberfläche; der Server bleibt unberührt.
+
+**Entscheidung.**
+
+- **`RareReveal`** (`src/features/nexamon/components/rare-reveal.tsx`) ist ein wiederverwendbarer Baustein (auch für
+  die Ansicht der Pack Battles): Die Karte liegt verdeckt, ihr Glanz in der Farbe der Seltenheit schimmert heraus;
+  sobald `play` wahr wird, bebt sie immer stärker, Glanz und ein neuer 8-Bit-Klang (`revealCharge`, „pnpm sounds“)
+  steigen an, dann dreht sie sich um: Blitz über den ganzen Bildschirm (`ScreenFlash`), Pixel-Konfetti in den Farben
+  der Seltenheit, ein Banner und der Wert, der hochzählt (`useRollUp`), dazu Vibration (`jackpot`). Die Stufe
+  (`revealTier`): Ultra/Titanium 1, Prisma/Diamond 2, Legendary 3, One of One/Uranium 4; eine Karte im Wert von
+  mindestens zehn Packs (`BIG_PULL_FACTOR`) steigt eine Stufe. Aufladen 0,75 s bis 2,1 s. Common und Rare bleiben
+  beim bisherigen Aufdecken. Das sind Darstellungswerte, keine Spielwerte, daher in `lib.ts` statt `balance.ts`.
+- **Pack-Opening:** Nur die letzten zwei Plätze bekommen den großen Moment (`finaleSlots`). Die Karte darüber
+  gleitet langsamer weg; während des Aufladens wirft ein Wischen oder eine Taste die Karte nicht, sondern kürzt das
+  Warten ab. Der Glanz des Stapels und der One-of-One-Moment folgen nach dem Umdrehen.
+- **ASP-Paket:** Der Slab steigt verdeckt auf und dreht sich zum Zählen um; ein Scanner läuft über das verdeckte
+  Etikett, jeder Schritt lässt den Slab zucken (ab 8,5 auch Vibration). Ist die Note erreicht, hält das Etikett den
+  Atem an: bei einer 10 1,4 s mit Herzschlag und Aufladeklang, beim Black Label 2,8 s, während der ganze Bildschirm
+  schwarz wird. Danach: 9/9,5 Funken, 10 goldener Blitz und Konfetti in zwei Wellen, Black Label weißer Lichtstreif,
+  ein Sturm aus schwarz-goldenem Konfetti in drei Wellen, zwei Blitze und der große Stempel. Der Wert zählt vom
+  rohen Kartenwert zum Slab hoch („Wert ×3,2“). „Überspringen“ steht schon vor dem Aufreißen bereit.
+- **Viele Packs („Alle aufdecken“):** `MultiPackSummary` zeigt oben, beim Scrollen festgeheftet, Gewinn oder
+  Verlust groß in Grün oder Rot, Wert, Preis, Karten und Neue; darunter die drei besten Treffer, alle Karten als
+  kompaktes Raster nach Wert (Filter je Seltenheit), den Wert je Pack zum Aufklappen und den Sofortverkauf
+  (ADR-196) für alle Karten. Die Berechnung steckt in `summarizePacks` (`view.ts`, getestet).
+- **Boni:** Ringe für die sieben Bonus-Arten gegen ihre Grenze (Gold, wenn gedeckelt), die Regel zum Aufklappen,
+  „Als Nächstes“ mit den drei Sammlungen, die am nächsten am Ziel sind (samt fehlender Karten), die aktiven
+  Bonus-Karten und auf Wunsch die fehlenden, darunter jedes Set zusammengeklappt (das mit dem meisten Fortschritt
+  offen) mit Set komplett, Master-Set und den Typ-Sammlungen als Kacheln mit Ring.
+- Mit reduzierter Bewegung (System oder Einstellung „Animationen“) entfallen Beben, Blitz, Konfetti und Abdunkeln;
+  Karte und Note stehen sofort da, Banner und Wert ohne Hochzählen. Es bewegen sich nur `transform` und `opacity`.
+
+**Folgen.** Ein großer Treffer kostet in den letzten zwei Plätzen 0,75 bis 2,1 s mehr, ein ASP-Ergebnis bis zu
+rund 1,5 s mehr; beides lässt sich abkürzen. Die Pack-Battle-Ansicht kann `RareReveal` mit `play` und `valueCents`
+einbinden. Die Übertragung großer Züge an Zuschauer (ADR-172) bleibt unverändert.
+
+## ADR-208: Weltkarte – Standort, Zentrale, Tochterfirmen und Länder-Lobby — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer möchte Firmen ab 10 Mio. € Firmenwert auf einer Weltkarte platzieren: ein Land mit
+realistischen Eigenschaften wählen (China billig, aber schwächeres Image; Deutschland teure Arbeit, starkes Image; USA
+große Nachfrage, höhere Steuern …), alle Länder unterm Strich gleich gut. Dazu eine ausbaubare Zentrale (pixelig,
+gestaltbar), später Tochterfirmen in anderen Ländern und ein Marktführer je Land mit Lobby-Bonus und Standortgebühr.
+Alles im neuen Firmen-Tab „Standort“ direkt vor „Buchhaltung“. Parallel entstehen externe Ereignisse und Steuern
+(ADR-209); beide teilen einen Vertrag.
+
+**Entscheidung.**
+
+- **Länder** (`src/config/countries.ts`, `game_config.world.countries`): 22 Länder. Je Land Produktionskosten,
+  Arbeitskosten, Nachfragepotenzial und Image als Basispunkte gegen 10 000, Steuersatz, politisches Risiko,
+  Zollrisiko, Konfliktrisiko (0–100) und Naturgefahren, dazu Kartenposition und Flaggenfarben (Daten).
+- **Balance-Prüfung:** `countryScore` gewichtet jeden Vorteil nach seiner Wirkung auf die Stunde (Wareneinsatz 0,5,
+  Arbeit 0,3, Nachfrage 1, Image 0,5, Steuern 0,2 je Basispunkt; Risiken je Punkt 4/3/6, je Naturgefahr 120). Jedes
+  Land liegt höchstens `balance.tolerance` = 400 Punkte vom Mittel (größte Abweichung heute ≈ 310), und kein Land ist
+  in allen Kosten-, Nachfrage- und Steuerwerten das beste (`world.test.ts`).
+- **Vertrag mit ADR-209** (Migration 10000, Signaturen fest): Tabelle `company_locations` (company_id, country_key,
+  placed_at, hq_tier, hq_style, invested_cents, …), `world_cfg()`, `country_cfg(text) → jsonb`,
+  `company_country(uuid) → text`, `country_market_leader(text) → uuid`, `company_is_market_leader(uuid) → boolean`,
+  dazu in 10010 `world_tax_rate_bps(uuid)` (Mischsatz aus Zentrale und Töchtern, minus Lobby-Rabatt). Steuern und
+  Ereignisse liest ADR-209; diese ADR wendet nur Kosten und Nachfrage an.
+- **Freischaltung:** ab `unlockWorthCents` = 10 Mio. € (`company_worth_cents`, ADR-203). Darunter zeigt der Tab die
+  Karte mit allen Firmen, die Ländereigenschaften und den Fortschritt.
+- **Zentrale:** Bürogebäude 1 Mio. €, dann Bürokomplex 4 Mio., Campus 15 Mio., Tower 60 Mio., Mega-Campus 250 Mio.
+  (Firmenkasse → Staatskasse, Ledger). Jede Stufe bringt Plätze (`company_max_employees`), einen Prestige-Aufschlag auf
+  die Nachfrage (0 bis 4 %) und einmalig Ruf (`company_reputation_bump`), Bekanntheit (nur über
+  `company_awareness_add`) und Zufriedenheit eines Börsenteams; Prestige und Stufe stehen auf dem Firmenprofil. Das
+  Gebäude ist Pixel-Art (`src/components/pixel/hq.ts`, eigene Entwürfe), gestaltbar: Fassade, Dach, Schild (8 Farben),
+  Dachform, Schmuck, Landesfahne; das Schild trägt die Initialen.
+- **Umzug:** 20 % des in die Zentrale gesteckten Geldes, mindestens 0,5 Mio. €, danach 7 Tage Pause; die Stufe bleibt.
+- **Tochterfirmen:** ab 50 Mio. € Firmenwert oder ab Bürokomplex, höchstens 4, nie im Land der Zentrale. Gründung
+  3 Mio. €, jede weitere × 1,6. Laufend 600 € je Stunde, zu Beginn das Dreifache, über 14 Tage fallend. Eine
+  hochgelaufene Tochter macht 15 % des Umsatzes zu den Bedingungen ihres Landes und bringt 5 % Nachfrage aus dem neuen
+  Markt; jede weitere nur 60 % davon (abnehmender Ertrag, harte Grenze).
+- **Image-Kampagne im Land:** 0,5 % des Firmenwerts (mindestens 200 000 €), +5 % Image dort, höchstens +30 %, verblasst
+  um 1 % am Tag, alle 12 Stunden.
+- **Länder-Lobby:** Marktführer ist die aktive Spielerfirma mit dem größten `company_worth_cents` unter allen mit
+  Zentrale im Land (mindestens 10 Mio. €). Sie zahlt 10 % weniger Steuern und spürt politische Ereignisse 30 % schwächer
+  (beides wendet ADR-209 an) und darf eine Standortgebühr bis 3 % des Stundenumsatzes der anderen Spielerfirmen im Land
+  verlangen (Änderung höchstens einmal am Tag, alle werden benachrichtigt). Die Gebühr wird in der Stundenabrechnung nur
+  aus der freien Kasse gezahlt, nie als offene Rechnung (kein Soft-Lock), und verfällt, sobald jemand anderes führt.
+  Ausweg: wachsen oder umziehen. KI-Firmen stehen nur auf der Karte (Land aus ihrer ID), führen nie und kassieren nie.
+- **Stundenabrechnung:** `player_company_close_hour` bleibt unverändert. `listed_hour_effect` (volle Kopie aus 8300)
+  multipliziert `world_hour_effect` in Nachfrage, Wareneinsatz und Fixkosten; `listed_hour_costs` (volle Kopie aus 5400) bucht vorher `world_hour_costs` (Tochterkosten, Gebühr) für jede Spielerfirma. Fehler darin landen in
+  `company_close_warn`, die Stunde läuft weiter. Die Faktoren bleiben zwischen 0,6 und 1,6.
+- **Oberfläche:** Tab „Standort“ vor „Buchhaltung“ (`tabs.ts`, alte Links bleiben gültig, neue Ziele `world-hq`,
+  `world-lobby`, `world-subsidiaries`, `world-map`), Kachel auf dem Dashboard, Offenlegung `companyWorld` ab Level 9.
+  Karte mit Ziehen und Zoomen (Zwei-Finger, Mausrad, Knöpfe; ganzzahlige Stufen), alle Länder zusätzlich als Liste.
+  Mira beantwortet Fragen zu Ländern aus der Konfiguration, ohne Claude.
+
+**Folgen.** Ein Spieler hat mit 22 Ländern echte Wahl ohne Pflichtland; wer früh groß wird, kann in seinem Land
+kassieren, aber höchstens 3 % und nur so lange er führt. Mit 4 Spielern funktioniert alles, auch wenn alle im selben
+Land sitzen. Neue Länder oder Werte ändern nur die Konfiguration; die Balance-Prüfung schlägt Alarm, wenn ein Land
+herausragt. Die Gebühr zählt für den Zahler als Fixkosten der Stunde; für den Marktführer ist sie Geld in der Kasse,
+kein Umsatz. SQL-Test `e6_world.sql`, Unit-Tests `world.test.ts`, `hq.test.ts`, Mira `assistant/world.test.ts`, E2E
+`world-map.spec.ts`.

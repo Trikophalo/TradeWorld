@@ -174,7 +174,10 @@ select public.set_company_strategy(gen_random_uuid(), 'premium', true) is not nu
 reset role;
 select tests.company_of(:d) as dco \gset
 select tests.company_of(:e) as eco \gset
-update public.player_companies set awareness = 0.3, quality = 0.5 where company_id in (:'dco', :'eco');
+-- the same niche for both (the founding draws it from a Pareto tail): word of mouth scales with the served share, and a
+-- heavy-tail draw left one garage sold out (served ~4 %), so the budget garage spread less than the premium one
+update public.player_companies set awareness = 0.3, quality = 0.5, potential_annual_cents = round(1200000 / :mf_garage)
+ where company_id in (:'dco', :'eco');
 -- ADR-188: word of mouth works every hour (wordOfMouthPerHour)
 select tests.set_cfg('startups', '{awareness,wordOfMouthPerHour}', '0.05') is null as ok \gset
 select public.player_company_close_hour(:'dco', :'qs'::timestamptz + interval '7 hours') is not null
@@ -186,7 +189,9 @@ select tests.assert(
   :awd::float8 > :awe::float8 and :awe::float8 > 0.3
   -- ADR-188: word of mouth also includes served share and reputation; the premium hour still spreads
   and (select (awareness_parts ->> 'word_of_mouth')::float8 > 0 from public.player_company_hours h
-        where h.company_id = :'eco' order by h.hour_start desc limit 1),
+        where h.company_id = :'eco' order by h.hour_start desc limit 1)
+  -- same niche, both fully served: the ratio is exactly pricing.awareness budget / premium
+  and abs((:awd::float8 - 0.3) / (:awe::float8 - 0.3) - 1.5 / 0.7) < 1e-6,
   'operating hour: word of mouth x pricing.awareness (budget 1.5, premium 0.7)');
 
 -- =============================================================================

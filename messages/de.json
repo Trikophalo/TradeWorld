@@ -143,7 +143,7 @@
   },
   "vault": {
     "title": "Tresor",
-    "subtitle": "Grundeinkommen {rate} pro Stunde",
+    "subtitle": "{rate} pro Stunde · voll {cap}",
     "full": "Voll",
     "fullHint": "Der Tresor ist voll. Alles darüber verfällt.",
     "fillsIn": "Voll in",
@@ -174,7 +174,76 @@
       "homeTenant": "Zur Miete bei {owner} · Wohnwert {wohnwert}",
       "homeNone": "Mit einem Zuhause oder zur Miete: jede Stunde Geld und XP."
     },
-    "upgrade": "Tresor vergrößern"
+    "upgrade": "Tresor vergrößern",
+    "yield": {
+      "title": "Das bringt dein Tresor",
+      "income": "Grundeinkommen",
+      "incomeDetail": "100 € je Stunde plus Verbesserungen",
+      "level": "Level-Bonus",
+      "levelDetail": "Level {level}: +{percent} je Level über 1",
+      "levelMax": "Level {level}: höchster Bonus erreicht",
+      "treasury": "Staatskasse knapp",
+      "treasuryDetail": "Das Grundeinkommen sinkt, solange die Staatskasse leer ist.",
+      "rate": "Im Tresor",
+      "perHour": "{amount}/Std.",
+      "factor": "× {factor}",
+      "full": "Voller Tresor ({hours} Std.)",
+      "interest": "Tresorzinsen +{percent} bei jedem Leeren",
+      "perDay": "Am Tag, wenn du rechtzeitig leerst",
+      "perDayHint": "24 Stunden Grundeinkommen samt Tresorzinsen. Wer seltener leert, als der Tresor fasst, verschenkt den Rest."
+    },
+    "boost": {
+      "title": "So bringt er mehr",
+      "level": "Nächstes Level",
+      "levelText": "+{percent} Level-Bonus",
+      "income": "Grundeinkommen verbessern",
+      "vault": "Tresor vergrößern",
+      "vaultXl": "Panzertresor",
+      "interest": "Tresorzinsen",
+      "deposits": "Festgeld anlegen",
+      "depositsText": "bis {amount} sicher verzinsen",
+      "depositsLocked": "ab Level {level}",
+      "perHourMore": "+{amount}/Std.",
+      "hoursMore": "+{hours} Std. Platz",
+      "percentMore": "+{percent} je Leerung",
+      "fromLevel": "ab Level {level}",
+      "maxed": "Alles ausgebaut",
+      "maxedText": "Dein Tresor ist voll ausgebaut. Mehr bringen jetzt Level und Festgeld."
+    },
+    "deposits": {
+      "title": "Festgeld im Tresor",
+      "intro": "Leg Geld für 1, 3 oder 7 Tage fest an. Es bleibt dein Geld und zählt zum Vermögen, und am Ende gibt es Zinsen aus der Staatskasse. Vorzeitig auflösen geht, dann ohne Zinsen.",
+      "locked": "Festgeld gibt es ab Level {level}.",
+      "room": "Noch {free} von {cap} frei",
+      "earned": "Bisher verdient: {amount}",
+      "amount": "Betrag in Euro",
+      "amountHint": "Mindestens {min}, höchstens {max}",
+      "term": "Laufzeit",
+      "termOption": "{days, plural, one {# Tag} other {# Tage}} · +{percent}",
+      "preview": "Nach {days, plural, one {# Tag} other {# Tagen}}: {total} (+{interest})",
+      "submit": "Festgeld anlegen",
+      "opened": "Festgeld angelegt",
+      "openedText": "{amount} liegen für {days, plural, one {# Tag} other {# Tage}} im Tresor.",
+      "openFailed": "Festgeld nicht angelegt",
+      "open": "Laufende Anlagen",
+      "emptyTitle": "Noch kein Festgeld",
+      "emptyText": "Geld, das du gerade nicht brauchst, bringt hier sicher Zinsen.",
+      "row": "{days, plural, one {# Tag} other {# Tage}} · +{percent}",
+      "maturesIn": "fällig in {time}",
+      "matured": "fällig",
+      "interest": "+{amount} Zinsen",
+      "collect": "Abholen",
+      "break": "Auflösen",
+      "breakHint": "Vorzeitig: nur der Betrag, keine Zinsen",
+      "collected": "Festgeld abgeholt",
+      "collectedText": "{amount} plus {interest} Zinsen sind auf deinem Konto.",
+      "broken": "Festgeld aufgelöst",
+      "brokenText": "{amount} sind zurück auf deinem Konto, ohne Zinsen.",
+      "closeFailed": "Nicht geklappt",
+      "full": "Alle {max} Anlagen belegt",
+      "max": "Max",
+      "treasuryLow": "Die Staatskasse ist knapp: Zinsen fallen kleiner aus."
+    }
   },
   "portfolio": {
     "title": "Portfolio",
@@ -555,7 +624,7 @@
     "vault": {
       "title": "Grundeinkommen und Tresor",
       "summary": "{rate} pro Stunde, höchstens {hours} Stunden",
-      "text": "Du bekommst {rate} pro Stunde, auch wenn du offline bist. Das Geld sammelt sich im Tresor, der höchstens {hours} Stunden fasst. Was darüber hinausgeht, verfällt.",
+      "text": "Du bekommst {rate} pro Stunde, auch wenn du offline bist. Das Geld sammelt sich im Tresor, der höchstens {hours} Stunden fasst. Was darüber hinausgeht, verfällt. Mit jedem Level wächst das Grundeinkommen im Tresor um {bonus} (bis Level {maxLevel}), ab Level {depositLevel} kannst du dort Geld als Festgeld für Zinsen anlegen.",
       "example": "Nach einer Nacht ist der Tresor voll: Du holst {cap} ab. Wer zweimal am Tag leert, verschenkt trotzdem einen Teil.",
       "where": "Auf der Startseite im Tresor, mit Countdown bis er voll ist."
     },
@@ -764,6 +833,8 @@
     "mission_already_claimed": "Die Belohnung hast du schon abgeholt.",
     "mission_reset_used": "Heute hast du schon neu gewürfelt. Morgen geht es wieder.",
     "mission_reset_nothing": "Gerade ist keine Mission offen, die du tauschen könntest.",
+    "mission_skip_used": "Heute hast du schon eine Mission übersprungen. Morgen geht es wieder.",
+    "mission_skip_invalid": "Diese Mission lässt sich nicht überspringen.",
     "avatar_unknown": "Dieses Profilbild gibt es nicht.",
     "avatar_locked": "Dieses Profilbild schaltest du mit einem höheren Level frei.",
     "daily_reward_claimed": "Die heutige Belohnung hast du schon abgeholt.",
@@ -771,6 +842,14 @@
     "skill_learned": "Diesen Skill kannst du schon.",
     "skill_locked": "Lerne zuerst die Voraussetzung. Skills gehen der Reihe nach.",
     "skill_points_insufficient": "Dafür hast du nicht genug Skillpunkte.",
+    "demands_not_met": "Nicht alle Forderungen sind erfüllt. Schau in die Liste im Angebot.",
+    "offer_too_low": "Das Angebot reicht nicht. Biete mehr Lohn oder Benefits.",
+    "offer_pending": "Für dieses Talent läuft schon ein Abwerbeversuch.",
+    "seat_taken": "Diese Stelle ist schon besetzt. Trenne dich zuerst vom bisherigen Talent.",
+    "not_available": "Dieses Talent ist gerade nicht auf dem Markt.",
+    "already_hired": "Das hast du schon erledigt.",
+    "not_eligible": "Für die Mit-Geschäftsführung braucht es mindestens Senior (Führungskraft: Profi).",
+    "coceo_full": "Mehr Mit-Geschäftsführer sind nicht erlaubt.",
     "job_not_found": "Diese Stelle gibt es nicht mehr.",
     "job_level_too_low": "Für diese Stelle ist dein Level noch zu niedrig.",
     "job_skills_missing": "Dir fehlen noch Skills für diese Stelle.",
@@ -950,11 +1029,22 @@
     "news_promo_inactive": "Diese Aktion läuft gerade nicht (mehr).",
     "news_promo_claimed": "Du hast diese Aktion schon genutzt.",
     "news_promo_no_company": "Für die Steuererklärung brauchst du eine eigene Firma.",
+    "deposit_too_small": "Festgeld beginnt bei 1.000 €.",
+    "deposit_limit": "Mehr Festgeld passt gerade nicht in deinen Tresor: Grenze oder Zahl der Anlagen erreicht.",
+    "deposit_not_found": "Dieses Festgeld gibt es nicht (mehr).",
     "clone_level_too_low": "Einen Klon kannst du ab Level 20 erschaffen.",
     "clone_exists": "Du hast schon einen Klon. Mehr als einen gibt es nicht.",
     "clone_missing": "Du hast noch keinen Klon. Erschaffe ihn im Job-Tab.",
     "clone_own_company": "Dein Klon arbeitet nicht in deiner eigenen Firma. Such ihm eine Stelle bei einer anderen Firma.",
-    "clone_same_company": "Du und dein Klon arbeitet nicht in derselben Firma. Wähle eine andere Firma."
+    "clone_same_company": "Du und dein Klon arbeitet nicht in derselben Firma. Wähle eine andere Firma.",
+    "world_locked": "Die Weltkarte öffnet sich ab 10 Mio. € Firmenwert.",
+    "world_placed": "Deine Firma hat schon eine Zentrale. Du kannst sie umziehen.",
+    "world_not_placed": "Dafür braucht deine Firma erst einen Standort auf der Weltkarte.",
+    "world_max_tier": "Deine Zentrale ist schon auf der höchsten Stufe.",
+    "world_subsidiary_locked": "Tochterfirmen gibt es ab 50 Mio. € Firmenwert oder mit einem Bürokomplex.",
+    "world_subsidiary_cap": "Mehr Tochterfirmen geht nicht. Schließe eine, um ein neues Land zu öffnen.",
+    "world_same_country": "In diesem Land ist deine Firma schon.",
+    "world_not_leader": "Nur der Marktführer eines Landes legt die Standortgebühr fest."
   },
   "locks": {
     "level": "Level {level}",
@@ -1007,7 +1097,16 @@
       "cancel": "Lieber nicht",
       "doneTitle": "Neu gewürfelt",
       "doneText": "Frische Missionen warten auf dich. Morgen kannst du wieder würfeln.",
-      "failed": "Neu würfeln fehlgeschlagen"
+      "failed": "Neu würfeln fehlgeschlagen",
+      "skipHint": "Eine einzelne Mission kannst du außerdem einmal am Tag kostenlos tauschen.",
+      "skipUsed": "Einzeltausch für heute verbraucht. Wieder in"
+    },
+    "skip": {
+      "button": "Tauschen",
+      "label": "{title} gegen eine andere Mission tauschen",
+      "doneTitle": "Mission getauscht",
+      "doneText": "Eine neue Mission wartet auf dich.",
+      "failed": "Tauschen fehlgeschlagen"
     },
     "goTo": "{title} – dorthin gehen"
   },
@@ -4023,7 +4122,6 @@
     "failed": "Nicht gekauft",
     "cashLabel": "Dein Geld",
     "moneyNote": "Das Geld geht an die Staatskasse, aus der alle ihr Grundeinkommen bekommen.",
-    "groupCount": "{bought} von {total} Stufen",
     "groups": {
       "vault": "Tresor und Einkommen",
       "work": "Job und Karriere",
@@ -4039,7 +4137,7 @@
       },
       "income": {
         "name": "Grundeinkommen",
-        "text": "Ein bisschen mehr Grundeinkommen jede Stunde. Klein, aber es läuft immer.",
+        "text": "Mehr Grundeinkommen jede Stunde: +50 % je Stufe. Es läuft immer, auch offline.",
         "value": "{amount} pro Stunde"
       },
       "study": {
@@ -4192,7 +4290,12 @@
         "text": "Du weißt, wie man Leute bewegt: Deine Kampagnen gegen Firmen wirken öfter.",
         "value": "+{percent} Wirkung"
       }
-    }
+    },
+    "groupSummary": "{bought}/{total} gekauft",
+    "groupNext": "nächste ab {price}",
+    "groupNextLevel": "nächste ab Level {level}",
+    "groupMaxed": "alles gekauft",
+    "groupBuyable": "{count} jetzt kaufbar"
   },
   "ladder": {
     "title": "Karriereleiter",
@@ -4793,11 +4896,13 @@
     "yourBoss": "deine Vorgesetzten",
     "more": "+{count} weitere",
     "ai": "KI-Kräfte",
+    "talents": "Talente (leiten ihre Stelle)",
+    "talentRole": "{role} · {tier}",
     "aiCount": "{count} KI-Kräfte",
     "you": "Du",
     "aiBoard": "KI-Vorstand",
     "aiBoss": "KI-Chefin",
-    "hint": "Wer einen Rang höher steht, ist Vorgesetzter. Mit Beförderungen steigst du auf, in größeren Firmen gibt es mehr Ebenen."
+    "hint": "Wer einen Rang höher steht, ist Vorgesetzter. Mit Beförderungen steigst du auf, in größeren Firmen gibt es mehr Ebenen. Talente leiten ihre Stelle und stehen über den KI-Kräften; Mit-Geschäftsführer sind markiert."
   },
   "crypto": {
     "title": "Krypto",
@@ -8362,7 +8467,7 @@
       }
     },
     "open": {
-      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} skills {Zu den Fertigkeiten} other {Hinschauen}}"
+      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} skills {Zu den Fertigkeiten} location {Zum Standort} other {Hinschauen}}"
     },
     "advice": {
       "distress": "Alarm: Die Firma hat {unpaid} offene Rechnungen. Bleiben sie offen, droht die Insolvenz. Zahl Geld ein, bevor die Schonfrist abläuft.",
@@ -8396,7 +8501,9 @@
         "marketing": "Etwa +{gain} Punkte Bekanntheit je Stunde.",
         "expand": "Kostet {cost} aus der Firmenkasse."
       },
-      "companySkills": "Fertigkeit bereit: „{skill}“ kannst du jetzt für {amount} lernen. Sie wirkt nach der Schulung jede Stunde auf den Gewinn."
+      "companySkills": "Fertigkeit bereit: „{skill}“ kannst du jetzt für {amount} lernen. Sie wirkt nach der Schulung jede Stunde auf den Gewinn.",
+      "talentsVacant": "{count, plural, one {Eine Stelle ist} other {# Stellen sind}} noch unbesetzt. Talente bringen spürbar mehr Umsatz – schau in den Talentmarkt.",
+      "talentsUnhappy": "{count, plural, one {Ein Talent ist} other {# Talente sind}} unzufrieden und {count, plural, one {denkt} other {denken}} ans Kündigen. Prüfe Lohn, Benefits und Kasse."
     },
     "next": {
       "intro": "Das würde ich jetzt tun, das Wichtigste zuerst:",
@@ -8479,6 +8586,13 @@
       "todo": "Offen: {tasks, plural, =0 {keine Aufgabe} one {eine Aufgabe} other {# Aufgaben}}{event, select, crisis {, eine Krise} chance {, eine Chance} other {}}.",
       "best": "Mein wichtigster Tipp:",
       "calm": "Gerade gibt es nichts, was sich lohnt anzupacken."
+    },
+    "world": {
+      "about": "Ab {amount} Firmenwert platzierst du deine Firma auf der Weltkarte. Jedes Land hat Vor- und Nachteile, keins ist das beste. Später kommen Tochterfirmen in anderen Ländern dazu.",
+      "tip": "Frag mich nach einem Land, zum Beispiel: „Wie ist China?“",
+      "country": "{name}: Produktion {production}, Arbeit {labour}, Nachfrage {demand}, Image {image}, Steuern {tax}.",
+      "strength": "Stärke: {best, select, production {günstige Produktion} labour {günstige Arbeit} demand {große Nachfrage} image {gutes Image} tax {niedrige Steuern} other {{best}}}. Schwäche: {worst, select, production {teure Produktion} labour {teure Arbeit} demand {kleine Nachfrage} image {schwaches Image} tax {hohe Steuern} other {{worst}}}.",
+      "risks": "Risiken (0 bis 100): Politik {political}, Zölle {tariff}, Konflikte {war}, {disasters, plural, =0 {keine Naturgefahren} one {eine Naturgefahr} other {# Naturgefahren}}."
     }
   },
   "newsShow": {
@@ -9877,7 +9991,10 @@
         "good": "Starke Note!",
         "ten": "Gem Mint: die 10!",
         "black": "Black Label!!!"
-      }
+      },
+      "holdTen": "Das sieht nach Gem Mint aus …",
+      "holdBlack": "Moment. Da ist noch mehr …",
+      "valueFactor": "Wert {factor}"
     },
     "profile": {
       "title": "Collectibles",
@@ -9913,7 +10030,7 @@
       }
     },
     "bonuses": {
-      "tag": "+{bps} {kind}",
+      "tag": "{bps} {kind}",
       "active": "aktiv",
       "inactive": "nicht aktiv: du hast keine Kopie außerhalb des Markts",
       "kinds": {
@@ -9930,7 +10047,7 @@
         "master": "Master-Set"
       },
       "typeCollection": "Typ-Sammlung {type}",
-      "everyKind": "+{bps} auf jeden Bonus",
+      "everyKind": "{bps} auf jeden Bonus",
       "totals": "Deine Karten-Boni",
       "totalsHint": "Jede Bonus-Karte zählt einmal, solange du sie besitzt und nicht im Markt anbietest. Ein Slab ab 9 bringt das 1,5-Fache, ein Black Label das Doppelte. Viele Boni einer Art zählen ab der Hälfte der Grenze nur noch halb.",
       "ofCap": "{value} von max. {cap}",
@@ -9945,7 +10062,19 @@
       "more": "und {n} weitere",
       "cardTitle": "Account-Bonus",
       "cardHint": "Solange du eine Kopie besitzt, die nicht im Markt steht. Slab ab 9: x1,5, Black Label: x2.",
-      "missingTag": "Bonus fehlt dir noch"
+      "missingTag": "Bonus fehlt dir noch",
+      "activeKinds": "{n} von {total} Bonus-Arten aktiv",
+      "ruleShow": "So zählen Boni",
+      "ruleHide": "Regel ausblenden",
+      "capShort": "max. {cap}",
+      "diminishedShort": "Summe {raw}, gedeckelt",
+      "next": "Als Nächstes",
+      "nextEmptyTitle": "Noch keine Sammlung angefangen",
+      "nextEmptyText": "Sobald du Karten eines Sets hast, siehst du hier, welche Sammlung du als Nächstes schaffen kannst.",
+      "showMissingCards": "Bonus-Karten, die dir fehlen ({n})",
+      "hideMissingCards": "Fehlende Bonus-Karten ausblenden",
+      "setsTitle": "Sammlungen je Set",
+      "collectionsDone": "Sammlungen"
     },
     "hype": {
       "marker": "Hype",
@@ -10028,6 +10157,33 @@
       "buyLater": "Kaufen und später öffnen ({price})",
       "buyFailed": "Kauf hat nicht geklappt",
       "bought": "{set} liegt bei „Ungeöffnete Booster“"
+    },
+    "rareReveal": {
+      "tier1": "Treffer!",
+      "tier2": "Großer Treffer!",
+      "tier3": "Riesentreffer!",
+      "tier4": "Jackpot!",
+      "value": "Wert dieser Karte: {value}",
+      "charging": "Da kommt etwas Großes …",
+      "announce": "{rarity} aufgedeckt!"
+    },
+    "multi": {
+      "title": "{count, plural, one {# Pack aufgedeckt} other {Alle # Packs}}",
+      "line": "Gezogen {worth} · bezahlt {paid}",
+      "return": "{pct} gegenüber dem Preis",
+      "worth": "Wert",
+      "cards": "Karten",
+      "fresh": "Neu",
+      "best": "Deine besten Treffer",
+      "all": "Alle Karten",
+      "sorted": "nach Wert sortiert",
+      "filter": "Nach Seltenheit filtern",
+      "filterAll": "Alle {count}",
+      "emptyTitle": "Keine Karte dieser Seltenheit",
+      "emptyText": "Wähl oben eine andere Seltenheit.",
+      "perPack": "Wert je Pack",
+      "packN": "Pack {n}",
+      "tile": "{name}, Wert {value}"
     }
   },
   "hq": {
@@ -10036,7 +10192,8 @@
       "controlling": "Controlling",
       "staff": "Mitarbeiter",
       "books": "Buchhaltung",
-      "board": "Geschäftsrat"
+      "board": "Geschäftsrat",
+      "location": "Standort"
     },
     "charts": {
       "gaugeLabel": "{label}: {value} von 100, {zone}",
@@ -11178,5 +11335,443 @@
     "trainingLabel": "In Schulung, wirkt in",
     "capLabel": "max.",
     "empty": "Gründe zuerst eine Firma, dann lernt sie hier Fertigkeiten."
+  },
+  "talents": {
+    "title": "Stellen & Talente",
+    "intro": "15 Stellen, jede mit genau einem Talent. Talente sind Fachleute mit Namen und Persönlichkeit: Sie bringen viel, verlangen aber auch viel – und gehen, wenn etwas nicht passt.",
+    "views": {
+      "seats": "Stellen",
+      "market": "Talentmarkt"
+    },
+    "empty": "Die Stellen laden nicht. Gründe zuerst eine Firma.",
+    "seat": {
+      "vacant": "Unbesetzt",
+      "vacantHint": "Hier fehlt noch jemand.",
+      "find": "Talent suchen",
+      "open": "Ansehen",
+      "satisfaction": "Zufriedenheit",
+      "warning": "Unzufrieden – droht zu kündigen",
+      "coceo": "Mit-GF",
+      "filled": "{filled} von {total} Stellen besetzt",
+      "cost": "{amount} pro Stunde",
+      "leads": "leitet die Stelle, KI-Kräfte berichten an sie oder ihn"
+    },
+    "total": "Wirkung aller Talente",
+    "totalNone": "Noch keine Wirkung: Besetze eine Stelle.",
+    "capLabel": "max.",
+    "effects": {
+      "demand": "Nachfrage +{pct} %",
+      "capacity": "Kapazität +{pct} %",
+      "cogs": "Wareneinsatz −{pct} %",
+      "fixed": "Fixkosten −{pct} %",
+      "quality": "Qualität +{pct} Punkte",
+      "awareness": "Bekanntheit +{pct} Punkte je Stunde",
+      "reputation": "Ruf +{pct} je Stunde",
+      "morale": "Zufriedenheit der anderen +{pct} % je Stunde"
+    },
+    "roles": {
+      "sales": "Vertrieb",
+      "marketing": "Marketing",
+      "customer_service": "Kundenservice",
+      "strategy": "Strategie",
+      "production": "Produktion",
+      "logistics": "Logistik",
+      "it": "IT",
+      "company_doctor": "Betriebsarzt",
+      "purchasing": "Einkauf",
+      "controlling": "Controlling",
+      "accounting": "Buchhaltung",
+      "science": "Wissenschaft",
+      "quality": "Qualität",
+      "legal": "Recht",
+      "hr": "Personal"
+    },
+    "roleText": {
+      "sales": "Holt neue Kunden: mehr Nachfrage.",
+      "marketing": "Macht die Firma bekannt: Bekanntheit steigt jede Stunde.",
+      "customer_service": "Hält Kunden: mehr Nachfrage.",
+      "strategy": "Findet neue Märkte: mehr Nachfrage.",
+      "production": "Mehr Ausstoß: mehr Kapazität.",
+      "logistics": "Liefert schneller: mehr Kapazität.",
+      "it": "Automatisiert: mehr Kapazität.",
+      "company_doctor": "Weniger Krankheit und Stress: mehr Kapazität.",
+      "purchasing": "Verhandelt Preise: weniger Wareneinsatz.",
+      "controlling": "Findet Kostenfresser: weniger Fixkosten.",
+      "accounting": "Saubere Bücher: weniger Fixkosten.",
+      "science": "Forscht: höhere Qualität.",
+      "quality": "Prüft alles: höhere Qualität.",
+      "legal": "Verhindert Skandale und Klagen: Ruf steigt jede Stunde.",
+      "hr": "Kümmert sich ums Team: alle anderen Talente werden zufriedener."
+    },
+    "tiers": {
+      "0": "Junior",
+      "1": "Profi",
+      "2": "Senior",
+      "3": "Expertin/Experte",
+      "4": "Legende"
+    },
+    "traits": {
+      "ambitious": "Ehrgeizig",
+      "loyal": "Loyal",
+      "diva": "Diva",
+      "team_player": "Teamplayer",
+      "workaholic": "Workaholic",
+      "night_owl": "Nachteule",
+      "family": "Familienmensch",
+      "sporty": "Sportlich",
+      "cautious": "Vorsichtig",
+      "bold": "Risikofreudig",
+      "leader": "Führungskraft",
+      "perfectionist": "Perfektionist",
+      "idealist": "Idealist"
+    },
+    "traitText": {
+      "ambitious": "Will mehr Lohn und Weiterbildung, leistet mehr, ist leichter abzuwerben.",
+      "loyal": "Bleibt lange, verzeiht viel und ist schwer abzuwerben.",
+      "diva": "Teuer, will einen Firmenwagen und mehr Ruf, leistet aber deutlich mehr. Schnell beleidigt.",
+      "team_player": "Leistet etwas mehr und bleibt gern.",
+      "workaholic": "Leistet viel mehr und will einen Bonus.",
+      "night_owl": "Will Gleitzeit.",
+      "family": "Will Homeoffice und bleibt gern.",
+      "sporty": "Will ein Fitnessangebot.",
+      "cautious": "Entscheidet als Mit-GF vorsichtig: gründlich, spart Budget.",
+      "bold": "Entscheidet als Mit-GF schnell und mutig.",
+      "leader": "Will Mitspracherecht; kann schon als Profi Mit-GF werden.",
+      "perfectionist": "Will ein gutes Büro (Ausbau ab Stufe 1), leistet mehr.",
+      "idealist": "Will Mitspracherecht und einen guten Ruf, ist dafür günstiger."
+    },
+    "benefits": {
+      "homeoffice": "Homeoffice",
+      "company_car": "Firmenwagen",
+      "bonus": "Bonus",
+      "training": "Weiterbildung",
+      "say": "Mitspracherecht",
+      "office": "Büro-Ausstattung",
+      "gym": "Fitness",
+      "flextime": "Gleitzeit"
+    },
+    "forms": {
+      "0": "Garage",
+      "1": "Kleinunternehmen",
+      "2": "GmbH",
+      "3": "AG",
+      "4": "Börse"
+    },
+    "status": {
+      "available": "Verfügbar",
+      "off_market": "Heute nicht auf dem Markt",
+      "resting": "Macht Pause",
+      "employed": "Bei {name}",
+      "mine": "Bei dir"
+    },
+    "market": {
+      "role": "Stelle",
+      "all": "Alle",
+      "tier": "Stufe",
+      "show": "Zeigen",
+      "showAll": "Alle",
+      "showFree": "Verfügbar",
+      "showEmployed": "Angestellt",
+      "sort": "Sortieren",
+      "sortQuality": "Qualität",
+      "sortPrice": "Preis",
+      "count": "{count} Talente",
+      "none": "Niemand passt zu diesen Filtern.",
+      "wage": "{amount}/h",
+      "refresh": "Der Markt wechselt jeden Tag: Nicht alle freien Talente suchen heute."
+    },
+    "detail": {
+      "personality": "Persönlichkeit",
+      "demands": "Forderungen",
+      "wage": "Lohn mindestens {amount} pro Stunde",
+      "benefits": "Benefits: {list}",
+      "noBenefits": "Keine besonderen Benefits",
+      "reputation": "Ruf mindestens {value}",
+      "awareness": "Bekanntheit mindestens {value} %",
+      "form": "Rechtsform mindestens {form}",
+      "effect": "Wirkung bei dir",
+      "employer": "Arbeitet bei",
+      "poachMin": "Abwerben ab {amount} pro Stunde (Lohn + Benefits)",
+      "offer": "Angebot machen",
+      "poach": "Abwerben",
+      "dismiss": "Trennen",
+      "dismissed": "{name} ist gegangen.",
+      "contract": "Vertrag: {wage} Lohn + Benefits = {cost} pro Stunde",
+      "since": "Seit {date}",
+      "appoint": "Zur Mit-Geschäftsführung machen",
+      "notEligible": "Mit-GF ab Senior (Führungskraft: ab Profi)."
+    },
+    "offer": {
+      "titleHire": "Angebot an {name}",
+      "titlePoach": "{name} abwerben",
+      "titleCounter": "{name} halten",
+      "titleCoceo": "{name} als Mit-GF",
+      "wage": "Lohn pro Stunde (€, ganze Euro)",
+      "benefits": "Benefits",
+      "benefitCost": "+{pct} % vom Lohn",
+      "free": "kostenlos",
+      "wanted": "gefordert",
+      "checks": "Forderungen",
+      "check": {
+        "wage": "Lohn",
+        "benefits": "Geforderte Benefits",
+        "reputation": "Ruf",
+        "awareness": "Bekanntheit",
+        "form": "Rechtsform",
+        "office": "Büro-Ausstattung braucht Ausbau-Stufe 1",
+        "cash": "Kasse deckt {hours} Stunden",
+        "poach": "Mehr als beim jetzigen Arbeitgeber",
+        "counter": "Mindestens so viel wie das Abwerbeangebot"
+      },
+      "met": "erfüllt",
+      "unmet": "nicht erfüllt",
+      "total": "Kosten pro Stunde",
+      "send": "Angebot senden",
+      "hired": "{name} fängt bei dir an!",
+      "hiredText": "Die Stelle {role} ist besetzt. Lohn wird jede volle Stunde gebucht.",
+      "pending": "Abwerbeversuch läuft",
+      "pendingText": "{name} entscheidet in {minutes} Minuten. Der jetzige Arbeitgeber kann nachbessern.",
+      "countered": "{name} bleibt bei dir.",
+      "autonomy": "Befugnis",
+      "advise": "Beraten",
+      "decide": "Entscheiden",
+      "budget": "Tagesbudget (€)",
+      "budgetHint": "Bis zu diesem Betrag am Tag darf sie oder er Geld ausgeben (z. B. Fertigkeiten).",
+      "appointed": "{name} ist jetzt Mit-Geschäftsführung.",
+      "coceoNeeds": "Mit-GF verlangt {pct} % mehr Lohn als die Grundforderung und Mitspracherecht."
+    },
+    "coceo": {
+      "title": "Mit-Geschäftsführung",
+      "text": "Talente ab Senior stehen über den KI-Kräften. Als Mit-GF entscheiden sie selbst: Ereignisse, Autopilot, Fertigkeiten bis zum Tagesbudget.",
+      "count": "{count} von {max}",
+      "spent": "Heute ausgegeben: {spent} von {budget}",
+      "save": "Speichern",
+      "saved": "Gespeichert.",
+      "remove": "Mit-GF beenden",
+      "removed": "Mit-GF beendet.",
+      "advise": "berät nur",
+      "decide": "entscheidet"
+    },
+    "incoming": {
+      "title": "Abwerbeversuche",
+      "text": "{from} will {name} für {amount} pro Stunde. Läuft ab in",
+      "counter": "Nachbessern"
+    },
+    "log": {
+      "title": "Verlauf",
+      "none": "Noch nichts passiert.",
+      "undo": "Rückgängig",
+      "undone": "Rückgängig gemacht.",
+      "kinds": {
+        "hired": "{name} eingestellt",
+        "dismissed": "{name} entlassen",
+        "quit": "{name} hat gekündigt",
+        "warned": "{name} ist unzufrieden",
+        "poached": "{name} wurde abgeworben",
+        "countered": "{name} gehalten",
+        "coceo_appointed": "{name} ist Mit-GF",
+        "coceo_removed": "{name} ist nicht mehr Mit-GF",
+        "decision": "{name} (Mit-GF) {text}",
+        "advice": "{name} (Mit-GF) {text}"
+      }
+    },
+    "tile": {
+      "label": "Stellen",
+      "value": "{filled}/{total}",
+      "hint": "{warn} unzufrieden"
+    }
+  },
+  "world": {
+    "title": "Standort",
+    "tabText": "Wähle das Land deiner Zentrale, bau sie aus und erobere mit Tochterfirmen neue Märkte.",
+    "empty": "Die Weltkarte lädt gerade nicht. Versuch es gleich noch einmal.",
+    "locked": {
+      "title": "Weltkarte ab 10 Mio. € Firmenwert",
+      "text": "Wächst deine Firma auf {amount}, platzierst du sie auf der Weltkarte. Jedes Land hat eigene Stärken und Schwächen.",
+      "progress": "Firmenwert {now} von {target}",
+      "preview": "So sieht die Welt gerade aus. Tippe auf ein Land, um seine Eigenschaften zu sehen."
+    },
+    "choose": {
+      "title": "Wähle ein Land für deine Zentrale",
+      "text": "Tippe auf ein Land. Kein Land ist das beste: Günstige Produktion bezahlst du mit schwächerem Image, große Nachfrage mit höheren Steuern.",
+      "cost": "Ein Bürogebäude kostet {amount} aus der Firmenkasse."
+    },
+    "map": {
+      "label": "Weltkarte",
+      "zoomIn": "Hineinzoomen",
+      "zoomOut": "Herauszoomen",
+      "reset": "Ansicht zurücksetzen",
+      "hint": "Ziehen zum Verschieben, mit zwei Fingern oder dem Mausrad zoomen.",
+      "companies": "{count, plural, =0 {keine Firma} one {# Firma} other {# Firmen}}",
+      "marker": "{country}: {companies}",
+      "legendHq": "Zentrale",
+      "legendSub": "Tochterfirma",
+      "legendAi": "KI-Firma",
+      "legendMine": "Deine Firma",
+      "countries": "Alle Länder"
+    },
+    "traits": {
+      "title": "Eigenschaften",
+      "production": "Produktionskosten",
+      "labour": "Arbeitskosten",
+      "demand": "Nachfrage",
+      "image": "Image",
+      "tax": "Steuersatz",
+      "risks": "Risiken",
+      "political": "Politik",
+      "tariff": "Zölle",
+      "war": "Konflikte",
+      "disaster": "Naturgefahren",
+      "none": "keine",
+      "better": "Vorteil",
+      "worse": "Nachteil",
+      "neutral": "normal",
+      "riskLow": "gering",
+      "riskMid": "mittel",
+      "riskHigh": "hoch",
+      "pct": "{sign}{pct} %"
+    },
+    "disasters": {
+      "earthquake": "Erdbeben",
+      "flood": "Hochwasser",
+      "storm": "Stürme",
+      "wildfire": "Waldbrände",
+      "drought": "Dürre"
+    },
+    "tiers": {
+      "office": "Bürogebäude",
+      "complex": "Bürokomplex",
+      "campus": "Campus",
+      "tower": "Tower",
+      "mega": "Mega-Campus",
+      "subsidiary": "Tochterfirma"
+    },
+    "hq": {
+      "title": "Deine Zentrale",
+      "in": "in {country}",
+      "tier": "Stufe {tier} von {max}",
+      "upgrade": "Ausbauen: {name}",
+      "upgradeCost": "Kostet {amount} aus der Firmenkasse",
+      "maxed": "Höchste Stufe erreicht. Mehr geht nicht.",
+      "seats": "+{count} Plätze",
+      "prestige": "Prestige {points}",
+      "demandBonus": "Nachfrage +{pct} %",
+      "nextGives": "Die nächste Stufe bringt",
+      "edit": "Gestalten",
+      "upgraded": "{name} eröffnet!",
+      "upgradedText": "Mehr Platz, mehr Ansehen, mehr Bekanntheit.",
+      "placed": "Zentrale in {country} eröffnet",
+      "placedText": "Ab der nächsten Stunde gelten die Bedingungen des Landes.",
+      "noCash": "Dafür reicht die freie Firmenkasse nicht."
+    },
+    "effect": {
+      "title": "Wirkung jede Stunde",
+      "text": "So verändern Land, Zentrale und Tochterfirmen deine Stundenabrechnung.",
+      "demand": "Nachfrage",
+      "cogs": "Wareneinsatz",
+      "fixed": "Fixkosten",
+      "tax": "Steuersatz",
+      "share": "Umsatz über Töchter"
+    },
+    "relocate": {
+      "button": "Hierhin umziehen",
+      "cost": "Umzug: {amount}",
+      "cooldown": "Umzug wieder möglich in",
+      "done": "Umzug nach {country} geschafft",
+      "doneText": "Die Zentrale behält ihre Stufe."
+    },
+    "subsidiaries": {
+      "title": "Tochterfirmen",
+      "text": "Eine Tochter macht einen Teil deines Umsatzes zu den Bedingungen ihres Landes und öffnet einen neuen Markt. Anfangs teuer, auf lange Sicht lohnend.",
+      "locked": "Tochterfirmen gibt es ab 50 Mio. € Firmenwert oder mit einem Bürokomplex.",
+      "count": "{count} von {max}",
+      "open": "Tochter gründen",
+      "openCost": "Gründung: {amount}",
+      "ramp": "Anlauf {pct} %",
+      "hourly": "{amount} pro Stunde",
+      "close": "Schließen",
+      "closeHint": "Die Gründungskosten bekommst du nicht zurück.",
+      "opened": "Tochterfirma in {country} gegründet",
+      "openedText": "Die ersten Wochen kostet sie mehr, dann trägt sie sich.",
+      "closed": "Tochter in {country} geschlossen",
+      "empty": "Noch keine Tochter. Wähle auf der Karte ein Land.",
+      "full": "Alle Plätze sind belegt."
+    },
+    "image": {
+      "title": "Image-Kampagne",
+      "text": "Gezielte Werbung im Land hebt dort dein Image und damit die Nachfrage. Der Effekt verblasst langsam.",
+      "button": "Kampagne starten",
+      "cost": "Kostet {amount}",
+      "bonus": "Image-Bonus +{pct} %",
+      "ready": "Nächste Kampagne in",
+      "done": "Image-Kampagne in {country} läuft",
+      "doneText": "Dein Image dort steigt um {pct} %."
+    },
+    "lobby": {
+      "title": "Länder-Lobby",
+      "leader": "Marktführer",
+      "leaderText": "Du bist die größte Firma in {country}: weniger Steuern, schwächere Folgen politischer Ereignisse. Du darfst eine Standortgebühr von anderen Spielerfirmen im Land verlangen.",
+      "fee": "Standortgebühr",
+      "feeValue": "{pct} % vom Stundenumsatz",
+      "feeSave": "Gebühr festlegen",
+      "feeSaved": "Standortgebühr: {pct} %",
+      "feeSavedText": "Die anderen Firmen in {country} werden benachrichtigt.",
+      "feeCooldown": "Änderung wieder möglich in",
+      "received": "Bisher eingenommen: {amount}",
+      "paying": "{leader} führt den Markt in {country} an und verlangt {pct} % deines Stundenumsatzes.",
+      "payingHint": "Wachse an ihr vorbei oder zieh in ein anderes Land.",
+      "paid": "Bisher gezahlt: {amount}",
+      "free": "Niemand verlangt eine Standortgebühr von dir.",
+      "notLeader": "Wirst du die größte Firma in {country}, bekommst du den Lobby-Bonus.",
+      "leaderIs": "Marktführer: {name}",
+      "noLeader": "Noch kein Marktführer"
+    },
+    "country": {
+      "here": "Hier sitzt deine Zentrale",
+      "sub": "Hier sitzt eine deiner Töchter",
+      "companies": "Firmen hier",
+      "noCompanies": "Noch keine Firma hier.",
+      "place": "Zentrale hier bauen",
+      "placeCost": "Bürogebäude: {amount}",
+      "lockedHint": "Ab 10 Mio. € Firmenwert kannst du hier bauen.",
+      "mine": "Du",
+      "ai": "KI",
+      "by": "von {owner}"
+    },
+    "editor": {
+      "title": "Zentrale gestalten",
+      "text": "Farben, Dach, Schmuck und Fahne. Das Schild trägt die Initialen deiner Firma.",
+      "wall": "Fassade",
+      "roof": "Dach",
+      "sign": "Schild",
+      "roofKind": "Dachform",
+      "deco": "Schmuck",
+      "flag": "Landesfahne zeigen",
+      "save": "Speichern",
+      "saved": "Zentrale neu gestaltet",
+      "color": "Farbe {n}",
+      "roofs": {
+        "flat": "Flach",
+        "gable": "Giebel",
+        "dome": "Kuppel",
+        "antenna": "Antenne",
+        "garden": "Dachgarten"
+      },
+      "decos": {
+        "none": "Nichts",
+        "trees": "Bäume",
+        "fountain": "Brunnen",
+        "statue": "Statue",
+        "flags": "Fahnen",
+        "lights": "Laternen"
+      }
+    },
+    "dash": {
+      "label": "Standort",
+      "hint": "Land, Zentrale und Tochterfirmen",
+      "placed": "{country} · {tier}",
+      "ready": "Weltkarte offen",
+      "locked": "{pct} % bis zur Weltkarte"
+    }
   }
 }

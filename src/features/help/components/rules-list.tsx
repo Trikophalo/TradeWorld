@@ -8,7 +8,7 @@ import { Accordion, type AccordionItem } from "@/components/ui/accordion";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { BALANCE } from "@/config/balance";
 import { chanceBps, formatChance, packOdds } from "@/features/nexamon/view";
-import { formatInteger, formatMoney } from "@/lib/format";
+import { formatBps, formatInteger, formatMoney } from "@/lib/format";
 import { RuleBody } from "./rule-body";
 
 const percent = (bps: number) => `${formatInteger(bps / 100)} %`;
@@ -105,7 +105,13 @@ export function RulesList() {
       content: (
         <RuleBody
           labels={labels}
-          text={t("vault.text", { rate: whole(economy.basicIncomeCentsPerHour), hours: economy.vaultCapHours })}
+          text={t("vault.text", {
+            rate: whole(economy.basicIncomeCentsPerHour),
+            hours: economy.vaultCapHours,
+            bonus: formatBps(BALANCE.vault.levelBonusBps).replace("+", ""),
+            maxLevel: BALANCE.vault.levelBonusMaxLevel,
+            depositLevel: BALANCE.vault.deposits.minLevel,
+          })}
           example={t("vault.example", { cap: whole(vaultCap) })}
           where={t("vault.where")}
         />

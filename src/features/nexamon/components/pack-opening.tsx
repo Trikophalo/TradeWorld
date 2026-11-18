@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -21,23 +22,18 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  NEXAMON_CARD_SIZE,
-  type NexamonArt,
-  type NexamonCard,
-  type NexamonRarity,
-  type NexamonSetKey,
-} from "@/config/nexamon";
+import { NEXAMON_CARD_SIZE, type NexamonArt, type NexamonCard, type NexamonSetKey } from "@/config/nexamon";
 import { composePack, PACK_SIZE, packTearRow } from "@/components/pixel/nexamon-pack";
 import { burstConfetti } from "@/components/ui/effects";
 import { DURATION, EASE, SPRING, STAGGER } from "@/lib/motion";
-import { playSound, type SoundName } from "@/lib/sound";
+import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { isHit, isTap, pixelScale, rarityRank, swipeOutcome, tearProgress } from "../lib";
+import { finaleSlots, isHit, isTap, pixelScale, rarityRank, swipeOutcome, tearProgress, type RevealTier } from "../lib";
 import { RarityBadge } from "./badges";
 import { NexamonCardBack, NexamonCardFace } from "./card-face";
 import { PackFoil, PackSheen } from "./pack";
 import { PixelCanvas } from "./pixel-canvas";
+import { RareReveal, REVEAL_SOUND, type RareRevealControl } from "./rare-reveal";
 import { TiltFlip } from "./tilt-flip";
 import "./nexamon.css";
 
@@ -61,24 +57,18 @@ export interface PackOpeningProps {
   onComplete?: (cards: readonly NexamonCard[]) => void;
   /** Plays the built-in sounds (foil, tear, every card leaving and showing, bigger ones for better pulls). */
   sound?: boolean;
+  /**
+   * ADR-204: value of the pulled copy at slot `index`. The last two slots show it rolling up when they hold a big
+   * pull, and a pull worth ten packs (`packPriceCents`) gets a bigger reveal.
+   */
+  pullValueOf?: (card: NexamonCard, index: number) => number | undefined;
+  /** Price of the pack, for the value step of the reveal (ADR-204). */
+  packPriceCents?: number;
   /** Shown under the summary: buttons of the page that uses the opening. */
   children?: ReactNode;
   className?: string;
 }
 
-/** The better the pull, the bigger its sound; a common only ticks. */
-const REVEAL_SOUND: Record<NexamonRarity, SoundName> = {
-  common: "cardShow",
-  rare: "pullRare",
-  ultra: "pullUltra",
-  prisma: "pullPrisma",
-  legendary: "pullLegendary",
-  one_of_one: "pullOneOfOne",
-  iron: "cardShow",
-  titanium: "pullUltra",
-  diamond: "pullLegendary",
-  uranium: "pullUranium",
-};
 /** Upper part of the pack (share of its height) where a tear can start. */
 const TEAR_ZONE = 0.45;
 /** Crackles of the foil over a whole tear. */
@@ -102,6 +92,16 @@ interface StackCardProps {
   /** The card starts to leave (thrown, flicked or pulled with the keyboard). */
   onFly: () => void;
   onGone: () => void;
+  /** ADR-204: a big pull of the last two slots: lies face down until it is on top, then charges up and turns. */
+  finale: RevealTier;
+  valueCents: number | undefined;
+  sound: boolean;
+  /** The finale is charging: a press or a key ends the wait instead of throwing the card. */
+  locked: boolean;
+  /** The next card is a finale: this one leaves slower, so the glow below shows itself. */
+  slow: boolean;
+  revealRef: RefObject<RareRevealControl | null>;
+  onLanded: () => void;
 }
 
 const HOVER_SPRING = { stiffness: 260, damping: 22, mass: 0.6 } as const;
@@ -121,6 +121,13 @@ function StackCard({
   onTurn,
   onFly,
   onGone,
+  finale,
+  valueCents,
+  sound,
+  locked,
+  slow,
+  revealRef,
+  onLanded,
 }: StackCardProps) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -140,13 +147,13 @@ function StackCard({
   const turn = useSpring(0, SPRING.smooth);
   const rotateY = useTransform(() => (lightX.get() - 0.5) * 2 * HOVER_TILT + turn.get());
   const flip = useCallback(() => {
-    if (leaving.current) return;
+    if (leaving.current || locked) return;
     setFlipped((was) => {
       turn.set(was ? 0 : 180);
       return !was;
     });
     onTurn();
-  }, [onTurn, turn]);
+  }, [locked, onTurn, turn]);
   const lean = (event: PointerEvent<HTMLDivElement>) => {
     if (!top || reduced || leaving.current || event.pointerType === "touch") return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -161,6 +168,10 @@ function StackCard({
   const fly = useCallback(
     (dirX: number, dirY: number) => {
       if (leaving.current) return;
+      if (locked) {
+        revealRef.current?.skip();
+        return;
+      }
       leaving.current = true;
       onFly();
       if (reduced) {
@@ -168,12 +179,18 @@ function StackCard({
         return;
       }
       const reach = width * 2.2;
-      const options = { duration: DURATION.slower, ease: EASE.out } as const;
+      // before a finale the card glides off slowly, so the glow underneath gets its moment
+      const stretch = slow ? 2.2 : 1;
+      const options = { duration: DURATION.slower * stretch, ease: EASE.out } as const;
       void animate(x, x.get() + dirX * reach, options);
       void animate(y, y.get() + dirY * reach, options);
-      void animate(opacity, 0, { duration: DURATION.slow, ease: EASE.in, delay: DURATION.instant }).then(onGone);
+      void animate(opacity, 0, {
+        duration: DURATION.slow * stretch,
+        ease: EASE.in,
+        delay: DURATION.instant * stretch,
+      }).then(onGone);
     },
-    [onFly, onGone, opacity, reduced, width, x, y],
+    [locked, onFly, onGone, opacity, reduced, revealRef, slow, width, x, y],
   );
 
   useEffect(() => {
@@ -191,6 +208,10 @@ function StackCard({
     void animate(y, 0, SPRING.bouncy);
   };
   const down = (event: PointerEvent<HTMLDivElement>) => {
+    if (top && locked) {
+      revealRef.current?.skip();
+      return;
+    }
     if (!top || leaving.current || drag.current) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     x.stop();
@@ -269,14 +290,39 @@ function StackCard({
           transition={{ duration: DURATION.base, ease: EASE.standard }}
           className="[backface-visibility:hidden]"
         >
-          <NexamonCardFace
-            card={card}
-            art={art}
-            scale={u}
-            evolvesFromName={evolvesFromName}
-            foil={top ? "live" : "still"}
-            light={top ? { x: lightX, y: lightY } : undefined}
-          />
+          {finale > 0 ? (
+            <RareReveal
+              rarity={card.rarity}
+              tier={finale}
+              play={top}
+              width={width}
+              height={NEXAMON_CARD_SIZE.height * u}
+              valueCents={valueCents}
+              sound={sound}
+              controlRef={top ? revealRef : undefined}
+              onRevealed={onLanded}
+              front={
+                <NexamonCardFace
+                  card={card}
+                  art={art}
+                  scale={u}
+                  evolvesFromName={evolvesFromName}
+                  foil={top ? "live" : "still"}
+                  light={top ? { x: lightX, y: lightY } : undefined}
+                />
+              }
+              back={<NexamonCardBack scale={u} />}
+            />
+          ) : (
+            <NexamonCardFace
+              card={card}
+              art={art}
+              scale={u}
+              evolvesFromName={evolvesFromName}
+              foil={top ? "live" : "still"}
+              light={top ? { x: lightX, y: lightY } : undefined}
+            />
+          )}
         </motion.div>
         <motion.div
           initial={false}
@@ -309,6 +355,8 @@ export function PackOpening({
   onReveal,
   onComplete,
   sound = true,
+  pullValueOf,
+  packPriceCents,
   children,
   className,
 }: PackOpeningProps) {
@@ -334,6 +382,20 @@ export function PackOpening({
   const rasters = composePack(set);
   const setName = t(`sets.${set}`);
   const current = cards[index];
+  // ADR-204: the big pulls of the last two slots, and up to which slot their reveal has landed
+  const finale = useMemo(
+    () =>
+      finaleSlots(
+        cards.map((card) => card.rarity),
+        (i) => pullValueOf?.(cards[i]!, i),
+        packPriceCents,
+      ),
+    [cards, pullValueOf, packPriceCents],
+  );
+  const [landed, setLanded] = useState(-1);
+  const revealRef = useRef<RareRevealControl | null>(null);
+  // with reduced motion a finale turns at once: nothing to wait for
+  const charging = !reduced && phase === "stack" && (finale[index] ?? 0) > 0 && landed < index;
 
   useEffect(() => {
     const pending = timers.current;
@@ -350,6 +412,8 @@ export function PackOpening({
       const card = cards[at];
       if (!card) return;
       onReveal?.(card, at);
+      // a finale plays its own sound and confetti once it turns (RareReveal)
+      if ((finale[at] ?? 0) > 0) return;
       if (sound) playSound(REVEAL_SOUND[card.rarity]);
       if (!isHit(card.rarity)) return;
       if (rarityRank(card.rarity) >= rarityRank("prisma") && stackRef.current)
@@ -362,7 +426,7 @@ export function PackOpening({
               : 22,
         );
     },
-    [cards, onReveal, sound],
+    [cards, finale, onReveal, sound],
   );
 
   /** Opens the pack. Torn by hand, the strip is already loose and comes off at once; otherwise the pack shakes first. */
@@ -477,7 +541,7 @@ export function PackOpening({
   const cardH = NEXAMON_CARD_SIZE.height * u;
   const packW = PACK_SIZE.width * u;
   const packH = PACK_SIZE.height * u;
-  const glow = phase === "stack" && current && isHit(current.rarity) ? current.rarity : null;
+  const glow = phase === "stack" && current && isHit(current.rarity) && !charging ? current.rarity : null;
 
   if (phase === "summary") {
     return (
@@ -638,6 +702,7 @@ export function PackOpening({
               current ? t("pack.stackLabel", { n: index + 1, total: cards.length, name: current.name }) : undefined
             }
             data-testid="pack-stack"
+            data-charging={charging}
             onKeyDown={key}
             onClick={click}
             initial={reduced ? false : { opacity: 0, y: 32, scale: 0.88 }}
@@ -696,6 +761,13 @@ export function PackOpening({
                   onTurn={turned}
                   onFly={flick}
                   onGone={gone}
+                  finale={finale[i] ?? 0}
+                  valueCents={pullValueOf?.(card, i)}
+                  sound={sound}
+                  locked={i === index && charging}
+                  slow={i === index && (finale[i + 1] ?? 0) > 0}
+                  revealRef={revealRef}
+                  onLanded={() => setLanded((was) => Math.max(was, i))}
                 />
               ))}
           </motion.div>

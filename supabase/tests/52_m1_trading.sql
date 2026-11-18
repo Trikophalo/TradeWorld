@@ -320,10 +320,10 @@ select tests.assert(
   'complete_tutorial() grants the XP only once');
 select tests.assert(
   (:'fpf'::jsonb ->> 'level')::int = 2 and (:'fpf'::jsonb ->> 'xp_total')::int = 120
-  and (:'fpf'::jsonb ->> 'xp_into_level')::int = 20 and (:'fpf'::jsonb ->> 'xp_for_next')::int = 707
+  and (:'fpf'::jsonb ->> 'xp_into_level')::int = 20 and (:'fpf'::jsonb ->> 'xp_for_next')::int = 566
   and (:'fpf'::jsonb ->> 'tutorial_completed')::boolean
   and exists (select 1 from public.player_unlocks where player_id = :f and unlock_key = 'jobs_intern'),
-  'get_my_portfolio(): level 2, 120 XP, 20 into the level, 707 to level 3 (ADR-055); level-2 unlocks granted');
+  'get_my_portfolio(): level 2, 120 XP, 20 into the level, 566 to level 3 (ADR-055, ADR-202); level-2 unlocks granted');
 
 -- =============================================================================
 -- 9. rate limit (abuse.rateLimits.ordersPerDay set to 2 for the test)

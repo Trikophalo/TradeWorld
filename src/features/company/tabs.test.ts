@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   COMPANY_GROUPS,
+  COMPANY_TABS,
+  sectionAvailable,
   companyHref,
   groupOf,
   isCompanyTab,
@@ -189,6 +191,17 @@ describe("company tabs", () => {
       pane: "marketing",
     });
     expect(placeOf({ tab: "staff", section: "todo" })).toEqual({ tab: "staff", group: "todo", pane: null });
+  });
+
+  it("puts the Standort tab right before Buchhaltung (ADR-208)", () => {
+    expect(COMPANY_TABS.indexOf("location")).toBe(COMPANY_TABS.indexOf("books") - 1);
+    expect(resolveCompanyTarget("location")).toEqual({ tab: "location" });
+    expect(resolveCompanyTarget("world")).toEqual({ tab: "location" });
+    expect(resolveCompanyTarget(null, "lobby")).toEqual({ tab: "location", target: "world-lobby" });
+    expect(resolveCompanyTarget(null, "location")).toEqual({ tab: "location", section: "location" });
+    expect(companyHref({ tab: "location" })).toBe("/company?tab=location");
+    expect(notificationHref("world_location", "/company")).toBe("/company?tab=location&section=world-lobby");
+    expect(sectionAvailable("location", { listed: false, trainingOpen: false })).toBe(true);
   });
 
   it("adds the tab to notifications that link to the bare company page", () => {

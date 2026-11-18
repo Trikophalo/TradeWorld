@@ -8,13 +8,13 @@ set client_min_messages = notice;
 -- A. Levels
 -- =============================================================================
 select tests.assert(
-  public.xp_for_next_level(1) = 100 and public.xp_for_next_level(2) = 707 and public.xp_for_next_level(10) = 7906
-  and public.xp_total_for_level(1) = 0 and public.xp_total_for_level(2) = 100 and public.xp_total_for_level(3) = 807
-  and public.xp_total_for_level(6) = 6901
-  and public.level_for_xp(99) = 1 and public.level_for_xp(100) = 2 and public.level_for_xp(806) = 2
-  and public.level_for_xp(807) = 3
-  and (public.level_progress(900) ->> 'xp_into_level')::int = 93 and (public.level_progress(900) ->> 'xp_for_next')::int = 1299,
-  'curve (ADR-055): 100 XP to level 2, then round(250 x level^1.5); level_progress / level_for_xp agree');
+  public.xp_for_next_level(1) = 100 and public.xp_for_next_level(2) = 566 and public.xp_for_next_level(10) = 6325
+  and public.xp_total_for_level(1) = 0 and public.xp_total_for_level(2) = 100 and public.xp_total_for_level(3) = 666
+  and public.xp_total_for_level(6) = 5541
+  and public.level_for_xp(99) = 1 and public.level_for_xp(100) = 2 and public.level_for_xp(665) = 2
+  and public.level_for_xp(666) = 3
+  and (public.level_progress(900) ->> 'xp_into_level')::int = 234 and (public.level_progress(900) ->> 'xp_for_next')::int = 1039,
+  'curve (ADR-055, ADR-202): 100 XP to level 2, then round(200 x level^1.5); level_progress / level_for_xp agree');
 
 \set l '''0b3c3c3c-0000-4000-8000-0000000000a1'''
 \set m '''0b3c3c3c-0000-4000-8000-0000000000a2'''
@@ -27,21 +27,21 @@ on conflict (player_id) do update set free_points = 5;
 select public.keep_levels_after_curve_change() as raised1 \gset
 select public.keep_levels_after_curve_change() as raised2 \gset
 select tests.assert(
-  (select level = 6 and xp_total = 6901 from public.profiles where id = :l)
+  (select level = 6 and xp_total = 5541 from public.profiles where id = :l)
   and (select level = 6 and xp_total = 7500 from public.profiles where id = :m)
   and :raised1 >= 1 and :raised2 = 0
   and (select bool_and(free_points = 5) from public.player_skill_points where player_id in (:l, :m)),
-  'nobody loses a level: xp_total raised to the new level-6 threshold (6901), higher totals untouched, idempotent, skill points unchanged');
+  'nobody loses a level: xp_total raised to the new level-6 threshold (5541), higher totals untouched, idempotent, skill points unchanged');
 select public.grant_xp(:l, 'mission', 10, 'test:m3c:level') as gx \gset
 select tests.assert(
-  (select level = 6 and xp_total = 6921 from public.profiles where id = :l)
+  (select level = 6 and xp_total = 5561 from public.profiles where id = :l)
   and (select free_points from public.player_skill_points where player_id = :l) = 5,
   'grant_xp() after the change: level stays 6, no extra skill points');
 update public.profiles set xp_total = 0 where id = :m;
 select public.grant_xp(:m, 'mission', 10, 'test:m3c:level') as gx2 \gset
 select tests.assert((select level from public.profiles where id = :m) = 6, 'grant_xp() never lowers a level');
 select tests.assert(
-  (select xp_to_next from public.levels where level = 2) = 707 and (select xp_cumulative from public.levels where level = 6) = 6901,
+  (select xp_to_next from public.levels where level = 2) = 566 and (select xp_cumulative from public.levels where level = 6) = 5541,
   'reference table levels follows the new curve');
 
 -- =============================================================================

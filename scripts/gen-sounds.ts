@@ -1720,6 +1720,7 @@ const RENDER: Record<string, () => Float64Array> = {
   "pull-legendary": pullLegendary,
   "pull-one-of-one": pullOneOfOne,
   "pull-uranium": pullUranium,
+  "reveal-charge": revealCharge,
   "grade-drum": gradeDrum,
   "grade-tick": gradeTick,
   "grade-low": gradeLow,
@@ -1938,6 +1939,38 @@ function pullUranium(): Float64Array {
     bell(m, 1.9 + i * 0.16, ["E7", "B6", "E7", "G#6", "B6", "E6", "B6", "E7", "B7", "E7"][i]!, { gain: 0.08 });
   noise(m, 1.75, 1.7, { type: "hp", cutoff: 6000 }, 0.06, { a: 0.2, d: 1.2, r: 0.4 });
   return master(m.buf, { room: { mix: 0.3, size: 1.3 } });
+}
+
+/**
+ * The charge-up before a big pull in the last two slots (ADR-204): a pentatonic arpeggio that climbs and speeds up
+ * over a rising sub and a noise riser, then a short breath of silence before the pull sound lands.
+ */
+function revealCharge(): Float64Array {
+  const m = new Mix(1.75, 204);
+  const notes = ["C4", "E4", "G4", "A4", "C5", "D5", "E5", "G5", "A5", "C6", "D6", "E6", "G6", "A6", "C7"];
+  let at = 0;
+  let gap = 0.16;
+  let i = 0;
+  while (at < 1.45) {
+    const power = 0.35 + 0.65 * (at / 1.45);
+    const note = notes[Math.min(notes.length - 1, i)]!;
+    chip(m, at, note, 0.04, { env: { d: 0.05, s: 0.25, r: 0.04 }, gain: 0.55 * power, duty: 0.125 });
+    at += gap;
+    gap = Math.max(0.035, gap * 0.86);
+    i++;
+  }
+  m.tone({
+    at: 0,
+    note: "C2",
+    to: "C3",
+    glide: 1.45,
+    gate: 1.45,
+    wave: "triangle",
+    gain: 0.35,
+    env: { a: 1.1, d: 0.1, s: 0.9, r: 0.06 },
+  });
+  noise(m, 0.1, 1.35, { type: "bp", cutoff: 900, to: 7000, sweep: 1.35, q: 1.4 }, 0.18, { a: 1.2, d: 0.1, r: 0.05 });
+  return master(m.buf, { room: { mix: 0.14, size: 0.8 }, maxSeconds: 1.6 });
 }
 
 /** The ASP package is open: a snare roll that gets denser and louder while the slab rises (ADR-165). */

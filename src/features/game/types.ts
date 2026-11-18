@@ -13,6 +13,7 @@ import type { NexamonEngine } from "./nexamon-types";
 import type { NexamonSealedEngine } from "./nexamon-sealed-types";
 import type { PackBattleEngine } from "./pack-battle-types";
 import type { ListedEngine } from "./listed-types";
+import type { WorldEngine } from "./world-types";
 import type { SectorKey } from "@/components/pixel/art";
 import type { FloorMaterial, PropertyTier } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
@@ -184,6 +185,45 @@ export interface Vault {
   lastClaimedAt: string | null;
   fullAt: string;
   serverTime: string;
+  /** Basic income with the upgrades, before level bonus and treasury factor (ADR-201). */
+  incomeCentsPerHour: number;
+  /** Level bonus on the vault income, 10_000 = none (ADR-201). */
+  levelFactorBps: number;
+  /** Hours the vault holds (base, vault and vault_xl upgrades). */
+  capHours: number;
+}
+
+/** One open Festgeld deposit in the vault (ADR-201). */
+export interface VaultDeposit {
+  id: number;
+  amountCents: number;
+  termDays: number;
+  rateBps: number;
+  createdAt: string;
+  maturesAt: string;
+  matured: boolean;
+  /** Interest at maturity with the treasury factor of now. */
+  interestCents: number;
+}
+
+/** Festgeld in the vault (ADR-201): terms, limits and the open deposits. */
+export interface VaultDeposits {
+  level: number;
+  minLevel: number;
+  minCents: number;
+  capCents: number;
+  maxOpen: number;
+  factorBps: number;
+  serverTime: string;
+  terms: { days: number; rateBps: number }[];
+  openCents: number;
+  /** Interest collected so far. */
+  earnedCents: number;
+  deposits: VaultDeposit[];
+}
+
+export interface VaultDepositClosed extends VaultDeposits {
+  closed: { id: number; amountCents: number; interestCents: number; matured: boolean };
 }
 
 export interface Portfolio {
@@ -729,9 +769,18 @@ export interface MissionReset {
   nextAt: string | null;
 }
 
+/** The daily free skip of one open mission (ADR-202). */
+export interface MissionSkip {
+  /** A skip is still possible today. */
+  available: boolean;
+  /** When the next one is possible (midnight in Berlin); null while one is available. */
+  nextAt: string | null;
+}
+
 export interface MissionsState {
   groups: MissionGroup[];
   reset: MissionReset;
+  skip: MissionSkip;
 }
 
 /** Client-only events that count for a few quick missions. */
@@ -1097,8 +1146,22 @@ export interface CompanyOrg {
   company: { id: string; name: string; tier: CompanyTier };
   founder: OrgPerson;
   members: OrgMember[];
+  /** Talente of the company (ADR-199): they lead their Stelle, above the AI workers. Co-CEOs first. */
+  talents: OrgTalent[];
   aiWorkers: number;
   aiWorkerSkills: string[];
+}
+
+export interface OrgTalent {
+  key: string;
+  firstName: string;
+  lastName: string;
+  avatarKey: string;
+  role: string;
+  /** 0 Junior .. 4 Legende. */
+  tier: number;
+  isCoCeo: boolean;
+  since: string | null;
 }
 
 // ------------------------------------------------------------------ campaigns (ADR-097)
@@ -2327,13 +2390,31 @@ export const GAME_ERROR_KEYS = [
   "mission_already_claimed",
   "mission_reset_used",
   "mission_reset_nothing",
+  "mission_skip_used",
+  "mission_skip_invalid",
   "avatar_unknown",
   "avatar_locked",
   "daily_reward_claimed",
   "skill_unknown",
   "skill_learned",
   "skill_locked",
+  "world_locked",
+  "world_placed",
+  "world_not_placed",
+  "world_max_tier",
+  "world_subsidiary_locked",
+  "world_subsidiary_cap",
+  "world_same_country",
+  "world_not_leader",
   "skill_points_insufficient",
+  "demands_not_met",
+  "offer_too_low",
+  "offer_pending",
+  "seat_taken",
+  "not_available",
+  "already_hired",
+  "not_eligible",
+  "coceo_full",
   "job_not_found",
   "job_level_too_low",
   "job_skills_missing",
@@ -2504,6 +2585,10 @@ export const GAME_ERROR_KEYS = [
   "news_promo_inactive",
   "news_promo_claimed",
   "news_promo_no_company",
+  // ADR-201
+  "deposit_too_small",
+  "deposit_limit",
+  "deposit_not_found",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -2662,7 +2747,92 @@ export interface InterviewAnswer {
   quick?: number;
 }
 
-export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEngine, PackBattleEngine, ListedEngine {
+/** Talente for the 15 Stellen and the Mit-Geschaeftsfuehrung (ADR-199). */
+export type TalentEffectKind =
+  "demand" | "capacity" | "cogs" | "fixed" | "quality" | "awareness" | "reputation" | "morale";
+export type TalentStatus = "available" | "off_market" | "resting" | "employed" | "mine";
+export interface TalentFacts {
+  reputation: number;
+  awarenessBps: number;
+  formRank: number;
+  expansionLevel: number;
+  freeCashCents: number;
+}
+export interface Talent {
+  key: string;
+  role: string;
+  /** 0 Junior .. 4 Legende. */
+  tier: number;
+  firstName: string;
+  lastName: string;
+  avatar: string;
+  traits: string[];
+  wageDemandCents: number;
+  benefitDemands: string[];
+  minReputation: number;
+  minAwarenessBps: number;
+  minForm: number;
+  effectBps: number;
+  status: TalentStatus;
+  employer: { companyId: string; name: string } | null;
+  /** Hourly cost a poacher must at least offer. */
+  poachMinCostCents: number | null;
+  offerPending: boolean;
+  restingUntil: string | null;
+  isCoCeo: boolean;
+}
+export interface OwnTalent extends Talent {
+  wageCents: number;
+  benefits: string[];
+  costCents: number;
+  hiredAt: string;
+  satisfactionBps: number;
+  warned: boolean;
+  coCeoAutonomy: "advise" | "decide";
+  coCeoBudgetCents: number;
+  coCeoSpentCents: number;
+}
+export interface TalentSeat {
+  role: string;
+  effect: TalentEffectKind;
+  talent: OwnTalent | null;
+}
+export interface TalentEvent {
+  id: number;
+  talentKey: string;
+  kind: string;
+  payload: Record<string, unknown>;
+  costCents: number;
+  reversible: boolean;
+  createdAt: string;
+}
+export interface CompanyTalentsState {
+  facts: TalentFacts;
+  seats: TalentSeat[];
+  effectBps: Record<TalentEffectKind, number>;
+  capBps: Record<TalentEffectKind, number>;
+  coCeoMax: number;
+  incoming: {
+    id: string;
+    talentKey: string;
+    fromName: string;
+    wageCents: number;
+    benefits: string[];
+    costCents: number;
+    expiresAt: string;
+  }[];
+  outgoing: { id: string; talentKey: string; toName: string; costCents: number; expiresAt: string }[];
+  events: TalentEvent[];
+  /** Set by talent_offer: hired at once or a poaching attempt is waiting. */
+  result?: "hired" | "pending";
+}
+export interface TalentMarketState {
+  facts: TalentFacts | null;
+  talents: Talent[];
+}
+
+export interface GameEngine
+  extends BattleEngine, NexamonEngine, NexamonSealedEngine, PackBattleEngine, ListedEngine, WorldEngine {
   /** The own CEO interview: an open request or the latest result (ADR-173). */
   companyInterview(): Promise<CompanyInterviewState>;
   answerCompanyInterview(requestId: string, id: number, answers: InterviewAnswer[]): Promise<CompanyInterviewState>;
@@ -2671,6 +2841,32 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   /** Fertigkeiten of the own company (ADR-194). */
   companySkills(): Promise<CompanySkillsState>;
   learnCompanySkill(requestId: string, key: string): Promise<CompanySkillsState>;
+  /** Talente (ADR-199): market of one Stelle or all, the own Stellen and the writes. */
+  talentMarket(role: string | null): Promise<TalentMarketState>;
+  companyTalents(): Promise<CompanyTalentsState>;
+  offerTalent(requestId: string, key: string, wageCents: number, benefits: string[]): Promise<CompanyTalentsState>;
+  counterTalentOffer(
+    requestId: string,
+    offerId: string,
+    wageCents: number,
+    benefits: string[],
+  ): Promise<CompanyTalentsState>;
+  dismissTalent(requestId: string, key: string): Promise<CompanyTalentsState>;
+  appointCoCeo(
+    requestId: string,
+    key: string,
+    wageCents: number,
+    autonomy: "advise" | "decide",
+    budgetCents: number,
+  ): Promise<CompanyTalentsState>;
+  setCoCeo(
+    requestId: string,
+    key: string,
+    autonomy: "advise" | "decide",
+    budgetCents: number,
+    remove: boolean,
+  ): Promise<CompanyTalentsState>;
+  undoTalentDecision(requestId: string, eventId: number): Promise<CompanyTalentsState>;
   /** The running News-Aktion, if any (ADR-193). */
   newsPromo(): Promise<NewsPromoState>;
   fileNewsTaxReturn(requestId: string): Promise<NewsTaxReturnResult>;
@@ -2713,6 +2909,10 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   quoteOrder(input: OrderQuoteInput): Promise<OrderQuote>;
   cancelOrder(requestId: string, orderId: string): Promise<void>;
   claimVault(requestId: string): Promise<{ claimedCents: number; cashCents: number }>;
+  /** Festgeld in the vault (ADR-201). */
+  vaultDeposits(): Promise<VaultDeposits>;
+  openVaultDeposit(requestId: string, amountCents: number, termDays: number): Promise<VaultDeposits>;
+  closeVaultDeposit(requestId: string, depositId: number): Promise<VaultDepositClosed>;
   completeTutorial(requestId: string): Promise<ProgressResult>;
   richList(scope: RichListScope, limit: number, offset: number): Promise<RichList>;
   richNews(limit: number): Promise<RichNews[]>;
@@ -2773,6 +2973,8 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   missions(): Promise<MissionsState>;
   /** Swaps the open quick, daily and weekly missions for new ones, once per Berlin day (ADR-166). */
   resetMissions(requestId: string): Promise<MissionsState>;
+  /** Swaps one open quick, daily or weekly mission for another, free, once per Berlin day (ADR-202). */
+  skipMission(requestId: string, missionId: string): Promise<MissionsState>;
   claimMission(requestId: string, missionId: string): Promise<ProgressResult>;
   checkIn(requestId: string): Promise<ProgressResult & { streakDays: number; alreadyCheckedIn: boolean }>;
   track(event: TrackedEvent, ref?: string): Promise<void>;

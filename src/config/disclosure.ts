@@ -27,6 +27,8 @@ export const DISCLOSURE = {
   newsBattle: 2,
   /** Link from the vault to the upgrades (ADR-093): not during the tutorial. */
   homeUpgrades: 2,
+  /** Festgeld in the open vault (ADR-201): with the server unlock BALANCE.vault.deposits.minLevel. */
+  vaultDeposits: 5,
   /** Patch notes button in the top bar (ADR-137): not during the tutorial. */
   topbarPatchNotes: 2,
   /** Renting out places in the home and the rental market (ADR-158): with the property unlock (level 8). */
@@ -46,6 +48,13 @@ export const DISCLOSURE = {
   companyInterview: 3,
   /** Fertigkeiten of the own company (ADR-194): with the company, after the tutorial. */
   companySkills: 3,
+  /** Talente for the 15 Stellen and the talent market (ADR-199): with the company, after the tutorial. */
+  companyTalents: 3,
+  /**
+   * The tab "Standort" with the world map (ADR-208): shown with the company once the IPO is in reach, locked with the
+   * progress toward world.unlockWorthCents until the company is worth that much.
+   */
+  companyWorld: 9,
   /** News-Aktionen of the live show (ADR-193): the news tab section and the toast, after the tutorial. */
   newsPromo: 2,
   /** The clone on the job tab (ADR-206): shown locked a few levels ahead, usable from jobs.clone.minLevel (20). */

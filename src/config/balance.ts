@@ -4,6 +4,7 @@ import { COMPANY_TASK_RULES, COMPANY_TASKS, FUN_NEWS, type CompanyTaskConfig } f
 import { NEWS_SHOW_RULES } from "./news-show.ts";
 import { NEWS_PROMO_RULES } from "./news-promos.ts";
 import { COMPANY_SKILL_RULES, COMPANY_SKILLS } from "./company-skills.ts";
+import { TALENT_POOL, TALENT_ROLES, TALENT_RULES, TALENT_TRAITS } from "./talents.ts";
 import { INTERVIEW_QUESTIONS, INTERVIEW_RULES, type InterviewQuestionConfig } from "./interviews.ts";
 import { PITCH_RULES } from "./pitches.ts";
 import { PROTEST_RULES } from "./protests.ts";
@@ -12,6 +13,7 @@ import { ACCESSORY_RULES } from "./accessories.ts";
 import { BATTLE_RULES } from "./battles.ts";
 import { NEXAMON_RULES } from "./nexamon-rules.ts";
 import { LISTED_RULES } from "./listed.ts";
+import { COUNTRIES, WORLD_RULES, type CountryConfig } from "./countries.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -83,6 +85,34 @@ export interface EconomyConfig {
   readonly vaultMinClaimCents: number;
   readonly bankruptcyStatusGameDays: number;
   readonly bankruptcyReputationPenalty: number;
+}
+
+export interface VaultDepositTerm {
+  /** Lock time in days (game time). */
+  readonly days: number;
+  /** Interest on the deposited amount for the whole term, in bps (before the treasury factor). */
+  readonly rateBps: number;
+}
+
+/**
+ * The vault grows with the player (ADR-201): the basic income in the vault rises with the player level, and from
+ * `deposits.minLevel` money can be locked in the vault for a fixed term ("Festgeld") for interest from the treasury.
+ */
+export interface VaultConfig {
+  /** Extra vault income per player level above 1, in bps of the basic income (with the upgrades). */
+  readonly levelBonusBps: number;
+  /** Levels above this one add no more level bonus. */
+  readonly levelBonusMaxLevel: number;
+  readonly deposits: {
+    readonly minLevel: number;
+    /** Smallest deposit. */
+    readonly minCents: number;
+    /** All open deposits of a player together hold at most this times the player level. */
+    readonly capCentsPerLevel: number;
+    /** Open deposits at the same time. */
+    readonly maxOpen: number;
+    readonly terms: readonly VaultDepositTerm[];
+  };
 }
 
 export interface LeverageTier {
@@ -562,6 +592,16 @@ export interface ProgressionConfig {
   readonly missionCountScaleMax: number;
   /** ADR-166: how often per Berlin day a player may swap the open quick, daily and weekly missions. */
   readonly missionResetsPerDay: number;
+  /** ADR-202: how often per Berlin day a player may skip one open quick, daily or weekly mission, free. */
+  readonly missionSkipsPerDay: number;
+  /** ADR-202: the draw of quick, daily and weekly missions (repeats, cooldown, feature weights). */
+  readonly missionDraw: {
+    readonly recentDraws: { readonly quick: number; readonly daily: number; readonly weekly: number };
+    readonly cooldownHours: { readonly quick: number; readonly daily: number; readonly weekly: number };
+    readonly featureWeightBps: number;
+    readonly newFeatureLevels: number;
+    readonly newFeatureWeightBps: number;
+  };
   /**
    * ADR-166: missions never ask for money the player does not have. Money targets are clamped to a share of the
    * player's means when the mission is assigned; purchases need the cheapest offer to be affordable.
@@ -861,6 +901,8 @@ export interface StockNewsConfig {
 export interface BalanceConfig {
   readonly time: TimeConfig;
   readonly economy: EconomyConfig;
+  /** Vault level bonus and fixed-term deposits (ADR-201), formulas in src/lib/sim/vault.ts. */
+  readonly vault: VaultConfig;
   readonly trading: TradingConfig;
   readonly centralBank: CentralBankConfig;
   readonly bonds: BondsConfig;
@@ -917,6 +959,12 @@ export interface BalanceConfig {
   readonly newsPromos: typeof NEWS_PROMO_RULES;
   /** Fertigkeiten of player companies (ADR-194), values in company-skills.ts. */
   readonly companySkills: typeof COMPANY_SKILL_RULES & { readonly skills: typeof COMPANY_SKILLS };
+  /** Talente for the 15 Stellen (ADR-199), values and the generated pool in talents.ts. */
+  readonly talents: typeof TALENT_RULES & {
+    readonly roles: typeof TALENT_ROLES;
+    readonly traits: typeof TALENT_TRAITS;
+    readonly pool: typeof TALENT_POOL;
+  };
   /** CEO interviews of NEXA Nachrichten (ADR-173), values and question pools in interviews.ts. */
   readonly interviews: typeof INTERVIEW_RULES & { readonly pool: readonly InterviewQuestionConfig[] };
   /** Own strategies judged by Claude or the Mini-KI (ADR-132), values in pitches.ts. */
@@ -933,6 +981,7 @@ export interface BalanceConfig {
   readonly nexamon: typeof NEXAMON_RULES;
   /** Listed player companies (ADR-167): research, benefits, board, taxes; values in listed.ts. */
   readonly listed: typeof LISTED_RULES;
+  readonly world: typeof WORLD_RULES & { readonly countries: readonly CountryConfig[] };
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -1861,6 +1910,27 @@ export const BALANCE = {
     bankruptcyReputationPenalty: 10,
   },
 
+  // ------------------------------------------------- vault grows with the player (ADR-201)
+  vault: {
+    // +8 % basic income in the vault per level above 1, up to level 40: level 5 x1.32, 15 x2.12, 30 x3.32, 40 x4.12
+    levelBonusBps: 800,
+    levelBonusMaxLevel: 40,
+    // Festgeld: lock cash for 1, 3 or 7 days; interest from the treasury (times the treasury factor), at most
+    // 25.000 € x level in all open deposits. 7 days pay 2 % a day, a day 1,5 %: a safe, capped yield well below
+    // the expected 7 % a day of a stock portfolio (BALANCING 2.1), but without risk.
+    deposits: {
+      minLevel: 5,
+      minCents: 100_000,
+      capCentsPerLevel: 2_500_000,
+      maxOpen: 3,
+      terms: [
+        { days: 1, rateBps: 150 },
+        { days: 3, rateBps: 500 },
+        { days: 7, rateBps: 1_400 },
+      ],
+    },
+  },
+
   // --------------------------------------------------------------- trading (spec 10)
   trading: {
     limitOrders: false,
@@ -2329,15 +2399,19 @@ export const BALANCE = {
   progression: {
     // Owner feedback: the first levels were too fast. Level 2 stays at the tutorial reward,
     // after that every level needs 2.5 times the XP of the old curve (ADR-055).
+    // ADR-202: then too slow later on: 250 -> 200 (every level from 2 on needs 20 % less XP; nobody loses a level).
     firstLevelXp: 100,
-    xpBase: 250,
+    xpBase: 200,
     xpExponent: 1.5,
     maxLevel: 10_000,
     prestige: { fromLevel: 50, titleEveryLevels: 10 },
     missionTargetScalePerLevel: 0.2,
     missionTargetScaleMax: 5,
-    /** ADR-142: mission XP x (1 + perLevel x (level - 1)), at most max: level 10 = x2.35, level 30 = x5.35. */
-    missionXpScalePerLevel: 0.15,
+    /**
+     * ADR-142: mission XP x (1 + perLevel x (level - 1)), at most max. ADR-202: 0.15 -> 0.18,
+     * level 10 = x2.62, level 30 = x6.22, the cap 8 from level 40.
+     */
+    missionXpScalePerLevel: 0.18,
     missionXpScaleMax: 8,
     /**
      * ADR-159: counted missions get harder with the level: targets of daily and weekly missions (and quick missions
@@ -2347,6 +2421,20 @@ export const BALANCE = {
     missionCountScaleMax: 3,
     /** ADR-166: one swap of the open missions per real (Berlin) day. */
     missionResetsPerDay: 1,
+    /** ADR-202: and one free skip of a single open mission per real (Berlin) day. */
+    missionSkipsPerDay: 1,
+    /**
+     * ADR-202: the draw avoids repeats. A template among the last `recentDraws` draws of its kind, or drawn within
+     * `cooldownHours`, only comes when nothing fresh is doable. Missions of an unlocked feature weigh
+     * x featureWeightBps, of a feature unlocked within the last `newFeatureLevels` levels x newFeatureWeightBps.
+     */
+    missionDraw: {
+      recentDraws: { quick: 12, daily: 9, weekly: 6 },
+      cooldownHours: { quick: 48, daily: 96, weekly: 504 },
+      featureWeightBps: 15_000,
+      newFeatureLevels: 5,
+      newFeatureWeightBps: 25_000,
+    },
     /** ADR-166: a buy fits into half the cash; volume and profit follow cash plus positions. */
     missionAfford: {
       buyShareBps: 5_000,
@@ -2846,6 +2934,7 @@ export const BALANCE = {
   newsShow: NEWS_SHOW_RULES,
   newsPromos: NEWS_PROMO_RULES,
   companySkills: { ...COMPANY_SKILL_RULES, skills: COMPANY_SKILLS },
+  talents: { ...TALENT_RULES, roles: TALENT_ROLES, traits: TALENT_TRAITS, pool: TALENT_POOL },
   interviews: { ...INTERVIEW_RULES, pool: INTERVIEW_QUESTIONS },
   pitches: PITCH_RULES,
   protests: PROTEST_RULES,
@@ -2854,6 +2943,8 @@ export const BALANCE = {
   battles: BATTLE_RULES,
   nexamon: NEXAMON_RULES,
   listed: LISTED_RULES,
+  /** Weltkarte, Standorte, Tochterfirmen und Länder-Lobby (ADR-208). */
+  world: { ...WORLD_RULES, countries: COUNTRIES },
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,

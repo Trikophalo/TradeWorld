@@ -92,7 +92,7 @@ select tests.assert(
                    'list_nexamon_cards', 'unlist_nexamon_cards', 'bulk_sell_nexamon', 'instant_sell_nexamon', 'buy_nexamon_packs',
                    'create_nexamon_pack_battle', 'join_nexamon_pack_battle']
           -- mission reset (a2)
-          || array['reset_missions']
+          || array['reset_missions', 'skip_mission']
           -- listed companies (a3)
           || array['get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
                    'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',
@@ -114,13 +114,21 @@ select tests.assert(
           || array['get_news_promo', 'file_news_tax_return']
           -- Fertigkeiten of player companies (ADR-194)
           || array['get_company_skills', 'learn_company_skill']
+          -- Festgeld in the vault (ADR-201)
+          || array['get_vault_deposits', 'open_vault_deposit', 'close_vault_deposit']
           -- clone, job perks (ADR-206)
           || array['get_clone', 'create_clone', 'clone_apply_for_job', 'clone_sign_contract', 'clone_quit_job',
                    'clone_cancel_quit', 'clone_request_raise', 'clone_request_promotion', 'set_job_posting_perks']
           -- the own net worth in parts (ADR-203)
           || array['get_my_net_worth']
           -- redraw the company logo (ADR-200)
-          || array['redraw_company_logo', 'get_logo_redraw']) x),
+          || array['redraw_company_logo', 'get_logo_redraw']
+          -- Talente and Mit-Geschaeftsfuehrung (ADR-199)
+          || array['get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
+                   'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision']
+          -- Weltkarte (ADR-208)
+          || array['get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
+                   'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

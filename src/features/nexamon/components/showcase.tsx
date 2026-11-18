@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import {
+  NEXAMON_CARD_SIZE,
   NEXAMON_CARDS,
   NEXAMON_RARITIES,
   NEXAMON_SETS,
@@ -33,6 +34,8 @@ import { DealNote, ListingRow } from "./listing-row";
 import { NexamonPack } from "./pack";
 import { InstantSell } from "./instant-sell";
 import { PackOpening } from "./pack-opening";
+import { RareReveal } from "./rare-reveal";
+import { revealTier } from "../lib";
 import { CopyQuality, CopyVisual, FactRow, GradeChip, SelectField, Stat } from "./parts";
 import { NexamonSlab } from "./slab";
 
@@ -95,6 +98,12 @@ const DEMO_LISTINGS: NexamonListing[] = [
     ...row,
   };
 });
+
+/** Values of the demo pack (ADR-204): the last two roll up under the card. */
+const DEMO_PACK_VALUES = [120, 90, 80, 2_400, 9_600];
+const DEMO_PACK_PRICE = 1_500;
+/** The big reveal on its own: every rarity that gets one, with a made-up value. */
+const RARE_DEMOS = NEXAMON_SAMPLE_CARDS.filter((card) => revealTier(card.rarity) > 0);
 
 /** One package per result tier for the reveal demo: below 8, a 9, a 10 and the Black Label. */
 const REVEAL_DEMOS = [
@@ -338,12 +347,16 @@ export function NexamonShowcase() {
             artOf={sampleArt}
             evolvesFromNameOf={evolvesName}
             onReveal={(card, index) => setLog((lines) => [...lines, `${index + 1}: ${card.name}`])}
+            pullValueOf={(_, index) => DEMO_PACK_VALUES[index]}
+            packPriceCents={DEMO_PACK_PRICE}
           />
           <p className="mt-3 min-h-4 text-center text-xs text-fg-3" data-testid="nexamon-reveal-log">
             {log.join(" · ")}
           </p>
         </Block>
       </div>
+
+      <RareRevealDemo />
 
       <Block label="Sofort an das Spiel (ADR-196): frisch gezogene Karten für 85 % verkaufen" testId="nexamon-instant">
         <InstantSell
@@ -480,5 +493,58 @@ export function NexamonShowcase() {
         <ProfileNexamon nickname={null} />
       </Block>
     </div>
+  );
+}
+
+/** ADR-204: the big reveal of the last two slots on its own, per rarity (RareReveal, also for the Pack Battle). */
+function RareRevealDemo() {
+  const art = nexamonSampleArt();
+  const [pick, setPick] = useState(RARE_DEMOS[RARE_DEMOS.length - 1]!.key);
+  const [round, setRound] = useState(0);
+  const [play, setPlay] = useState(false);
+  const card = RARE_DEMOS.find((c) => c.key === pick) ?? RARE_DEMOS[0]!;
+  const u = 3;
+  return (
+    <Block label="Großer Treffer (ADR-204): Aufladen, Umdrehen, Blitz, Konfetti, Wert" testId="nexamon-rare-reveal">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <Segmented
+          value={pick}
+          onValueChange={(value) => {
+            setPick(value);
+            setPlay(false);
+            setRound((n) => n + 1);
+          }}
+          options={RARE_DEMOS.map((c) => ({ value: c.key, label: c.rarity.replace(/_/g, " ") }))}
+          label="Seltenheit"
+        />
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setPlay(true)} disabled={play} data-testid="rare-reveal-play">
+            Aufdecken
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setPlay(false);
+              setRound((n) => n + 1);
+            }}
+          >
+            Neu
+          </Button>
+        </div>
+      </div>
+      <div className="flex justify-center overflow-hidden py-10">
+        <RareReveal
+          key={`${pick}-${round}`}
+          rarity={card.rarity}
+          play={play}
+          width={NEXAMON_CARD_SIZE.width * u}
+          height={NEXAMON_CARD_SIZE.height * u}
+          valueCents={card.rarity === "one_of_one" || card.rarity === "uranium" ? 2_500_000 : 48_000}
+          front={<NexamonCardFace card={card} art={art[card.key]} scale={u} evolvesFromName={evolvesName(card)} />}
+          back={<NexamonCardBack scale={u} />}
+        />
+      </div>
+    </Block>
   );
 }

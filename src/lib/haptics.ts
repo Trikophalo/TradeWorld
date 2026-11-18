@@ -5,6 +5,8 @@ const PATTERNS = {
   success: [12, 40, 18],
   warning: [30, 60, 30],
   error: [40, 40, 40, 40, 60],
+  /** A big pull lands (ADR-204): a short drum roll and one long buzz. */
+  jackpot: [14, 30, 14, 30, 18, 50, 90],
 } satisfies Record<string, number[]>;
 
 export type HapticPattern = keyof typeof PATTERNS;

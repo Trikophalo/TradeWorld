@@ -8241,6 +8241,68 @@ total_cents }`: eigene rohe Kopien aus einem Pack (`source = 'pack'`), höchsten
   `ai.excludedRarities`; `nexamon_copies_ai_guard` lässt ihn zu, `nexamon_ai_reset()` mustert ihn nie aus.
 - Bulk (`bulk_sell_nexamon`): `quickSell.bps` jetzt 8 000 (20 % Gebühr).
 
+## Nachtrag: Flachere Levelkurve, Missionen ohne Wiederholung und ohne Sackgasse (ADR-202)
+
+Migrationen `20261204009400_level_curve_lower.sql` und `20261204009410_mission_variety.sql`.
+
+- Levelkurve: `game_config.progression.xpBase` 250 → 200, `missionXpScalePerLevel` 0,15 → 0,18 (die Migration setzt
+  beide Werte einmal, wo noch die alten stehen). `raise_levels_after_curve_change()` (intern, idempotent) hebt jedes
+  Profil auf das Level seiner XP, mit freien Skillpunkten und Freischaltungen wie `grant_xp`; es senkt nie. Die
+  Referenztabelle `levels` wird nachgezogen.
+- `player_missions.draw_seq bigint` (Sequenz `player_missions_draw_seq`) und `drawn_at timestamptz` (Spielzeit):
+  Reihenfolge und Zeit jeder Ziehung, Index `(player_id, kind, draw_seq desc)`. Ältere Zeilen bekommen sie in der
+  Reihenfolge von `created_at`. Eine schnelle Mission, die am selben Tag noch einmal gezogen wird, ersetzt ihre
+  erledigte Zeile (`claimed`/`expired`; die XP-Buchung hängt an der alten ID).
+- `player_missions.state.replaced` bzw. `state.skipped`: von `missions_assign` ersetzt (unmöglich geworden) bzw. mit
+  `skip_mission` getauscht; beide setzen `reset_at`, der Platz wird frei.
+- `mission_resets.skips integer` (≥ 0): Einzeltausche des Berliner Tages.
+- `missions_assign(p_player)` (intern): Ziehung in Stufen (frisch → Abkühlzeit → letzte Ziehungen; +1, wenn eine
+  offene Mission dieselbe Metrik zählt), Gewichte für freigeschaltete und neu freigeschaltete Bereiche
+  (`progression.missionDraw`), `params.fixedCount` ohne Level-Skalierung. Ersetzt offene unmögliche Missionen
+  (ohne Fortschritt, wenn `mission_doable` nein sagt; mit Fortschritt, wenn die Voraussetzung `requires` fehlt;
+  Meilensteine nur ohne Fortschritt, sie dürfen nach 20 Stunden mit ihrem Fortschritt wiederkommen).
+- `mission_doable` (neu definiert) fragt für die neuen Metriken und `sell`, `nexamon_pack`, `nexamon_listed`,
+  `nexamon_sold`, `nexamon_bought`, `art_painted` die interne `mission_more_doable(p_player, p_key, p_metric)`;
+  `mission_cheapest_pack_cents()` (intern) liefert den billigsten erschienenen Nexamon-Pack.
+- Trigger `mission_more_events` (Funktion `mission_more_events()`) auf `trades` (Krypto: `crypto_trade`,
+  `crypto_buy`, `crypto_distinct`), `orders` (`short_opened`), `watchlist_items` (`watchlist_add`, je Wertpapier
+  einmal), `crypto_coins` (`crypto_created`), `nexamon_sales` (`nexamon_quick_sold`, Bulk und Sofortverkauf),
+  `nexamon_copies` (`nexamon_grading_sent`), `nexamon_battle_seats` (`pack_battle_join`), `news_promo_claims`
+  (`news_promo`), `company_campaigns` (`campaign_started`), `company_skills` (`company_skill`), `player_upgrades`
+  (`upgrade_bought`), `work_tasks` (`work_task_done`), `daily_reward_claims` (`daily_reward`), `feed_reactions`
+  (`feed_react`, je Beitrag einmal). Die RPCs bleiben unverändert.
+- 52 neue Vorlagen in `mission_templates` (Schlüssel `q_watchlist` … `m_upgrades_10`).
+
+| RPC                                        | Antwort                                                                                                                                                                                                                                                                           |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_my_missions()`                        | zusätzlich `skip_available boolean`, `skips_left integer`, `next_skip_at timestamptz \| null`                                                                                                                                                                                     |
+| `skip_mission(p_request_id, p_mission_id)` | wie `get_my_missions` plus `skipped` (Vorlage); idempotent. Nur offene schnelle, tägliche und wöchentliche Missionen der laufenden Periode, `progression.missionSkipsPerDay` je Berliner Tag. Fehler `mission_skip_used` NX420, `mission_skip_invalid` NX421, `mission_not_found` |
+
+Test `supabase/tests/e1_mission_draw.sql`.
+
+## Tresor mit Level-Bonus und Festgeld (ADR-201, Migration `20261204009300_vault_level_deposits.sql`)
+
+- `vault_status(player)` (also `get_my_portfolio.vault`): `rate_cents_per_hour` = `base_rate_cents_per_hour` ×
+  `factor_bps`; `base_rate_cents_per_hour` = `income_cents_per_hour` (Grundeinkommen mit Verbesserungen) ×
+  `level_factor_bps` („half even“). Neu: `income_cents_per_hour`, `level`, `level_factor_bps`, `cap_hours`.
+  Intern `vault_level_factor_bps(level)`.
+- `vault_deposits (id, player_id, request_id, amount_cents, term_days, rate_bps, created_at, matures_at, status
+open|paid|broken|void, closed_at, interest_cents)`, eindeutig `(player_id, request_id)`. RLS: lesen nur die eigenen;
+  schreiben nur über RPC. Trigger `vault_deposits_on_reset` auf `player_private.account_reset_at`: offene Anlagen
+  werden `void`.
+- Intern: `vault_deposit_interest_cents(amount, rate_bps, factor_bps)`, `vault_deposits_json(player)`.
+
+| RPC                                                             | Antwort                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_vault_deposits()`                                          | `{ level, min_level, min_cents, cap_cents, max_open, factor_bps, server_time, terms: [{ days, rate_bps }], open_cents, earned_cents, deposits: [{ id, amount_cents, term_days, rate_bps, created_at, matures_at, matured, interest_cents }] }` |
+| `open_vault_deposit(p_request_id, p_amount_cents, p_term_days)` | wie oben plus `deposit_id`, `cash_cents`; idempotent. Fehler `locked` (unter `minLevel`), `invalid_argument` (Laufzeit), `deposit_too_small`, `deposit_limit` (Deckel oder Anzahl), `insufficient_funds`, `rate_limited`                       |
+| `close_vault_deposit(p_request_id, p_deposit_id)`               | wie oben plus `closed: { id, amount_cents, interest_cents, matured }`, `cash_cents`; idempotent. Fällig: Betrag und Zinsen, sonst nur der Betrag. Fehler `deposit_not_found`                                                                   |
+
+Ledger: `transfer` „Festgeld im Tresor angelegt“ von `player_cash` an `player_reserve` (Schlüssel
+`vault_deposit:<id>:open`) und zurück („Festgeld aus dem Tresor zurück“ bzw. „… vorzeitig aufgelöst“,
+`vault_deposit:<id>:close`); Zinsen `vault_claim` „Festgeld-Zinsen“ aus der Staatskasse (`state_pay_partial`,
+`vault_deposit:<id>:interest`), danach `loan_withhold`. `player_reserve` hält damit offene Orders und Festgeld.
+
 ## Nachtrag: Titans Revenge neu gewichtet (ADR-207)
 
 - Interne Funktion `nexamon_scale_card_values(p_set, p_rarity, p_num, p_den)` → Anzahl Karten: `start_e4`, `value_e4`,
@@ -8339,3 +8401,84 @@ shares }`.
 
 `p_sector` filtert (`invalid_argument` bei unbekannter Branche); `rank` bleibt der Platz im ganzen Scope. Veränderung
 gegenüber dem letzten Schnappschuss, der mindestens 24 Stunden alt ist; `null`, solange es keinen gibt.
+
+## Talente und Mit-Geschäftsführung (ADR-199, Migrationen `20261204008900_talents.sql`, `20261204008910_talent_coceo.sql`)
+
+- `talents (talent_key PK, role_key, tier 0..4, first_name, last_name, avatar_key, traits[], wage_demand_cents,
+benefit_demands[], min_reputation, min_awareness_bps, min_form, effect_bps, company_id → companies (null = frei),
+wage_cents, benefits[], hired_at, paid_until, satisfaction_bps, warned_at, resting_until, is_coceo, coceo_autonomy
+advise|decide, coceo_budget_cents, coceo_spent_day, coceo_spent_cents, coceo_last_run, updated_at)`; eindeutig
+  `(company_id, role_key)`. RLS: alle Angemeldeten lesen (der Markt ist öffentlich), schreiben nur über RPC.
+- `talent_offers (id, talent_key, from_company, to_company, wage_cents, benefits[], cost_cents, status
+pending|accepted|countered|failed|cancelled, expires_at, created_by, created_at, settled_at)`; höchstens ein
+  `pending` je Talent. RLS: Gründer/CEO beider Firmen.
+- `talent_events (id, company_id, talent_key, kind, payload, cost_cents, reversible, undone_at, created_at)`: Verlauf
+  (hired, dismissed, quit, warned, poached, countered, coceo_appointed, coceo_removed, decision, advice). RLS: eigene
+  Firma.
+- `talent_hours (talent_key, hour_start) PK, company_id, cost_cents, paid, satisfaction_bps`; RLS: eigene Firma.
+- `talent_company_hours (company_id, hour_start) PK, awareness, reputation`: Marketing und Recht einmal je Stunde;
+  kein Client-Zugriff.
+- Intern: `talents_cfg`, `talents_ensure`, `talent_offer_cost`, `talent_company_facts`, `talent_check_offer`,
+  `talent_poach_min_cost`, `talent_status`, `talent_hire_into`, `talent_release`, `talents_hour_effect`,
+  `talent_offers_settle`, `talent_hour`, `talent_company_hour`, `talents_run_due` (Cron `nexa-talents` jede Minute),
+  `talents_coceo_run`, `talent_coceo_pick`, `talent_coceo_style`, `talent_coceo_eligible`. `listed_hour_effect`
+  multipliziert `talents_hour_effect` ein (Antwortfeld `talents`).
+- Benachrichtigungstyp `company_talent`; Firmennachrichten `talent_<kind>`.
+
+| RPC                                                                                          | Antwort / Fehler                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_talent_market(p_role)`                                                                  | `{ company_id, facts, talents: [{ key, role, tier, first_name, last_name, avatar, traits, wage_demand_cents, benefit_demands, min_*, effect_bps, status, employer, poach_min_cost_cents, offer_pending, resting_until, is_coceo }] }` |
+| `get_company_talents()`                                                                      | `{ company_id, facts, seats: [{ role, effect, talent }], effect: { bps, *_factor }, cap_bps, coceo_max, incoming, outgoing, events }`                                                                                                 |
+| `talent_offer(p_request_id, p_talent_key, p_wage_cents, p_benefits)`                         | wie oben plus `result` hired/pending; `demands_not_met`, `offer_too_low`, `offer_pending`, `seat_taken`, `not_available`, `already_hired`                                                                                             |
+| `talent_counter(p_request_id, p_offer_id, p_wage_cents, p_benefits)`                         | wie `get_company_talents`; `offer_closed`, `offer_too_low`                                                                                                                                                                            |
+| `talent_dismiss(p_request_id, p_talent_key)`                                                 | wie `get_company_talents`                                                                                                                                                                                                             |
+| `talent_coceo_appoint(p_request_id, p_talent_key, p_wage_cents, p_autonomy, p_budget_cents)` | wie `get_company_talents`; `not_eligible`, `coceo_full`, `offer_too_low`, `insufficient_funds`                                                                                                                                        |
+| `talent_coceo_set(p_request_id, p_talent_key, p_autonomy, p_budget_cents, p_remove)`         | wie `get_company_talents`                                                                                                                                                                                                             |
+| `talent_undo_decision(p_request_id, p_event_id)`                                             | wie `get_company_talents`; `locked`                                                                                                                                                                                                   |
+
+`get_company_org(p_company_id)` (Migration `20261204010200_talents_after_clone.sql`) trägt zusätzlich `talents: [{ key,
+first_name, last_name, avatar_key, role, tier, is_coceo, since }]` (Mit-GF zuerst, dann Stufe absteigend, dann Stelle);
+das Organigramm zeigt sie über den KI-Kräften.
+
+Ledger: `company_costs` „Talent: Name“, Schlüssel `talent_wage:<talent>:<firma>:<stunde>`; Fertigkeit der Mit-GF
+„Fertigkeit: Schulung (Mit-GF)“, Schlüssel `talent_coceo_skill:<talent>:<fertigkeit>:<stufe>:<firma>`.
+
+## Weltkarte und Standorte (ADR-208, Migrationen `20261204010000_world_contract.sql` und `20261204010010_world_map.sql`)
+
+Tabellen (RLS an, keine Schreibrechte für Clients, alles über RPCs):
+
+| Tabelle                 | Spalten                                                                                                                                                                | Lesen                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `company_locations`     | `company_id` (PK), `country_key`, `placed_at`, `hq_tier` (1–5), `hq_style` jsonb, `invested_cents`, `moved_at`, `fees_paid_cents`, `fees_received_cents`, `updated_at` | alle Angemeldeten (Karte) |
+| `company_subsidiaries`  | `company_id`, `country_key` (PK zusammen), `opened_at`, `setup_cost_cents`                                                                                             | alle Angemeldeten (Karte) |
+| `company_country_image` | `company_id`, `country_key` (PK), `bonus_bps` (Stand bei `bonus_at`), `bonus_at`, `last_campaign_at`, `spent_cents`                                                    | Gründer und CEO           |
+| `country_lobby`         | `country_key` (PK), `leader_company_id`, `fee_bps`, `fee_set_at`, `collected_cents`, `updated_at`                                                                      | alle Angemeldeten         |
+
+Interne Funktionen (Vertrag mit ADR-209, Signaturen fest): `world_cfg()`, `country_cfg(text) → jsonb` (null bei
+unbekanntem Land), `company_country(uuid) → text`, `country_market_leader(text) → uuid` (größter
+`company_worth_cents` unter aktiven Spielerfirmen mit Zentrale dort, mindestens `lobby.minWorthCents`; Gleichstand:
+früher platziert), `company_is_market_leader(uuid)`, `world_tax_rate_bps(uuid)` (Mischsatz, minus Lobby-Rabatt; null
+ohne Standort). Stunde: `world_hour_effect(firma, stunde)` → `{ placed, country, hq_tier, leader, demand_factor,
+cogs_factor, fixed_factor, tax_rate_bps, subsidiary_share }`, `world_hour_costs(firma, stunde, key)` bucht
+Tochterkosten (an die Haushalte, `key:world:subs`) und die Standortgebühr (an die Kasse des Marktführers,
+`key:world:fee`) aus der freien Kasse; beide über `listed_hour_effect` / `listed_hour_costs`.
+`company_max_employees` zählt die Plätze aller erreichten Zentralen-Stufen mit.
+
+| RPC                                               | Wirkung                                                                 | Fehler                                                                   |
+| ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `get_world()`                                     | `{ company, unlock_worth_cents, me, places[], countries[] }`            | –                                                                        |
+| `world_place_hq(p_request_id, p_country)`         | Bürogebäude, Firmenkasse → Staatskasse                                  | `world_locked`, `world_placed`, `insufficient_funds`, `invalid_argument` |
+| `world_upgrade_hq(p_request_id)`                  | nächste Stufe                                                           | `world_not_placed`, `world_max_tier`, `insufficient_funds`               |
+| `world_relocate_hq(p_request_id, p_country)`      | Umzug, Stufe bleibt                                                     | `locked`, `world_same_country`, `insufficient_funds`                     |
+| `world_save_hq_style(p_request_id, p_style)`      | Stil (unbekannte Felder fallen weg, Werte begrenzt)                     | `world_not_placed`                                                       |
+| `world_open_subsidiary(p_request_id, p_country)`  | Tochter, Gründungspreis wächst                                          | `world_subsidiary_locked`, `world_subsidiary_cap`, `world_same_country`  |
+| `world_close_subsidiary(p_request_id, p_country)` | Tochter schließen, kein Geld zurück                                     | `invalid_argument`                                                       |
+| `world_image_campaign(p_request_id, p_country)`   | Image-Bonus im Land (Zentrale oder Tochter)                             | `world_not_placed`, `locked`, `insufficient_funds`                       |
+| `world_set_location_fee(p_request_id, p_fee_bps)` | Standortgebühr 0 … `lobby.maxFeeBps`, benachrichtigt (`world_location`) | `world_not_leader`, `locked`, `invalid_argument`                         |
+
+`me`: `country, hq_tier, hq_style, invested_cents, placed_at, moved_at, relocate_ready_at, relocation_cost_cents,
+next_tier_cost_cents, subsidiaries[{ country, opened_at, setup_cost_cents, ramp, hourly_cost_cents }],
+next_subsidiary_cost_cents, subsidiary_unlocked, image{ land: { bonus_bps, ready_at, spent_cents } },
+image_campaign_cost_cents, effect, leader, fee_bps, fee_ready_at, paying_fee, fees_paid_cents, fees_received_cents`.
+`places`: Zentralen und Töchter aller Spieler plus bis zu `world.aiOnMap` (12) große KI-Firmen (Land aus
+`hashtext(id)`, nie Marktführer). Alle Schreib-RPCs sind idempotent (`request_id`) und antworten wie `get_world`.

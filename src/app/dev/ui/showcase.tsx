@@ -51,6 +51,7 @@ import { PostingPerks } from "@/features/career/components/job-portal";
 import { RewardsBox } from "@/features/career/components/my-job-card";
 import { PostingPerksFields } from "@/features/company/components/employer";
 import { UpgradeCard } from "@/features/upgrades/components/upgrade-shop";
+import { VaultDeposits, VaultYield } from "@/features/progression/components/vault-details";
 import { CRYPTO } from "@/config/crypto";
 import { StatBars } from "@/features/crypto/components/coin-detail";
 import { CoinLogo } from "@/features/crypto/components/coin-logo";
@@ -58,13 +59,16 @@ import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { CompanySkillsCard } from "@/features/company/components/company-skills";
 import { LogoRedraw } from "@/features/company/components/logo-redraw";
+import { TalentsCard } from "@/features/company/components/talents";
+import { WorldShowcase } from "@/features/company/world/world-showcase";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
 import { FirmSection, InfoTip, SectionNav, SubSection } from "@/features/company/components/firm-layout";
 import { ReputationCard } from "@/features/company/components/reputation-card";
 import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
 import { InterviewCard } from "@/features/company/components/interview-card";
 import { NewsPromoCard, TaxPromoCard } from "@/features/news/promo/promo-card";
-import type { CompanySkillsState, NewsPromo } from "@/features/game/types";
+import type { CompanySkillsState, CompanyTalentsState, NewsPromo, OwnTalent, Talent } from "@/features/game/types";
+import { TALENT_POOL } from "@/config/talents";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AutopilotCard } from "@/features/company/components/autopilot-card";
@@ -333,6 +337,83 @@ const SAMPLE_COMPANY_SKILLS: CompanySkillsState = {
   }),
   totalBps: { demand: 200, capacity: 0, cogs: 500, fixed: 0, quality: 0 },
   capBps: { ...BALANCE.companySkills.capBps },
+};
+
+/** Talente (ADR-199): three Stellen filled (one unhappy, one Mit-GF), the rest empty. */
+const sampleTalent = (i: number, status: Talent["status"]): Talent => {
+  const s = TALENT_POOL[i]!;
+  return {
+    key: s.key,
+    role: s.role,
+    tier: s.tier,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    avatar: s.avatar,
+    traits: [...s.traits],
+    wageDemandCents: s.wageCents,
+    benefitDemands: [...s.benefits],
+    minReputation: s.minReputation,
+    minAwarenessBps: s.minAwarenessBps,
+    minForm: s.minForm,
+    effectBps: s.effectBps,
+    status,
+    employer: status === "employed" ? { companyId: "x", name: "Nordlicht Werke" } : null,
+    poachMinCostCents: status === "employed" ? Math.round(s.wageCents * 1.15) : null,
+    offerPending: false,
+    restingUntil: null,
+    isCoCeo: false,
+  };
+};
+const sampleOwn = (i: number, satisfactionBps: number, coCeo = false): OwnTalent => ({
+  ...sampleTalent(i, "mine"),
+  isCoCeo: coCeo,
+  wageCents: TALENT_POOL[i]!.wageCents,
+  benefits: [...TALENT_POOL[i]!.benefits],
+  costCents: TALENT_POOL[i]!.wageCents,
+  hiredAt: "2026-11-01T10:00:00Z",
+  satisfactionBps,
+  warned: satisfactionBps < 3_500,
+  coCeoAutonomy: "decide",
+  coCeoBudgetCents: 100_000,
+  coCeoSpentCents: 20_000,
+});
+const SAMPLE_OWN = [sampleOwn(42, 8_200), sampleOwn(3 * 44 + 30, 9_000, true), sampleOwn(9 * 44 + 2, 2_800)];
+const SAMPLE_TALENTS: CompanyTalentsState = {
+  facts: { reputation: 58, awarenessBps: 1_800, formRank: 2, expansionLevel: 1, freeCashCents: 4_000_000 },
+  seats: BALANCE.talents.roles.map((r) => ({
+    role: r.key,
+    effect: r.effect,
+    talent: SAMPLE_OWN.find((t) => t.role === r.key) ?? null,
+  })),
+  effectBps: { demand: 660, capacity: 0, cogs: 0, fixed: 220, quality: 0, awareness: 0, reputation: 0, morale: 0 },
+  capBps: { ...BALANCE.talents.capBps },
+  coCeoMax: BALANCE.talents.coCeo.max,
+  incoming: [],
+  outgoing: [],
+  events: [
+    {
+      id: 2,
+      talentKey: SAMPLE_OWN[1]!.key,
+      kind: "decision",
+      payload: { name: "Mit-GF", text: "hat den Autopiloten eingeschaltet." },
+      costCents: 0,
+      reversible: true,
+      createdAt: "2026-11-17T10:00:00Z",
+    },
+    {
+      id: 1,
+      talentKey: SAMPLE_OWN[0]!.key,
+      kind: "hired",
+      payload: { name: `${SAMPLE_OWN[0]!.firstName} ${SAMPLE_OWN[0]!.lastName}` },
+      costCents: 0,
+      reversible: false,
+      createdAt: "2026-11-17T09:00:00Z",
+    },
+  ],
+};
+const SAMPLE_TALENT_MARKET = {
+  facts: SAMPLE_TALENTS.facts,
+  talents: TALENT_POOL.slice(0, 44).map((_, i) => sampleTalent(i, i % 7 === 3 ? "employed" : "available")),
 };
 
 const SAMPLE_INTERVIEW = {
@@ -772,6 +853,20 @@ function Demo({ label, children, className }: { label: string; children: ReactNo
     </Card>
   );
 }
+
+/** The open vault of a level 15 player with half the income upgrades (ADR-201). */
+const SAMPLE_VAULT = {
+  accruedCents: 1_200_000,
+  capCents: 2_671_200,
+  rateCentsPerHour: 95_400,
+  factorBps: 10_000,
+  lastClaimedAt: null,
+  fullAt: "2026-11-18T08:00:00.000Z",
+  serverTime: "2026-11-17T20:00:00.000Z",
+  incomeCentsPerHour: 45_000,
+  levelFactorBps: 21_200,
+  capHours: 28,
+};
 
 export function Showcase() {
   const t = useTranslations("showcase");
@@ -1341,12 +1436,18 @@ export function Showcase() {
         <InterviewCard preview={SAMPLE_INTERVIEW} />
         <CompanySkillsCard preview={SAMPLE_COMPANY_SKILLS} />
         <LogoRedrawShowcase />
+        <TalentsCard preview={SAMPLE_TALENTS} previewMarket={SAMPLE_TALENT_MARKET} />
+        <WorldShowcase />
         <NewsPromoShowcase />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />
         <UpgradeCard upgradeKey="rhetoric" level={0} />
         <UpgradeCard upgradeKey="vault_interest" level={1} />
         <UpgradeCard upgradeKey="ai_turbo" level={0} />
+        <Card padding="lg" className="space-y-4">
+          <VaultYield vault={SAMPLE_VAULT} level={15} />
+          <VaultDeposits />
+        </Card>
         <Demo label="Krypto: Pixel-Coins der Markt-Coins (ADR-101)" className="flex-wrap justify-start gap-3">
           {CRYPTO.coins.map((c) => (
             <CoinLogo key={c.ticker} coin={{ ...c, logo: null }} scale={3} />

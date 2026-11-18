@@ -35,7 +35,7 @@ export async function unfoldCompany(page: Page) {
   }, ALL_SECTIONS);
 }
 
-export type CompanyTabName = "Dashboard" | "Controlling" | "Mitarbeiter" | "Buchhaltung" | "Geschäftsrat";
+export type CompanyTabName = "Dashboard" | "Controlling" | "Mitarbeiter" | "Standort" | "Buchhaltung" | "Geschäftsrat";
 
 export async function showTab(page: Page, name: CompanyTabName) {
   const tab = page.getByTestId("company-tabs").getByRole("tab", { name: new RegExp(name) });

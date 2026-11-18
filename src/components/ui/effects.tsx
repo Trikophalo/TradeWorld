@@ -28,10 +28,26 @@ interface EffectsState {
   remove: (id: number) => void;
 }
 
+const gone = new Set<number>();
+let flushing = false;
+
 const useEffects = create<EffectsState>((set) => ({
   particles: [],
   add: (particles) => set((state) => ({ particles: [...state.particles, ...particles] })),
-  remove: (id) => set((state) => ({ particles: state.particles.filter((p) => p.id !== id) })),
+  // Finished particles leave together once per frame: a big burst ends in one update, not a hundred nested ones.
+  remove: (id) => {
+    gone.add(id);
+    if (flushing) return;
+    flushing = true;
+    const flush = () => {
+      flushing = false;
+      const ids = new Set(gone);
+      gone.clear();
+      set((state) => ({ particles: state.particles.filter((p) => !ids.has(p.id)) }));
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(flush);
+    else flush();
+  },
 }));
 
 let nextId = 1;
@@ -55,21 +71,21 @@ export function flyCoins(from: Element, to: Element | null, count = 8): void {
 
 const CONFETTI_COLORS = ["var(--gain)", "var(--gold)", "var(--accent)", "var(--info)", "var(--fg-1)"];
 
-/** A burst of square pixel confetti from an element. */
-export function burstConfetti(from: Element, count = 28): void {
+/** A burst of square pixel confetti from an element; `colors` (CSS colours or tokens) default to the house mix. */
+export function burstConfetti(from: Element, count = 28, colors: readonly string[] = CONFETTI_COLORS, reach = 1): void {
   if (prefersReducedMotion()) return;
   const start = center(from.getBoundingClientRect());
   useEffects.getState().add(
     Array.from({ length: count }, (_, i) => {
       const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
-      const distance = 70 + Math.random() * 110;
+      const distance = (70 + Math.random() * 110) * reach;
       return {
         id: nextId++,
         kind: "confetti" as const,
         from: start,
         to: { x: start.x + Math.cos(angle) * distance, y: start.y + Math.sin(angle) * distance + 60 },
         delay: Math.random() * 0.05,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        color: colors[i % colors.length],
         rotate: Math.round(Math.random() * 4) * 90,
       };
     }),
