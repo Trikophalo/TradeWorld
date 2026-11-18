@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "sounds": "tsx scripts/gen-sounds.ts",
     "icons": "tsx scripts/gen-icons.ts",
+    "worldmap": "tsx scripts/gen-world-map.ts",
     "artworks": "tsx scripts/gen-artworks.ts",
     "furniture": "tsx scripts/gen-furniture.ts",
     "patchnotes": "tsx scripts/gen-patch-notes.ts"

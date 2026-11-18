@@ -198,7 +198,9 @@ select tests.assert(
            'get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
            'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee',
            -- risks and insurance of the own company (ADR-209)
-           'get_company_risks', 'set_company_insurance']
+           'get_company_risks', 'set_company_insurance',
+           -- fixed and variable costs of the last hour (ADR-208, Nachtrag)
+           'get_company_hour_costs']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

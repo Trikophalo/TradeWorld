@@ -90,6 +90,7 @@ import {
   type DemoListedStock,
 } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
+import { demoHourCosts } from "./demo/hour-costs";
 import { demoRisks, demoSetInsurance } from "./demo/risks";
 import { wealthSource, wealthTotal } from "@/features/rich-list/wealth";
 import {
@@ -2697,6 +2698,27 @@ export const demoEngine: GameEngine = {
     const mine = (await company.engine.myCompany()).company;
     if (!mine) throw new GameError("company_not_found");
     return demoRisks(mine.id, company.worth()?.cents ?? 0, mine.live?.revenuePerHourCents ?? 0);
+  },
+
+  companyHourCosts: async () => {
+    const mine = (await company.engine.myCompany()).company;
+    if (!mine) throw new GameError("company_not_found");
+    const last = mine.hours.at(-1);
+    const risks = demoRisks(mine.id, company.worth()?.cents ?? 0, mine.live?.revenuePerHourCents ?? 0);
+    const premium = risks.insurance.levels.find((l) => l.level === risks.insurance.level)?.premiumBps ?? 0;
+    const seats = (await talents.companyTalents()).seats;
+    return demoHourCosts({
+      hourStart: last?.hourStart ?? null,
+      revenueCents: last?.revenueCents ?? 0,
+      profitCents: last?.profitCents ?? 0,
+      playerWagesCents: last?.playerWagesPaidCents ?? 0,
+      aiWagesCents: last?.aiWagesPaidCents ?? mine.live?.aiWagesPerHourCents ?? 0,
+      fixedCents: mine.live?.fixedPerHourCents ?? 0,
+      marketingCents: mine.live?.marketingPerHourCents ?? 0,
+      talentsCents: seats.reduce((s, x) => s + (x.talent?.costCents ?? 0), 0),
+      premiumBps: premium,
+      overheadBps: Math.max(0, risks.overheadBps),
+    });
   },
 
   setCompanyInsurance: async (_requestId, level) => {

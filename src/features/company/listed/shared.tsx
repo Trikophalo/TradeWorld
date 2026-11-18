@@ -149,6 +149,7 @@ export function Stat({
   tone,
   className,
   testId,
+  uniform,
 }: {
   label: string;
   children: ReactNode;
@@ -158,9 +159,18 @@ export function Stat({
   tone?: "gain" | "loss" | "warn";
   className?: string;
   testId?: string;
+  /** Always three single lines (label, value, hint, the hint line kept empty if there is none): equal-size tiles. */
+  uniform?: boolean;
 }) {
   return (
-    <div className={cn("min-w-0 rounded-md bg-surface-2 px-3 py-2.5", className)} data-testid={testId}>
+    <div
+      className={cn(
+        "min-w-0 rounded-md bg-surface-2 px-3 py-2.5",
+        uniform && "flex flex-col justify-center",
+        className,
+      )}
+      data-testid={testId}
+    >
       <p className="flex items-center gap-1 text-xs text-fg-3">
         <span className="min-w-0 truncate">{label}</span>
         {info && <InfoTip text={info} label={label} className="size-4" />}
@@ -173,7 +183,15 @@ export function Stat({
       >
         {children}
       </p>
-      {hint && <p className="truncate nums text-xs text-fg-3">{hint}</p>}
+      {hint ? (
+        <p className="truncate nums text-xs text-fg-3">{hint}</p>
+      ) : (
+        uniform && (
+          <p aria-hidden className="text-xs">
+            {" "}
+          </p>
+        )
+      )}
     </div>
   );
 }

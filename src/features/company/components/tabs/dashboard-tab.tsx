@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { LiveMoney, ShortMoney } from "@/components/ui/live-money";
@@ -25,6 +26,7 @@ import { useCompanyAutopilot } from "../autopilot-card";
 import { COMPANY_MOVES_KEY, moveText } from "../company-moves";
 import { COMPANY_SKILLS_KEY } from "../company-skills";
 import { COMPANY_TALENTS_KEY } from "../talents";
+import { HourCostsSheet, useHourCosts, type CostKind } from "../hour-costs";
 import { countryOf, useWorld } from "../../world/hooks";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { ChartLink, DashLink, FirmSection, SectionNav, useWhere, type NavItem } from "../firm-layout";
@@ -197,14 +199,56 @@ function KpiTile({
   ...stat
 }: Omit<Parameters<typeof Stat>[0], "testId"> & { target: CompanyTarget; testId: string; go: Go }) {
   const where = useWhere();
+  return <TileFrame link={where(target)} onGo={() => go(target)} testId={testId} {...stat} />;
+}
+
+/**
+ * The frame of every number tile: label, value and hint each on one line (cut with …) and the link hint below, so all
+ * tiles of the grid have the same size (ADR-208, Nachtrag).
+ */
+function TileFrame({
+  link,
+  onGo,
+  testId,
+  ...stat
+}: Omit<Parameters<typeof Stat>[0], "testId"> & { link: string; onGo: () => void; testId: string }) {
   return (
-    <DashLink hint={where(target)} onGo={() => go(target)} testId={`tile-${testId}`}>
+    <DashLink hint={link} onGo={onGo} testId={`tile-${testId}`} className="h-full w-full" compact>
       <Stat
         {...stat}
+        uniform
         testId={`stat-${testId}`}
-        className="h-full transition-colors duration-fast group-hover:bg-surface-3"
+        className="flex-1 transition-colors duration-fast group-hover:bg-surface-3"
       />
     </DashLink>
+  );
+}
+
+/** Fixkosten and variable Kosten of the last closed hour; a tap opens where they arise (ADR-208, Nachtrag). */
+function CostTile({ kind, onOpen }: { kind: CostKind; onOpen: (kind: CostKind) => void }) {
+  const t = useTranslations("hq.dashNew.costs");
+  const q = useHourCosts();
+  const data = q.data;
+  const cents = data ? (kind === "fixed" ? data.fixedCents : data.variableCents) : 0;
+  const ready = data && data.hourStart !== null;
+  return (
+    <TileFrame
+      link={t("open")}
+      onGo={() => onOpen(kind)}
+      testId={kind === "fixed" ? "fixed-costs" : "variable-costs"}
+      label={t(kind)}
+      hint={
+        !data
+          ? undefined
+          : !ready
+            ? t("none")
+            : data.revenueCents > 0
+              ? t("share", { percent: pct(Math.round((cents / data.revenueCents) * 10_000)) })
+              : undefined
+      }
+    >
+      {ready ? t("perHour", { amount: money(cents) }) : "–"}
+    </TileFrame>
   );
 }
 
@@ -302,158 +346,165 @@ function KpiGrid({
     before === undefined ? undefined : t("vsPrevious", { amount: signed(now - before) });
   const listing = company.listing?.status === "listed" ? company.listing : null;
   const reputation = reputationOf(company, listed);
+  const [costSheet, setCostSheet] = useState<CostKind | null>(null);
   return (
-    <div
-      className="grid grid-cols-2 gap-x-2 gap-y-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
-      data-testid="dashboard-numbers"
-    >
-      <KpiTile
-        go={go}
-        label={t("cash")}
-        testId="cash"
-        target={{ tab: "controlling", section: "money" }}
-        hint={
-          listed
-            ? listed.reservedCents > 0
-              ? t("cashFree", { free: money(listed.freeCashCents), reserved: money(listed.reservedCents) })
-              : t("cashAllFree")
-            : company.unpaidCents > 0
-              ? t("unpaid", { amount: money(company.unpaidCents) })
-              : undefined
-        }
+    <>
+      <HourCostsSheet kind={costSheet} onClose={() => setCostSheet(null)} />
+      <div
+        // every tile the same size: equal rows, each tile fills its cell (ADR-208, Nachtrag)
+        className="grid auto-rows-fr grid-cols-2 gap-x-2 gap-y-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+        data-testid="dashboard-numbers"
       >
-        {live ? (
-          <LiveMoney cents={company.cashCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
-        ) : (
-          <ShortMoney cents={company.cashCents} />
+        <KpiTile
+          go={go}
+          label={t("cash")}
+          testId="cash"
+          target={{ tab: "controlling", section: "money" }}
+          hint={
+            listed
+              ? listed.reservedCents > 0
+                ? t("cashFree", { free: money(listed.freeCashCents), reserved: money(listed.reservedCents) })
+                : t("cashAllFree")
+              : company.unpaidCents > 0
+                ? t("unpaid", { amount: money(company.unpaidCents) })
+                : undefined
+          }
+        >
+          {live ? (
+            <LiveMoney cents={company.cashCents} perHourCents={live.profitPerHourCents} asOf={live.lastHourAt} />
+          ) : (
+            <ShortMoney cents={company.cashCents} />
+          )}
+        </KpiTile>
+        <KpiTile
+          go={go}
+          label={t("revenueHour")}
+          testId="revenue"
+          target={{ tab: "controlling", section: "profit" }}
+          hint={last && delta(last.revenueCents, prev?.revenueCents)}
+        >
+          {last ? <ShortMoney cents={last.revenueCents} /> : "–"}
+        </KpiTile>
+        <KpiTile
+          go={go}
+          label={t("costsHour")}
+          testId="costs"
+          target={{ tab: "controlling", section: "business" }}
+          hint={last && delta(costs(last), prev ? costs(prev) : undefined)}
+        >
+          {last ? <ShortMoney cents={costs(last)} /> : "–"}
+        </KpiTile>
+        <CostTile kind="fixed" onOpen={setCostSheet} />
+        <CostTile kind="variable" onOpen={setCostSheet} />
+        <KpiTile
+          go={go}
+          label={t("profitHour")}
+          testId="profit"
+          target={{ tab: "controlling", section: "profit" }}
+          tone={last ? (last.profitCents >= 0 ? "gain" : "loss") : undefined}
+          hint={last && delta(last.profitCents, prev?.profitCents)}
+        >
+          {last ? <ShortMoney cents={last.profitCents} /> : "–"}
+        </KpiTile>
+        <KpiTile
+          go={go}
+          label={tn("awareness")}
+          testId="awareness"
+          target={{ tab: "controlling", section: "marketing" }}
+          hint={tn("marketingHint", { amount: money(company.marketingCentsPerQuarter) })}
+        >
+          {pct(company.awarenessBps)}
+        </KpiTile>
+        <KpiTile
+          go={go}
+          label={tn("quality")}
+          testId="quality"
+          target={{ tab: "controlling", section: "expansion" }}
+          tone={company.qualityBps >= 5_000 ? "gain" : undefined}
+        >
+          {pct(company.qualityBps)}
+        </KpiTile>
+        <Reveal feature="companySkills" className="min-w-0">
+          <SkillsTile go={go} />
+        </Reveal>
+        <Reveal feature="companyTalents" className="min-w-0">
+          <TalentsTile go={go} />
+        </Reveal>
+        <Reveal feature="companyWorld" className="min-w-0">
+          <LocationTile go={go} worthCents={company.worth?.cents ?? 0} />
+        </Reveal>
+        {reputation && (
+          <KpiTile
+            go={go}
+            label={t("reputation")}
+            testId="reputation"
+            target={{ tab: "controlling", section: "moves" }}
+            tone={reputation.value >= 50 ? "gain" : reputation.value < 35 ? "loss" : "warn"}
+            hint={t("reputationDemand", { percent: formatBps(Math.round((reputation.demandFactor - 1) * 10_000)) })}
+          >
+            {Math.round(reputation.value)}
+            <span className="text-sm font-normal text-fg-3"> / 100</span>
+          </KpiTile>
         )}
-      </KpiTile>
-      <KpiTile
-        go={go}
-        label={t("revenueHour")}
-        testId="revenue"
-        target={{ tab: "controlling", section: "profit" }}
-        hint={last && delta(last.revenueCents, prev?.revenueCents)}
-      >
-        {last ? <ShortMoney cents={last.revenueCents} /> : "–"}
-      </KpiTile>
-      <KpiTile
-        go={go}
-        label={t("costsHour")}
-        testId="costs"
-        target={{ tab: "controlling", section: "business" }}
-        hint={last && delta(costs(last), prev ? costs(prev) : undefined)}
-      >
-        {last ? <ShortMoney cents={costs(last)} /> : "–"}
-      </KpiTile>
-      <KpiTile
-        go={go}
-        label={t("profitHour")}
-        testId="profit"
-        target={{ tab: "controlling", section: "profit" }}
-        tone={last ? (last.profitCents >= 0 ? "gain" : "loss") : undefined}
-        hint={last && delta(last.profitCents, prev?.profitCents)}
-      >
-        {last ? <ShortMoney cents={last.profitCents} /> : "–"}
-      </KpiTile>
-      <KpiTile
-        go={go}
-        label={tn("awareness")}
-        testId="awareness"
-        target={{ tab: "controlling", section: "marketing" }}
-        hint={tn("marketingHint", { amount: money(company.marketingCentsPerQuarter) })}
-      >
-        {pct(company.awarenessBps)}
-      </KpiTile>
-      <KpiTile
-        go={go}
-        label={tn("quality")}
-        testId="quality"
-        target={{ tab: "controlling", section: "expansion" }}
-        tone={company.qualityBps >= 5_000 ? "gain" : undefined}
-      >
-        {pct(company.qualityBps)}
-      </KpiTile>
-      <Reveal feature="companySkills">
-        <SkillsTile go={go} />
-      </Reveal>
-      <Reveal feature="companyTalents">
-        <TalentsTile go={go} />
-      </Reveal>
-      <Reveal feature="companyWorld">
-        <LocationTile go={go} worthCents={company.worth?.cents ?? 0} />
-      </Reveal>
-      {reputation && (
-        <KpiTile
-          go={go}
-          label={t("reputation")}
-          testId="reputation"
-          target={{ tab: "controlling", section: "moves" }}
-          tone={reputation.value >= 50 ? "gain" : reputation.value < 35 ? "loss" : "warn"}
-          hint={t("reputationDemand", { percent: formatBps(Math.round((reputation.demandFactor - 1) * 10_000)) })}
-        >
-          {Math.round(reputation.value)}
-          <span className="text-sm font-normal text-fg-3"> / 100</span>
-        </KpiTile>
-      )}
-      {listed && (
-        <KpiTile
-          go={go}
-          label={t("satisfaction")}
-          testId="satisfaction"
-          target={{ tab: "staff", section: "staff-mood", target: "satisfaction" }}
-          tone={listed.satisfaction.zone === "green" ? "gain" : listed.satisfaction.zone === "red" ? "loss" : "warn"}
-        >
-          {Math.round(listed.satisfaction.value)}
-          <span className="text-sm font-normal text-fg-3"> / 100</span>
-        </KpiTile>
-      )}
-      {listing && (
-        <KpiTile
-          go={go}
-          label={t("sharePrice")}
-          testId="share"
-          target={{ tab: "controlling", section: "capital" }}
-          hint={listing.ticker ?? undefined}
-        >
-          {listing.lastPriceE4 !== null ? formatPrice(listing.lastPriceE4) : "–"}
-        </KpiTile>
-      )}
-      {listing && listedPending && <Skeleton className="h-[68px] rounded-md" />}
-      {listed && (
-        <>
+        {listed && (
           <KpiTile
             go={go}
-            label={t("upkeep")}
-            testId="upkeep"
-            target={{ tab: "controlling", section: "growth" }}
-            hint={t("upkeepRef", { amount: money(listed.refRevenueCents) })}
+            label={t("satisfaction")}
+            testId="satisfaction"
+            target={{ tab: "staff", section: "staff-mood", target: "satisfaction" }}
+            tone={listed.satisfaction.zone === "green" ? "gain" : listed.satisfaction.zone === "red" ? "loss" : "warn"}
           >
-            {t("perHour", { amount: money(listed.upkeepPerHourCents) })}
+            {Math.round(listed.satisfaction.value)}
+            <span className="text-sm font-normal text-fg-3"> / 100</span>
           </KpiTile>
+        )}
+        {listing && (
           <KpiTile
             go={go}
-            label={t("taxDue")}
-            testId="tax"
-            target={{ tab: "books", target: "taxes" }}
-            tone={listed.taxes.dueCents > 0 ? "warn" : undefined}
-            hint={t("taxRate", { percent: pct(listed.taxes.rateBps) })}
+            label={t("sharePrice")}
+            testId="share"
+            target={{ tab: "controlling", section: "capital" }}
+            hint={listing.ticker ?? undefined}
           >
-            {money(listed.taxes.dueCents)}
+            {listing.lastPriceE4 !== null ? formatPrice(listing.lastPriceE4) : "–"}
           </KpiTile>
-        </>
-      )}
-      <KpiTile
-        go={go}
-        label={tn("todo")}
-        testId="todo"
-        target={{ tab: "staff", section: "todo" }}
-        tone={urgentCount > 0 ? "loss" : todoCount > 0 ? "warn" : "gain"}
-        hint={urgentCount > 0 ? tn("urgent", { count: urgentCount }) : undefined}
-      >
-        {todoCount}
-      </KpiTile>
-    </div>
+        )}
+        {listing && listedPending && <Skeleton className="h-full min-h-[68px] rounded-md" />}
+        {listed && (
+          <>
+            <KpiTile
+              go={go}
+              label={t("upkeep")}
+              testId="upkeep"
+              target={{ tab: "controlling", section: "growth" }}
+              hint={t("upkeepRef", { amount: money(listed.refRevenueCents) })}
+            >
+              {t("perHour", { amount: money(listed.upkeepPerHourCents) })}
+            </KpiTile>
+            <KpiTile
+              go={go}
+              label={t("taxDue")}
+              testId="tax"
+              target={{ tab: "books", target: "taxes" }}
+              tone={listed.taxes.dueCents > 0 ? "warn" : undefined}
+              hint={t("taxRate", { percent: pct(listed.taxes.rateBps) })}
+            >
+              {money(listed.taxes.dueCents)}
+            </KpiTile>
+          </>
+        )}
+        <KpiTile
+          go={go}
+          label={tn("todo")}
+          testId="todo"
+          target={{ tab: "staff", section: "todo" }}
+          tone={urgentCount > 0 ? "loss" : todoCount > 0 ? "warn" : "gain"}
+          hint={urgentCount > 0 ? tn("urgent", { count: urgentCount }) : undefined}
+        >
+          {todoCount}
+        </KpiTile>
+      </div>
+    </>
   );
 }
 

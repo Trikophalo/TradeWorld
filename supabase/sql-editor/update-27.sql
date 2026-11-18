@@ -2227,484 +2227,426 @@ begin
 end;
 $$;
 
--- ===== supabase/updates/20261204010900_stock_unbounded.sql =====
--- ===== idempotent copy of migrations/20261204010900_stock_unbounded.sql =====
+-- ===== supabase/updates/20261204010600_company_hour_costs.sql =====
+-- ===== idempotent copy of migrations/20261204010600_company_hour_costs.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
 -- =============================================================================
--- NEXA · 010900 · Stocks without a daily limit, market forces against overheated stocks (ADR-214)
+-- Fixed and variable costs of the last closed hour (ADR-208, Nachtrag)
 -- =============================================================================
--- The owner: "Aktien sollen unendlich steigen und sinken können am Tag ohne Grenze. Aber es steigt gerade zu schnell.
--- Es soll mehr Ereignisse von außen geben, welche das verhindern oder verlangsamen."
---
--- 1. No daily band: trading.playerStocks.dailyBandBps is 0 in game_config (src/config/balance.ts). market_tick_at and
---    market_order_plan already treat 0 as "no band" (ADR-170/ADR-189), so the tick and the fair-fill path run as for
---    any other stock; the per-tick circuit breaker maxTickReturnBps (and with it the fair fill of big orders) stays.
--- 2. Market forces: once a minute (inside stock_news_run_due) every listed stock without an open hint may draw a force
---    from outside: profit taking, analyst downgrade, short-seller report, insider probe, margin calls, special audit,
---    capital-increase rumours, bubble warning; bargain hunters, buyback rumours and upgrades for stocks far below their
---    value; a small background rate (rotation, fund entry) for every stock. Chance and size grow with the heat of the
---    stock (price / fair value, 24-hour and 7-day gain). Waves hit several hot stocks at once (market correction,
---    sector correction, rate fears) or lift the coldest (relief rally). Formulas = src/lib/sim/market-forces.ts.
---    Every force is a stock hint with a lead (stock_tips.source = 'market', ADR-119): announced in the stock news and the
---    news feed, settled by stock_news_run_due through market_force_shock(), which moves the price and the mood
---    (sentiment) but never the fair value.
--- 3. stock_news_run_due: the 1200 definition plus (a) market hints do not hold back the ordinary news rhythm,
---    (b) they settle through market_force_shock, (c) market_forces_run() at the end.
---
--- Values: game_config.marketForces (src/config/market-forces.ts). Without that row no force is drawn.
--- New internal functions: market_force_heat, market_force_chance_per_hour, market_force_weight, market_force_pick,
--- market_force_move_bps, market_force_shock, market_forces_run. No new RPCs, no new error keys.
--- Idempotent: runs unchanged as supabase/updates/20261204010900_stock_unbounded.sql.
+-- The dashboard shows two tiles "Fixkosten" and "Variable Kosten" per hour; tapping one opens where the money went.
+-- get_company_hour_costs() reads the last row of player_company_hours of the own company and the ledger bookings of
+-- that hour (exact idempotency keys of player_company_close_hour, listed_hour_costs and world_hour_costs), so the parts
+-- add up to what the hour really paid. Nothing is written; no schema change.
+--   fixed:    wages_players, wages_ai, talents (current hourly cost of the hired talents), rent (base fixed costs with
+--             the country factor), marketing, upkeep (research, products, expansion, benefits of listed companies),
+--             advisor, subsidiaries, insurance, overhead (ADR-209: both are a share of the own revenue and part of
+--             cogs_cents; split out with macro_friction at today's company value)
+--   variable: goods (cogs_cents minus insurance and overhead), profit_share (ADR-206, job_rewards of the hour),
+--             location_fee (Standortgebühr, ADR-208), supply_fees (supply contracts, ADR-098)
+-- New RPC (founder): get_company_hour_costs(). Idempotent.
 
-alter table public.stock_tips add column if not exists source text not null default 'news';
-alter table public.stock_tips add column if not exists force_key text;
-alter table public.stock_tips add column if not exists sentiment_delta double precision not null default 0;
-do $$
-begin
-  if not exists (select 1 from pg_constraint where conname = 'stock_tips_source_check') then
-    alter table public.stock_tips add constraint stock_tips_source_check check (source in ('news', 'market'));
-  end if;
-end;
-$$;
-comment on column public.stock_tips.source is
-  'news: ordinary stock news (ADR-119); market: a market force against an overheated or a fallen stock (ADR-214).';
-comment on column public.stock_tips.force_key is 'Key of the market force (game_config marketForces.forces[].key or wave:<kind>).';
-comment on column public.stock_tips.sentiment_delta is 'Mood change applied with a market force when it comes true (ADR-214).';
-create index if not exists stock_tips_source_published_idx on public.stock_tips (source, published_at desc);
-
--- -----------------------------------------------------------------------------
--- Formulas (src/lib/sim/market-forces.ts)
--- -----------------------------------------------------------------------------
-
--- stockHeat: heat and cold of a stock; p_p24 / p_p7 null while there is no history
-create or replace function public.market_force_heat(p_price bigint, p_fair bigint, p_p24 bigint, p_p7 bigint, p_cfg jsonb,
-                                                    out heat double precision, out cold double precision)
-language plpgsql
-immutable
-set search_path = ''
-as $$
-declare
-  h       jsonb := coalesce(p_cfg -> 'heat', '{}'::jsonb);
-  v_prem  double precision := case when p_fair > 0 and p_price > 0 then ln(p_price::double precision / p_fair) else 0 end;
-  v_g24   double precision := case when p_p24 > 0 and p_price > 0 then ln(p_price::double precision / p_p24) else 0 end;
-  v_g7    double precision := case when p_p7 > 0 and p_price > 0 then ln(p_price::double precision / p_p7) else 0 end;
-  v_max   double precision := public.cfg_num(h, '{maxHeat}', 4);
-  v_gains double precision := 0;
-begin
-  if v_prem >= -public.cfg_num(h, '{gainGate}', 0.1) then
-    v_gains := greatest(0, v_g24 - public.cfg_num(h, '{gain24hFree}', 0.2)) / public.cfg_num(h, '{gain24hScale}', 0.4)
-             + greatest(0, v_g7 - public.cfg_num(h, '{gain7dFree}', 0.5)) / public.cfg_num(h, '{gain7dScale}', 0.8);
-  end if;
-  heat := least(v_max, greatest(0, v_prem - public.cfg_num(h, '{premiumFree}', 0.25)) / public.cfg_num(h, '{premiumScale}', 0.5)
-                       + v_gains);
-  cold := least(v_max, greatest(0, -v_prem - public.cfg_num(h, '{discountFree}', 0.3)) / public.cfg_num(h, '{discountScale}', 0.6)
-                       + greatest(0, -v_g24 - public.cfg_num(h, '{loss24hFree}', 0.3)) / public.cfg_num(h, '{loss24hScale}', 0.5));
-end;
-$$;
-
--- forceChancePerHour
-create or replace function public.market_force_chance_per_hour(p_heat double precision, p_cold double precision, p_cfg jsonb)
-returns double precision
-language sql
-immutable
-set search_path = ''
-as $$
-  select least(public.cfg_num(p_cfg, '{chance,maxPerHour}', 3),
-               public.cfg_num(p_cfg, '{chance,basePerHour}', 0.012)
-               + public.cfg_num(p_cfg, '{chance,perHeatPerHour}', 0.9) * p_heat
-               + public.cfg_num(p_cfg, '{chance,perColdPerHour}', 0.35) * p_cold);
-$$;
-
--- forceWeight
-create or replace function public.market_force_weight(p_force jsonb, p_heat double precision, p_cold double precision)
-returns double precision
-language sql
-immutable
-set search_path = ''
-as $$
-  select case p_force ->> 'when'
-           when 'hot' then case when p_heat > 0 and p_heat >= coalesce((p_force ->> 'minHeat')::double precision, 0)
-                                then (p_force ->> 'weight')::double precision * p_heat else 0 end
-           when 'cold' then (p_force ->> 'weight')::double precision * p_cold
-           else case when (p_heat > 0 and (p_force ->> 'direction')::integer > 0)
-                       or (p_cold > 0 and (p_force ->> 'direction')::integer < 0) then 0
-                     else (p_force ->> 'weight')::double precision end
-         end;
-$$;
-
--- pickForce: the force for a uniform draw p_u in [0, 1), in config order; null when none has weight
-create or replace function public.market_force_pick(p_heat double precision, p_cold double precision, p_u double precision,
-                                                    p_cfg jsonb)
+create or replace function public.company_hour_costs_json(p_company uuid)
 returns jsonb
 language plpgsql
-immutable
+stable
+security definer
 set search_path = ''
 as $$
 declare
-  v_forces jsonb := coalesce(p_cfg -> 'forces', '[]'::jsonb);
-  v_total  double precision := 0;
-  v_x      double precision;
-  v_w      double precision;
-  v_last   jsonb;
-  f        jsonb;
+  h        public.player_company_hours;
+  pc       public.player_companies;
+  v_acc    uuid;
+  k        text;
+  v_lx     jsonb := '{}'::jsonb;
+  v_subs   bigint := 0;
+  v_fee    bigint := 0;
+  v_upkeep bigint := 0;
+  v_adv    bigint := 0;
+  v_rent   bigint;
+  v_tal    bigint;
+  v_share  bigint;
+  v_own    bigint;
+  v_total  double precision;
+  v_prem   double precision;
+  v_ins    bigint;
+  v_over   bigint;
+  v_goods  bigint;
+  v_fixed  jsonb;
+  v_var    jsonb;
+  r        record;
 begin
-  for f in select value from jsonb_array_elements(v_forces) loop
-    v_total := v_total + public.market_force_weight(f, p_heat, p_cold);
+  select * into pc from public.player_companies where company_id = p_company;
+  select * into h from public.player_company_hours x where x.company_id = p_company order by x.hour_start desc limit 1;
+  if h.company_id is null then
+    return jsonb_build_object('company_id', p_company, 'hour_start', null, 'revenue_cents', 0, 'fixed_cents', 0,
+                              'variable_cents', 0, 'fixed', '[]'::jsonb, 'variable', '[]'::jsonb);
+  end if;
+  v_acc := public.company_cash_account(p_company);
+  k := 'pch:' || p_company::text || ':' || to_char(h.hour_start at time zone 'UTC', 'YYYYMMDDHH24');
+  -- what left the cash under the hour's exact keys
+  for r in select t.idempotency_key as key, coalesce(sum(-e.amount_cents), 0)::bigint as cents
+             from public.ledger_transactions t
+             join public.ledger_entries e on e.transaction_id = t.id and e.account_id = v_acc
+            where t.idempotency_key = any (array[k || ':lx:research', k || ':lx:product', k || ':lx:expansion',
+                                                 k || ':lx:benefit', k || ':lx:advisor', k || ':world:subs',
+                                                 k || ':world:fee'])
+            group by t.idempotency_key loop
+    if r.key = k || ':lx:advisor' then
+      v_adv := greatest(0, r.cents);
+    elsif r.key = k || ':world:subs' then
+      v_subs := greatest(0, r.cents);
+    elsif r.key = k || ':world:fee' then
+      v_fee := greatest(0, r.cents);
+    else
+      v_upkeep := v_upkeep + greatest(0, r.cents);
+    end if;
   end loop;
-  if v_total <= 0 then
+  -- fixed_cents holds the base fixed costs plus the listed and world costs of the hour
+  v_rent := greatest(0, h.fixed_cents - v_upkeep - v_adv - v_subs - v_fee);
+  select coalesce(sum(public.talent_offer_cost(t.wage_cents, t.benefits)), 0)::bigint into v_tal
+    from public.talents t where t.company_id = p_company;
+  select coalesce(sum(j.amount_cents), 0)::bigint into v_share
+    from public.job_rewards j
+   where j.company_id = p_company and j.kind = 'profit_share'
+     and j.source_key like 'profit:%:' || floor(extract(epoch from h.hour_start))::bigint::text;
+  -- ADR-209: overhead and the insurance premium move with the own revenue inside cogs_cents
+  v_own := greatest(0, h.revenue_cents - coalesce(h.contract_revenue_cents, 0) - coalesce(h.strength_bonus_cents, 0));
+  v_total := coalesce((public.macro_friction(public.company_worth_cents(p_company), pc.insurance_level)
+                       ->> 'extra_cost_share')::double precision, 0);
+  v_prem := public.cfg_num(public.macro_cfg(),
+                           array['insurance', 'levels', greatest(0, coalesce(pc.insurance_level, 0))::text, 'premiumBps'], 0)
+            / 10000.0;
+  v_ins := floor(v_own * least(v_prem, v_total))::bigint;
+  v_over := floor(v_own * greatest(0, v_total - v_prem))::bigint;
+  if v_ins + v_over > h.cogs_cents then
+    v_ins := case when v_ins + v_over > 0 then h.cogs_cents * v_ins / (v_ins + v_over) else 0 end;
+    v_over := h.cogs_cents - v_ins;
+  end if;
+  v_goods := greatest(0, h.cogs_cents - v_ins - v_over);
+  v_fixed := jsonb_build_array(
+    jsonb_build_object('key', 'wages_players', 'cents', coalesce(h.player_wages_paid_cents, 0)),
+    jsonb_build_object('key', 'wages_ai', 'cents', coalesce(h.ai_wages_paid_cents, 0)),
+    jsonb_build_object('key', 'talents', 'cents', v_tal),
+    jsonb_build_object('key', 'rent', 'cents', v_rent),
+    jsonb_build_object('key', 'marketing', 'cents', coalesce(h.marketing_cents, 0)),
+    jsonb_build_object('key', 'upkeep', 'cents', v_upkeep),
+    jsonb_build_object('key', 'advisor', 'cents', v_adv),
+    jsonb_build_object('key', 'subsidiaries', 'cents', v_subs),
+    jsonb_build_object('key', 'insurance', 'cents', v_ins),
+    jsonb_build_object('key', 'overhead', 'cents', v_over));
+  v_var := jsonb_build_array(
+    jsonb_build_object('key', 'goods', 'cents', v_goods),
+    jsonb_build_object('key', 'profit_share', 'cents', v_share),
+    jsonb_build_object('key', 'location_fee', 'cents', v_fee),
+    jsonb_build_object('key', 'supply_fees', 'cents', coalesce(h.supply_fee_paid_cents, 0)));
+  return jsonb_build_object(
+    'company_id', p_company,
+    'hour_start', h.hour_start,
+    'revenue_cents', h.revenue_cents,
+    'fixed_cents', (select coalesce(sum((x ->> 'cents')::bigint), 0) from jsonb_array_elements(v_fixed) x),
+    'variable_cents', (select coalesce(sum((x ->> 'cents')::bigint), 0) from jsonb_array_elements(v_var) x),
+    'fixed', v_fixed,
+    'variable', v_var);
+end;
+$$;
+revoke all on function public.company_hour_costs_json(uuid) from public, anon, authenticated;
+
+create or replace function public.get_company_hour_costs()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return public.company_hour_costs_json(public.require_own_company());
+end;
+$$;
+comment on function public.get_company_hour_costs() is
+  'RPC (founder): fixed and variable costs of the last closed hour of the own company, each split by where they '
+  'arise (ADR-208, Nachtrag).';
+revoke all on function public.get_company_hour_costs() from public, anon;
+grant execute on function public.get_company_hour_costs() to authenticated;
+
+-- ===== supabase/updates/20261204010700_withdraw_interval.sql =====
+-- ===== idempotent copy of migrations/20261204010700_withdraw_interval.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 10700 · Withdrawals from the own company every 6 hours (ADR-213)
+-- =============================================================================
+-- The owner: "Man soll Geld aus der Firma alle 6 Stunden entnehmen können."
+-- Until now company_withdraw() had no timing rule at all; it only refused money that is not free (open bills,
+-- ADR-083; money the board earmarked, ADR-167; issue proceeds for issueProceedsLockHours, ADR-170) and withdrawals
+-- while the board's ban holds (ADR-167). The UI showed neither the issue lock nor any rhythm.
+-- * player_companies.last_withdraw_at: the last successful withdrawal (set by company_withdraw()).
+-- * company_withdraw(): a further withdrawal only startups.withdrawIntervalHours (6) after the last one, error
+--   withdraw_cooldown (NX213). The automatic founder payout (ADR-086) and dividends are not withdrawals and do not
+--   count. Full copy of the latest definition (m3d + the listed checks of 20261204005400) with the rule.
+-- * company_withdraw_json(): interval, last and next possible withdrawal, issue-locked money and until when;
+--   company_state() (full copy of 20261204009500) returns it as 'withdraw' for the money card's countdown.
+-- Idempotent: runs unchanged as supabase/updates/.
+-- =============================================================================
+
+alter table public.player_companies add column if not exists last_withdraw_at timestamptz;
+comment on column public.player_companies.last_withdraw_at is
+  'Last successful company_withdraw() (ADR-213); the next one is allowed startups.withdrawIntervalHours later.';
+
+-- Error key withdraw_cooldown (NX213)
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''withdraw_cooldown''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    else 'NX007'
+$q$, $q$    when 'withdraw_cooldown'          then 'NX213'
+    else 'NX007'
+$q$);
+    if position('''withdraw_cooldown''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add withdraw_cooldown (NX213) by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+-- The next moment the founder may withdraw again; null when a withdrawal is allowed now
+create or replace function public.company_withdraw_next_at(p_company uuid)
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when x.next_at > public.game_now() then x.next_at end
+    from (select pc.last_withdraw_at
+                 + make_interval(secs => greatest(0, public.config_double('startups', '{withdrawIntervalHours}', 6)) * 3600)
+                 as next_at
+            from public.player_companies pc where pc.company_id = p_company) x;
+$$;
+comment on function public.company_withdraw_next_at(uuid) is
+  'When the founder may withdraw from the company again (ADR-213); null when allowed now.';
+
+-- What the money card needs to say when and how much the founder may withdraw
+create or replace function public.company_withdraw_json(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_listed boolean := public.listed_is(p_company);
+  v_locked bigint := 0;
+  v_until  timestamptz;
+begin
+  if v_listed then
+    v_locked := public.listed_issue_locked_cents(p_company);
+    if v_locked > 0 then
+      select max(e.created_at) + public.config_double('startups', '{ipo,issueProceedsLockHours}', 72) * interval '1 hour'
+        into v_until
+        from public.ledger_accounts ca
+        join public.ledger_entries e on e.account_id = ca.id and e.amount_cents > 0
+        join public.ledger_transactions t on t.id = e.transaction_id and t.ref_type = 'share_offer'
+       where ca.owner_company_id = p_company and ca.kind = 'company_cash'
+         and e.created_at > now() - public.config_double('startups', '{ipo,issueProceedsLockHours}', 72) * interval '1 hour';
+    end if;
+  end if;
+  return (select jsonb_build_object(
+            'interval_hours', public.config_double('startups', '{withdrawIntervalHours}', 6),
+            'last_at', pc.last_withdraw_at,
+            'next_at', public.company_withdraw_next_at(p_company),
+            'issue_locked_cents', v_locked,
+            'issue_locked_until', v_until)
+            from public.player_companies pc where pc.company_id = p_company);
+end;
+$$;
+comment on function public.company_withdraw_json(uuid) is
+  'Withdrawal rhythm of the own company (ADR-213): interval, last and next withdrawal, issue proceeds still locked.';
+
+-- company_withdraw as in m3d with the listed checks of 20261204005400 (full copy), plus the 6-hour rhythm
+create or replace function public.company_withdraw(p_request_id uuid, p_amount_cents bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  v_free    bigint;
+  v_next    timestamptz;
+begin
+  v_company := public.require_own_company();
+  v_player := public.require_player();
+  if p_request_id is null or p_amount_cents is null or p_amount_cents < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'company_withdraw');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.player_companies pc where pc.company_id = v_company for update;
+  perform public.listed_withdraw_check(v_company, p_amount_cents);  -- ADR-167
+  select a.balance_cents - pc.unpaid_cents - public.listed_reserved_cents(v_company) into v_free
+    from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
+   where a.owner_company_id = v_company and a.kind = 'company_cash';
+  if coalesce(v_free, 0) < p_amount_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  -- ADR-213: one withdrawal every startups.withdrawIntervalHours (checked last, so a too large amount still says why)
+  v_next := public.company_withdraw_next_at(v_company);
+  if v_next is not null then
+    perform public.api_error('withdraw_cooldown');
+  end if;
+  perform public.ledger_transfer(public.company_cash_account(v_company), public.ledger_player_account(v_player, 'player_cash'),
+                                 p_amount_cents, 'transfer', 'Entnahme', 'company', v_company,
+                                 'withdraw:' || p_request_id::text, v_player);
+  perform public.loan_withhold(v_player, p_amount_cents, 'withdraw:' || p_request_id::text);
+  update public.player_companies set last_withdraw_at = public.game_now() where company_id = v_company;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('company', public.company_state(v_company)));
+end;
+$$;
+
+-- company_state as in 20261204009500_toplists.sql (full copy), plus 'withdraw'
+create or replace function public.company_state(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  pc       public.player_companies;
+  c        public.companies;
+  v_team   jsonb;
+  v_tier   jsonb;
+  v_sb     jsonb;
+  v_level  integer;
+  v_cash   bigint;
+  v_spread double precision;
+  v_last   jsonb;
+  v_hist   jsonb;
+  v_cost   bigint;
+  v_mf     double precision;
+  v_camp   public.company_campaigns;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
     return null;
   end if;
-  v_x := p_u * v_total;
-  for f in select value from jsonb_array_elements(v_forces) loop
-    v_w := public.market_force_weight(f, p_heat, p_cold);
-    if v_w > 0 then
-      v_x := v_x - v_w;
-      v_last := f;
-      if v_x < 0 then
-        return f;
-      end if;
-    end if;
-  end loop;
-  return v_last;
+  select * into c from public.companies where id = p_company;
+  v_team := public.player_company_team(p_company);
+  v_tier := public.company_tier_cfg(pc.tier);
+  v_sb := public.company_tier_cfg('small_business');
+  select p.level into v_level from public.profiles p where p.id = pc.founder_id;
+  v_cash := coalesce((select a.balance_cents from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash'), 0);
+  v_spread := public.config_double('startups', '{estimate,initialSpread}', 2.3)
+            * power(public.config_double('startups', '{estimate,decayPerQuarter}', 0.85), pc.quarters_active);
+  select jsonb_build_object(
+           'label', r.label, 'demand_cents', r.demand_cents, 'capacity_cents', r.capacity_cents,
+           'revenue_cents', r.revenue_cents, 'cogs_cents', r.cogs_cents, 'fixed_cents', r.fixed_cents,
+           'ai_worker_cents', r.ai_worker_cents, 'marketing_cents', r.marketing_cents, 'wages_cents', r.wages_cents,
+           'operating_profit_cents', r.operating_profit_cents, 'utilization_bps', r.utilization_bps,
+           'bonus_cents', r.bonus_cents)
+    into v_last
+    from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+   where r.company_id = p_company order by gq.ends_at desc limit 1;
+  select coalesce(jsonb_agg(jsonb_build_object('label', h.label, 'revenue_cents', h.revenue_cents,
+                                               'profit_cents', h.operating_profit_cents) order by h.ends_at), '[]'::jsonb)
+    into v_hist
+    from (select r.label, r.revenue_cents, r.operating_profit_cents, gq.ends_at
+            from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+           where r.company_id = p_company order by gq.ends_at desc limit 12) h;
+  v_cost := public.company_upgrade_cost(pc.tier);
+  -- the estimate describes the market the company reaches (ADR-083)
+  v_mf := public.company_market_factor(pc.tier, pc.expansion_level);
+  v_camp := public.company_campaign_at(p_company, public.game_now());
+  return jsonb_build_object(
+    'id', c.id,
+    'name', c.name,
+    'idea', pc.idea,
+    'sector', c.sector_key,
+    'color', c.brand_color,
+    'logo', public.company_logo(p_company),
+    'logo_hidden', pc.logo_hidden,
+    'founder_has_job', exists (select 1 from public.player_jobs x where x.player_id = pc.founder_id and x.status = 'active'),
+    'full_time_from', public.config_double('startups', '{fullTimeFromEmployees}', 5)::integer,
+    'training_from', public.config_double('startups', '{training,fromEmployees}', 5)::integer,
+    'headcount', public.company_headcount(p_company),
+    'tier', pc.tier,
+    'founded_at', c.founded_at,
+    'cash_cents', v_cash,
+    'value_cents', public.company_value_cents(p_company),
+    'unpaid_cents', pc.unpaid_cents,
+    'distress', pc.distress,
+    'distress_quarters', pc.distress_quarters,
+    'grace_quarters', public.config_double('startups', '{insolvency,graceQuarters}', 4)::integer,
+    'pay_factor_bps', pc.pay_factor_bps,
+    'product_key', public.company_product(p_company) ->> 'key',
+    'stage', (v_team ->> 'stage')::integer,
+    'stages', public.company_stages_json(p_company),
+    'awareness_bps', round(pc.awareness * 10000)::integer,
+    'quality_bps', round(pc.quality * 10000)::integer,
+    'quarters_active', pc.quarters_active,
+    'estimate_low_cents', round(pc.potential_annual_cents * v_mf
+                                * exp(-v_spread * (0.3 + 0.7 * public.uniform_from_text(pc.company_id::text || ':' || pc.quarters_active || ':low'))))::bigint,
+    'estimate_high_cents', round(pc.potential_annual_cents * v_mf
+                                 * exp(v_spread * (0.3 + 0.7 * public.uniform_from_text(pc.company_id::text || ':' || pc.quarters_active || ':high'))))::bigint,
+    'marketing_cents_per_quarter', pc.marketing_cents_per_quarter,
+    'ai_workers', pc.ai_workers,
+    'ai_worker_cost_cents', public.config_bigint('startups', '{aiWorkerCostCentsPerQuarter}', 72000),
+    'ai_wage_cents_per_hour', public.config_bigint('startups', '{aiWorkerWageCentsPerHour}', 12000),
+    'ai_worker_skills', to_jsonb(pc.ai_worker_skills),
+    'max_employees', public.company_max_employees(p_company),
+    'employees', (v_team ->> 'employees')::integer,
+    'open_postings', (select count(*) from public.job_postings jp where jp.company_id = p_company and jp.status = 'open')::integer,
+    'pending_applications', (select count(*) from public.job_applications a join public.job_postings jp on jp.id = a.posting_id
+                              where jp.company_id = p_company and a.status = 'pending')::integer,
+    'founder_productivity_bps', (v_team ->> 'founder_productivity_bps')::integer,
+    'team_productivity_bps', (v_team ->> 'team_productivity_bps')::integer,
+    'capacity_cents', round((v_team ->> 'capacity_cents')::bigint * public.company_capacity_factor(pc.expansion_level))::bigint,
+    'next_quarter_at', coalesce((public.current_game_quarter()).ends_at, public.game_now()),
+    'can_upgrade', public.company_next_tier(pc.tier) is not null
+                   and coalesce(v_level, 1) >= (public.company_tier_cfg(public.company_next_tier(pc.tier)) ->> 'minLevel')::integer,
+    'listing', public.company_listing_json(p_company, pc.founder_id),
+    'can_go_public', c.phase = 'private' and public.company_open_offer(p_company) is null
+                     and coalesce(public.config_jsonb('startups', '{ipo,fromTiers}'), '["garage", "small_business", "gmbh"]'::jsonb) ? pc.tier
+                     and coalesce(v_level, 1) >= public.config_double('startups', '{ipo,minLevel}', 6),
+    'can_capital_increase', c.phase = 'listed' and public.company_open_offer(p_company) is null,
+    'upgrade_cost_cents', v_cost,
+    'last_quarter', v_last,
+    'history', v_hist,
+    'live', public.company_live_json(p_company),
+    'hours', public.company_hours_json(p_company))
+    || jsonb_build_object(
+         'banner', pc.banner,
+         -- ADR-083: price strategy, contract work, expansion
+         'price_level', pc.price_level,
+         'contract_work', pc.contract_work,
+         'expansion_level', pc.expansion_level,
+         'can_expand', public.company_can_expand(pc.tier),
+         'expansion_cost_cents', case when public.company_can_expand(pc.tier)
+                                      then public.company_expansion_cost_cents(pc.expansion_level) end,
+         'market_factor', round(v_mf::numeric, 4),
+         -- ADR-086: share of the hourly profit paid to the founder automatically
+         'founder_payout_bps', pc.founder_payout_bps,
+         -- ADR-097: the running campaign and the current prices (from the demand of the last closed hour)
+         'campaign', case when v_camp.id is not null then public.campaign_json(v_camp.id) end,
+         'campaign_costs', public.company_campaign_costs(p_company),
+         -- ADR-176: slow strengths with their reward, and a stuck hourly close
+         'strengths', public.company_strengths_json(p_company),
+         -- ADR-183: the reputation of every company and extra steps of the close that failed
+         'reputation', public.company_reputation_json(p_company),
+         'close_warnings', public.company_close_warnings_json(p_company),
+         -- ADR-203: the value of the company as Top-Unternehmen and the net worth count it
+         'worth', public.company_worth_json(p_company),
+         -- ADR-213: when the founder may withdraw again and what else holds money back
+         'withdraw', public.company_withdraw_json(p_company));
 end;
 $$;
 
--- forceMoveBps: uniform(min, max) × (1 + severityPerHeat × heat or cold), at most maxMoveBps (positive)
-create or replace function public.market_force_move_bps(p_force jsonb, p_heat double precision, p_cold double precision,
-                                                        p_u double precision, p_cfg jsonb)
-returns integer
-language sql
-immutable
-set search_path = ''
-as $$
-  select greatest(1, least(public.cfg_num(p_cfg, '{maxMoveBps}', 4500),
-           round(((p_force ->> 'minMoveBps')::double precision
-                  + p_u * ((p_force ->> 'maxMoveBps')::double precision - (p_force ->> 'minMoveBps')::double precision))
-                 * (1 + public.cfg_num(p_cfg, '{severityPerHeat}', 0.45)
-                        * case when (p_force ->> 'direction')::integer < 0 then p_heat else p_cold end))))::integer;
-$$;
-
--- -----------------------------------------------------------------------------
--- The shock: price and mood move, the fair value and the EMAs stay (the value funds pull back to the anchor)
--- -----------------------------------------------------------------------------
-create or replace function public.market_force_shock(p_security uuid, p_move_bps integer, p_sentiment double precision,
-                                                     p_now timestamptz)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  st    public.security_sim_state;
-  v_res jsonb;
-begin
-  select * into st from public.security_sim_state where security_id = p_security for update;
-  v_res := public.event_price_shock(p_security, p_move_bps, p_now);
-  if st.security_id is not null then
-    update public.security_sim_state
-       set fair_value_e4 = st.fair_value_e4,
-           event_value_factor = st.event_value_factor,
-           ema_fast = st.ema_fast,
-           ema_slow = st.ema_slow,
-           sentiment = greatest(-1, least(1, st.sentiment + coalesce(p_sentiment, 0))),
-           updated_at = now()
-     where security_id = p_security;
-  end if;
-  return v_res;
-end;
-$$;
-comment on function public.market_force_shock(uuid, integer, double precision, timestamptz) is
-  'Internal (ADR-214): a market force moves the price (as event_price_shock) and the mood, never the fair value.';
-
--- -----------------------------------------------------------------------------
--- Drawing forces once a minute
--- -----------------------------------------------------------------------------
-create or replace function public.market_forces_run(p_now timestamptz default null)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_cfg      jsonb := public.config_jsonb('marketForces');
-  v_now      timestamptz := coalesce(p_now, public.game_now());
-  v_lead_min double precision;
-  v_lead_max double precision;
-  v_rel      integer;
-  v_sent     double precision;
-  v_words    jsonb;
-  v_new      integer := 0;
-  v_waves    integer := 0;
-  v_force    jsonb;
-  v_move     integer;
-  v_strength smallint;
-  v_head     text;
-  v_body     text;
-  v_news     bigint;
-  v_kind     text;
-  v_mean     double precision;
-  v_names    text;
-  v_sector   text;
-  v_sec_name text;
-  v_hit      uuid[];
-  r          record;
-begin
-  if v_cfg is null or jsonb_typeof(v_cfg) <> 'object' then
-    return jsonb_build_object('skipped', 'no_config');
-  end if;
-  v_lead_min := greatest(1, public.cfg_num(v_cfg, '{leadMinMinutes}', 3));
-  v_lead_max := greatest(v_lead_min, public.cfg_num(v_cfg, '{leadMaxMinutes}', 15));
-  v_rel      := least(10000, greatest(0, public.cfg_num(v_cfg, '{reliabilityBps}', 8500)))::integer;
-  v_sent     := public.cfg_num(v_cfg, '{sentimentPerMove}', 2);
-  v_words    := coalesce(v_cfg -> 'strengthWords', '["leicht", "spürbar", "deutlich"]'::jsonb);
-
-  if to_regclass('pg_temp.market_force_heat_tmp') is not null then
-    drop table pg_temp.market_force_heat_tmp;
-  end if;
-  create temporary table market_force_heat_tmp (
-    security_id uuid primary key, name text, sector_key text, heat double precision, cold double precision
-  ) on commit drop;
-  insert into pg_temp.market_force_heat_tmp (security_id, name, sector_key, heat, cold)
-  select sec.id, sec.name, sec.sector_key, h.heat, h.cold
-    from public.securities sec
-    join public.security_quotes q on q.security_id = sec.id
-    join public.security_sim_state st on st.security_id = sec.id
-    cross join lateral public.market_force_heat(
-      q.last_price_e4, st.fair_value_e4,
-      (select c.close_e4 from public.candles c
-        where c.security_id = sec.id and c.interval = '1h'
-          and c.bucket_start <= v_now - interval '24 hours' and c.bucket_start > v_now - interval '48 hours'
-        order by c.bucket_start desc limit 1),
-      (select c.close_e4 from public.candles c
-        where c.security_id = sec.id and c.interval = '1h'
-          and c.bucket_start <= v_now - interval '7 days' and c.bucket_start > v_now - interval '8 days'
-        order by c.bucket_start desc limit 1),
-      v_cfg) h
-   where sec.kind = 'stock' and sec.status = 'listed'
-     and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null);
-
-  -- 1. single forces
-  for r in select * from pg_temp.market_force_heat_tmp loop
-    if random() < 1 - exp(-greatest(0, public.market_force_chance_per_hour(r.heat, r.cold, v_cfg)) / 60.0) then
-      v_force := public.market_force_pick(r.heat, r.cold, random(), v_cfg);
-      continue when v_force is null;
-      v_move := public.market_force_move_bps(v_force, r.heat, r.cold, random(), v_cfg);
-      v_strength := case when v_move < 800 then 1 when v_move < 1600 then 2 else 3 end;
-      v_head := replace(v_force ->> 'headline', '{name}', r.name);
-      v_body := replace(replace(v_force ->> 'body', '{name}', r.name), '{w}', v_words ->> (v_strength - 1));
-      insert into public.news_items (category, headline, body, importance, security_id, published_at)
-      values ('market', v_head, v_body, v_strength, r.security_id, v_now) returning id into v_news;
-      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
-                                     published_at, due_at, source, force_key, sentiment_delta)
-      values (r.security_id, v_news, (v_force ->> 'direction')::smallint, v_move, v_strength, random() * 10000 < v_rel,
-              v_head, v_body, v_now, v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))),
-              'market', v_force ->> 'key',
-              greatest(-1, least(1, (v_force ->> 'direction')::integer * v_move / 10000.0 * v_sent)));
-      v_new := v_new + 1;
-      delete from pg_temp.market_force_heat_tmp where security_id = r.security_id;
-    end if;
-  end loop;
-
-  -- 2. a wave over the hot stocks, or a relief rally for the cold ones
-  select avg(t.heat) into v_mean from pg_temp.market_force_heat_tmp t
-   where t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2);
-  v_kind := null;
-  if v_mean is not null and random() < 1 - exp(-least(public.cfg_num(v_cfg, '{waves,maxPerHour}', 1),
-                                                       public.cfg_num(v_cfg, '{waves,basePerHour}', 0.02)
-                                                       + public.cfg_num(v_cfg, '{waves,perHeatPerHour}', 0.25) * v_mean) / 60.0) then
-    v_kind := (array['market', 'sector', 'rates'])[1 + floor(random() * 3)::integer];
-  elsif exists (select 1 from pg_temp.market_force_heat_tmp t where t.cold > 0)
-        and random() < 1 - exp(-public.cfg_num(v_cfg, '{waves,reliefPerHour}', 0.02) / 60.0) then
-    v_kind := 'relief';
-  end if;
-  if v_kind = 'sector' then
-    select t.sector_key, s.name into v_sector, v_sec_name
-      from pg_temp.market_force_heat_tmp t join public.sectors s on s.key = t.sector_key
-     where t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2)
-     group by t.sector_key, s.name order by avg(t.heat) desc, count(*) desc limit 1;
-    if v_sector is null then v_kind := 'market'; end if;
-  end if;
-  if v_kind is not null then
-    select array_agg(x.security_id order by x.lvl desc), string_agg(x.name, ', ' order by x.lvl desc) into v_hit, v_names
-      from (select t.security_id, t.name, case when v_kind = 'relief' then t.cold else t.heat end as lvl
-              from pg_temp.market_force_heat_tmp t
-             where case when v_kind = 'relief' then t.cold > 0
-                        else t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2)
-                             and (v_kind <> 'sector' or t.sector_key = v_sector) end
-             order by 3 desc
-             limit greatest(1, public.cfg_num(v_cfg, '{waves,maxStocks}', 6))::integer) x;
-  end if;
-  if v_hit is not null and cardinality(v_hit) > 0 then
-    v_head := replace(v_cfg #>> array['waveTexts', v_kind, 'headline'], '{sector}', coalesce(v_sec_name, ''));
-    v_body := replace(v_cfg #>> array['waveTexts', v_kind, 'body'], '{names}', v_names);
-    insert into public.news_items (category, headline, body, importance, published_at)
-    values ('market', v_head, v_body, 2, v_now) returning id into v_news;
-    for r in select t.* from pg_temp.market_force_heat_tmp t where t.security_id = any (v_hit) loop
-      v_move := public.market_force_move_bps(
-        jsonb_build_object('direction', case when v_kind = 'relief' then 1 else -1 end, 'minMoveBps', 300, 'maxMoveBps', 1000),
-        r.heat, r.cold, random(), v_cfg);
-      v_strength := case when v_move < 800 then 1 when v_move < 1600 then 2 else 3 end;
-      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
-                                     published_at, due_at, source, force_key, sentiment_delta)
-      values (r.security_id, v_news, case when v_kind = 'relief' then 1 else -1 end, v_move, v_strength,
-              random() * 10000 < v_rel, v_head, v_body, v_now,
-              v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))),
-              'market', 'wave:' || v_kind,
-              greatest(-1, least(1, case when v_kind = 'relief' then 1 else -1 end * v_move / 10000.0 * v_sent)));
-    end loop;
-    v_waves := 1;
-  end if;
-  return jsonb_build_object('forces', v_new, 'waves', v_waves, 'wave', v_kind);
-end;
-$$;
-comment on function public.market_forces_run(timestamptz) is
-  'Internal, every minute from stock_news_run_due (ADR-214): draws market forces against overheated or fallen stocks.';
-
--- -----------------------------------------------------------------------------
--- stock_news_run_due: the 1200 definition, market hints settle through market_force_shock and do not hold back the
--- ordinary news; draws the market forces at the end
--- -----------------------------------------------------------------------------
-create or replace function public.stock_news_run_due(p_now timestamptz default null)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_cfg      jsonb := public.config_jsonb('stockNews');
-  v_now      timestamptz := coalesce(p_now, public.game_now());
-  v_every    double precision;
-  v_lead_min double precision;
-  v_lead_max double precision;
-  v_min      integer;
-  v_max      integer;
-  v_rel      integer;
-  v_settled  integer := 0;
-  v_new      integer := 0;
-  v_forces   jsonb;
-  t          public.stock_tips;
-  s          record;
-  v_dir      smallint;
-  v_move     integer;
-  v_strength smallint;
-  v_head     text;
-  v_body     text;
-  v_news     bigint;
-  v_good     jsonb := jsonb_build_array(
-      jsonb_build_array('Rekordauftrag für {name}', '{name} gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz {w} anheben.'),
-      jsonb_build_array('{name} hebt die Prognose an', 'Die Geschäfte laufen besser als geplant. Analysten erwarten einen {w} steigenden Kurs.'),
-      jsonb_build_array('Neuer Chef-Entwickler wechselt zu {name}', 'Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das {w} honorieren.'),
-      jsonb_build_array('{name} gewinnt Branchenpreis', 'Das Unternehmen wird für sein neues Produkt ausgezeichnet. Rückenwind für die Aktie erwartet.'),
-      jsonb_build_array('Übernahmegerüchte um {name}', 'Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs {w} treiben.'),
-      jsonb_build_array('{name} startet Aktienrückkauf', 'Das Unternehmen kauft eigene Aktien zurück. Das stützt den Kurs {w}.'),
-      jsonb_build_array('Staatlicher Großauftrag für {name}', 'Ein mehrjähriger Vertrag mit der öffentlichen Hand ist unterschrieben.'),
-      jsonb_build_array('{name}: Neues Produkt ausverkauft', 'Die Nachfrage übertrifft alle Erwartungen. Händler rechnen mit einem {w} steigenden Kurs.'),
-      jsonb_build_array('Patent für {name} erteilt', 'Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen.'),
-      jsonb_build_array('{name} senkt die Kosten deutlich', 'Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt.'),
-      jsonb_build_array('Star-Investor steigt bei {name} ein', 'Ein bekannter Anleger hat ein großes Paket gekauft. Andere könnten folgen.'),
-      jsonb_build_array('{name} erschließt neuen Markt', 'Der Start im Ausland läuft besser als geplant.'),
-      jsonb_build_array('Kooperation: {name} und ein Branchenriese', 'Die Partnerschaft soll beiden Seiten neue Kunden bringen.'),
-      jsonb_build_array('Analysten-Upgrade: {name} jetzt Kaufempfehlung', 'Mehrere Häuser heben ihr Kursziel {w} an.'),
-      jsonb_build_array('Sonderdividende bei {name} erwartet', 'Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen.'));
-  v_bad      jsonb := jsonb_build_array(
-      jsonb_build_array('Affäre erschüttert {name}', 'Die Chefetage von {name} steht wegen einer Affäre in der Kritik. Anleger werden nervös.'),
-      jsonb_build_array('{name} plant Kapitalerhöhung', 'Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte {w} nachgeben.'),
-      jsonb_build_array('Rassismus-Vorwürfe gegen {name}', 'Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge.'),
-      jsonb_build_array('Rückruf bei {name}', 'Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer.'),
-      jsonb_build_array('Datenleck bei {name}', 'Kundendaten sind im Netz aufgetaucht. Die Aufsicht prüft.'),
-      jsonb_build_array('{name}-Chef tritt überraschend zurück', 'Die Gründe sind unklar. Der Markt mag keine Unsicherheit.'),
-      jsonb_build_array('Razzia bei {name}', 'Ermittler durchsuchen die Zentrale wegen des Verdachts auf Bilanztricks.'),
-      jsonb_build_array('{name} senkt die Prognose', 'Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem {w} fallenden Kurs.'),
-      jsonb_build_array('Streik legt {name} lahm', 'Die Belegschaft legt die Arbeit nieder. Lieferungen verzögern sich.'),
-      jsonb_build_array('Großkunde springt bei {name} ab', 'Ein wichtiger Vertrag wird nicht verlängert.'),
-      jsonb_build_array('Analysten-Downgrade für {name}', 'Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel.'),
-      jsonb_build_array('{name} verliert Patentstreit', 'Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen.'),
-      jsonb_build_array('Umweltskandal bei {name}', 'Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich.'),
-      jsonb_build_array('Lieferkette reißt bei {name}', 'Ein wichtiger Zulieferer fällt aus. Die Produktion stockt.'),
-      jsonb_build_array('Leerverkäufer wetten gegen {name}', 'Ein bekannter Fonds hält die Aktie für überbewertet.'));
-  v_pick     jsonb;
-  v_words    text[] := array['leicht', 'spürbar', 'deutlich'];
-begin
-  if v_cfg is null or jsonb_typeof(v_cfg) <> 'object' then
-    return jsonb_build_object('skipped', 'no_config');
-  end if;
-  -- same lock as the minute job: never beside a running tick
-  perform pg_advisory_xact_lock(7311001);
-  v_every    := greatest(1, public.cfg_num(v_cfg, '{everyMinutes}', 12));
-  v_lead_min := greatest(1, public.cfg_num(v_cfg, '{leadMinMinutes}', 10));
-  v_lead_max := greatest(v_lead_min, public.cfg_num(v_cfg, '{leadMaxMinutes}', 40));
-  v_min      := greatest(1, public.cfg_num(v_cfg, '{minMoveBps}', 300))::integer;
-  v_max      := greatest(v_min, public.cfg_num(v_cfg, '{maxMoveBps}', 1200)::integer);
-  v_rel      := least(10000, greatest(0, public.cfg_num(v_cfg, '{reliabilityBps}', 7500)))::integer;
-
-  -- 1. hints whose time has come
-  for t in select * from public.stock_tips x where x.applied_at is null and x.due_at <= v_now order by x.due_at for update loop
-    select sec.name, sec.status into s from public.securities sec where sec.id = t.security_id;
-    if t.comes_true and s.status = 'listed' then
-      if t.source = 'market' then
-        -- ADR-214: a market force moves the price and the mood, not the fair value
-        perform public.market_force_shock(t.security_id, t.direction * t.move_bps, t.sentiment_delta, v_now);
-      else
-        perform public.event_price_shock(t.security_id, t.direction * t.move_bps, v_now);
-      end if;
-      v_head := case when t.direction > 0 then s.name || ' legt zu: Die Erwartungen haben sich bestätigt'
-                     else s.name || ' gibt nach: Die Warnungen haben sich bestätigt' end;
-    else
-      v_head := 'Entwarnung bei ' || s.name || ': Die Meldung hat sich nicht bestätigt';
-    end if;
-    insert into public.news_items (category, headline, body, importance, security_id, published_at)
-    values ('company', v_head, null, 1, t.security_id, v_now) returning id into v_news;
-    update public.stock_tips set applied_at = v_now, result_news_id = v_news where id = t.id;
-    v_settled := v_settled + 1;
-  end loop;
-
-  -- 2. a new hint when the last ordinary one is old enough (market forces do not count, ADR-214)
-  if not exists (select 1 from public.stock_tips x
-                  where x.published_at > v_now - make_interval(secs => v_every * 60 - 5) and x.source = 'news') then
-    select sec.id, sec.name into s
-      from public.securities sec
-     where sec.kind = 'stock' and sec.status = 'listed'
-       and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null)
-     order by random() limit 1;
-    if s.id is not null then
-      v_dir := case when random() < 0.5 then 1 else -1 end;
-      v_move := v_min + floor(random() * (v_max - v_min + 1))::integer;
-      v_strength := least(3, 1 + floor(3.0 * (v_move - v_min) / greatest(1, v_max - v_min + 1)))::smallint;
-      v_pick := case when v_dir > 0 then v_good -> floor(random() * jsonb_array_length(v_good))::integer
-                     else v_bad -> floor(random() * jsonb_array_length(v_bad))::integer end;
-      v_head := replace(v_pick ->> 0, '{name}', s.name);
-      v_body := replace(replace(v_pick ->> 1, '{name}', s.name), '{w}', v_words[v_strength]) || ' Sicher ist das nicht.';
-      insert into public.news_items (category, headline, body, importance, security_id, published_at)
-      values ('company', v_head, v_body, v_strength, s.id, v_now) returning id into v_news;
-      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
-                                     published_at, due_at)
-      values (s.id, v_news, v_dir, v_move, v_strength, random() * 10000 < v_rel, v_head, v_body, v_now,
-              v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))));
-      v_new := 1;
-    end if;
-  end if;
-
-  -- 3. market forces from outside (ADR-214)
-  v_forces := public.market_forces_run(v_now);
-
-  delete from public.stock_tips x
-   where x.applied_at is not null
-     and x.published_at < v_now - make_interval(hours => greatest(1, public.cfg_num(v_cfg, '{keepHours}', 24))::integer);
-  return jsonb_build_object('settled', v_settled, 'published', v_new, 'market_forces', v_forces);
-end;
-$$;
-comment on function public.stock_news_run_due(timestamptz) is
-  'Internal, cron every minute (ADR-119, ADR-214): settles due stock hints, publishes a new one when it is time, draws market forces.';
-
-revoke all on function public.market_force_heat(bigint, bigint, bigint, bigint, jsonb) from public, anon, authenticated;
-revoke all on function public.market_force_chance_per_hour(double precision, double precision, jsonb) from public, anon, authenticated;
-revoke all on function public.market_force_weight(jsonb, double precision, double precision) from public, anon, authenticated;
-revoke all on function public.market_force_pick(double precision, double precision, double precision, jsonb) from public, anon, authenticated;
-revoke all on function public.market_force_move_bps(jsonb, double precision, double precision, double precision, jsonb) from public, anon, authenticated;
-revoke all on function public.market_force_shock(uuid, integer, double precision, timestamptz) from public, anon, authenticated;
-revoke all on function public.market_forces_run(timestamptz) from public, anon, authenticated;
-revoke all on function public.stock_news_run_due(timestamptz) from public, anon, authenticated;
-grant execute on function public.market_forces_run(timestamptz) to service_role;
-grant execute on function public.stock_news_run_due(timestamptz) to service_role;
+revoke all on function public.company_withdraw_next_at(uuid) from public, anon, authenticated;
+revoke all on function public.company_withdraw_json(uuid) from public, anon, authenticated;
 
 commit;

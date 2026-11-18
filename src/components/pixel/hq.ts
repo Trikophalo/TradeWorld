@@ -4,6 +4,7 @@
  * kind, decoration, flag of the country, sign with the company's initials). Original designs, no real buildings or
  * logos. Pure: the same input always gives the same grid; rendered by PixelIcon (integer scaling only).
  */
+import { countryFlagArt, countryFlagMini } from "./flags";
 import type { PixelArt } from "./pixel-icon";
 
 export const HQ_CANVAS = { width: 28, height: 28 } as const;
@@ -53,6 +54,8 @@ export interface HqArtInput {
   /** Up to three colors of the country's flag; null hides the flag. */
   flag?: readonly string[] | null;
   flagVertical?: boolean;
+  /** Key of the country: draws its own pixel flag (flags.ts) instead of plain stripes. */
+  country?: string | null;
   /** Initials on the sign (1–2 letters). */
   initials?: string;
 }
@@ -230,17 +233,26 @@ export function hqArt(input: HqArtInput): PixelArt {
   }
   // flag of the country on a pole
   const flag = input.flag ?? null;
+  // the country's own pixel flag (flags.ts), its colors under the keys "0".."9"
+  const mini = flag ? countryFlagMini(input.country) : null;
+  const miniKeys = mini ? Object.keys(mini.palette) : [];
   if (flag && flag.length > 0) {
     const fx = flagBase.x;
     const fy = Math.max(1, flagBase.y - 5);
     rect(fx, fy, 1, flagBase.y - fy + 1, "p");
-    const colors = flag.slice(0, 3);
-    for (let j = 0; j < 3; j++) {
-      for (let i = 0; i < 4; i++) {
-        const n = input.flagVertical
-          ? Math.min(colors.length - 1, Math.floor((i * colors.length) / 4))
-          : Math.min(colors.length - 1, j % colors.length);
-        set(fx + 1 + i, fy + j, ["x", "y", "z"][n]!);
+    if (mini) {
+      mini.grid.forEach((line, j) =>
+        [...line].forEach((ch, i) => set(fx + 1 + i, fy + j, String(miniKeys.indexOf(ch)))),
+      );
+    } else {
+      const colors = flag.slice(0, 3);
+      for (let j = 0; j < 3; j++) {
+        for (let i = 0; i < 4; i++) {
+          const n = input.flagVertical
+            ? Math.min(colors.length - 1, Math.floor((i * colors.length) / 4))
+            : Math.min(colors.length - 1, j % colors.length);
+          set(fx + 1 + i, fy + j, ["x", "y", "z"][n]!);
+        }
       }
     }
   }
@@ -293,8 +305,14 @@ export function hqArt(input: HqArtInput): PixelArt {
       x: fc[0] ?? "#ffffff",
       y: fc[1] ?? fc[0] ?? "#ffffff",
       z: fc[2] ?? fc[1] ?? fc[0] ?? "#ffffff",
+      ...Object.fromEntries(miniKeys.map((k, i) => [String(i), mini!.palette[k]!])),
     },
   };
+}
+
+/** The pixel flag of a country: its own design (flags.ts, 15×9), stripes of its colors for an unknown key. */
+export function countryFlag(country: { key: string; flag: readonly string[]; flagVertical?: boolean }): PixelArt {
+  return countryFlagArt(country.key) ?? flagArt(country.flag, country.flagVertical);
 }
 
 /** A small pixel flag (6×4) from up to three colors, horizontal or vertical stripes. */

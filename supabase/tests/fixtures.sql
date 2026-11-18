@@ -242,6 +242,9 @@ select public.get_my_net_worth();
 select public.get_company_risks();
 \o :fixture_dir/set_company_insurance.json
 select public.set_company_insurance(gen_random_uuid(), 1);
+-- fixed and variable costs of the last closed hour (ADR-208, Nachtrag)
+\o :fixture_dir/get_company_hour_costs.json
+select public.get_company_hour_costs();
 \o :fixture_dir/upgrade_company.json
 select public.upgrade_company(gen_random_uuid());
 \o :fixture_dir/get_player_card_founder.json

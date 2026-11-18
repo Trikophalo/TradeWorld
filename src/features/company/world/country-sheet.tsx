@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { flagArt } from "@/components/pixel/hq";
+import { countryFlag } from "@/components/pixel/hq";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Sheet } from "@/components/ui/sheet";
@@ -94,7 +94,7 @@ export function CountryTraits({ country }: { country: CountryConfig }) {
 export function CountryTitle({ country }: { country: CountryConfig }) {
   return (
     <span className="flex items-center gap-2">
-      <PixelIcon {...flagArt(country.flag, country.flagVertical)} scale={3} className="ring-1 ring-line-2" />
+      <PixelIcon {...countryFlag(country)} scale={2} className="ring-1 ring-line-2" />
       <span className="truncate">{country.name}</span>
     </span>
   );

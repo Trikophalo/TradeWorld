@@ -4,6 +4,10 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen),
+  das Mausrad und zwei Finger zoomen nur noch die Karte statt die Seite zu scrollen, jedes Land hat seine richtige
+  Flagge, alle Kennzahl-Kacheln sind gleich groß, und neue Kacheln zeigen Fixkosten und variable Kosten je Stunde mit
+  Aufschlüsselung, woher sie kommen.
 - Entnahmen aus der Firma: Du kannst alle 6 Stunden Geld entnehmen. Die Firmenkasse zeigt mit Zähler, wann die
   nächste Entnahme geht, und bei Börsenfirmen, wie viel Geld aus dem Börsengang noch gesperrt ist.
 

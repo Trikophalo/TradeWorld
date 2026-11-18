@@ -1,6 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useState } from "react";
+import { countryFlag, hqArt } from "@/components/pixel/hq";
+import { PixelIcon } from "@/components/pixel/pixel-icon";
+import { Button } from "@/components/ui/button";
+import { HourCostsSheet, type CostKind } from "../components/hour-costs";
 import { Card } from "@/components/ui/card";
 import { COUNTRIES, WORLD_RULES } from "@/config/countries";
 import { aiCountry } from "@/features/game/demo/world";
@@ -108,6 +113,7 @@ export const SAMPLE_WORLD: WorldState = {
 export function WorldShowcase() {
   const tt = useTranslations("world.tiers");
   const de = COUNTRIES.find((c) => c.key === "de");
+  const [costs, setCosts] = useState<CostKind | null>(null);
   return (
     <div className="space-y-4" data-testid="world-showcase">
       <Card padding="lg" className="space-y-3">
@@ -131,6 +137,30 @@ export function WorldShowcase() {
             </figure>
           ))}
         </div>
+      </Card>
+      <Card padding="lg" className="space-y-3">
+        <p className="label-pixel text-fg-3">Flaggen (ADR-208)</p>
+        <ul className="flex flex-wrap gap-3">
+          {COUNTRIES.map((c) => (
+            <li key={c.key} className="flex items-center gap-2 text-xs text-fg-2">
+              <PixelIcon {...countryFlag(c)} scale={2} className="ring-1 ring-line-2" />
+              <PixelIcon {...hqArt({ tier: 1, flag: c.flag, country: c.key })} scale={1} />
+              {c.name}
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <Card padding="lg" className="space-y-3">
+        <p className="label-pixel text-fg-3">Kosten je Stunde (Dashboard)</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setCosts("fixed")}>
+            Fixkosten
+          </Button>
+          <Button variant="secondary" onClick={() => setCosts("variable")}>
+            Variable Kosten
+          </Button>
+        </div>
+        <HourCostsSheet kind={costs} onClose={() => setCosts(null)} />
       </Card>
       <LocationTab preview={SAMPLE_WORLD} />
       <LocationTab

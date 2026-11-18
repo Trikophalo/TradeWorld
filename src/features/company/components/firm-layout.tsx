@@ -449,12 +449,15 @@ export function DashLink({
   onGo,
   testId,
   className,
+  compact,
   children,
 }: {
   hint: string;
   onGo: () => void;
   testId?: string;
   className?: string;
+  /** The hint on one line (cut with …): tiles of a grid stay the same height. */
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -475,7 +478,7 @@ export function DashLink({
         className="mt-1 flex items-start gap-1 px-1 text-2xs text-accent transition-opacity duration-fast pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-visible:opacity-100"
         data-testid="dash-hint"
       >
-        <span className="min-w-0 text-pretty">{hint}</span>
+        <span className={cn("min-w-0", compact ? "truncate" : "text-pretty")}>{hint}</span>
         <span aria-hidden className="font-pixel">
           ›
         </span>
