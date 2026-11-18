@@ -2,7 +2,8 @@
 -- e4 · Talente (ADR-199): pool of 15 Stellen, hire only when every demand is met, idempotent, one per Stelle, wage
 --      and benefits booked hourly through the ledger, the effect in the close hour, warning and quitting when unmet
 --      (the effect stops), poaching with a counter-offer and with a move after the window, the Mit-Geschäftsführung
---      (appointment, decision logged within the budget, never above it, undo), four players, money stays whole.
+--      (appointment, decision logged within the budget, never above it, undo), risen demands of hired talents with a
+--      grace period and talent_raise (Nachtrag ADR-199), four players, money stays whole.
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
@@ -188,6 +189,56 @@ select public.talents_run_due() is not null as ok \gset
 select tests.assert((select company_id = :'bco'::uuid from public.talents where talent_key = :'tp')
                     and exists (select 1 from public.talent_events where company_id = :'aco' and talent_key = :'tp' and kind = 'poached'),
   'e4: without a counter the talent moves after the window');
+
+-- ---------------------------------------------------------------------------
+-- 6b. Risen demand (Nachtrag ADR-199): grace period with notification, then unhappy until the owner pays more
+-- ---------------------------------------------------------------------------
+select talent_key as tr, wage_demand_cents as tr_wage, benefit_demands as tr_ben
+  from public.talents where role_key = 'logistics' and tier = 0 and company_id is null order by talent_key limit 1 \gset
+select public.talent_hire_into(:'tr', :'cco', :tr_wage::bigint, :'tr_ben', public.game_now());
+select (o - 1)::text as tr_idx from jsonb_array_elements(public.talents_cfg() -> 'pool') with ordinality as p(v, o)
+ where v ->> 'key' = :'tr' \gset
+update public.game_config set value = jsonb_set(value, array['pool', :'tr_idx', 'wageCents'], to_jsonb(:tr_wage::bigint * 3))
+ where key = 'talents';
+select public.talents_ensure() >= 0 as ok \gset
+select tests.assert((select wage_demand_cents = :tr_wage::bigint * 3 and wage_cents = :tr_wage::bigint
+                            and raise_due_at between public.game_now() + interval '23 hours' and public.game_now() + interval '25 hours'
+                       from public.talents where talent_key = :'tr')
+                    and exists (select 1 from public.talent_events where talent_key = :'tr' and kind = 'demand_raised')
+                    and exists (select 1 from public.notifications n where n.player_id = :c and n.title = 'Gehaltsforderung gestiegen'),
+  'e4: a changed pool reaches hired talents: the demand rises, 24 hours of grace, the owner is notified');
+select public.talents_ensure() = 0 as ok \gset
+select tests.assert(:'ok'::boolean, 'e4: an unchanged pool is not synced again');
+-- neutral traits (after the sync, which writes the generated fields back)
+update public.talents set traits = '{sporty,night_owl}' where talent_key = :'tr';
+update public.talents set paid_until = public.game_now() - interval '1 hour', satisfaction_bps = 7000 where talent_key = :'tr';
+select public.talents_run_due() is not null as ok \gset
+select tests.assert((select satisfaction_bps from public.talents where talent_key = :'tr') = 7250,
+  'e4: within the grace period the old wage still satisfies');
+update public.talents set paid_until = public.game_now() - interval '90 minutes', raise_due_at = public.game_now() - interval '2 hours'
+ where talent_key = :'tr';
+select public.talents_run_due() is not null as ok \gset
+select tests.assert((select satisfaction_bps from public.talents where talent_key = :'tr') = 7250 - 1500,
+  'e4: after the grace period an underpaid talent loses satisfaction every hour');
+select tests.login_as('authenticated', :c);
+select (public.get_company_talents() -> 'seats') as tr_seats \gset
+select tests.throws_key(format($$select public.talent_raise(gen_random_uuid(), %L, %s, %L)$$, :'tr', :tr_wage::bigint * 3 - 100, :'tr_ben'),
+  'demands_not_met', 'e4: a new contract below the demand is refused');
+select tests.throws_key(format($$select public.talent_raise(gen_random_uuid(), %L, %s, %L)$$, :'tp', :tr_wage::bigint * 9, :'tr_ben'),
+  'invalid_argument', 'e4: only own talents');
+select public.talent_raise(gen_random_uuid(), :'tr', :tr_wage::bigint * 3, :'tr_ben') as rz1 \gset
+reset role;
+select tests.assert(exists (select 1 from jsonb_array_elements(:'tr_seats'::jsonb) x
+                             where x #>> '{talent,key}' = :'tr' and x #>> '{talent,raise_due_at}' is not null
+                               and (x #>> '{talent,wage_floor_cents}')::bigint = :tr_wage::bigint * 3)
+                    and (select wage_cents = :tr_wage::bigint * 3 and raise_due_at is null from public.talents where talent_key = :'tr')
+                    and exists (select 1 from public.talent_events where talent_key = :'tr' and kind = 'raised'),
+  'e4: the owner sees the deadline and raises the wage; the deadline is gone');
+update public.game_config set value = jsonb_set(value, array['pool', :'tr_idx', 'wageCents'], to_jsonb(:tr_wage::bigint))
+ where key = 'talents';
+select public.talents_ensure() >= 0 as ok \gset
+select tests.assert((select wage_demand_cents = :tr_wage::bigint and raise_due_at is null from public.talents where talent_key = :'tr'),
+  'e4: back to the old pool, no deadline');
 
 -- ---------------------------------------------------------------------------
 -- 7. Mit-Geschäftsführung: appointment, decisions within the budget, never above, undo

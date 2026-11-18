@@ -1748,15 +1748,15 @@ Nexamon-Marktwert, `property.*`, Tresor).
 
 Werte in `src/config/talents.ts` (`TALENT_RULES`, `TALENT_ROLES`, `TALENT_TRAITS`), zur Laufzeit `game_config.talents`.
 
-| Wert                         | Junior | Profi  | Senior           | Experte | Legende |
-| ---------------------------- | ------ | ------ | ---------------- | ------- | ------- |
-| Lohn je Stunde (vor Stelle)  | 40 €   | 90 €   | 200 €            | 420 €   | 900 €   |
-| Wirkung (× Basis der Stelle) | 100 %  | 180 %  | 300 %            | 450 %   | 650 %   |
-| Anzahl je Stelle             | 14     | 12     | 10               | 6       | 2       |
-| Ruf mindestens               | 0      | 35     | 45               | 55      | 65      |
-| Bekanntheit mindestens       | 0 %    | 3 %    | 10 %             | 25 %    | 45 %    |
-| Rechtsform mindestens        | Garage | Garage | Kleinunternehmen | GmbH    | AG      |
-| Benefits mindestens          | 0      | 1      | 1                | 2       | 3       |
+| Wert                         | Junior | Profi  | Senior           | Experte | Legende  |
+| ---------------------------- | ------ | ------ | ---------------- | ------- | -------- |
+| Lohn je Stunde (vor Stelle)  | 60 €   | 300 €  | 1.500 €          | 8.000 € | 40.000 € |
+| Wirkung (× Basis der Stelle) | 100 %  | 180 %  | 300 %            | 450 %   | 650 %    |
+| Anzahl je Stelle             | 14     | 12     | 10               | 6       | 2        |
+| Ruf mindestens               | 0      | 35     | 45               | 55      | 65       |
+| Bekanntheit mindestens       | 0 %    | 3 %    | 10 %             | 25 %    | 45 %     |
+| Rechtsform mindestens        | Garage | Garage | Kleinunternehmen | GmbH    | AG       |
+| Benefits mindestens          | 0      | 1      | 1                | 2       | 3        |
 
 Lohnfaktor der Stelle 80–130 %, Eigenschaften −5 … +25 %, Streuung ±10 %. Benefits (Anteil am Lohn): Homeoffice 2 %,
 Firmenwagen 15 %, Bonus 10 %, Weiterbildung 8 %, Mitspracherecht 0, Büro-Ausstattung 5 %, Fitness 4 %, Gleitzeit 0.
@@ -1765,6 +1765,43 @@ Deckel: Nachfrage +35 %, Kapazität +35 %, Wareneinsatz −15 %, Fixkosten −25
 15 Minuten. Markt: 65 % der freien Talente je Tag, Pause 12 h, Kassendeckung 12 h. Mit-GF: höchstens 2, ab Senior
 (Führungskraft ab Profi), +30 % Lohn, Budget ≤ 100.000 € je Tag, Ereignis nach 30 Minuten, vorsichtig 50 % des
 Restbudgets.
+
+**Steile Löhne (Nachtrag ADR-199).** Vorher 40 / 90 / 200 / 420 / 900 €, jetzt etwa × 5 je Stufe. Benefits (Anteil am
+Lohn), Kassendeckung (12 h Lohn + Benefits), Mit-GF-Aufschlag (+30 %), Abwerben (+15 % plus Loyalität) und Nachbessern
+hängen am Lohn und steigen damit von selbst mit. Steigt die Forderung eines angestellten Talents über den Vertrag, hat
+der Chef 24 Stunden (`raiseGraceHours`), danach −15 % Zufriedenheit je Stunde (`satisfaction.underpaidBps`, mal
+Empfindlichkeit) bis zum neuen Vertrag oder zur Kündigung.
+
+Lohn der Talente im Pool (mit Stelle, Eigenschaften und Streuung; Kosten = Lohn + geforderte Benefits):
+
+| Stufe   | Grundlohn/h | Lohn/h im Pool (min … Median … max) | Kosten/h (Median) | Kassendeckung 12 h (Median) |
+| ------- | ----------- | ----------------------------------- | ----------------- | --------------------------- |
+| Junior  | 60 €        | 44 … 67 … 112 €                     | 71 €              | 855 €                       |
+| Profi   | 300 €       | 216 … 331 … 532 €                   | 350 €             | 4.195 €                     |
+| Senior  | 1.500 €     | 1.106 … 1.691 … 2.535 €             | 1.825 €           | 21.900 €                    |
+| Experte | 8.000 €     | 6.400 … 8.832 … 14.126 €            | 9.660 €           | 115.920 €                   |
+| Legende | 40.000 €    | 33.120 … 46.920 … 71.500 €          | 58.050 €          | 696.597 €                   |
+
+Was ein Talent einbringt (`scripts/talent-value.ts`: Wachstums-Harness von ADR-209 mit Reibung, Spitzen-Nische
+Pharma, drei Läufe, je 24 Stunden ab Erreichen des Firmenwerts; dieselbe Stunde einmal ohne, einmal mit der Wirkung
+einer Produktion-Stelle mit neutraler Persönlichkeit, Kapazität +3 % × Stufe). Produktion ist der stärkste Hebel,
+weil die Firma im Harness an der Kapazität hängt; Vertrieb bringt dort nichts (Nachfrage ist nicht der Engpass),
+Controlling etwa 2 % davon. Lohn der Produktion-Stelle = 90 % des Grundlohns.
+
+| Firmenwert | Umsatz/h  | Gewinn/h  | Junior +Gewinn/h | Profi    | Senior   | Experte  | Legende  |
+| ---------- | --------- | --------- | ---------------- | -------- | -------- | -------- | -------- |
+| 1 Mio. €   | 28.772 €  | 9.258 €   | 558 €            | 1.004 €  | 1.673 €  | 2.509 €  | 3.624 €  |
+| 10 Mio. €  | 217.969 € | 69.475 €  | 4.224 €          | 7.604 €  | 12.673 € | 19.009 € | 27.458 € |
+| 100 Mio. € | 497.306 € | 113.394 € | 8.072 €          | 14.529 € | 24.215 € | 36.322 € | 52.465 € |
+| 1 Mrd. €   | 646.120 € | 80.231 €  | 8.290 €          | 14.922 € | 24.869 € | 37.304 € | 53.883 € |
+| Lohn/h     |           |           | 54 €             | 270 €    | 1.350 €  | 7.200 €  | 36.000 € |
+
+Lesart: Junior und Profi lohnen sich schon für kleine Firmen, ein Senior ab wenigen Mio. €, ein Experte ab etwa
+10 Mio. €; eine Legende (mit Benefits und Persönlichkeit eher 45.000–60.000 € je Stunde) kostet bei 10 Mio. € fast
+doppelt so viel, wie sie bringt, und rechnet sich erst ab etwa 100 Mio. € Firmenwert, auf der stärksten Stelle und
+auch dann nur knapp. Wegen der Reibung
+(ADR-209) wächst der Ertrag oberhalb von 100 Mio. € kaum noch; der Deckel (+35 % je Wirkung) begrenzt mehrere
+Spitzenleute auf derselben Wirkung.
 
 ## Weltkarte und Standorte (ADR-208)
 

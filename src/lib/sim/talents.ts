@@ -75,6 +75,16 @@ export function talentOfferAccepted(checks: readonly OfferCheck[]): boolean {
   return checks.every((c) => c.ok);
 }
 
+/** Lowest wage a hired talent accepts: the demand, for a Mit-Geschäftsführer plus the co-CEO premium (whole euros). */
+export function talentWageFloor(
+  wageDemandCents: number,
+  isCoCeo: boolean,
+  cfg: TalentsConfig = BALANCE.talents,
+): number {
+  if (!isCoCeo) return wageDemandCents;
+  return Math.ceil((wageDemandCents * (10_000 + cfg.coCeo.wageBonusBps)) / 10_000 / 100) * 100;
+}
+
 /** Minimum hourly cost a poacher must offer: current cost × (1 + margin + loyalty of both traits). */
 export function talentPoachMinCost(
   currentCostCents: number,
@@ -90,6 +100,8 @@ export interface SatisfactionFacts {
   reputationOk: boolean;
   awarenessOk: boolean;
   benefitsOk: boolean;
+  /** The wage is below the (risen) demand and the grace period is over. */
+  underpaid?: boolean;
   /** Morale bonus of the HR Stelle (bps per hour). */
   moraleBps: number;
 }
@@ -108,6 +120,7 @@ export function talentSatisfactionStep(
   if (!facts.reputationOk) loss += s.reputationBps;
   if (!facts.awarenessOk) loss += s.awarenessBps;
   if (!facts.benefitsOk) loss += s.benefitBps;
+  if (facts.underpaid) loss += s.underpaidBps;
   const delta = loss > 0 ? -Math.round(loss * decay) : s.gainBps;
   return Math.max(0, Math.min(10_000, satisfactionBps + delta + Math.max(0, facts.moraleBps)));
 }

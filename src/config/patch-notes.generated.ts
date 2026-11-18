@@ -1002,6 +1002,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Flyer für kleine Firmen: Solange deine Firma eine Garage ist oder weniger als 1 Mio. € wert, kostet die Flyer-Kampagne höchstens 2.000 €.",
       },
+      {
+        id: "m0-fundament-847d6b10",
+        title: null,
+        text: "Talente sind nach oben viel teurer: Ein Junior kostet ab 60 € je Stunde, ein Profi 300 €, ein Senior 1.500 €, ein Experte 8.000 € und eine Legende…",
+      },
     ],
   },
 ];

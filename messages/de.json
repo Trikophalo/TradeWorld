@@ -11797,7 +11797,8 @@
       "coceo": "Mit-GF",
       "filled": "{filled} von {total} Stellen besetzt",
       "cost": "{amount} pro Stunde",
-      "leads": "leitet die Stelle, KI-Kräfte berichten an sie oder ihn"
+      "leads": "leitet die Stelle, KI-Kräfte berichten an sie oder ihn",
+      "raise": "Fordert mehr Lohn"
     },
     "total": "Wirkung aller Talente",
     "totalNone": "Noch keine Wirkung: Besetze eine Stelle.",
@@ -11942,7 +11943,10 @@
       "contract": "Vertrag: {wage} Lohn + Benefits = {cost} pro Stunde",
       "since": "Seit {date}",
       "appoint": "Zur Mit-Geschäftsführung machen",
-      "notEligible": "Mit-GF ab Senior (Führungskraft: ab Profi)."
+      "notEligible": "Mit-GF ab Senior (Führungskraft: ab Profi).",
+      "renegotiate": "Gehalt anpassen",
+      "raiseDue": "Fordert jetzt {amount} pro Stunde. Ohne neuen Vertrag sinkt die Zufriedenheit in",
+      "raiseOverdue": "Fordert jetzt {amount} pro Stunde. Die Frist ist vorbei, die Zufriedenheit sinkt jede Stunde."
     },
     "offer": {
       "titleHire": "Angebot an {name}",
@@ -11981,7 +11985,11 @@
       "budget": "Tagesbudget (€)",
       "budgetHint": "Bis zu diesem Betrag am Tag darf sie oder er Geld ausgeben (z. B. Fertigkeiten).",
       "appointed": "{name} ist jetzt Mit-Geschäftsführung.",
-      "coceoNeeds": "Mit-GF verlangt {pct} % mehr Lohn als die Grundforderung und Mitspracherecht."
+      "coceoNeeds": "Mit-GF verlangt {pct} % mehr Lohn als die Grundforderung und Mitspracherecht.",
+      "titleRaise": "Vertrag mit {name}",
+      "raised": "Neuer Vertrag mit {name}.",
+      "sendRaise": "Vertrag ändern",
+      "raiseNeeds": "Mindestens die aktuelle Forderung von {amount} pro Stunde und alle geforderten Benefits."
     },
     "coceo": {
       "title": "Mit-Geschäftsführung",
@@ -12015,7 +12023,9 @@
         "coceo_appointed": "{name} ist Mit-GF",
         "coceo_removed": "{name} ist nicht mehr Mit-GF",
         "decision": "{name} (Mit-GF) {text}",
-        "advice": "{name} (Mit-GF) {text}"
+        "advice": "{name} (Mit-GF) {text}",
+        "demand_raised": "{name} verlangt mehr Lohn",
+        "raised": "Neuer Vertrag mit {name}"
       }
     },
     "tile": {

@@ -5,6 +5,7 @@ import {
   talentOfferAccepted,
   talentOfferChecks,
   talentOfferCost,
+  talentWageFloor,
   talentsEffectBps,
 } from "@/lib/sim/talents";
 import {
@@ -90,6 +91,7 @@ export function createTalentsEngine(
   | "offerTalent"
   | "counterTalentOffer"
   | "dismissTalent"
+  | "raiseTalent"
   | "appointCoCeo"
   | "setCoCeo"
   | "undoTalentDecision"
@@ -127,6 +129,12 @@ export function createTalentsEngine(
               coCeoAutonomy: c.coCeo?.autonomy ?? "advise",
               coCeoBudgetCents: c.coCeo?.budgetCents ?? 0,
               coCeoSpentCents: 0,
+              wageFloorCents: talentWageFloor(seed.wageCents, Boolean(c.coCeo)),
+              // the demo has no satisfaction: a risen demand always shows the full grace period
+              raiseDueAt:
+                c.wageCents < talentWageFloor(seed.wageCents, Boolean(c.coCeo))
+                  ? new Date(host.now() + cfg.raiseGraceHours * 3_600_000).toISOString()
+                  : null,
             }
           : null;
       return { role: role.key, effect: role.effect, talent };
@@ -190,6 +198,19 @@ export function createTalentsEngine(
       return mutate(requestId, (st) => {
         if (!st[key]) throw new GameError("invalid_argument");
         delete st[key];
+      });
+    },
+    raiseTalent(requestId, key, wageCents, benefits) {
+      return mutate(requestId, (st) => {
+        const seed = TALENT_POOL.find((t) => t.key === key);
+        const c = st[key];
+        if (!seed || !c || wageCents <= 0 || wageCents % 100 !== 0) throw new GameError("invalid_argument");
+        const next = [...new Set(c.coCeo ? [...benefits, "say"] : benefits)].sort();
+        if (wageCents < talentWageFloor(seed.wageCents, Boolean(c.coCeo))) throw new GameError("demands_not_met");
+        if (!seed.benefits.every((b) => next.includes(b))) throw new GameError("demands_not_met");
+        if (next.includes("office") && !c.benefits.includes("office") && facts().expansionLevel < 1)
+          throw new GameError("demands_not_met");
+        st[key] = { ...c, wageCents, benefits: next };
       });
     },
     appointCoCeo(requestId, key, wageCents, autonomy, budgetCents) {

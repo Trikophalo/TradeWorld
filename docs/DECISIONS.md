@@ -4525,6 +4525,24 @@ Talente; die 30 Legenden sind knapp und werden abgeworben. Talentlöhne stehen n
 als eigene Buchung „Talent: Name“; der Gewinn der Stunde zeigt sie nicht. Die Demo kennt Markt, Einstellen und Mit-GF,
 aber keine Löhne, keine Zufriedenheit und kein Abwerben.
 
+**Nachtrag: viel steilere Löhne** (Eigentümer: „Die Stellen und Talente sollen viel teurer nach oben werden.
+Wirklich viel teurer.“). Grundlohn je Stunde jetzt 60 / 300 / 1.500 / 8.000 / 40.000 € (vorher 40 / 90 / 200 / 420 /
+900 €), etwa × 5 je Stufe. Benefits (Anteil am Lohn), Kassendeckung (12 h), Mit-GF-Aufschlag (+30 %), Abwerben und
+Nachbessern hängen am Lohn und steigen von selbst mit; ihre Sätze bleiben. Gemessen mit `scripts/talent-value.ts`
+(Harness von ADR-209 mit Reibung, Tabelle in `docs/BALANCING.md`): Eine Produktion-Legende bringt bei 10 Mio. €
+Firmenwert etwa 27.000 € Gewinn je Stunde, bei 100 Mio. € und 1 Mrd. € etwa 53.000 € – bei rund 45.000–60.000 € Kosten
+rechnet sie sich nur für sehr große Firmen und auch dort knapp; Junior und Profi lohnen sich für alle. Angestellte
+Talente: Ihre Forderung steigt sofort (`talents_ensure` gleicht den Pool jetzt auch bei geändertem Inhalt ab, md5 in
+`talent_pool_sync`), der alte Vertrag gilt aber 24 Stunden weiter (`raiseGraceHours`); der Chef bekommt eine
+Benachrichtigung, das Stellenraster zeigt „Fordert mehr Lohn“ mit Frist. Danach verliert das Talent je Stunde 15 %
+Zufriedenheit (`satisfaction.underpaidBps`, mal Empfindlichkeit) und kündigt nach wenigen Stunden, bis der Chef mit
+„Gehalt anpassen“ (`talent_raise`: mindestens die Forderung, Mit-GF + 30 %, alle geforderten Benefits, keine
+Kassendeckung) einen neuen Vertrag schließt. Begründung: Sofort teurer wäre für unvorbereitete Firmen ein Schock
+(große Talente zahlen sich nicht mehr aus, die Kasse leert sich unbemerkt), Bestandsschutz bis zur nächsten
+Verhandlung würde alte Legenden auf ewig billig halten. „Gehalt anpassen“ steht auch ohne Anlass im Talentblatt
+(Benefits nachreichen). Migration `20261204010800_talent_wages_steep.sql`, Tests `e4_talents.sql` (6b) und
+`talents.test.ts`.
+
 ## ADR-195: KI-Sammler kaufen auch teure Karten zum Marktwert — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: „Die KI muss auch teure Karten zu Marktpreis kaufen.“ Angebote um 1,5 Mio. € zum

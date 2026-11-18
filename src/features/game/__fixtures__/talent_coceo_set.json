@@ -1,8 +1,8 @@
 {
   "facts": {
     "form_rank": 2,
-    "reputation": 49.87,
-    "awareness_bps": 2239,
+    "reputation": 52.87,
+    "awareness_bps": 2539,
     "expansion_level": 1,
     "free_cash_cents": 50000000
   },
@@ -19,26 +19,28 @@
         "traits": ["workaholic", "diva"],
         "warned": false,
         "benefits": ["bonus", "company_car"],
-        "employer": { "name": "Fixture Werke", "company_id": "805a69d0-19b5-4ca3-abde-0faf5c709d38" },
-        "hired_at": "2026-11-17T22:54:03.612305+00:00",
+        "employer": { "name": "Fixture Werke", "company_id": "03b22048-0b16-4e89-bd6f-053ca88ad633" },
+        "hired_at": "2026-11-18T13:03:17.328329+00:00",
         "is_coceo": false,
         "min_form": 0,
         "last_name": "Pfeiffer",
-        "cost_cents": 7750,
+        "cost_cents": 11750,
         "effect_bps": 381,
         "first_name": "Arne",
-        "wage_cents": 6200,
+        "wage_cents": 9400,
+        "raise_due_at": null,
         "offer_pending": false,
         "resting_until": null,
         "coceo_autonomy": "advise",
         "min_reputation": 0,
         "benefit_demands": ["bonus", "company_car"],
         "satisfaction_bps": 7000,
+        "wage_floor_cents": 9400,
         "coceo_spent_cents": 0,
         "min_awareness_bps": 0,
-        "wage_demand_cents": 6200,
+        "wage_demand_cents": 9400,
         "coceo_budget_cents": 0,
-        "poach_min_cost_cents": 8138
+        "poach_min_cost_cents": 12338
       }
     },
     { "role": "marketing", "effect": "awareness", "talent": null },
@@ -55,26 +57,28 @@
         "traits": ["workaholic", "team_player"],
         "warned": false,
         "benefits": ["bonus", "say"],
-        "employer": { "name": "Fixture Werke", "company_id": "805a69d0-19b5-4ca3-abde-0faf5c709d38" },
-        "hired_at": "2026-11-17T22:54:03.552402+00:00",
+        "employer": { "name": "Fixture Werke", "company_id": "03b22048-0b16-4e89-bd6f-053ca88ad633" },
+        "hired_at": "2026-11-18T13:03:17.310716+00:00",
         "is_coceo": true,
         "min_form": 1,
         "last_name": "Vollmer",
-        "cost_cents": 37180,
+        "cost_cents": 278300,
         "effect_bps": 772,
         "first_name": "Zoe",
-        "wage_cents": 33800,
+        "wage_cents": 253000,
+        "raise_due_at": null,
         "offer_pending": false,
         "resting_until": null,
         "coceo_autonomy": "advise",
         "min_reputation": 45,
         "benefit_demands": ["bonus"],
         "satisfaction_bps": 7000,
+        "wage_floor_cents": 252900,
         "coceo_spent_cents": 0,
         "min_awareness_bps": 1000,
-        "wage_demand_cents": 25900,
+        "wage_demand_cents": 194500,
         "coceo_budget_cents": 50000,
-        "poach_min_cost_cents": 44616
+        "poach_min_cost_cents": 333960
       }
     },
     { "role": "production", "effect": "capacity", "talent": null },
@@ -91,26 +95,28 @@
         "traits": ["diva", "workaholic"],
         "warned": false,
         "benefits": ["bonus", "company_car"],
-        "employer": { "name": "Fixture Werke", "company_id": "805a69d0-19b5-4ca3-abde-0faf5c709d38" },
-        "hired_at": "2026-11-17T22:54:03.554503+00:00",
+        "employer": { "name": "Fixture Werke", "company_id": "03b22048-0b16-4e89-bd6f-053ca88ad633" },
+        "hired_at": "2026-11-18T13:03:17.311906+00:00",
         "is_coceo": false,
         "min_form": 0,
         "last_name": "Quast",
-        "cost_cents": 7375,
+        "cost_cents": 11000,
         "effect_bps": 279,
         "first_name": "Wanda",
-        "wage_cents": 5900,
+        "wage_cents": 8800,
+        "raise_due_at": null,
         "offer_pending": true,
         "resting_until": null,
         "coceo_autonomy": "advise",
         "min_reputation": 0,
         "benefit_demands": ["company_car", "bonus"],
         "satisfaction_bps": 7000,
+        "wage_floor_cents": 8800,
         "coceo_spent_cents": 0,
         "min_awareness_bps": 0,
-        "wage_demand_cents": 5900,
+        "wage_demand_cents": 8800,
         "coceo_budget_cents": 0,
-        "poach_min_cost_cents": 7744
+        "poach_min_cost_cents": 11550
       }
     },
     { "role": "company_doctor", "effect": "capacity", "talent": null },
@@ -141,35 +147,35 @@
   },
   "events": [
     {
-      "id": 14,
+      "id": 16,
       "kind": "coceo_appointed",
       "payload": {
         "name": "Zoe Vollmer",
         "role": "strategy",
         "autonomy": "decide",
-        "wage_cents": 33800,
+        "wage_cents": 253000,
         "budget_cents": 100000
       },
       "cost_cents": 0,
-      "created_at": "2026-11-17T22:54:03.639467+00:00",
+      "created_at": "2026-11-18T13:03:17.341931+00:00",
       "reversible": false,
       "talent_key": "t_strategy_27"
     },
     {
-      "id": 13,
+      "id": 15,
       "kind": "hired",
-      "payload": { "name": "Arne Pfeiffer", "role": "sales", "tier": 0, "wage_cents": 6200 },
+      "payload": { "name": "Arne Pfeiffer", "role": "sales", "tier": 0, "wage_cents": 9400 },
       "cost_cents": 0,
-      "created_at": "2026-11-17T22:54:03.612305+00:00",
+      "created_at": "2026-11-18T13:03:17.328329+00:00",
       "reversible": false,
       "talent_key": "t_sales_01"
     },
     {
-      "id": 12,
+      "id": 14,
       "kind": "decision",
       "payload": { "name": "Fixture", "text": "hat den Autopiloten eingeschaltet.", "action": "autopilot_on" },
       "cost_cents": 0,
-      "created_at": "2026-11-17T22:54:03.558078+00:00",
+      "created_at": "2026-11-18T13:03:17.313552+00:00",
       "reversible": true,
       "talent_key": "t_strategy_27"
     }
@@ -186,16 +192,16 @@
   },
   "incoming": [
     {
-      "id": "7a48f19f-a2e1-4971-b646-70b73a7bdad6",
+      "id": "b22f97d4-29a4-48c2-be95-b56ba8d44ab7",
       "benefits": ["company_car", "bonus"],
-      "from_name": "Gleich Werk",
-      "cost_cents": 6900,
-      "expires_at": "2026-11-17T23:04:03.556426+00:00",
+      "from_name": "Mitte Werkstatt",
+      "cost_cents": 9800,
+      "expires_at": "2026-11-18T13:13:17.312717+00:00",
       "talent_key": "t_it_01",
-      "wage_cents": 6900
+      "wage_cents": 9800
     }
   ],
   "outgoing": [],
   "coceo_max": 2,
-  "company_id": "805a69d0-19b5-4ca3-abde-0faf5c709d38"
+  "company_id": "03b22048-0b16-4e89-bd6f-053ca88ad633"
 }
