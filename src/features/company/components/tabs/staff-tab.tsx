@@ -19,6 +19,7 @@ import { PitchCard } from "../pitch-card";
 import { CompanyNewsCard, SituationCard } from "../situation";
 import { TaxPromoCard } from "@/features/news/promo/promo-card";
 import { StaffValueCard } from "../staff-value-card";
+import { TalentsCard } from "../talents";
 import { TodoCenter, type TodoItem } from "../todo-center";
 
 /** From this many people "Was jeder leistet" starts closed. */
@@ -50,11 +51,13 @@ export function StaffTab({
   const tgr = useTranslations("hq.groupCards");
   const tt = useTranslations("hq.todo");
   const tf = useTranslations("hq.folds");
+  const tl = useTranslations("talents");
   const heads = company.employees + company.aiWorkers + 1;
   const nav: NavItem[] = [
     { id: "todo", label: tt("title"), icon: UI_ICONS.bell, badge: todos.length },
     { id: "staff-tasks", label: t("jump.tasks"), icon: UI_ICONS.briefcase },
     { id: "situation", label: tw("situation"), icon: UI_ICONS.news },
+    { id: "talents", label: tl("views.seats"), icon: UI_ICONS.star },
     { id: "group-team", label: t("jump.team"), icon: UI_ICONS.profile, badge: company.pendingApplications },
     { id: "staff-chat", label: t("jump.chat"), icon: UI_ICONS.news },
   ];
@@ -150,6 +153,11 @@ export function StaffTab({
               <CompanyNewsCard />
             </div>
           </FirmSection>
+          <Reveal feature="companyTalents">
+            <FirmSection id="talents" icon={UI_ICONS.star} title={tl("title")} description={tl("coceo.text")}>
+              <TalentsCard />
+            </FirmSection>
+          </Reveal>
           <MergedCard
             id="group-team"
             icon={UI_ICONS.profile}

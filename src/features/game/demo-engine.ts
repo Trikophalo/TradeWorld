@@ -66,6 +66,7 @@ import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanySkillsEngine, type DemoCompanySkills } from "./demo/company-skills";
 import { createVaultDepositsEngine, initialVaultDeposits, type DemoVaultDepositsState } from "./demo/vault-deposits";
+import { createTalentsEngine, demoOrgTalents, type DemoTalents } from "./demo/talents";
 import { createInterviewEngine, type DemoInterviewState } from "./demo/interviews";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
@@ -160,6 +161,7 @@ interface PlayerState {
   companySkills?: DemoCompanySkills;
   /** Festgeld in the vault (ADR-201). */
   vaultDeposits?: DemoVaultDepositsState;
+  talents?: DemoTalents;
   companyTasks?: DemoTasksState;
   /** NEXA Nachrichten (ADR-150). */
   newsShow?: DemoNewsShowState;
@@ -1804,6 +1806,17 @@ const companySkills = createCompanySkillsEngine({
   now: () => Date.now(),
 });
 
+const talents = createTalentsEngine({
+  company: () => p().company ?? null,
+  state: () => p().talents ?? {},
+  setState: (next) => {
+    p().talents = next;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+});
+
 const companyTasks = createCompanyTasksEngine({
   company: () => p().company ?? null,
   nickname: () => p().nickname,
@@ -2095,6 +2108,7 @@ export const demoEngine: GameEngine = {
   ...companyMoves,
   ...companySkills,
   ...vaultDeposits,
+  ...talents,
   ...companyTasks,
   ...pitches,
   // AI companies of the demo (ADR-125): facts from the start values, no players work there.
@@ -2183,6 +2197,10 @@ export const demoEngine: GameEngine = {
   ...deals.engine,
   ...crypto.engine,
   ...company.engine,
+  // The org chart shows the hired talents above the AI workers (ADR-199).
+  async companyOrg(companyId) {
+    return { ...(await company.engine.companyOrg(companyId)), talents: demoOrgTalents(p().talents ?? {}) };
+  },
   ...art.engine,
   ...home.engine,
   ...rentals.engine,

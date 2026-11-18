@@ -24,6 +24,7 @@ import type { CompanyTarget } from "../../tabs";
 import { useCompanyAutopilot } from "../autopilot-card";
 import { COMPANY_MOVES_KEY, moveText } from "../company-moves";
 import { COMPANY_SKILLS_KEY } from "../company-skills";
+import { COMPANY_TALENTS_KEY } from "../talents";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { ChartLink, DashLink, FirmSection, SectionNav, useWhere, type NavItem } from "../firm-layout";
 import { HealthPanel, type AskMira } from "../health-panel";
@@ -226,6 +227,30 @@ function SkillsTile({ go }: { go: Go }) {
   );
 }
 
+/** Stellen & Talente (ADR-199): filled seats, and how many talents are unhappy. */
+function TalentsTile({ go }: { go: Go }) {
+  const tl = useTranslations("talents");
+  const q = useQuery({
+    queryKey: COMPANY_TALENTS_KEY,
+    queryFn: () => engine.companyTalents(),
+    refetchInterval: 60_000,
+  });
+  const seats = q.data?.seats ?? [];
+  const filled = seats.filter((s) => s.talent).length;
+  const warn = seats.filter((s) => s.talent?.warned).length;
+  return (
+    <KpiTile
+      go={go}
+      label={tl("tile.label")}
+      testId="talents"
+      target={{ tab: "staff", section: "talents" }}
+      hint={warn > 0 ? tl("tile.hint", { warn }) : tl("views.market")}
+    >
+      {q.data ? tl("tile.value", { filled, total: seats.length }) : "–"}
+    </KpiTile>
+  );
+}
+
 /** The key numbers as tiles; each one leads to where it is influenced. */
 function KpiGrid({
   company,
@@ -327,6 +352,9 @@ function KpiGrid({
       </KpiTile>
       <Reveal feature="companySkills">
         <SkillsTile go={go} />
+      </Reveal>
+      <Reveal feature="companyTalents">
+        <TalentsTile go={go} />
       </Reveal>
       {reputation && (
         <KpiTile

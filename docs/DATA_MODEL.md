@@ -8389,3 +8389,44 @@ shares }`.
 
 `p_sector` filtert (`invalid_argument` bei unbekannter Branche); `rank` bleibt der Platz im ganzen Scope. Veränderung
 gegenüber dem letzten Schnappschuss, der mindestens 24 Stunden alt ist; `null`, solange es keinen gibt.
+
+## Talente und Mit-Geschäftsführung (ADR-199, Migrationen `20261204008900_talents.sql`, `20261204008910_talent_coceo.sql`)
+
+- `talents (talent_key PK, role_key, tier 0..4, first_name, last_name, avatar_key, traits[], wage_demand_cents,
+benefit_demands[], min_reputation, min_awareness_bps, min_form, effect_bps, company_id → companies (null = frei),
+wage_cents, benefits[], hired_at, paid_until, satisfaction_bps, warned_at, resting_until, is_coceo, coceo_autonomy
+advise|decide, coceo_budget_cents, coceo_spent_day, coceo_spent_cents, coceo_last_run, updated_at)`; eindeutig
+  `(company_id, role_key)`. RLS: alle Angemeldeten lesen (der Markt ist öffentlich), schreiben nur über RPC.
+- `talent_offers (id, talent_key, from_company, to_company, wage_cents, benefits[], cost_cents, status
+pending|accepted|countered|failed|cancelled, expires_at, created_by, created_at, settled_at)`; höchstens ein
+  `pending` je Talent. RLS: Gründer/CEO beider Firmen.
+- `talent_events (id, company_id, talent_key, kind, payload, cost_cents, reversible, undone_at, created_at)`: Verlauf
+  (hired, dismissed, quit, warned, poached, countered, coceo_appointed, coceo_removed, decision, advice). RLS: eigene
+  Firma.
+- `talent_hours (talent_key, hour_start) PK, company_id, cost_cents, paid, satisfaction_bps`; RLS: eigene Firma.
+- `talent_company_hours (company_id, hour_start) PK, awareness, reputation`: Marketing und Recht einmal je Stunde;
+  kein Client-Zugriff.
+- Intern: `talents_cfg`, `talents_ensure`, `talent_offer_cost`, `talent_company_facts`, `talent_check_offer`,
+  `talent_poach_min_cost`, `talent_status`, `talent_hire_into`, `talent_release`, `talents_hour_effect`,
+  `talent_offers_settle`, `talent_hour`, `talent_company_hour`, `talents_run_due` (Cron `nexa-talents` jede Minute),
+  `talents_coceo_run`, `talent_coceo_pick`, `talent_coceo_style`, `talent_coceo_eligible`. `listed_hour_effect`
+  multipliziert `talents_hour_effect` ein (Antwortfeld `talents`).
+- Benachrichtigungstyp `company_talent`; Firmennachrichten `talent_<kind>`.
+
+| RPC                                                                                          | Antwort / Fehler                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_talent_market(p_role)`                                                                  | `{ company_id, facts, talents: [{ key, role, tier, first_name, last_name, avatar, traits, wage_demand_cents, benefit_demands, min_*, effect_bps, status, employer, poach_min_cost_cents, offer_pending, resting_until, is_coceo }] }` |
+| `get_company_talents()`                                                                      | `{ company_id, facts, seats: [{ role, effect, talent }], effect: { bps, *_factor }, cap_bps, coceo_max, incoming, outgoing, events }`                                                                                                 |
+| `talent_offer(p_request_id, p_talent_key, p_wage_cents, p_benefits)`                         | wie oben plus `result` hired/pending; `demands_not_met`, `offer_too_low`, `offer_pending`, `seat_taken`, `not_available`, `already_hired`                                                                                             |
+| `talent_counter(p_request_id, p_offer_id, p_wage_cents, p_benefits)`                         | wie `get_company_talents`; `offer_closed`, `offer_too_low`                                                                                                                                                                            |
+| `talent_dismiss(p_request_id, p_talent_key)`                                                 | wie `get_company_talents`                                                                                                                                                                                                             |
+| `talent_coceo_appoint(p_request_id, p_talent_key, p_wage_cents, p_autonomy, p_budget_cents)` | wie `get_company_talents`; `not_eligible`, `coceo_full`, `offer_too_low`, `insufficient_funds`                                                                                                                                        |
+| `talent_coceo_set(p_request_id, p_talent_key, p_autonomy, p_budget_cents, p_remove)`         | wie `get_company_talents`                                                                                                                                                                                                             |
+| `talent_undo_decision(p_request_id, p_event_id)`                                             | wie `get_company_talents`; `locked`                                                                                                                                                                                                   |
+
+`get_company_org(p_company_id)` (Migration `20261204010200_talents_after_clone.sql`) trägt zusätzlich `talents: [{ key,
+first_name, last_name, avatar_key, role, tier, is_coceo, since }]` (Mit-GF zuerst, dann Stufe absteigend, dann Stelle);
+das Organigramm zeigt sie über den KI-Kräften.
+
+Ledger: `company_costs` „Talent: Name“, Schlüssel `talent_wage:<talent>:<firma>:<stunde>`; Fertigkeit der Mit-GF
+„Fertigkeit: Schulung (Mit-GF)“, Schlüssel `talent_coceo_skill:<talent>:<fertigkeit>:<stufe>:<firma>`.

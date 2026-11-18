@@ -1760,3 +1760,46 @@ select public.set_job_posting_perks(gen_random_uuid(),
                              50000, 1) ->> 'id')::uuid, 200, 300);
 \o
 reset role;
+
+-- Talente (ADR-199) --------------------------------------------------------------------------------------------------
+select public.talents_ensure() >= 0 as ok \gset
+update public.game_config set value = jsonb_set(value, '{market,shareBps}', '10000') where key = 'talents';
+select company_id as fx_tco from public.player_companies where founder_id = :fx_g and status = 'active' limit 1 \gset
+select company_id as fx_tother from public.player_companies where founder_id <> :fx_g and status = 'active' limit 1 \gset
+select tests.set_company_cash(:'fx_tco', 50000000);
+select talent_key as fx_tj, wage_demand_cents as fx_tj_wage, benefit_demands as fx_tj_ben
+  from public.talents where role_key = 'sales' and tier = 0 and company_id is null and resting_until is null order by talent_key limit 1 \gset
+select talent_key as fx_tc, wage_demand_cents as fx_tc_wage from public.talents
+ where role_key = 'strategy' and tier = 2 and company_id is null order by talent_key limit 1 \gset
+select talent_key as fx_tp, wage_demand_cents as fx_tp_wage from public.talents
+ where role_key = 'it' and tier = 0 and company_id is null order by talent_key limit 1 \gset
+select public.talent_hire_into(:'fx_tc', :'fx_tco', :fx_tc_wage::bigint, (select benefit_demands from public.talents where talent_key = :'fx_tc'), public.game_now());
+select public.talent_hire_into(:'fx_tp', :'fx_tco', :fx_tp_wage::bigint, (select benefit_demands from public.talents where talent_key = :'fx_tp'), public.game_now());
+insert into public.talent_offers (talent_key, from_company, to_company, wage_cents, benefits, cost_cents, expires_at)
+values (:'fx_tp', :'fx_tother', :'fx_tco', :fx_tp_wage::bigint + 1000, (select benefit_demands from public.talents where talent_key = :'fx_tp'),
+        :fx_tp_wage::bigint + 1000, public.game_now() + interval '10 minutes') returning id as fx_toffer \gset
+insert into public.talent_events (company_id, talent_key, kind, payload, reversible)
+values (:'fx_tco', :'fx_tc', 'decision', '{"action":"autopilot_on","name":"Fixture","text":"hat den Autopiloten eingeschaltet."}', true)
+returning id as fx_tev \gset
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_talent_market.json
+select public.get_talent_market('sales');
+\o :fixture_dir/talent_offer.json
+select public.talent_offer(gen_random_uuid(), :'fx_tj', :fx_tj_wage, :'fx_tj_ben');
+\o :fixture_dir/talent_coceo_appoint.json
+select public.talent_coceo_appoint(gen_random_uuid(), :'fx_tc', (ceil(:fx_tc_wage::numeric * 1.3 / 100) * 100 + 100)::bigint, 'decide', 100000);
+\o :fixture_dir/talent_coceo_set.json
+select public.talent_coceo_set(gen_random_uuid(), :'fx_tc', 'advise', 50000, false);
+\o :fixture_dir/get_company_talents.json
+select public.get_company_talents();
+\o :fixture_dir/talent_counter.json
+select public.talent_counter(gen_random_uuid(), :'fx_toffer', :fx_tp_wage::bigint + 2000, (select benefit_demands from public.talents where talent_key = :'fx_tp'));
+\o :fixture_dir/talent_undo_decision.json
+select public.talent_undo_decision(gen_random_uuid(), :fx_tev);
+\o :fixture_dir/talent_dismiss.json
+select public.talent_dismiss(gen_random_uuid(), :'fx_tj');
+\o :fixture_dir/get_company_org_talents.json
+select public.get_company_org(:'fx_tco');
+\o
+reset role;
+update public.game_config set value = jsonb_set(value, '{market,shareBps}', '6500') where key = 'talents';

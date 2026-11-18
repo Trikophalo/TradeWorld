@@ -1219,6 +1219,7 @@ export function createCompanyEngine(host: CompanyHost) {
         company: { id: company.id, name: company.name, tier: company.tier },
         founder: { nickname: host.nickname(), tag: null, avatarKey: host.avatarKey(), isMe: true },
         members: [],
+        talents: [],
         aiWorkers: company.aiWorkers,
         aiWorkerSkills: company.aiWorkerSkills ?? [],
       };

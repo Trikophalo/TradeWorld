@@ -1,0 +1,29 @@
+{
+  "company": { "id": "59b81600-c8a1-455d-bcd9-7e7fe357fd9c", "name": "Fixture Werke", "tier": "gmbh" },
+  "founder": { "tag": "MB2G", "is_me": true, "nickname": "Fixture_Gmbh", "avatar_key": "rookie" },
+  "members": [],
+  "talents": [
+    {
+      "key": "t_strategy_27",
+      "role": "strategy",
+      "tier": 2,
+      "since": "2026-11-18T08:22:09.76895+00:00",
+      "is_coceo": true,
+      "last_name": "Vollmer",
+      "avatar_key": "founder",
+      "first_name": "Zoe"
+    },
+    {
+      "key": "t_it_01",
+      "role": "it",
+      "tier": 0,
+      "since": "2026-11-18T08:22:09.776588+00:00",
+      "is_coceo": false,
+      "last_name": "Quast",
+      "avatar_key": "analyst",
+      "first_name": "Wanda"
+    }
+  ],
+  "ai_workers": 0,
+  "ai_worker_skills": []
+}

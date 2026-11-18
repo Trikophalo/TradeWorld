@@ -4437,6 +4437,94 @@ entfällt. `company_awareness_hour` (6 Argumente) ist gelöscht, `company_awaren
 **Offen.** Die Firmenseite (andere Baustelle) hängt `AwarenessBreakdown` ein; `growth-path.tsx` liest weiter die
 Anzeige-Grenzen der Garage.
 
+## ADR-199: Talente – 15 Stellen, Talentmarkt, Abwerben und Mit-Geschäftsführung — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: „Man soll nun auch echte Leute mit Namen einstellen können statt KI, aber auch vom
+Spiel. Diese haben hohe Ansprüche, bringen aber auch hohen Umsatz. Man braucht jetzt weitere Branchen im Unternehmen …
+15 Stellen und jeweils einen Mitarbeitermarkt … man kann sie von anderen Spieler-Unternehmen abwerben … Wenn was
+nicht passt, kündigen sie.“ Nachtrag: „Die neuen Mitarbeiter stehen in der Hierarchie auch weiter oben als die KI und
+können auch Mit-Geschäftsführer werden und Entscheidungen treffen.“
+
+**Entscheidung.**
+
+- **Talente sind Spielfiguren, keine Spieler.** KI-Kräfte (ADR-180) und Spieler-Mitarbeiter (`player_jobs`) bleiben
+  unverändert. KI-Firmen beschäftigen keine Talente.
+- **15 Stellen, je eine pro Firma, ab der Gründung** (unabhängig von Rechtsform und Ausbau; bessere Talente verlangen
+  aber eine höhere Rechtsform). Unbesetzte Stellen stehen als Lücke im Raster.
+
+  | Stelle        | Wirkung (Junior → Legende, neutrale Persönlichkeit)  |
+  | ------------- | ---------------------------------------------------- |
+  | Vertrieb      | Nachfrage +3 … +19,5 %                               |
+  | Marketing     | Bekanntheit +0,12 … +0,78 Punkte je Stunde           |
+  | Kundenservice | Nachfrage +2 … +13 %                                 |
+  | Strategie     | Nachfrage +2,2 … +14,3 %                             |
+  | Produktion    | Kapazität +3 … +19,5 %                               |
+  | Logistik      | Kapazität +2 … +13 %                                 |
+  | IT            | Kapazität +2,2 … +14,3 %                             |
+  | Betriebsarzt  | Kapazität +1,5 … +9,75 % (weniger Krankheit, Stress) |
+  | Einkauf       | Wareneinsatz −1,2 … −7,8 %                           |
+  | Controlling   | Fixkosten −2,2 … −14,3 %                             |
+  | Buchhaltung   | Fixkosten −1,5 … −9,75 %                             |
+  | Wissenschaft  | Qualität +0,7 … +4,6 Punkte                          |
+  | Qualität      | Qualität +0,5 … +3,3 Punkte                          |
+  | Recht         | Ruf +0,04 … +0,26 je Stunde (weniger Skandale)       |
+  | Personal (HR) | Zufriedenheit aller anderen Talente +0,6 … +3,9 %/h  |
+
+  Deckel der Summe: Nachfrage +35 %, Kapazität +35 %, Wareneinsatz −15 %, Fixkosten −25 %, Qualität +8 Punkte,
+  Bekanntheit +0,6 Punkte/h, Ruf +0,3/h, Zufriedenheit +6 %/h. „Umsatz und Aktie steigen immens“: eine voll besetzte
+  Firma mit Spitzenleuten verdient ein Vielfaches, aber begrenzt; der Kurs folgt über den fairen Wert
+  (`listed_hour_after`), Bekanntheit nur über `company_awareness_add`, Ruf über `company_reputation_bump`.
+
+- **Talentmarkt:** 44 Talente je Stelle (660), deterministisch erzeugt (`src/config/talents.ts`, eigener LCG, kein
+  `Math.random`), eindeutige, erfundene deutsche Namen, Pixel-Porträt aus `avatars.ts`, zwei Eigenschaften aus 13
+  (Ehrgeizig, Loyal, Diva, Teamplayer, Workaholic, Nachteule, Familienmensch, Sportlich, Vorsichtig, Risikofreudig,
+  Führungskraft, Perfektionist, Idealist), Stufe Junior/Profi/Senior/Experte/Legende (14/12/10/6/2 je Stelle). Der Pool
+  geht mit `pnpm db:config` nach `game_config.talents.pool`; `talents_ensure()` legt die Zeilen an. Freie Talente sind
+  an einem Berliner Tag zu 65 % „auf dem Markt“ (Hash aus Schlüssel und Tag), Gekündigte machen 12 Stunden Pause.
+  Angestellte Talente sieht jeder mit Arbeitgeber.
+- **Forderungen:** Lohn je Stunde (Stufe × Stelle × Eigenschaften, ganze Euro), Benefits (Homeoffice, Firmenwagen,
+  Bonus, Weiterbildung, Mitspracherecht, Büro-Ausstattung – braucht Ausbau ≥ 1 –, Fitness, Gleitzeit; je Stufe 0–3
+  plus Wünsche der Eigenschaften), Ruf mindestens, Bekanntheit mindestens, Rechtsform mindestens (Senior
+  Kleinunternehmen, Experte GmbH, Legende AG) und eine freie Kasse für 12 Stunden Lohn und Benefits. Benefits kosten
+  einen Anteil des Lohns (0–15 %).
+- **Einstellen:** `talent_offer` prüft alle Forderungen (`talentOfferChecks`, dieselbe Liste live im Angebot).
+  Erfüllt → sofort angestellt, sonst `demands_not_met`. Eine Stelle hat genau ein Talent (`seat_taken`).
+- **Abwerben** (nur von Spielerfirmen): Das Angebot muss alle Forderungen erfüllen und die Stundenkosten des jetzigen
+  Vertrags um 15 % plus Loyalität der Eigenschaften (Loyal +25 %, Familienmensch +10 %, Diva −10 % …) übertreffen.
+  Dann entsteht ein offener Abwerbeversuch; der Chef bekommt eine Benachrichtigung und kann 15 Minuten nachbessern
+  (`talent_counter`: mindestens so teuer wie das Abwerbeangebot, Zufriedenheit +10 %). Sonst wechselt das Talent,
+  wenn der Abwerber alle Forderungen noch erfüllt und die Stelle frei ist. Je Talent ein Versuch zur Zeit.
+- **Jede volle Stunde seit Einstellung** (`talents_run_due`, Cron jede Minute): Lohn + Benefits über das Ledger
+  (Firmenkasse → Haushalte, Summe 0, offene Rechnungen zuerst); reicht die Kasse nicht, wird nichts gebucht und das
+  Talent wird unzufrieden. Zufriedenheit: +2,5 % wenn alles erfüllt, sonst −25 % (unbezahlt), −8 % (Ruf zu niedrig),
+  −4 % (Bekanntheit), −6 % (Benefits fehlen), mal Empfindlichkeit der Eigenschaften, plus HR. Unter 35 %: Warnung an den
+  Chef; bei 10 % Kündigung, die Wirkung endet sofort.
+- **Hierarchie:** Talente leiten ihre Stelle, KI-Kräfte berichten an sie (Anzeige im Stellenraster und Talentblatt).
+  Im Organigramm (ADR-104, `get_company_org`, für alle Spieler offen) stehen die Talente als eigene Ebene unter den
+  Spieler-Rängen und über den KI-Kräften, Mit-Geschäftsführer zuerst und markiert; gezeigt werden nur Name, Porträt,
+  Stelle und Stufe (kein Lohn, keine Zufriedenheit). Migration `20261204010200_talents_after_clone.sql` kopiert dafür
+  die letzte Fassung aus 0100 (Aufgaben); sie läuft nach Klon und Jobs (ADR-206, 9800/9810), deren neu geschriebene
+  Team- und Jobfunktionen keine Talent-Logik tragen.
+- **Mit-Geschäftsführung:** ab Senior (Führungskraft ab Profi), höchstens 2 je Firma, Lohn ≥ Forderung × 1,3 und
+  Mitspracherecht. Befugnis „Beraten“ (nur Empfehlungen) oder „Entscheiden“ mit Tagesbudget (≤ 100.000 €). Einmal je
+  Stunde: auf ein offenes Ereignis nach 30 Minuten eine Strategie wählen (vorsichtig = höchste Abmilderung,
+  risikofreudig = wenigste Schritte, sonst Abmilderung je Schritt), den bestehenden Autopiloten einschalten (ADR-180;
+  nicht erneut, wenn der Chef das zurückgenommen hat) und die günstigste lernbare Fertigkeit (ADR-194, gleiche Regeln
+  und Buchung) im Restbudget kaufen (vorsichtig: höchstens die Hälfte). Jede Entscheidung steht mit Namen im Verlauf,
+  in den Firmennachrichten und als Benachrichtigung; Strategie und Autopilot kann der Chef rückgängig machen
+  (`talent_undo_decision`), Käufe nicht. Preise, Marketing und Bewerbungen entscheidet die Mit-GF vorerst nicht.
+- **Schnittstelle:** `listed_hour_effect` (vollständige Kopie der Fassung aus 8300) multipliziert
+  `talents_hour_effect` ein; `player_company_close_hour` bleibt unangetastet. Die Mit-GF hängt am Haken
+  `talents_coceo_run` (8900 leer, 8910 befüllt).
+- **Oberfläche:** Mitarbeiter-Tab, Abschnitt „Stellen & Talente“ (Offenlegung `companyTalents`, Stufe 3) mit
+  Umschalter Stellen/Talentmarkt, Talentblatt, Angebotsblatt mit Live-Prüfung, Mit-GF-Einstellungen und Verlauf;
+  Kachel auf dem Dashboard; Mira nennt unzufriedene Talente und leere Stellen.
+
+**Folgen.** Neue Talente nur anhängen (Schlüssel bleiben). Mit vier Spielern konkurrieren alle um dieselben 660
+Talente; die 30 Legenden sind knapp und werden abgeworben. Talentlöhne stehen nicht in `player_company_hours`, sondern
+als eigene Buchung „Talent: Name“; der Gewinn der Stunde zeigt sie nicht. Die Demo kennt Markt, Einstellen und Mit-GF,
+aber keine Löhne, keine Zufriedenheit und kein Abwerben.
+
 ## ADR-195: KI-Sammler kaufen auch teure Karten zum Marktwert — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: „Die KI muss auch teure Karten zu Marktpreis kaufen.“ Angebote um 1,5 Mio. € zum

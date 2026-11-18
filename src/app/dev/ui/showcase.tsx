@@ -58,13 +58,15 @@ import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { CompanySkillsCard } from "@/features/company/components/company-skills";
+import { TalentsCard } from "@/features/company/components/talents";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
 import { FirmSection, InfoTip, SectionNav, SubSection } from "@/features/company/components/firm-layout";
 import { ReputationCard } from "@/features/company/components/reputation-card";
 import { companyHealth, type HealthCompany } from "@/lib/sim/company-health";
 import { InterviewCard } from "@/features/company/components/interview-card";
 import { NewsPromoCard, TaxPromoCard } from "@/features/news/promo/promo-card";
-import type { CompanySkillsState, NewsPromo } from "@/features/game/types";
+import type { CompanySkillsState, CompanyTalentsState, NewsPromo, OwnTalent, Talent } from "@/features/game/types";
+import { TALENT_POOL } from "@/config/talents";
 import { TaskGameView } from "@/features/company/tasks/games";
 import { TaskBoard } from "@/features/company/tasks/task-board";
 import { AutopilotCard } from "@/features/company/components/autopilot-card";
@@ -333,6 +335,83 @@ const SAMPLE_COMPANY_SKILLS: CompanySkillsState = {
   }),
   totalBps: { demand: 200, capacity: 0, cogs: 500, fixed: 0, quality: 0 },
   capBps: { ...BALANCE.companySkills.capBps },
+};
+
+/** Talente (ADR-199): three Stellen filled (one unhappy, one Mit-GF), the rest empty. */
+const sampleTalent = (i: number, status: Talent["status"]): Talent => {
+  const s = TALENT_POOL[i]!;
+  return {
+    key: s.key,
+    role: s.role,
+    tier: s.tier,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    avatar: s.avatar,
+    traits: [...s.traits],
+    wageDemandCents: s.wageCents,
+    benefitDemands: [...s.benefits],
+    minReputation: s.minReputation,
+    minAwarenessBps: s.minAwarenessBps,
+    minForm: s.minForm,
+    effectBps: s.effectBps,
+    status,
+    employer: status === "employed" ? { companyId: "x", name: "Nordlicht Werke" } : null,
+    poachMinCostCents: status === "employed" ? Math.round(s.wageCents * 1.15) : null,
+    offerPending: false,
+    restingUntil: null,
+    isCoCeo: false,
+  };
+};
+const sampleOwn = (i: number, satisfactionBps: number, coCeo = false): OwnTalent => ({
+  ...sampleTalent(i, "mine"),
+  isCoCeo: coCeo,
+  wageCents: TALENT_POOL[i]!.wageCents,
+  benefits: [...TALENT_POOL[i]!.benefits],
+  costCents: TALENT_POOL[i]!.wageCents,
+  hiredAt: "2026-11-01T10:00:00Z",
+  satisfactionBps,
+  warned: satisfactionBps < 3_500,
+  coCeoAutonomy: "decide",
+  coCeoBudgetCents: 100_000,
+  coCeoSpentCents: 20_000,
+});
+const SAMPLE_OWN = [sampleOwn(42, 8_200), sampleOwn(3 * 44 + 30, 9_000, true), sampleOwn(9 * 44 + 2, 2_800)];
+const SAMPLE_TALENTS: CompanyTalentsState = {
+  facts: { reputation: 58, awarenessBps: 1_800, formRank: 2, expansionLevel: 1, freeCashCents: 4_000_000 },
+  seats: BALANCE.talents.roles.map((r) => ({
+    role: r.key,
+    effect: r.effect,
+    talent: SAMPLE_OWN.find((t) => t.role === r.key) ?? null,
+  })),
+  effectBps: { demand: 660, capacity: 0, cogs: 0, fixed: 220, quality: 0, awareness: 0, reputation: 0, morale: 0 },
+  capBps: { ...BALANCE.talents.capBps },
+  coCeoMax: BALANCE.talents.coCeo.max,
+  incoming: [],
+  outgoing: [],
+  events: [
+    {
+      id: 2,
+      talentKey: SAMPLE_OWN[1]!.key,
+      kind: "decision",
+      payload: { name: "Mit-GF", text: "hat den Autopiloten eingeschaltet." },
+      costCents: 0,
+      reversible: true,
+      createdAt: "2026-11-17T10:00:00Z",
+    },
+    {
+      id: 1,
+      talentKey: SAMPLE_OWN[0]!.key,
+      kind: "hired",
+      payload: { name: `${SAMPLE_OWN[0]!.firstName} ${SAMPLE_OWN[0]!.lastName}` },
+      costCents: 0,
+      reversible: false,
+      createdAt: "2026-11-17T09:00:00Z",
+    },
+  ],
+};
+const SAMPLE_TALENT_MARKET = {
+  facts: SAMPLE_TALENTS.facts,
+  talents: TALENT_POOL.slice(0, 44).map((_, i) => sampleTalent(i, i % 7 === 3 ? "employed" : "available")),
 };
 
 const SAMPLE_INTERVIEW = {
@@ -1354,6 +1433,7 @@ export function Showcase() {
         ))}
         <InterviewCard preview={SAMPLE_INTERVIEW} />
         <CompanySkillsCard preview={SAMPLE_COMPANY_SKILLS} />
+        <TalentsCard preview={SAMPLE_TALENTS} previewMarket={SAMPLE_TALENT_MARKET} />
         <NewsPromoShowcase />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />

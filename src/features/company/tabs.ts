@@ -39,6 +39,7 @@ export const COMPANY_GROUPS = {
   todo: { tab: "staff", panes: [] },
   "staff-tasks": { tab: "staff", panes: [] },
   situation: { tab: "staff", panes: [] },
+  talents: { tab: "staff", panes: [] },
   "group-team": { tab: "staff", panes: ["staff-team", "staff-mood", "staff-value"] },
 } as const satisfies Record<string, { tab: CompanyTab; panes: readonly string[] }>;
 export type CompanyGroup = keyof typeof COMPANY_GROUPS;
@@ -92,6 +93,10 @@ const SECTIONS = {
   tasks: { tab: "staff", section: "staff-tasks", target: "tasks" },
   situation: { tab: "staff", section: "situation" },
   event: { tab: "staff", section: "situation" },
+  // Stellen & Talente (ADR-199)
+  talents: { tab: "staff", section: "talents" },
+  stellen: { tab: "staff", section: "talents" },
+  "talent-market": { tab: "staff", section: "talents", target: "talents" },
   "group-team": { tab: "staff", section: "group-team" },
   "staff-team": { tab: "staff", section: "staff-team" },
   team: { tab: "staff", section: "staff-team" },
