@@ -17,9 +17,9 @@ select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
 select public.nexamon_sync() is not null as ok \gset
 
 select tests.assert(
-  (value #>> '{instantSell,payoutBps}')::integer = 9000 and (value #>> '{instantSell,windowSeconds}')::integer > 0
+  (value #>> '{instantSell,payoutBps}')::integer = 8500 and (value #>> '{instantSell,windowSeconds}')::integer > 0
   and (value #>> '{quickSell,bps}')::integer = 8000,
-  'd4: config instantSell.payoutBps 9000, quickSell.bps 8000 (20 % bulk fee)')
+  'd4: config instantSell.payoutBps 8500, quickSell.bps 8000 (20 % bulk fee)')
   from public.game_config where key = 'nexamon';
 
 select card_key as cr from public.nexamon_cards where set_key = 'mystic_energy' and rarity = 'rare' order by number limit 1 \gset
@@ -45,9 +45,9 @@ delete from public.nexamon_sales where copy_id = :'one';
 update public.nexamon_copies set owner_id = :a, ai_owner = null, grade = null, graded_at = null, grading_until = null,
        source = 'pack', created_at = public.game_now(), acquired_at = public.game_now() where id = :'one';
 
-select sum(public.div_round_half_even(public.nexamon_copy_value_cents(k.value_e4, c.condition, null)::numeric * 9000, 10000))::bigint as exp1
+select sum(public.div_round_half_even(public.nexamon_copy_value_cents(k.value_e4, c.condition, null)::numeric * 8500, 10000))::bigint as exp1
   from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key where c.id = :'f1' \gset
-select tests.assert(:exp1 = 1120, 'd4: 90 % of 12,45 € rounds half-even to 11,20 € ' || :exp1);
+select tests.assert(:exp1 = 1058, 'd4: 85 % of 12,45 € rounds half-even to 10,58 € ' || :exp1);
 select public.nexamon_copy_value_cents(k.value_e4, 'good', null) as v2 from public.nexamon_cards k where k.card_key = :'cc' \gset
 
 select tests.cash(:a) as cash0 \gset
@@ -67,10 +67,10 @@ select public.instant_sell_nexamon(:rq, array[:'f1', :'f2']::uuid[]) as s1 \gset
 select public.instant_sell_nexamon(:rq, array[:'f1', :'f2']::uuid[]) as s2 \gset
 reset role;
 select tests.assert(:'s1'::jsonb = :'s2'::jsonb and (:'s1'::jsonb ->> 'count')::integer = 2
-  and (select (e ->> 'price_cents')::bigint from jsonb_array_elements(:'s1'::jsonb -> 'sold') e where e ->> 'copy_id' = :'f1') = 1120
+  and (select (e ->> 'price_cents')::bigint from jsonb_array_elements(:'s1'::jsonb -> 'sold') e where e ->> 'copy_id' = :'f1') = 1058
   and (select (e ->> 'price_cents')::bigint from jsonb_array_elements(:'s1'::jsonb -> 'sold') e where e ->> 'copy_id' = :'f2')
-      = public.div_round_half_even(:v2::numeric * 9000, 10000),
-  'instant_sell_nexamon(): 90 % per copy incl. condition, idempotent ' || :'s1');
+      = public.div_round_half_even(:v2::numeric * 8500, 10000),
+  'instant_sell_nexamon(): 85 % per copy incl. condition, idempotent ' || :'s1');
 select tests.assert(tests.cash(:a) = :cash0::bigint + (:'s1'::jsonb ->> 'total_cents')::bigint
   and tests.households() = :hh0::bigint - (:'s1'::jsonb ->> 'total_cents')::bigint
   and not exists (select 1 from public.nexamon_copies where id in (:'f1', :'f2') and owner_id is not null)

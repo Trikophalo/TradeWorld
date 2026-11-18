@@ -143,3 +143,44 @@ test("a four-player pack battle over three packs (ADR-192)", async ({ page }, in
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-end-${info.project.name}.png` });
   await page.getByTestId("battle-done").click();
 });
+
+test("a twist battle: the mode is picked, shown, and the piles swap after the pack (ADR-205)", async ({
+  page,
+}, info) => {
+  test.setTimeout(120_000);
+  await preparePlayer(page);
+  await page.goto("/nexamon");
+  await expect(page.getByTestId("nexamon-lobby")).toBeVisible();
+  await page.getByTestId("battle-create").click();
+  const twist = page.getByTestId("mode-twist");
+  await expect(twist).toHaveAttribute("aria-pressed", "false");
+  await twist.click();
+  await expect(twist).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("mode-rules")).toContainText("Twist");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/twist-create-${info.project.name}.png` });
+  await page.getByTestId("challenge-send").click();
+  const view = page.getByTestId("battle-view");
+  await expect(view).toBeVisible({ timeout: 15_000 });
+  await expect(view.getByTestId("battle-mode-twist").first()).toBeAttached();
+  await expect(view).toHaveAttribute("data-phase", "revealing", { timeout: 30_000 });
+  // the last two cards of the pack reveal with the effect and its value counter
+  await expect(view.getByTestId("battle-reveal-fx").first()).toBeVisible({ timeout: 20_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/twist-reveal-${info.project.name}.png` });
+  await expect(view).toHaveAttribute("data-phase", "twisting", { timeout: 20_000 });
+  const overlay = view.getByTestId("battle-twist");
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveAttribute("data-round", "1");
+  // a swap names both players, or nothing moved
+  await expect(overlay.getByTestId("battle-twist-move").or(overlay.getByTestId("battle-twist-none"))).toBeVisible();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/twist-swap-${info.project.name}.png` });
+  await expect(page.getByTestId("battle-summary")).toBeVisible({ timeout: 30_000 });
+  // the scores are the piles: together they are everything pulled
+  const sides = [page.getByTestId("battle-side-challenger"), page.getByTestId("battle-side-opponent")];
+  const totals = await Promise.all(sides.map(async (s) => Number(await s.getAttribute("data-total"))));
+  const scores = await Promise.all(sides.map(async (s) => Number(await s.getAttribute("data-score"))));
+  expect(scores[0]! + scores[1]!).toBe(totals[0]! + totals[1]!);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/twist-end-${info.project.name}.png` });
+  await page.getByTestId("battle-done").click();
+});

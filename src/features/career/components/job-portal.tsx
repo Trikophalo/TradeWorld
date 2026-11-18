@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMemo, useRef, useState } from "react";
 import { UI_ICONS } from "@/components/pixel/art";
@@ -22,15 +22,15 @@ import { BALANCE } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame, usePlayerLevel } from "@/features/game/store";
-import type { JobApplication, JobPosting, JobRequirementInfo } from "@/features/game/types";
-import { formatMoney } from "@/lib/format";
+import type { JobApplication, JobHolder, JobPosting, JobRequirementInfo } from "@/features/game/types";
+import { formatMoney, formatPercentBps } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { SPRING, fadeUp, staggerContainer } from "@/lib/motion";
 import { unlockLevel } from "@/lib/sim/progression";
 import { fitPercent } from "@/lib/sim/skills";
 import { playSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { useApplications, useCareerRefresh, useJobBoard, useMyJob, useSkills } from "../hooks";
+import { useApplications, useCareerRefresh, useClone, useJobBoard, useMyJob, useSkills } from "../hooks";
 import { useJobTitle } from "./job-title";
 import { EmployerLogo } from "./my-job-card";
 import { MIN_INK, SignaturePad } from "./signature-pad";
@@ -53,9 +53,16 @@ export function JobPortal() {
   const [applyTo, setApplyTo] = useState<JobPosting | null>(null);
   const [contract, setContract] = useState<JobApplication | null>(null);
   const [counter, setCounter] = useState<JobApplication | null>(null);
+  const board = useJobBoard();
+  // ADR-206: apply for me or for my clone; "/career/jobs?holder=clone" opens the clone's side
+  const params = useSearchParams();
+  const [holder, setHolder] = useState<JobHolder>(params.get("holder") === "clone" ? "clone" : "self");
+  const hasClone = board.data?.hasClone ?? false;
+  const side: JobHolder = hasClone ? holder : "self";
+  const mine = applications.data?.filter((a) => a.forClone === (side === "clone")) ?? [];
   const firstJob = unlockLevel("first_job") ?? 2;
-  const openCount = applications.data?.filter((a) => OPEN.includes(a.status)).length ?? 0;
-  const offers = applications.data?.filter((a) => a.status === "offered").length ?? 0;
+  const openCount = mine.filter((a) => OPEN.includes(a.status)).length;
+  const offers = mine.filter((a) => a.status === "offered").length;
 
   if (level < firstJob) {
     return (
@@ -76,6 +83,21 @@ export function JobPortal() {
 
   return (
     <div className="space-y-5">
+      {hasClone && (
+        <div className="flex flex-wrap items-center gap-3" data-testid="holder-switch">
+          <span className="label-pixel text-fg-3">{t("holderLabel")}</span>
+          <Segmented<JobHolder>
+            value={side}
+            onValueChange={setHolder}
+            label={t("holderLabel")}
+            size="sm"
+            options={[
+              { value: "self", label: t("holderSelf") },
+              { value: "clone", label: t("holderClone") },
+            ]}
+          />
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Segmented<Tab>
           value={tab}
@@ -99,12 +121,17 @@ export function JobPortal() {
       </div>
 
       {tab === "postings" ? (
-        <Postings onApply={setApplyTo} onOpenApplication={openApplication} />
+        <Postings holder={side} onApply={setApplyTo} onOpenApplication={openApplication} />
       ) : (
-        <Applications onContract={setContract} onCounter={setCounter} />
+        <Applications holder={side} onContract={setContract} onCounter={setCounter} />
       )}
 
-      <ApplySheet posting={applyTo} onClose={() => setApplyTo(null)} onApplied={() => setTab("applications")} />
+      <ApplySheet
+        posting={applyTo}
+        holder={side}
+        onClose={() => setApplyTo(null)}
+        onApplied={() => setTab("applications")}
+      />
       <CounterSheet application={counter} onClose={() => setCounter(null)} />
       <ContractSheet application={contract} onClose={() => setContract(null)} />
     </div>
@@ -114,9 +141,11 @@ export function JobPortal() {
 // ------------------------------------------------------------------ postings
 
 function Postings({
+  holder,
   onApply,
   onOpenApplication,
 }: {
+  holder: JobHolder;
   onApply: (p: JobPosting) => void;
   onOpenApplication: (id: string) => void;
 }) {
@@ -165,7 +194,12 @@ function Postings({
         <motion.ul variants={staggerContainer} initial="hidden" animate="visible" className="grid gap-3 lg:grid-cols-2">
           {postings.map((posting) => (
             <motion.li key={posting.id} variants={fadeUp} className="min-w-0">
-              <PostingCard posting={posting} onApply={() => onApply(posting)} onOpenApplication={onOpenApplication} />
+              <PostingCard
+                posting={posting}
+                holder={holder}
+                onApply={() => onApply(posting)}
+                onOpenApplication={onOpenApplication}
+              />
             </motion.li>
           ))}
         </motion.ul>
@@ -222,10 +256,12 @@ function Requirements({
 
 function PostingCard({
   posting,
+  holder = "self",
   onApply,
   onOpenApplication,
 }: {
   posting: JobPosting;
+  holder?: JobHolder;
   onApply: () => void;
   onOpenApplication: (id: string) => void;
 }) {
@@ -235,10 +271,12 @@ function PostingCard({
   const level = usePlayerLevel();
   const skills = useSkills();
   const job = useMyJob();
+  const clone = useClone();
+  const forClone = holder === "clone";
   const fit = skills.data ? fitPercent(posting.required, skills.data.branchScores) : 0;
-  const mine = posting.myApplication;
+  const mine = forClone ? posting.myCloneApplication : posting.myApplication;
   const active = mine && (mine.status === "pending" || mine.status === "offered");
-  const isMyJob = mine?.status === "signed" && job.data !== null;
+  const isMyJob = mine?.status === "signed" && (forClone ? Boolean(clone.data?.job) : job.data !== null);
 
   return (
     <Card padding="md" className="flex h-full flex-col gap-3" data-posting={posting.id}>
@@ -251,6 +289,7 @@ function PostingCard({
         <Badge tone={posting.company.isAi ? "neutral" : "accent"}>{tc(posting.tier)}</Badge>
       </div>
       <Requirements required={posting.required} requiredSkills={posting.requiredSkills} />
+      <PostingPerks posting={posting} />
       <div className="flex items-end justify-between gap-3">
         <div>
           <p className="nums font-semibold text-fg-1">{formatMoney(posting.salaryCentsPerHour)}/Std.</p>
@@ -268,7 +307,11 @@ function PostingCard({
       </div>
       <div className="mt-auto">
         {isMyJob ? (
-          <Badge tone="gain">{t("employed")}</Badge>
+          <Badge tone="gain">{forClone ? t("cloneEmployed") : t("employed")}</Badge>
+        ) : forClone && posting.ownCompany ? (
+          <Button block variant="secondary" disabled>
+            {t("cloneOwnCompany")}
+          </Button>
         ) : active ? (
           <Button
             block
@@ -292,6 +335,58 @@ function PostingCard({
         )}
       </div>
     </Card>
+  );
+}
+
+/**
+ * What the role is worth with my skills, the profit share from Senior on and the chance for employee shares (ADR-206).
+ */
+export function PostingPerks({
+  posting,
+}: {
+  posting: Pick<
+    JobPosting,
+    | "skillPayBps"
+    | "marketSalaryCentsPerHour"
+    | "profitShareBps"
+    | "stockGrantChanceBps"
+    | "postingProfitShareBps"
+    | "postingStockGrantBps"
+    | "company"
+  >;
+}) {
+  const t = useTranslations("jobs.perks");
+  const boost = posting.skillPayBps - 10_000;
+  const extra = posting.postingProfitShareBps > 0 || posting.postingStockGrantBps > 0;
+  return (
+    <ul className="flex flex-wrap gap-1.5 text-xs" data-testid="posting-perks">
+      {boost > 0 && (
+        <li className="rounded-xs bg-gain-soft px-1.5 py-0.5 nums text-gain" title={t("skillPayHint")}>
+          {t("skillPay", { percent: formatPercentBps(boost) })}
+        </li>
+      )}
+      {!posting.company.isAi && (
+        <li className="rounded-xs bg-surface-3 px-1.5 py-0.5 nums text-fg-2" title={t("marketHint")}>
+          {t("market", { amount: formatMoney(posting.marketSalaryCentsPerHour) })}
+        </li>
+      )}
+      <li
+        className={cn(
+          "rounded-xs px-1.5 py-0.5 nums",
+          posting.profitShareBps > 0 ? "bg-accent-soft text-fg-1" : "bg-surface-3 text-fg-3",
+        )}
+      >
+        {posting.profitShareBps > 0
+          ? t("profitShare", { percent: formatPercentBps(posting.profitShareBps) })
+          : t("profitShareNone")}
+      </li>
+      {posting.stockGrantChanceBps > 0 && (
+        <li className="rounded-xs bg-surface-3 px-1.5 py-0.5 nums text-fg-2" title={t("stockHint")}>
+          {t("stock", { percent: formatPercentBps(posting.stockGrantChanceBps) })}
+        </li>
+      )}
+      {extra && <li className="rounded-xs border border-accent/50 px-1.5 py-0.5 text-fg-1">{t("extra")}</li>}
+    </ul>
   );
 }
 
@@ -341,10 +436,12 @@ function WishPicker({
 
 function ApplySheet({
   posting,
+  holder,
   onClose,
   onApplied,
 }: {
   posting: JobPosting | null;
+  holder: JobHolder;
   onClose: () => void;
   onApplied: () => void;
 }) {
@@ -373,6 +470,7 @@ function ApplySheet({
         postingId: shown.id,
         salaryWishCentsPerHour: wish,
         message: message.trim(),
+        forClone: holder === "clone",
       });
       setState("success");
       void playSound("success");
@@ -390,7 +488,7 @@ function ApplySheet({
     <Sheet
       open={posting !== null}
       onOpenChange={(open) => !open && onClose()}
-      title={t("applyTitle")}
+      title={holder === "clone" ? t("applyTitleClone") : t("applyTitle")}
       description={`${title} · ${shown.company.name}`}
       footer={
         <Button block size="lg" state={state} onClick={() => void send()}>
@@ -399,7 +497,8 @@ function ApplySheet({
       }
     >
       <div className="space-y-5">
-        <p className="text-sm text-pretty text-fg-2">{t("applyIntro")}</p>
+        <p className="text-sm text-pretty text-fg-2">{holder === "clone" ? t("applyIntroClone") : t("applyIntro")}</p>
+        <PostingPerks posting={shown} />
         {shown.company.isAi ? (
           // AI employers offer their maximum, there is nothing to wish for (ADR-064).
           <p className="rounded-md bg-gain-soft px-4 py-3 text-sm text-pretty text-fg-1" data-testid="ai-offer">
@@ -476,16 +575,19 @@ function CounterSheet({ application, onClose }: { application: JobApplication | 
 // ------------------------------------------------------------------ applications
 
 function Applications({
+  holder,
   onContract,
   onCounter,
 }: {
+  holder: JobHolder;
   onContract: (a: JobApplication) => void;
   onCounter: (a: JobApplication) => void;
 }) {
   const t = useTranslations("jobs");
   const applications = useApplications();
   if (!applications.data) return <Skeleton className="h-40 w-full rounded-lg" />;
-  if (applications.data.length === 0) {
+  const list = applications.data.filter((a) => a.forClone === (holder === "clone"));
+  if (list.length === 0) {
     return (
       <EmptyState
         art={<PixelIcon {...UI_ICONS.briefcase} scale={4} />}
@@ -497,7 +599,7 @@ function Applications({
   return (
     <ul className="space-y-3">
       <AnimatePresence initial={false}>
-        {applications.data.map((application) => (
+        {list.map((application) => (
           <motion.li key={application.id} layout transition={SPRING.smooth}>
             <ApplicationRow application={application} onContract={onContract} onCounter={onCounter} />
           </motion.li>
@@ -611,6 +713,8 @@ function ContractSheet({ application, onClose }: { application: JobApplication |
   const router = useRouter();
   const nickname = useGame((state) => state.portfolio?.nickname ?? "");
   const job = useMyJob();
+  const clone = useClone();
+  const board = useJobBoard();
   const [shown, setShown] = useState(application);
   const [signature, setSignature] = useState({ path: "", ink: 0 });
   const [state, setState] = useState<ButtonState>("idle");
@@ -623,17 +727,23 @@ function ContractSheet({ application, onClose }: { application: JobApplication |
   const title = useJobTitle(shown?.posting ?? { titleKey: null, title: null });
   if (!shown) return null;
   const salary = shown.offerSalaryCentsPerHour ?? shown.salaryWishCentsPerHour;
-  const hasJob = Boolean(job.data);
+  const forClone = shown.forClone;
+  const hasJob = forClone ? Boolean(clone.data?.job) : Boolean(job.data);
+  const posting = board.data?.postings.find((p) => p.id === shown.posting.id);
 
   const sign = async () => {
     setState("loading");
     try {
-      await engine.signContract(crypto.randomUUID(), shown.id, signature.path);
+      await engine.signContract(crypto.randomUUID(), shown.id, signature.path, forClone);
       setState("success");
       void playSound("levelUp");
       haptic("success");
       if (anchor.current) burstConfetti(anchor.current, 36);
-      toast.success(t("signedTitle"), t("signedText", { company: shown.posting.company.name }), { silent: true });
+      toast.success(
+        t("signedTitle"),
+        t(forClone ? "signedTextClone" : "signedText", { company: shown.posting.company.name }),
+        { silent: true },
+      );
       await refresh();
       window.setTimeout(() => {
         onClose();
@@ -651,6 +761,21 @@ function ContractSheet({ application, onClose }: { application: JobApplication |
     [t("contractHours"), t("contractHoursValue", { hours })],
     [t("contractQuit"), t("contractQuitValue", { amount: formatMoney(salary * BALANCE.jobs.salaryUnitHours) })],
     [t("contractFire"), t("contractFireValue")],
+    // ADR-206: profit share from Senior on, employee shares for good work
+    [
+      t("contractProfitShare"),
+      posting && posting.profitShareBps > 0
+        ? t("contractProfitShareValue", { percent: formatPercentBps(posting.profitShareBps) })
+        : t("contractProfitShareNone"),
+    ],
+    ...(posting && posting.stockGrantChanceBps > 0
+      ? [
+          [t("contractStock"), t("contractStockValue", { percent: formatPercentBps(posting.stockGrantChanceBps) })] as [
+            string,
+            string,
+          ],
+        ]
+      : []),
   ];
 
   return (
@@ -658,7 +783,10 @@ function ContractSheet({ application, onClose }: { application: JobApplication |
       open={application !== null}
       onOpenChange={(open) => !open && onClose()}
       title={t("contractTitle")}
-      description={t("contractParties", { company: shown.posting.company.name, name: nickname })}
+      description={t("contractParties", {
+        company: shown.posting.company.name,
+        name: forClone ? t("cloneName", { name: nickname }) : nickname,
+      })}
       footer={
         <Button block size="lg" state={state} disabled={hasJob || signature.ink < MIN_INK} onClick={() => void sign()}>
           {t("sign")}
@@ -676,7 +804,9 @@ function ContractSheet({ application, onClose }: { application: JobApplication |
         </dl>
         <p className="text-xs text-fg-3">{t("contractNote")}</p>
         {hasJob ? (
-          <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">{t("hasJobHint")}</p>
+          <p className="rounded-md bg-warn-soft px-4 py-3 text-sm text-warn">
+            {forClone ? t("hasCloneJobHint") : t("hasJobHint")}
+          </p>
         ) : (
           <SignaturePad onChange={(path, ink) => setSignature({ path, ink })} />
         )}

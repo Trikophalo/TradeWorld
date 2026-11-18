@@ -10,6 +10,7 @@ export const CAREER_KEYS = {
   board: ["career", "board"],
   applications: ["career", "applications"],
   job: ["career", "job"],
+  clone: ["career", "clone"],
   daily: ["career", "daily"],
   card: (nickname: string) => ["career", "card", nickname.toLowerCase()],
 } as const;
@@ -35,6 +36,16 @@ export function useMyJob() {
   return useQuery({
     queryKey: CAREER_KEYS.job,
     queryFn: () => engine.myJob(),
+    refetchInterval: 60_000,
+    staleTime: 15_000,
+  });
+}
+
+/** The clone and its job (ADR-206). */
+export function useClone() {
+  return useQuery({
+    queryKey: CAREER_KEYS.clone,
+    queryFn: () => engine.clone(),
     refetchInterval: 60_000,
     staleTime: 15_000,
   });

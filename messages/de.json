@@ -949,7 +949,12 @@
     "nexamon_battle_joined": "Du sitzt schon in diesem Pack Battle.",
     "news_promo_inactive": "Diese Aktion läuft gerade nicht (mehr).",
     "news_promo_claimed": "Du hast diese Aktion schon genutzt.",
-    "news_promo_no_company": "Für die Steuererklärung brauchst du eine eigene Firma."
+    "news_promo_no_company": "Für die Steuererklärung brauchst du eine eigene Firma.",
+    "clone_level_too_low": "Einen Klon kannst du ab Level 20 erschaffen.",
+    "clone_exists": "Du hast schon einen Klon. Mehr als einen gibt es nicht.",
+    "clone_missing": "Du hast noch keinen Klon. Erschaffe ihn im Job-Tab.",
+    "clone_own_company": "Dein Klon arbeitet nicht in deiner eigenen Firma. Such ihm eine Stelle bei einer anderen Firma.",
+    "clone_same_company": "Du und dein Klon arbeitet nicht in derselben Firma. Wähle eine andere Firma."
   },
   "locks": {
     "level": "Level {level}",
@@ -1022,7 +1027,7 @@
     "live": "Live, alle 15 Sekunden",
     "news": "Schlagzeilen",
     "newsEmpty": "Noch keine Meldungen. Sobald sich Plätze verschieben, steht es hier.",
-    "explain": "Gezählt wird dein Vermögen: Bargeld plus Aktien und Anleihen zum aktuellen Verkaufskurs, später auch Firmenanteile. Die KI-Tycoons sind erfundene Personen, deren Vermögen in Aktien der KI-Firmen steckt."
+    "explain": "Gezählt wird dein ganzes Vermögen: Bargeld und Tresor, Depot zum Verkaufskurs, deine Firma mit dem Wert aus „Top-Unternehmen“, Nexamon-Karten, NFTs und dein Zuhause, minus Schulden. Die KI-Tycoons sind erfundene Personen, deren Vermögen in Aktien der KI-Firmen steckt."
   },
   "titles": {
     "rookie": "Börsenneuling",
@@ -1865,7 +1870,19 @@
       "rules": "Gearbeitet wird 8 Stunden am Tag, von selbst. Ab einem Tag ohne Besuch gibt es 75 % Lohn, ab zwei Tagen 50 %, ab drei Tagen 25 %. Nach fünf Tagen ohne Besuch wirst du gekündigt.",
       "comeBack": "Spätestens am {date} wieder vorbeischauen."
     },
-    "payFactorWhy": "Weniger Lohn bei Krisen, Skandalen oder wenn die Aktie deines Arbeitgebers heute stark fällt. Auch wenn die Firma nicht genug verdient."
+    "payFactorWhy": "Weniger Lohn bei Krisen, Skandalen oder wenn die Aktie deines Arbeitgebers heute stark fällt. Auch wenn die Firma nicht genug verdient.",
+    "rewards": {
+      "title": "Beteiligung",
+      "skillPay": "Lohn durch Skills",
+      "factor": "×{value}",
+      "profitShare": "Gewinnbeteiligung",
+      "fromSenior": "ab Senior",
+      "stockChance": "Mitarbeiteraktien",
+      "perHour": "{percent} pro Std.",
+      "paid": "Bisher erhalten",
+      "grants": "{count, plural, one {# Mal} other {# Mal}} Aktien bekommen: {shares} Stück, {amount}",
+      "rules": "Ab Senior bekommst du einen Teil vom Gewinn deines Arbeitgebers, je Rang mehr, höchstens 5 %. Für gute Arbeit gibt es ab und zu Aktien."
+    }
   },
   "jobs": {
     "title": "Jobportal",
@@ -1943,7 +1960,33 @@
     "signedText": "Du arbeitest jetzt bei {company}. Gehalt kommt automatisch, auch wenn du offline bist.",
     "hasJobHint": "Du hast schon einen Job. Zum Unterschreiben musst du ihn erst kündigen.",
     "aiOffer": "Diese KI-Firma bietet dir {amount}/Std. Mehr zahlt sie nicht, weniger musst du nicht nehmen.",
-    "skillsRequired": "Muss können"
+    "skillsRequired": "Muss können",
+    "holderLabel": "Bewerben für",
+    "holderSelf": "Mich",
+    "holderClone": "Meinen Klon",
+    "cloneEmployed": "Job deines Klons",
+    "cloneOwnCompany": "Eigene Firma: nichts für den Klon",
+    "cloneName": "Klon von {name}",
+    "applyTitleClone": "Bewerbung für deinen Klon",
+    "applyIntroClone": "Dein Klon bewirbt sich mit deinen Skills. Lohn, Gewinnbeteiligung und Aktien gehen an dich.",
+    "signedTextClone": "Dein Klon arbeitet jetzt bei {company}. Der Lohn kommt automatisch auf dein Konto.",
+    "hasCloneJobHint": "Dein Klon hat schon einen Job. Zum Unterschreiben muss er ihn erst kündigen.",
+    "contractProfitShare": "Gewinnbeteiligung",
+    "contractProfitShareValue": "{percent} vom Gewinn der Firma, nur wenn sie Gewinn macht",
+    "contractProfitShareNone": "ab Senior",
+    "contractStock": "Mitarbeiteraktien",
+    "contractStockValue": "Chance {percent} pro Arbeitsstunde, wenn du da bist und die Firma Gewinn macht",
+    "perks": {
+      "skillPay": "Skills: +{percent} Lohn",
+      "skillPayHint": "Je mehr passende Skills und je mehr Skills insgesamt, desto mehr zahlt die Stelle. Höchstens das Dreifache.",
+      "market": "Dein Marktwert {amount}/Std.",
+      "marketHint": "So viel zahlt eine KI-Firma für diese Stufe bei deinen Skills. Ein guter Vergleich für deinen Gehaltswunsch.",
+      "profitShare": "{percent} Gewinnbeteiligung",
+      "profitShareNone": "Gewinnbeteiligung ab Senior",
+      "stock": "Aktien: {percent} pro Std.",
+      "stockHint": "Für gute Arbeit gibt es ab und zu Aktien des Arbeitgebers: Du bist da und die Firma macht Gewinn.",
+      "extra": "Extras von der Firma"
+    }
   },
   "skillTree": {
     "title": "Skills",
@@ -2073,7 +2116,8 @@
     "founderOf": "Gründer:in von {company}",
     "founderAt": "Gründer:in bei {company}",
     "trophies": "Pokale",
-    "trophiesHint": "Gold, Silber und Bronze aus der Wochenliga"
+    "trophiesHint": "Gold, Silber und Bronze aus der Wochenliga",
+    "cloneJobAt": "Klon von {name}: {title} bei {company}"
   },
   "firm": {
     "title": "Firma",
@@ -2482,7 +2526,20 @@
     "planAi": "KI-Kräfte",
     "planFree": "Freie Plätze",
     "marketingHint": "Ein Quartal sind {hours} Stunden: Jede Stunde gehen {perHour} aus der Kasse an die Werbung. Das macht dich jede Stunde etwas bekannter, doppeltes Budget bringt aber nicht doppelt so viel.",
-    "marketingInfo": "Marketing hebt die Bekanntheit in jeder abgerechneten Stunde. Ohne Budget wächst sie nur durch Mundpropaganda und geht langsam verloren. An der Obergrenze deiner Stufe verpufft jedes weitere Budget."
+    "marketingInfo": "Marketing hebt die Bekanntheit in jeder abgerechneten Stunde. Ohne Budget wächst sie nur durch Mundpropaganda und geht langsam verloren. An der Obergrenze deiner Stufe verpufft jedes weitere Budget.",
+    "cloneOf": "Klon von {name}",
+    "perks": {
+      "title": "Extras für die Stelle",
+      "hint": "Locke gute Leute mit Gewinnbeteiligung (ab Senior) und Mitarbeiteraktien. Bezahlt wird aus dem Firmengewinn und der Kasse.",
+      "profitShare": "Gewinnbeteiligung zusätzlich",
+      "profitShareTotal": "Zusammen mit dem Rang: {percent} vom Gewinn (höchstens 5 %)",
+      "profitShareFromSenior": "Gewinnbeteiligung gibt es erst ab Senior.",
+      "stock": "Aktien-Chance zusätzlich",
+      "stockTotal": "Zusammen mit dem Rang: {percent} pro Arbeitsstunde"
+    },
+    "valueMarketCap": "Börsenwert",
+    "valueEarnings": "Ertragswert",
+    "valueHint": "So zählt deine Firma in „Top-Unternehmen“ und in deinem Vermögen. {basis, select, market_cap {An der Börse: alle Aktien × letzter Kurs. Der Ertragswert ist Kasse plus Jahresgewinn × KGV, so viel wäre sie privat wert.} other {Privat: Kasse − offene Löhne + Jahresgewinn × KGV der Branche × Abschlag.}}"
   },
   "debt": {
     "title": "Schulden",
@@ -2669,7 +2726,21 @@
     "noticeHint": "Bis dahin bekommst du weiter Lohn. Du kannst die Kündigung zurücknehmen.",
     "cancelNotice": "Kündigung zurücknehmen",
     "noticeCancelled": "Kündigung zurückgenommen",
-    "founderHint": "Nebenbei führst du {name} ({count} von {from} Mitarbeitern). Ab {from} arbeitest du dort Vollzeit, dann endet dieser Job nach einem Tag."
+    "founderHint": "Nebenbei führst du {name} ({count} von {from} Mitarbeitern). Ab {from} arbeitest du dort Vollzeit, dann endet dieser Job nach einem Tag.",
+    "founderClone": "Ab Level 20 kann dein Klon woanders arbeiten, während du deine Firma führst.",
+    "clone": {
+      "title": "Dein Klon",
+      "pitch": "Dein Klon arbeitet zusätzlich bei einer anderen Firma, bis zu {hours} bezahlte Stunden am Tag. Lohn, Gewinnbeteiligung und Mitarbeiteraktien gehen auf dein Konto.",
+      "rules": "Einmal pro Spieler, nie in deiner eigenen Firma und nie in derselben Firma wie du. Er richtet sich nach dir: Bleibst du lange weg, sinkt auch sein Lohn.",
+      "lockedHint": "Ab Level {level} kannst du ihn erschaffen.",
+      "create": "Klon erschaffen",
+      "fee": "Einmalig {amount}",
+      "created": "Dein Klon ist da",
+      "createdText": "Such ihm im Jobportal eine Stelle.",
+      "noJob": "Dein Klon hat noch keinen Job.",
+      "toPortal": "Job für den Klon suchen",
+      "jobOf": "Dein Klon arbeitet zusätzlich"
+    }
   },
   "events": {
     "title": "Events",
@@ -2807,20 +2878,76 @@
   },
   "ranking": {
     "forbes": "Forbes 100",
-    "forbesHint": "Die 100 reichsten echten Spieler. Ohne KI-Tycoons.",
-    "allHint": "Alle, auch die erfundenen KI-Tycoons.",
+    "forbesHint": "Die 100 reichsten echten Spieler, nach ihrem ganzen Vermögen. Ohne KI-Tycoons.",
+    "allHint": "Alle Spieler und die erfundenen KI-Tycoons in einer Liste.",
     "companies": "Top-Unternehmen",
-    "companiesHint": "Die wertvollsten Firmen nach Firmenwert.",
+    "companiesHint": "Die wertvollsten Firmen. Jede Firma mit genau dem Wert, den auch ihre Firmenseite zeigt.",
     "companyScope": "Welche Firmen",
     "companyScopePlayers": "Spielerfirmen",
     "companyScopeAll": "Mit KI-Firmen",
-    "companyHint": "Spielerfirmen nach Firmenwert, KI-Firmen nach Börsenwert",
+    "companyHint": "An der Börse nach Börsenwert, private Firmen nach Firmenwert",
     "companyEmpty": "Noch hat niemand eine Firma gegründet. Deine könnte die erste sein.",
     "companyMine": "Deine Firma steht auf Platz {rank}.",
     "yours": "Deine",
     "foundedBy": "von {name}",
     "aiCompany": "KI-Firma an der Börse",
-    "revenue": "Umsatz"
+    "revenue": "Umsatz",
+    "method": "Wie wird gerechnet?",
+    "methodForbes": "Vermögen = alles, was dir gehört, minus Schulden. Gezählt wird so:",
+    "methodAll": "Spieler zählen wie in Forbes 100. KI-Tycoons sind erfundene Personen: Bargeld plus ihre Aktien zum Geldkurs.",
+    "methodCompanies": "Eine Firma, ein Wert, überall gleich: in dieser Liste, auf der Firmenseite und im Vermögen des Gründers.",
+    "methodLines": {
+      "cash": "Bargeld: dein Konto, reserviertes Geld, der volle Betrag im Tresor und Geld für gezeichnete Aktien",
+      "depot": "Depot: Aktien, Anleihen und Coins zum Geldkurs (so viel bringt ein Verkauf)",
+      "company": "Eigene Firma: privat mit ihrem Firmenwert, an der Börse deine Aktien zum letzten Kurs",
+      "cards": "Nexamon: Karten und Slabs zum Marktwert, Black Labels mit Hype",
+      "nfts": "NFTs zum letzten Verkaufspreis, Zuhause, Möbel, Autos und Böden zum Wiederverkaufswert",
+      "deals": "Deals mit anderen Spielern: Geliehenes zählt beim Verleiher, Schulden ziehen ab",
+      "marketCap": "Börsenwert: alle Aktien × letzter Kurs",
+      "companyValue": "Firmenwert (privat): Kasse − offene Löhne + Ertragswert (Jahresgewinn × KGV der Branche × Abschlag)",
+      "snapshot": "Pfeile: Veränderung gegenüber gestern um diese Zeit"
+    },
+    "colRank": "Platz",
+    "colName": "Name",
+    "colCompany": "Firma",
+    "colWealth": "Vermögen · 24 h",
+    "colValue": "Wert · 24 h",
+    "sector": "Branche",
+    "sectorEmptyTitle": "Noch keine Firma",
+    "sectorEmpty": "In dieser Branche steht noch keine Firma in der Liste.",
+    "basis": {
+      "market_cap": "Börsenwert",
+      "company_value": "Firmenwert"
+    },
+    "source": {
+      "cash": "Bargeld",
+      "depot": "Aktien",
+      "company": "Firma",
+      "cards": "Nexamon",
+      "nfts": "NFTs",
+      "property": "Immobilien"
+    },
+    "sourceLabel": "vor allem {source}",
+    "rankMove": "{count, plural, one {# Platz} other {# Plätze}} {up, select, true {hoch} other {runter}} seit gestern",
+    "yourPlace": "Dein Platz",
+    "breakdownTitle": "So setzt sich dein Vermögen zusammen",
+    "breakdownHint": "Genau diese Summe zählt in Forbes 100, auf deiner Visitenkarte und für Missionen.",
+    "breakdownTotal": "Vermögen",
+    "breakdownLeague": "Die Wochenliga lässt den Tresor weg: Grundeinkommen ist geschenktes Geld.",
+    "breakdownCompany": "{name}: {basis} {amount}",
+    "parts": {
+      "cash": "Bargeld",
+      "depot": "Depot (Geldkurs)",
+      "company": "Eigene Firma",
+      "cards": "Nexamon-Karten",
+      "slabs": "Slabs",
+      "nfts": "NFTs",
+      "property": "Zuhause, Möbel, Autos",
+      "vault": "Tresor",
+      "escrow": "Gezeichnete Aktien",
+      "deals": "Deals",
+      "debt": "Schulden"
+    }
   },
   "banner": {
     "title": "Firmen-Banner",
@@ -3260,7 +3387,8 @@
         "board_revolt": "hat im Geschäftsrat von {company} einen Aufstand angezettelt.",
         "research_done": "feiert bei {company} einen Forschungsdurchbruch.",
         "nexamon_master_set": "hat das Master-Set von {name} komplett.",
-        "nexamon_hype": "freut sich: Die Black Labels von {name} sind im Preis gesprungen."
+        "nexamon_hype": "freut sich: Die Black Labels von {name} sind im Preis gesprungen.",
+        "nexamon_battle_mode": "{mode, select, twist {(Twist)} reverse {(Umgekehrt)} both {(Twist + Umgekehrt)} other {}}"
       }
     },
     "notifications": {
@@ -4986,7 +5114,8 @@
     "news": "Neuigkeiten",
     "newsMarket": "Börse",
     "newsInside": "Aus der Firma",
-    "newsAgo": "vor {hours, plural, =0 {kurzem} one {# Stunde} other {# Stunden}}"
+    "newsAgo": "vor {hours, plural, =0 {kurzem} one {# Stunde} other {# Stunden}}",
+    "valueMarketCap": "Börsenwert"
   },
   "companyMoves": {
     "title": "Geschäftszüge",
@@ -10787,7 +10916,8 @@
       "takes": "{count} Karten im Wert von {value} gehen an den Gewinner.",
       "tieBreak": {
         "rarest": "Gleicher Wert: die seltenste Karte hat entschieden.",
-        "coin": "Gleicher Wert, gleich selten: der Münzwurf hat entschieden."
+        "coin": "Gleicher Wert, gleich selten: der Münzwurf hat entschieden.",
+        "rarestReverse": "Gleicher Wert: Die am wenigsten seltene Top-Karte hat entschieden."
       },
       "done": "Fertig",
       "winner": "Gewinner",
@@ -10799,7 +10929,15 @@
         "expired": "Nicht voll geworden: alle haben ihren Einsatz zurück",
         "cancelled": "Abgesagt: alle haben ihren Einsatz zurück",
         "aborted": "Abgebrochen: alle haben ihren Einsatz zurück"
-      }
+      },
+      "twist": {
+        "title": "Twist!",
+        "label": "Nach Pack {n}",
+        "none": "Kein Tausch: alle behalten ihren Wert.",
+        "from": "von {name}",
+        "pulled": "gezogen {value}"
+      },
+      "reverseHint": "Umgekehrt: Der niedrigste Wert hat gewonnen."
     },
     "spectate": {
       "title": "{name} öffnet live",
@@ -10881,6 +11019,17 @@
       "join": "Beitreten · {price}",
       "joinError": "Beitreten ging nicht",
       "cancel": "Absagen und Einsatz zurück"
+    },
+    "modes": {
+      "label": "Modus",
+      "twist": "Twist",
+      "reverse": "Umgekehrt",
+      "twistShort": "Nach jedem Pack werden die Werte zufällig getauscht.",
+      "reverseShort": "Der niedrigste Wert gewinnt.",
+      "classicText": "Klassisch: Wer insgesamt am meisten Wert zieht, bekommt alle Karten.",
+      "twistText": "Twist: Nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht. Wer am Ende den höchsten Wert hält, bekommt alle Karten. Reines Chaos.",
+      "reverseText": "Umgekehrt: Wer insgesamt am wenigsten Wert zieht, bekommt alle Karten.",
+      "both": "Twist + Umgekehrt: Nach jedem Pack werden die Werte zufällig vertauscht, am Ende gewinnt der niedrigste Wert alle Karten."
     }
   },
   "companyInterview": {

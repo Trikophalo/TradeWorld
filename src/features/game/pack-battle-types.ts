@@ -31,6 +31,9 @@ export interface NexamonLiveSession {
   opponent: NexamonFigure | null;
   /** ADR-192: battles: every player in seat order. */
   players: NexamonFigure[] | null;
+  /** ADR-205: battle modes (battles only). */
+  reverse?: boolean;
+  twist?: boolean;
   /** The viewer opens this pack or plays this battle. */
   isMe: boolean;
   startedAt: string;
@@ -57,6 +60,12 @@ export interface NexamonShownPull {
   idx: number;
 }
 
+/** ADR-205: the modes of a Pack Battle (both may be on). */
+export interface NexamonBattleModes {
+  reverse: boolean;
+  twist: boolean;
+}
+
 /** ADR-192: one pack of a battle's lineup. */
 export interface NexamonBattlePack {
   set: NexamonSetKey;
@@ -71,6 +80,8 @@ export interface NexamonBattleSeat {
   /** Only the cards the shared clock has reached. */
   cards: NexamonShownPull[];
   cents: number;
+  /** ADR-205: what the seat holds for the decision so far (its pile after the twists known); = cents without Twist. */
+  scoreCents: number;
 }
 
 export type NexamonBattleStatus = "pending" | "declined" | "expired" | "cancelled" | "aborted" | "running" | "done";
@@ -84,6 +95,16 @@ export interface NexamonBattle {
   /** ADR-192: duel = the classic challenge, multi = a lobby with a lineup and 2-4 seats. */
   mode: "duel" | "multi";
   size: number;
+  /** ADR-205 "Umgekehrt": the lowest total wins. */
+  reverse: boolean;
+  /** ADR-205 "Twist": the piles are permuted after every pack. */
+  twist: boolean;
+  /** ADR-205: the twists the shared clock has reached, one per pack: seat i takes the pile of seat perm[i]. */
+  twists: number[][];
+  /** ADR-205: how long each twist plays (0 without Twist). */
+  twistMs: number;
+  /** ADR-205: the seed of the twists, known from the decision moment on. */
+  twistSeed: number | null;
   packs: NexamonBattlePack[];
   seats: NexamonBattleSeat[];
   mySeat: number | null;
@@ -152,12 +173,16 @@ export interface PackBattleEngine {
   /** Marks the player as on the Collectibles tab; friends there, live openings, own battles. */
   nexamonLobby(allowWatch: boolean): Promise<NexamonLobby>;
   challengeNexamonBattle(requestId: string, nickname: string, set: NexamonSetKey): Promise<NexamonBattle>;
-  /** ADR-192: a lobby with a pack lineup (sets in order) for `size` players; invites friends by nickname. */
+  /**
+   * ADR-192: a lobby with a pack lineup (sets in order) for `size` players; invites friends by nickname.
+   * ADR-205: `modes` picks "Umgekehrt" (reverse) and/or "Twist".
+   */
   createNexamonPackBattle(
     requestId: string,
     sets: NexamonSetKey[],
     size: number,
     invite: string[],
+    modes?: NexamonBattleModes,
   ): Promise<NexamonBattle>;
   joinNexamonPackBattle(requestId: string, battleId: string): Promise<NexamonBattle>;
   respondNexamonBattle(requestId: string, battleId: string, accept: boolean): Promise<NexamonBattle>;

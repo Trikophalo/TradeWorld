@@ -154,8 +154,12 @@ function useFeedText() {
           serial: n(p.serial),
         });
       case "nexamon_battle_won":
-      case "nexamon_battle_big":
-        return t(item.kind, { other: str(p.other), value: formatMoney(n(p.total_cents)) });
+      case "nexamon_battle_big": {
+        // ADR-205: the battle's mode, if any
+        const mode = p.twist === true ? (p.reverse === true ? "both" : "twist") : p.reverse === true ? "reverse" : null;
+        const text = t(item.kind, { other: str(p.other), value: formatMoney(n(p.total_cents)) });
+        return mode ? `${text} ${t("nexamon_battle_mode", { mode })}` : text;
+      }
       case "nexamon_master_set":
         return t("nexamon_master_set", { name: str(p.name) });
       case "nexamon_hype":

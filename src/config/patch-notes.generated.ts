@@ -619,6 +619,21 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-b86b8e76",
+        title: "Ranglisten mit klaren Regeln",
+        text: "Jede Firma hat jetzt überall denselben Wert: an der Börse den Börsenwert (Aktien × letzter Kurs), privat den Firmenwert.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-d6c80d70",
+        title: "Dein Klon und bessere Jobs",
+        text: "Ab Level 20 erschaffst du im Job-Tab einmalig einen Klon (25 000 €).",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-a997be02",
+        title: "Pack Battles mit Modi",
+        text: "Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder…",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-7357c84e",
         title: "Mehr Nervenkitzel bei Packs und ASP",
         text: "Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti…",
@@ -936,6 +951,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         id: "m0-fundament-4ef402d3",
         title: null,
         text: "Projekt: Next.js 16, TypeScript strict, Tailwind 4, Supabase-Anbindung, Vitest, Playwright, Prettier, Husky.",
+      },
+      {
+        id: "m0-fundament-d114eb35",
+        title: null,
+        text: "Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.",
+      },
+      {
+        id: "m0-fundament-64ea1384",
+        title: null,
+        text: "Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines Packs bleibt gleich.",
       },
     ],
   },

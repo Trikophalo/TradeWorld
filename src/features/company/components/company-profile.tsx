@@ -144,7 +144,12 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
       </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="company-facts">
-        {facts.valueCents !== null && fact(t("value"), formatMoney(facts.valueCents, { compact: true }))}
+        {/* ADR-203: the same value as on the company page and in Top-Unternehmen */}
+        {facts.valueCents !== null &&
+          fact(
+            facts.valueBasis === "market_cap" ? t("valueMarketCap") : t("value"),
+            formatMoney(facts.valueCents, { compact: true }),
+          )}
         {facts.revenueCents !== null && fact(t("revenue"), formatMoney(facts.revenueCents, { compact: true }), period)}
         {facts.profitCents !== null &&
           fact(

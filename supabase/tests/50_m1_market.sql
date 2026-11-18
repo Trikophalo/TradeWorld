@@ -69,6 +69,13 @@ as $$
          xp_total = public.xp_total_for_level(p_level)
    where id = p_player;
 $$;
+-- keeps the vault of these players empty: since ADR-203 the accrued vault is part of the net worth and grows by the
+-- millisecond, so tests that compare net worths over several statements freeze it (accrual starts in ten years)
+create or replace function tests.vault_quiet(p_players uuid[]) returns void
+language sql
+as $$
+  update public.vaults set accrual_started_at = now() + interval '10 years' where player_id = any (p_players);
+$$;
 grant execute on all functions in schema tests to public;
 
 -- bootstrap ------------------------------------------------------------------------

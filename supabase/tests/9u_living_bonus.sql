@@ -11,6 +11,7 @@ set client_min_messages = notice;
 update public.invite_codes set max_uses = max_uses + 3 where code = 'M1-TESTS';
 select tests.signup(:o, 'Wanda_Wohnt') is not null and tests.signup(:t, 'Udo_Untermiete') is not null
    and tests.signup(:q, 'Quentin_Weg') is not null as ok \gset
+select tests.vault_quiet(array[:o, :t, :q]::uuid[]);
 select tests.set_level(:o, 12);
 select tests.set_level(:t, 9);
 select tests.set_level(:q, 9);
