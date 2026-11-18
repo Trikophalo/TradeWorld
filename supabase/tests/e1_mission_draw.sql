@@ -1,19 +1,19 @@
 -- =============================================================================
--- d8 · Lower level curve, mission variety, no repeats, never impossible, daily skip (ADR-202)
+-- e1 · Lower level curve, mission variety, no repeats, never impossible, daily skip (ADR-202)
 -- =============================================================================
 \set QUIET 1
 set client_min_messages = notice;
 
-\set n '''0d8d8d8d-0000-4000-8000-0000000000a1'''
-\set m '''0d8d8d8d-0000-4000-8000-0000000000b1'''
-\set l '''0d8d8d8d-0000-4000-8000-0000000000c1'''
-\set s '''0d8d8d8d-0000-4000-8000-0000000000d1'''
+\set n '''e1a20202-0000-4000-8000-0000000000a1'''
+\set m '''e1a20202-0000-4000-8000-0000000000b1'''
+\set l '''e1a20202-0000-4000-8000-0000000000c1'''
+\set s '''e1a20202-0000-4000-8000-0000000000d1'''
 update public.invite_codes set max_uses = max_uses + 4 where code = 'M1-TESTS';
 select tests.signup(:n, 'Neu_Nora') is not null and tests.signup(:m, 'Mitte_Mats') is not null
    and tests.signup(:l, 'Kurve_Lea') is not null and tests.signup(:s, 'Skip_Sami') is not null as ok \gset
 
 -- every open mission of a player passes the checks of the draw
-create or replace function tests.d8_impossible(p_player uuid) returns text language sql as $$
+create or replace function tests.e1_impossible(p_player uuid) returns text language sql as $$
   select string_agg(m.template_key, ', ')
     from public.player_missions m join public.mission_templates t on t.key = m.template_key
     join public.profiles p on p.id = m.player_id
@@ -24,24 +24,24 @@ create or replace function tests.d8_impossible(p_player uuid) returns text langu
           or (m.progress = 0 and not public.mission_doable(p_player, t.key, t.metric)));
 $$;
 -- every draw is logged (a quick mission drawn again the same day replaces its finished row)
-create table if not exists tests.d8_log (player_id uuid, kind text, template_key text, draw_seq bigint, primary key (player_id, draw_seq));
-create or replace function tests.d8_note(p_player uuid) returns void language sql as $$
-  insert into tests.d8_log (player_id, kind, template_key, draw_seq)
+create table if not exists tests.e1_log (player_id uuid, kind text, template_key text, draw_seq bigint, primary key (player_id, draw_seq));
+create or replace function tests.e1_note(p_player uuid) returns void language sql as $$
+  insert into tests.e1_log (player_id, kind, template_key, draw_seq)
   select m.player_id, m.kind, m.template_key, m.draw_seq from public.player_missions m
    where m.player_id = p_player and m.draw_seq is not null
   on conflict do nothing;
 $$;
 -- repeats: the same key twice among `p_window` consecutive draws of a kind
-create or replace function tests.d8_repeats(p_player uuid, p_kind text, p_window integer) returns integer language sql as $$
+create or replace function tests.e1_repeats(p_player uuid, p_kind text, p_window integer) returns integer language sql as $$
   with d as (select l.template_key, row_number() over (order by l.draw_seq) as rn
-               from tests.d8_log l where l.player_id = p_player and l.kind = p_kind)
+               from tests.e1_log l where l.player_id = p_player and l.kind = p_kind)
   select count(*)::integer from d a join d b on b.template_key = a.template_key and b.rn > a.rn and b.rn - a.rn < p_window;
 $$;
-create or replace function tests.d8_draws(p_player uuid, p_kind text) returns integer language sql as $$
-  select count(*)::integer from tests.d8_log l where l.player_id = p_player and l.kind = p_kind;
+create or replace function tests.e1_draws(p_player uuid, p_kind text) returns integer language sql as $$
+  select count(*)::integer from tests.e1_log l where l.player_id = p_player and l.kind = p_kind;
 $$;
-create or replace function tests.d8_distinct(p_player uuid, p_kind text) returns integer language sql as $$
-  select count(distinct l.template_key)::integer from tests.d8_log l where l.player_id = p_player and l.kind = p_kind;
+create or replace function tests.e1_distinct(p_player uuid, p_kind text) returns integer language sql as $$
+  select count(distinct l.template_key)::integer from tests.e1_log l where l.player_id = p_player and l.kind = p_kind;
 $$;
 grant execute on all functions in schema tests to public;
 
@@ -81,8 +81,8 @@ select tests.set_level(:s, 1);
 -- B. A fresh level-1 player: many draws, no repeats, nothing impossible
 -- ---------------------------------------------------------------------------
 select public.missions_assign(:n) is not null as ok \gset
-select tests.d8_note(:n);
-select tests.assert(tests.d8_impossible(:n) is null, 'level 1: every first mission is doable, got ' || coalesce(tests.d8_impossible(:n), '-'));
+select tests.e1_note(:n);
+select tests.assert(tests.e1_impossible(:n) is null, 'level 1: every first mission is doable, got ' || coalesce(tests.e1_impossible(:n), '-'));
 
 -- 40 rounds of claiming the quick missions; every round has to stay doable
 do $$
@@ -92,19 +92,19 @@ declare
 begin
   for i in 1 .. 40 loop
     update public.player_missions set status = 'claimed', claimed_at = now(), progress = target
-     where player_id = '0d8d8d8d-0000-4000-8000-0000000000a1' and kind = 'quick' and status = 'active';
-    perform public.missions_assign('0d8d8d8d-0000-4000-8000-0000000000a1');
-    perform tests.d8_note('0d8d8d8d-0000-4000-8000-0000000000a1');
-    bad := tests.d8_impossible('0d8d8d8d-0000-4000-8000-0000000000a1');
+     where player_id = 'e1a20202-0000-4000-8000-0000000000a1' and kind = 'quick' and status = 'active';
+    perform public.missions_assign('e1a20202-0000-4000-8000-0000000000a1');
+    perform tests.e1_note('e1a20202-0000-4000-8000-0000000000a1');
+    bad := tests.e1_impossible('e1a20202-0000-4000-8000-0000000000a1');
     if bad is not null then
       raise exception 'level 1, round %: impossible missions %', i, bad;
     end if;
   end loop;
 end;
 $$;
-select tests.d8_draws(:n, 'quick') as nq, tests.d8_distinct(:n, 'quick') as nqd \gset
+select tests.e1_draws(:n, 'quick') as nq, tests.e1_distinct(:n, 'quick') as nqd \gset
 select tests.assert(
-  :nq >= 120 and tests.d8_repeats(:n, 'quick', 13) = 0
+  :nq >= 120 and tests.e1_repeats(:n, 'quick', 13) = 0
   and (select count(*) from public.player_missions where player_id = :n and kind = 'quick' and status = 'active') = 3,
   format('level 1: %s quick draws (%s different), none twice within 12 draws', :nq, :nqd));
 
@@ -117,18 +117,18 @@ begin
   select coalesce(r.time_offset, interval '0') into v_off from public.sim_runtime r;
   for d in 1 .. 12 loop
     update public.sim_runtime set time_offset = v_off + make_interval(days => d);
-    perform public.missions_assign('0d8d8d8d-0000-4000-8000-0000000000a1');
-    perform tests.d8_note('0d8d8d8d-0000-4000-8000-0000000000a1');
-    if tests.d8_impossible('0d8d8d8d-0000-4000-8000-0000000000a1') is not null then
-      raise exception 'level 1, day %: impossible missions %', d, tests.d8_impossible('0d8d8d8d-0000-4000-8000-0000000000a1');
+    perform public.missions_assign('e1a20202-0000-4000-8000-0000000000a1');
+    perform tests.e1_note('e1a20202-0000-4000-8000-0000000000a1');
+    if tests.e1_impossible('e1a20202-0000-4000-8000-0000000000a1') is not null then
+      raise exception 'level 1, day %: impossible missions %', d, tests.e1_impossible('e1a20202-0000-4000-8000-0000000000a1');
     end if;
   end loop;
   update public.sim_runtime set time_offset = v_off;
 end;
 $$;
 select tests.assert(
-  tests.d8_draws(:n, 'daily') >= 36
-  and tests.d8_repeats(:n, 'daily', 10) = 0,
+  tests.e1_draws(:n, 'daily') >= 36
+  and tests.e1_repeats(:n, 'daily', 10) = 0,
   'level 1: 12 days of daily missions, none twice within 9 draws');
 -- the open board has no two missions counting the same thing while others are doable
 select tests.assert(
@@ -140,13 +140,13 @@ select tests.assert(
 -- C. A mid player (level 16, company, money): many draws, nothing impossible, the new features show up
 -- ---------------------------------------------------------------------------
 select tests.set_level(:m, 16);
-select tests.fund(:m, 50000000, 'test:d8:m');
+select tests.fund(:m, 50000000, 'test:e1:m');
 select tests.login_as('authenticated', :m);
 select public.found_company(gen_random_uuid(), 'Mitte Werkstatt', 'Alles aus einer Hand', 'tech', '#336699', 'garage') is not null as ok \gset
 reset role;
 select tests.company_of(:m) as mco \gset
 select public.ledger_transfer(public.ledger_system_account('households'), public.company_cash_account(:'mco'), 5000000,
-                              'transfer', 'Test', 'company', :'mco', 'test:d8:mco') is not null as ok \gset
+                              'transfer', 'Test', 'company', :'mco', 'test:e1:mco') is not null as ok \gset
 do $$
 declare
   i   integer;
@@ -154,19 +154,19 @@ declare
 begin
   for i in 1 .. 40 loop
     update public.player_missions set status = 'claimed', claimed_at = now(), progress = target
-     where player_id = '0d8d8d8d-0000-4000-8000-0000000000b1' and kind = 'quick' and status = 'active';
-    perform public.missions_assign('0d8d8d8d-0000-4000-8000-0000000000b1');
-    perform tests.d8_note('0d8d8d8d-0000-4000-8000-0000000000b1');
-    bad := tests.d8_impossible('0d8d8d8d-0000-4000-8000-0000000000b1');
+     where player_id = 'e1a20202-0000-4000-8000-0000000000b1' and kind = 'quick' and status = 'active';
+    perform public.missions_assign('e1a20202-0000-4000-8000-0000000000b1');
+    perform tests.e1_note('e1a20202-0000-4000-8000-0000000000b1');
+    bad := tests.e1_impossible('e1a20202-0000-4000-8000-0000000000b1');
     if bad is not null then
       raise exception 'level 16, round %: impossible missions %', i, bad;
     end if;
   end loop;
 end;
 $$;
-select tests.d8_draws(:m, 'quick') as mq, tests.d8_distinct(:m, 'quick') as mqd \gset
+select tests.e1_draws(:m, 'quick') as mq, tests.e1_distinct(:m, 'quick') as mqd \gset
 select tests.assert(
-  tests.d8_repeats(:m, 'quick', 13) = 0 and :mqd >= 40
+  tests.e1_repeats(:m, 'quick', 13) = 0 and :mqd >= 40
   and exists (select 1 from public.player_missions m join public.mission_templates t on t.key = m.template_key
                where m.player_id = :m and t.params ? 'unlock'),
   format('level 16: %s quick draws over %s templates, none twice within 12, feature missions among them', :mq, :mqd));
@@ -211,13 +211,13 @@ select tests.assert(
   and (select count(*) from public.player_missions where player_id = :n and kind = 'quick' and status in ('active', 'completed')) = 3
   and (select count(*) from public.player_missions where player_id = :n and kind = 'daily' and reset_at is null
          and period_start = (public.game_now() at time zone 'Europe/Berlin')::date) = 3
-  and tests.d8_impossible(:n) is null,
+  and tests.e1_impossible(:n) is null,
   'missions_assign(): a company mission without a company and a job mission without a job (even with progress) are replaced');
 
 -- ---------------------------------------------------------------------------
 -- E. skip_mission(): once per Berlin day, free, only open quick/daily/weekly missions
 -- ---------------------------------------------------------------------------
-\set rq '''0d8d8d8d-0000-4000-8000-00000000ee01'''
+\set rq '''e1a20202-0000-4000-8000-00000000ee01'''
 select tests.login_as('anon');
 select tests.throws($$select public.skip_mission(gen_random_uuid(), gen_random_uuid())$$, '42501', 'anon: skip_mission');
 reset role;

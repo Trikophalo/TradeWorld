@@ -8266,7 +8266,7 @@ Migrationen `20261204009400_level_curve_lower.sql` und `20261204009410_mission_v
 | `get_my_missions()`                        | zusätzlich `skip_available boolean`, `skips_left integer`, `next_skip_at timestamptz \| null`                                                                                                                                                                                     |
 | `skip_mission(p_request_id, p_mission_id)` | wie `get_my_missions` plus `skipped` (Vorlage); idempotent. Nur offene schnelle, tägliche und wöchentliche Missionen der laufenden Periode, `progression.missionSkipsPerDay` je Berliner Tag. Fehler `mission_skip_used` NX420, `mission_skip_invalid` NX421, `mission_not_found` |
 
-Test `supabase/tests/d8_mission_draw.sql`.
+Test `supabase/tests/e1_mission_draw.sql`.
 
 ## Nachtrag: Titans Revenge neu gewichtet (ADR-207)
 

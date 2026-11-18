@@ -633,6 +633,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Pack Battles mit Modi",
         text: "Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-e3f3e70c",
+        title: "Schneller aufsteigen, abwechslungsreichere Missionen",
+        text: "Jedes Level ab Level 2 braucht 20 % weniger XP, Missionen bringen mit dem Level mehr XP: Ein aktiver Spieler steigt etwa 1,3- bis 1,4-mal so schnell…",
+      },
     ],
   },
   {

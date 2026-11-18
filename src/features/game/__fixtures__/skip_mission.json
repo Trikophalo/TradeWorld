@@ -1,0 +1,167 @@
+{
+  "groups": [
+    {
+      "kind": "quick",
+      "missions": [
+        {
+          "id": "86d9260e-d2c8-400f-9f32-cd2bee983f48",
+          "xp": 168,
+          "key": "q_accessory",
+          "title": "Gönn dir ein Accessoire",
+          "status": "completed",
+          "target": 1,
+          "progress": 1,
+          "expires_at": null,
+          "description": "Ein neues Teil für deine Figur. Hauptsache albern."
+        },
+        {
+          "id": "e2d5ef41-5cd2-4e7f-8ba4-5919d3e9a1f6",
+          "xp": 310,
+          "key": "q_securities_2",
+          "title": "Kaufe 2 verschiedene Wertpapiere",
+          "status": "active",
+          "target": 2,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Streuen ist besser als alles auf eine Karte."
+        },
+        {
+          "id": "aca9f8e0-e263-414f-9e6e-91e12f6463e7",
+          "xp": 330,
+          "key": "q_learn_skill",
+          "title": "Lerne eine Fähigkeit",
+          "status": "active",
+          "target": 1,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Setze einen freien Fähigkeitspunkt ein."
+        }
+      ],
+      "resets_at": null
+    },
+    {
+      "kind": "daily",
+      "missions": [
+        {
+          "id": "0aaa90c3-056f-4f7a-af73-da5d534a52b7",
+          "xp": 1520,
+          "key": "d_nft_offers_2",
+          "title": "Mach 3 Preisangebote für NFTs",
+          "status": "active",
+          "target": 3,
+          "progress": 0,
+          "expires_at": "2026-11-18T23:00:00+00:00",
+          "description": "Verschiedene NFTs zählen."
+        },
+        {
+          "id": "46db8c21-c0df-4e32-8ed2-8a9df8b517dd",
+          "xp": 2704,
+          "key": "d_profit",
+          "title": "Erziele 190 € Gewinn mit einem Verkauf",
+          "status": "active",
+          "target": 19000,
+          "progress": 0,
+          "expires_at": "2026-11-18T23:00:00+00:00",
+          "description": "Gewinn nach Gebühren in einer Order."
+        },
+        {
+          "id": "ae4a4f1e-a401-44fb-9329-cbe32636a28f",
+          "xp": 1562,
+          "key": "d_sells",
+          "title": "Verkaufe 3-mal",
+          "status": "active",
+          "target": 3,
+          "progress": 0,
+          "expires_at": "2026-11-18T23:00:00+00:00",
+          "description": "Teilverkäufe zählen auch."
+        }
+      ],
+      "resets_at": "2026-11-18T23:00:00+00:00"
+    },
+    {
+      "kind": "weekly",
+      "missions": [
+        {
+          "id": "028f70cd-f412-44f2-ae6b-48fa8d937f1c",
+          "xp": 5012,
+          "key": "w_streak",
+          "title": "Halte eine Serie von 5 Tagen",
+          "status": "active",
+          "target": 5,
+          "progress": 1,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Hol dir jeden Tag deinen Tagesbonus."
+        },
+        {
+          "id": "668cd818-9d39-4279-aa3c-033e9a56dabc",
+          "xp": 6766,
+          "key": "w_trades",
+          "title": "Mach 47 Trades",
+          "status": "active",
+          "target": 47,
+          "progress": 0,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Diese Woche."
+        },
+        {
+          "id": "a752708b-cb60-4ee0-811b-28751aa61af0",
+          "xp": 7194,
+          "key": "w_all_sectors",
+          "title": "Kaufe Aktien aus allen 5 Branchen",
+          "status": "active",
+          "target": 5,
+          "progress": 0,
+          "expires_at": "2026-11-22T23:00:00+00:00",
+          "description": "Tech, Einzelhandel, Energie, Pharma und Logistik."
+        }
+      ],
+      "resets_at": "2026-11-22T23:00:00+00:00"
+    },
+    {
+      "kind": "milestone",
+      "missions": [
+        {
+          "id": "25115019-d7c3-4156-9064-4535da685858",
+          "xp": 2500,
+          "key": "m_work_for_player",
+          "title": "Arbeite bei einem echten Spieler",
+          "status": "active",
+          "target": 1,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Bewirb dich bei der Firma eines anderen Spielers und fang dort an. Gemeinsam wächst ihr schneller."
+        },
+        {
+          "id": "9baf445d-2191-4b50-8681-5f9c7b11a1d8",
+          "xp": 380,
+          "key": "m_first_trade",
+          "title": "Dein erster Trade",
+          "status": "completed",
+          "target": 1,
+          "progress": 1,
+          "expires_at": null,
+          "description": "Kaufe dein erstes Wertpapier."
+        },
+        {
+          "id": "6feacff3-9f05-4ae1-b88b-217093bd97fc",
+          "xp": 570,
+          "key": "m_first_profit",
+          "title": "Dein erster Gewinn",
+          "status": "active",
+          "target": 1,
+          "progress": 0,
+          "expires_at": null,
+          "description": "Verkaufe etwas teurer, als du es gekauft hast."
+        }
+      ],
+      "resets_at": null
+    }
+  ],
+  "skipped": "q_bond",
+  "skips_left": 0,
+  "server_time": "2026-11-18T08:04:41.459964+00:00",
+  "next_skip_at": "2026-11-18T23:00:00+00:00",
+  "next_reset_at": "2026-11-18T23:00:00+00:00",
+  "skip_available": false,
+  "reset_available": false
+}

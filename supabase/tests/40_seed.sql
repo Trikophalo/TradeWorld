@@ -111,11 +111,11 @@ select tests.assert(
 select tests.assert(
   (select count(*) = 50 from public.levels)
   and (select xp_to_next from public.levels where level = 1) = 100
-  -- an older database (NEXA_MIGRATIONS_UPTO) still has the reference table of ADR-055 until update-to-latest.sql
-  and (select xp_to_next from public.levels where level = 10) in (public.xp_for_next_level(10), 7906)
-  and (select xp_to_next from public.levels where level = 20) in (public.xp_for_next_level(20), 22361)
+  -- an older database (NEXA_MIGRATIONS_UPTO) mixes the curves of ADR-055 and ADR-202 until update-to-latest.sql
+  and (select xp_to_next from public.levels where level = 10) in (public.xp_for_next_level(10), 7906, 6325)
+  and (select xp_to_next from public.levels where level = 20) in (public.xp_for_next_level(20), 22361, 17889)
   and (select xp_to_next is null from public.levels where level = 50)
-  and (select xp_cumulative from public.levels where level = 3) in (100 + public.xp_for_next_level(2), 807),
+  and (select xp_cumulative from public.levels where level = 3) in (100 + public.xp_for_next_level(2), 807, 666),
   'XP curve (ADR-055, ADR-202): 50 levels, 100 XP to level 2, then round(xpBase * n^1.5)');
 select tests.assert(
   (select count(*) from public.unlocks) >= 16
