@@ -4970,3 +4970,34 @@ wertvollen Karten steigen. Die Pfeile und die 24-h-Prozente zeigen einen Tag lan
 `tests.vault_quiet` ihn in SQL-Tests ein, die Vermögen über mehrere Anweisungen vergleichen. Liegt der Börsenkurs weit
 unter dem Ertragswert (wie beim Eigentümer: 3 Mio. gegen 49,4 Mio.), zeigt die Firmenseite das jetzt offen; ob der
 Kurs einer Spieler-AG zu langsam zum fairen Wert findet, ist eine eigene Frage. SQL-Test `d9_toplists.sql`.
+
+## ADR-211: Firmenaufgaben laufen weiter, auch wenn eine einzelne Aufgabe scheitert — `Annahme`
+
+**Kontext.** Der Eigentümer meldet: „Firmenaufgaben funktionieren gerade nicht mehr.“ Nachgestellt auf einer lokalen
+Datenbank wie live (frisch aufgesetzt und über `update-to-latest.sql`, `scripts/apply-updates.sh` und die
+SQL-Editor-Teile von einem Stand vom 26.11. aus, mit offenen Aufgaben aller 32 Spiele): Aufgaben entstehen, die Liste
+lädt, jedes Spiel startet und wird bewertet, Abgeben an Mitarbeiter und KI, Autopilot und Fristen laufen. Die
+Rätsel-Felder des Servers passen in allen 32 Spielen zu denen der Client-Spiele. Ein Fehler, der nur mit den Daten
+live auftritt, ließ sich lokal also nicht erzwingen; die Bauweise erklärt aber, warum er **alle** Firmen trifft:
+`company_tasks_run_due()` (Cron jede Minute) erledigte KI-Ergebnisse, Fristen, neue Aufgaben, den Autopilot aller
+Firmen und das Aufräumen in einer einzigen Transaktion. Ein einziger Fehler irgendwo (eine Aufgabe, eine Firma) rollte
+die ganze Minute zurück – keine neuen Aufgaben, keine KI-Ergebnisse, keine Fristen, für alle, jede Minute, bis die
+Ursache weg war. Gesehen wurde der Fehler nirgends (nur in `cron.job_run_details`). Dabei aufgefallen: Eine Aufgabe für
+einen Klon (ADR-206) konnte niemand öffnen (der Klon sieht die Aufgabenliste nie) und lief in die Strafe; eine Antwort
+ohne Liste (`{}`) bekam bei „Belege prüfen“ und „Regal ordnen“ volle Punkte; eine Aufgabe eines Spiels, das der
+geladene Client noch nicht kennt (Server zuerst aktualisiert), ließ die ganze Liste an der Zod-Prüfung scheitern.
+
+**Entscheidung.**
+
+- Jede Aufgabe, jede Firma und jeder Schritt des Minutenlaufs (und des Autopiloten) läuft in einer eigenen
+  Untertransaktion. Fehler stehen in `job_runs` (`job_name = 'company_tasks'`, mit Meldung, Schritt und ID) und halten
+  die anderen nicht auf; die betroffene Aufgabe wird in der nächsten Minute erneut versucht.
+- Aufgaben, deren Empfänger nicht mehr in der Firma ist (gekündigt, entlassen) oder ein Klon ist, sind binnen einer
+  Minute wieder offen statt bis zur Frist blockiert. Klone bekommen keine Aufgaben und führen niemanden.
+- Fehlt die Liste in der Antwort, gibt es 0 Punkte, wie im TypeScript-Gegenstück.
+- Der Client lässt Aufgaben unbekannter Spiele weg und blendet Klone in der Aufgabenliste aus, statt die Antwort zu
+  verwerfen.
+
+**Folgen.** Ein künftiger Fehler trifft nur noch die eine Aufgabe oder Firma und ist mit einer Abfrage auf `job_runs`
+sichtbar. Der Lauf kostet je Zeile eine Untertransaktion (wenige Aufgaben je Minute). SQL-Test `e3_company_tasks.sql`,
+Unit-Test `src/features/game/api-tasks.test.ts`. Die ADR-Nummer ist vorläufig, falls parallel dieselbe vergeben wurde.

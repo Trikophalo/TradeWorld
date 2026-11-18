@@ -957,6 +957,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines Packs bleibt gleich.",
       },
+      {
+        id: "m0-fundament-d06be564",
+        title: null,
+        text: "Firmenaufgaben laufen wieder zuverlässig: Ein Fehler bei einer einzelnen Aufgabe hält nicht mehr alle Firmen auf, Aufgaben von Leuten, die gegangen…",
+      },
     ],
   },
 ];

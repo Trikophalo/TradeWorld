@@ -4,6 +4,8 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Firmenaufgaben laufen wieder zuverlässig: Ein Fehler bei einer einzelnen Aufgabe hält nicht mehr alle Firmen auf,
+  Aufgaben von Leuten, die gegangen sind, werden wieder frei, und Klone bekommen keine Aufgaben mehr.
 - Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines
   Packs bleibt gleich.
 - Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.
