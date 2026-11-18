@@ -376,6 +376,23 @@ export interface CompanyWorth {
   shares: number | null;
 }
 
+/** One part of the costs of an hour (ADR-208, Nachtrag); keys as in get_company_hour_costs. */
+export interface HourCostPart {
+  key: string;
+  cents: number;
+}
+
+/** Fixed and variable costs of the last closed hour, each split by where they arise (get_company_hour_costs). */
+export interface CompanyHourCosts {
+  /** Start of the hour; null before the first closed hour. */
+  hourStart: string | null;
+  revenueCents: number;
+  fixedCents: number;
+  variableCents: number;
+  fixed: HourCostPart[];
+  variable: HourCostPart[];
+}
+
 /** Risks of the own company (ADR-209): what size and the world outside do to it. */
 export interface CompanyRisks {
   companyId: string;
@@ -2955,6 +2972,8 @@ export interface GameEngine
   /** Risks of the own company: size, external events, insurance, lobby (ADR-209). */
   companyRisks(): Promise<CompanyRisks>;
   setCompanyInsurance(requestId: string, level: number): Promise<CompanyRisks>;
+  /** Fixed and variable costs of the last closed hour of the own company, split by source (ADR-208, Nachtrag). */
+  companyHourCosts(): Promise<CompanyHourCosts>;
   // Artworks (ADR-080)
   artworks(sort: ArtSort, origin: ArtOrigin, onAuction: boolean, limit: number, offset: number): Promise<ArtworkList>;
   artwork(id: string): Promise<ArtworkDetail>;

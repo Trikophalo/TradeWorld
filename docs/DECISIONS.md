@@ -5305,6 +5305,41 @@ herausragt. Die Gebühr zählt für den Zahler als Fixkosten der Stunde; für de
 kein Umsatz. SQL-Test `e6_world.sql`, Unit-Tests `world.test.ts`, `hq.test.ts`, Mira `assistant/world.test.ts`, E2E
 `world-map.spec.ts`.
 
+**Nachtrag (Eigentümer-Fehlerbericht zur Live-Karte, Dashboard-Kacheln).**
+
+- **Mausrad und Zwei-Finger zoomen nur die Karte.** Ein nativer `wheel`-Listener mit `passive: false` ruft
+  `preventDefault()` auf (Reacts `onWheel` ist passiv und kann das nicht), sammelt kleine Trackpad-Schritte (60 px je
+  Zoomstufe, `ctrlKey` = Trackpad-Pinch zählt vierfach) und zoomt um den Mauszeiger. Die Karte hat
+  `touch-action: none` und `overscroll-behavior: contain`, Safari-`gesture*`-Ereignisse werden abgefangen. Außerhalb
+  der Karte scrollt die Seite normal. Zoomstufen 1–4, weiter ganzzahlig.
+- **Flaggen.** Bisher zeichnete jede Flagge nur Streifen aus den Landesfarben; China (rot-gelb) sah aus wie
+  Deutschland (schwarz-rot-gold, das Schwarz verschwand auf dunklem Grund). Jetzt hat jedes der 22 Länder eine eigene,
+  handgezeichnete Pixel-Flagge (`src/components/pixel/flags.ts`, 15 × 9 für Karte, Liste und Länderblatt, 4 × 3 am
+  Mast der Zentrale; Sterne, Kreuze, Halbmond, Ahornblatt, Union Jack vereinfacht). Die Zentrale zeigt immer die Flagge
+  ihres eigenen Landes (`hqArt({ country })`). `flags.test.ts` prüft: jeder Schlüssel hat genau eine Flagge, keine zwei
+  gleichen, jede nutzt die Farben ihres Landes.
+- **Detailreiche Karte.** Statt 90 × 35 Zellen aus Hand-Umrissen jetzt 540 × 210 (6 × so fein, 36 × so viele Pixel),
+  erzeugt aus Natural-Earth-Ländergrenzen (gemeinfrei, `world-atlas@2.0.2`, `scripts/gen-world-map.ts`, jede Zelle mit
+  4 × 4 Stichproben, Datumsgrenze korrekt) als lauflängenkodierte Datei (14 KB). Darauf zeichnet `land.ts` rein und
+  deterministisch: Eis, Tundra, Nadel- und Regenwald, Savanne/Steppe, Wüsten, Gebirgszüge mit Schnee, Strände,
+  Flachwasser, Wellen, große Seen (handgezeichnete Umrisse), Ländergrenzen, die 22 Spielländer mit kräftiger Grenze,
+  das gewählte Land getönt. Palette als Daten je Theme (hell/dunkel). Die Karte ist ein einziges `<canvas>` mit
+  540 × 210 Pixeln, einmal je Theme und Auswahl gemalt, per CSS ganzzahlig und `pixelated` vergrößert: kein DOM je
+  Pixel, auf dem Handy schnell. Gleiche Projektion wie `countries.ts`, darum passen die Marker; `land.test.ts` prüft,
+  dass jeder Marker auf dem Land seines Landes liegt. Ein Tipp aufs Land eines Spiellandes öffnet es ebenfalls.
+- **Kennzahlen gleich groß.** Alle Kacheln des Dashboards haben je Breakpoint dieselbe Größe: Raster mit
+  `auto-rows-fr`, jede Kachel füllt ihre Zelle, Bezeichnung, Wert und Hinweis je eine Zeile (mit …), die
+  Hinweiszeile bleibt auch ohne Hinweis stehen, der „Beeinflussen in …“-Hinweis ist einzeilig.
+- **Fixkosten und Variable Kosten.** Zwei neue Kacheln zeigen die Kosten der letzten abgeschlossenen Stunde und ihren
+  Anteil am Umsatz; ein Tipp öffnet die Aufschlüsselung. Neuer RPC `get_company_hour_costs()` (Gründer, nur lesend,
+  Migration `20261204010600`): die letzte Zeile aus `player_company_hours` und die Buchungen dieser Stunde unter ihren
+  genauen Schlüsseln. Fix: Löhne der Mitarbeiter, KI-Kräfte, Talente (aktueller Stundensatz), Miete/Betrieb/Standort,
+  Werbebudget, laufende Kosten börsennotierter Firmen, Steuerberater, Tochterfirmen, Versicherung und Overhead (beide
+  stecken als Umsatzanteil im Wareneinsatz und werden mit `macro_friction` zum heutigen Firmenwert herausgerechnet;
+  der Eigentümer zählt sie zu den Fixkosten). Variabel: Wareneinsatz, Gewinnbeteiligung (ADR-206), Standortgebühr
+  (hängt am Umsatz, darum variabel, obwohl sie in `fixed_cents` der Stunde steckt), Gebühren aus Lieferverträgen.
+  Die Summen sind die Summen ihrer Teile. SQL-Test `f0_hour_costs.sql`.
+
 ## ADR-211: Firmenaufgaben laufen weiter, auch wenn eine einzelne Aufgabe scheitert — `Annahme`
 
 **Kontext.** Der Eigentümer meldet: „Firmenaufgaben funktionieren gerade nicht mehr.“ Nachgestellt auf einer lokalen

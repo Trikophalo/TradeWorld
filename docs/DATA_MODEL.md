@@ -8484,6 +8484,21 @@ image_campaign_cost_cents, effect, leader, fee_bps, fee_ready_at, paying_fee, fe
 `places`: Zentralen und Töchter aller Spieler plus bis zu `world.aiOnMap` (12) große KI-Firmen (Land aus
 `hashtext(id)`, nie Marktführer). Alle Schreib-RPCs sind idempotent (`request_id`) und antworten wie `get_world`.
 
+### Nachtrag: Kosten der letzten Stunde (ADR-208, Migration `20261204010600_company_hour_costs.sql`)
+
+Keine Schemaänderung. Intern `company_hour_costs_json(firma)`, RPC `get_company_hour_costs()` (Gründer, lesend;
+Fehler `company_not_found`): `{company_id, hour_start (null vor der ersten Stunde), revenue_cents, fixed_cents,
+variable_cents, fixed[{key, cents}], variable[{key, cents}]}`. Quelle ist die jüngste Zeile in `player_company_hours`
+und die Buchungen der Stunde unter `pch:<firma>:<YYYYMMDDHH>:lx:*` und `:world:subs|fee`.
+
+- `fixed`: `wages_players` (`player_wages_paid_cents`), `wages_ai` (`ai_wages_paid_cents`), `talents`
+  (Summe `talent_offer_cost` der Talente der Firma), `rent` (`fixed_cents` minus der laufenden Kosten, Steuerberater,
+  Tochter- und Standortkosten), `marketing`, `upkeep` (`:lx:research|product|expansion|benefit`), `advisor`,
+  `subsidiaries`, `insurance`, `overhead` (Anteil am eigenen Umsatz aus `macro_friction`, aus `cogs_cents`).
+- `variable`: `goods` (`cogs_cents` minus Versicherung und Overhead), `profit_share` (`job_rewards` der Stunde),
+  `location_fee`, `supply_fees` (`supply_fee_paid_cents`).
+- `fixed_cents` / `variable_cents` sind die Summen ihrer Teile; kein Teil ist negativ.
+
 ## Nachtrag: Firmenaufgaben laufen weiter, auch wenn eine Aufgabe scheitert (ADR-211)
 
 Migration `20261204008400_company_tasks_sturdy.sql`, Test `supabase/tests/e3_company_tasks.sql`.

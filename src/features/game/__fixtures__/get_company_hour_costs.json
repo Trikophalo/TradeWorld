@@ -1,0 +1,25 @@
+{
+  "fixed": [
+    { "key": "wages_players", "cents": 0 },
+    { "key": "wages_ai", "cents": 3000 },
+    { "key": "talents", "cents": 0 },
+    { "key": "rent", "cents": 2500 },
+    { "key": "marketing", "cents": 4167 },
+    { "key": "upkeep", "cents": 0 },
+    { "key": "advisor", "cents": 0 },
+    { "key": "subsidiaries", "cents": 0 },
+    { "key": "insurance", "cents": 29 },
+    { "key": "overhead", "cents": 0 }
+  ],
+  "variable": [
+    { "key": "goods", "cents": 35445 },
+    { "key": "profit_share", "cents": 0 },
+    { "key": "location_fee", "cents": 0 },
+    { "key": "supply_fees", "cents": 0 }
+  ],
+  "company_id": "f46939b9-c0b1-461f-9613-a68738b522d4",
+  "hour_start": "2026-11-18T11:00:00+00:00",
+  "fixed_cents": 9696,
+  "revenue_cents": 55487,
+  "variable_cents": 35445
+}

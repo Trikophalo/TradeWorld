@@ -130,7 +130,9 @@ select tests.assert(
           || array['get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
                    'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee']
           -- risks and insurance of the own company (ADR-209)
-          || array['get_company_risks', 'set_company_insurance']) x),
+          || array['get_company_risks', 'set_company_insurance']
+          -- fixed and variable costs of the last hour (ADR-208, Nachtrag)
+          || array['get_company_hour_costs']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

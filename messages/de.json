@@ -11441,7 +11441,42 @@
       "quality": "Qualität",
       "todo": "Zu erledigen",
       "urgent": "{count, plural, one {# dringend} other {# dringend}}",
-      "marketingHint": "Werbung {amount}/Quartal"
+      "marketingHint": "Werbung {amount}/Quartal",
+      "costs": {
+        "fixed": "Fixkosten",
+        "variable": "Variable Kosten",
+        "perHour": "{amount}/h",
+        "share": "{percent} vom Umsatz",
+        "none": "Noch keine Stunde",
+        "open": "Aufschlüsseln: woher die Kosten kommen",
+        "fixedTitle": "Fixkosten je Stunde",
+        "variableTitle": "Variable Kosten je Stunde",
+        "fixedText": "Fallen jede Stunde an, fast egal wie viel du verkaufst.",
+        "variableText": "Wachsen und schrumpfen mit Umsatz und Gewinn.",
+        "hour": "Letzte abgeschlossene Stunde, {time} Uhr",
+        "total": "Summe je Stunde",
+        "empty": "Noch keine abgeschlossene Stunde",
+        "emptyText": "Nach der ersten Betriebsstunde siehst du hier, wohin das Geld geht.",
+        "zero": "Ohne Betrag diese Stunde",
+        "error": "Kosten konnten nicht geladen werden.",
+        "parts": {
+          "wages_players": "Löhne der Mitarbeiter",
+          "wages_ai": "KI-Kräfte",
+          "talents": "Talente",
+          "rent": "Miete, Betrieb und Standort",
+          "marketing": "Werbebudget",
+          "upkeep": "Laufende Kosten (Produkte, Anlagen, Benefits)",
+          "advisor": "Steuerberater",
+          "subsidiaries": "Tochterfirmen",
+          "insurance": "Versicherung",
+          "overhead": "Overhead der Größe",
+          "goods": "Wareneinsatz",
+          "profit_share": "Gewinnbeteiligung der Mitarbeiter",
+          "location_fee": "Standortgebühr",
+          "supply_fees": "Gebühren aus Lieferverträgen",
+          "other": "Sonstiges"
+        }
+      }
     },
     "miraPanel": {
       "open": "Mira öffnen",

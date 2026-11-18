@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CompanyRisks, GameEngine } from "./types";
+import type { CompanyHourCosts, CompanyRisks, GameEngine } from "./types";
 import { rpc } from "./rpc";
 
 /*
@@ -34,9 +34,33 @@ const risksSchema = z.object({
   country: z.object({ key: z.string(), name: z.string().nullable() }).nullable(),
 });
 
+/** Fixed and variable costs of the last closed hour (ADR-208, Nachtrag). */
+const costPart = z.object({ key: z.string(), cents: num });
+const hourCostsSchema = z.object({
+  company_id: z.string(),
+  hour_start: z.string().nullable(),
+  revenue_cents: num,
+  fixed_cents: num,
+  variable_cents: num,
+  fixed: z.array(costPart),
+  variable: z.array(costPart),
+});
+
+export function toHourCosts(r: z.infer<typeof hourCostsSchema>): CompanyHourCosts {
+  return {
+    hourStart: r.hour_start,
+    revenueCents: r.revenue_cents,
+    fixedCents: r.fixed_cents,
+    variableCents: r.variable_cents,
+    fixed: r.fixed.map((p) => ({ key: p.key, cents: p.cents })),
+    variable: r.variable.map((p) => ({ key: p.key, cents: p.cents })),
+  };
+}
+
 export const MACRO_RPC_SCHEMAS = {
   get_company_risks: risksSchema,
   set_company_insurance: risksSchema,
+  get_company_hour_costs: hourCostsSchema,
 } as const;
 
 export function toRisks(r: z.infer<typeof risksSchema>): CompanyRisks {
@@ -78,11 +102,14 @@ export function toRisks(r: z.infer<typeof risksSchema>): CompanyRisks {
   };
 }
 
-export const liveMacroEngine: Pick<GameEngine, "companyRisks" | "setCompanyInsurance"> = {
+export const liveMacroEngine: Pick<GameEngine, "companyRisks" | "setCompanyInsurance" | "companyHourCosts"> = {
   async companyRisks() {
     return toRisks(await rpc("get_company_risks", {}, risksSchema));
   },
   async setCompanyInsurance(requestId, level) {
     return toRisks(await rpc("set_company_insurance", { p_request_id: requestId, p_level: level }, risksSchema));
+  },
+  async companyHourCosts() {
+    return toHourCosts(await rpc("get_company_hour_costs", {}, hourCostsSchema));
   },
 };

@@ -20,6 +20,22 @@ test("dashboard: key numbers, the last hour in words, the autopilot switch", asy
   const dashboard = page.getByTestId("company-dashboard");
   await expect(dashboard.getByTestId("stat-cash")).toBeVisible();
   await expect(dashboard.getByTestId("stat-todo")).toBeVisible();
+  // every number tile has the same size (ADR-208, Nachtrag)
+  const sizes = await dashboard
+    .getByTestId("dashboard-numbers")
+    .locator('[data-testid^="tile-"]')
+    .evaluateAll((els) => els.map((el) => el.getBoundingClientRect()));
+  expect(sizes.length).toBeGreaterThan(4);
+  const spread = (xs: number[]) => Math.max(...xs) - Math.min(...xs);
+  expect(spread(sizes.map((r) => r.height))).toBeLessThanOrEqual(1);
+  expect(spread(sizes.map((r) => r.width))).toBeLessThanOrEqual(1);
+  // fixed and variable costs open where they arise
+  await dashboard.getByTestId("tile-fixed-costs").click();
+  await expect(page.getByTestId("hour-costs-sheet")).toHaveAttribute("data-kind", "fixed");
+  await page.keyboard.press("Escape");
+  await dashboard.getByTestId("tile-variable-costs").click();
+  await expect(page.getByTestId("hour-costs-sheet")).toHaveAttribute("data-kind", "variable");
+  await page.keyboard.press("Escape");
   // The autopilot moved to the to-do center on Mitarbeiter (ADR-187); the to-do tile leads there.
   await dashboard.getByTestId("tile-todo").click();
   const autopilot = page.getByTestId("company-staff").getByTestId("company-autopilot");

@@ -15,12 +15,22 @@ export function useDisclosed(feature: DisclosureKey): boolean {
  * Renders its children only once the player has reached the level at which
  * `feature` is disclosed. Newly revealed parts fade and rise in.
  */
-export function Reveal({ feature, children }: { feature: DisclosureKey; children: ReactNode }) {
+export function Reveal({
+  feature,
+  className,
+  children,
+}: {
+  feature: DisclosureKey;
+  /** Classes of the wrapper (e.g. h-full inside an equal-height grid). */
+  className?: string;
+  children: ReactNode;
+}) {
   const visible = useDisclosed(feature);
   return (
     <AnimatePresence initial={false}>
       {visible && (
         <motion.div
+          className={className}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION.slower, ease: EASE.out }}
