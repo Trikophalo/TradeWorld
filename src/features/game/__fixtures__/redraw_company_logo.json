@@ -1,0 +1,149 @@
+{
+  "company": {
+    "id": "56c22125-1ed4-4ecb-9bb5-388b391101c0",
+    "idea": "Neue Logos",
+    "live": {
+      "last_hour_at": "2026-11-18T08:00:00+00:00",
+      "pay_factor_bps": 10000,
+      "today_profit_cents": 0,
+      "today_revenue_cents": 0,
+      "fixed_per_hour_cents": 0,
+      "quarter_profit_cents": 0,
+      "demand_per_hour_cents": 0,
+      "profit_per_hour_cents": 0,
+      "quarter_revenue_cents": 0,
+      "revenue_per_hour_cents": 0,
+      "ai_wages_per_hour_cents": 0,
+      "capacity_per_hour_cents": 0,
+      "marketing_per_hour_cents": 0,
+      "today_founder_payout_cents": 0,
+      "founder_payout_per_hour_cents": 0,
+      "contract_revenue_per_hour_cents": 0
+    },
+    "logo": {
+      "grid": [
+        "................",
+        "......0000......",
+        ".....011110.....",
+        ".....011110.....",
+        "......0000......",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................"
+      ],
+      "palette": ["#334455", "#ffffff"]
+    },
+    "name": "Fixture Pinsel",
+    "tier": "garage",
+    "color": "#aa3366",
+    "hours": [],
+    "stage": 0,
+    "worth": {
+      "basis": "company_value",
+      "cents": 1250000,
+      "shares": null,
+      "price_e4": null,
+      "company_value_cents": 1250000
+    },
+    "banner": null,
+    "sector": "tech",
+    "stages": [
+      {
+        "stage": 1,
+        "skills": [{ "key": "it_networks", "covered_by": null, "covered_by_ai": false }],
+        "reached": false
+      },
+      {
+        "stage": 2,
+        "skills": [
+          { "key": "it_security", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_programming", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 3,
+        "skills": [
+          { "key": "law_privacy", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_architecture", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      },
+      {
+        "stage": 4,
+        "skills": [
+          { "key": "it_crypto", "covered_by": null, "covered_by_ai": false },
+          { "key": "it_pentest", "covered_by": null, "covered_by_ai": false }
+        ],
+        "reached": false
+      }
+    ],
+    "history": [],
+    "listing": null,
+    "campaign": null,
+    "distress": false,
+    "employees": 0,
+    "headcount": 0,
+    "strengths": {
+      "next": { "at": 50, "bps": 200 },
+      "hours": 0,
+      "scores": { "team": 0.0, "margin": 0.0, "finance": 0.0, "quality": 0.0, "delivery": 0.0, "awareness": 0.0 },
+      "overall": 0.0,
+      "reward_bps": 0,
+      "close_error": null
+    },
+    "ai_workers": 0,
+    "can_expand": false,
+    "cash_cents": 1250000,
+    "founded_at": "2026-11-18T08:36:03.850586+00:00",
+    "reputation": { "at": null, "value": 50.0, "target": 50.0, "drivers": {}, "history": [], "demand_factor": 1.0 },
+    "can_upgrade": true,
+    "logo_hidden": false,
+    "price_level": "normal",
+    "product_key": "security_software",
+    "quality_bps": 2500,
+    "value_cents": 1250000,
+    "last_quarter": null,
+    "unpaid_cents": 0,
+    "awareness_bps": 300,
+    "can_go_public": true,
+    "contract_work": true,
+    "market_factor": 10.0,
+    "max_employees": 2,
+    "open_postings": 0,
+    "training_from": 5,
+    "campaign_costs": { "tv": 67700, "flyer": 20000, "online": 22600 },
+    "capacity_cents": 675000,
+    "close_warnings": [],
+    "full_time_from": 5,
+    "grace_quarters": 4,
+    "pay_factor_bps": 10000,
+    "expansion_level": 0,
+    "founder_has_job": false,
+    "next_quarter_at": "2026-11-18T13:00:00+00:00",
+    "quarters_active": 0,
+    "ai_worker_skills": [],
+    "distress_quarters": 0,
+    "estimate_low_cents": 744440,
+    "founder_payout_bps": 0,
+    "upgrade_cost_cents": 1250000,
+    "estimate_high_cents": 32456651,
+    "ai_worker_cost_cents": 72000,
+    "can_capital_increase": false,
+    "expansion_cost_cents": null,
+    "pending_applications": 0,
+    "team_productivity_bps": 15000,
+    "ai_wage_cents_per_hour": 12000,
+    "founder_productivity_bps": 15000,
+    "marketing_cents_per_quarter": 0
+  },
+  "cost_cents": 5000000
+}

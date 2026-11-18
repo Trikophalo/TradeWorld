@@ -432,6 +432,14 @@ export const NEWS_FRESH = {
         "Meine Serie ist gestern gerissen 😭",
         "Treue wird belohnt, hoffentlich",
       ],
+      corpLogo: [
+        "Neues Logo, wer dis?? 😂",
+        "Das alte war schöner, sorry {name}",
+        "{amount} für ein paar Pixel 😳",
+        "Ich find's schick 🎨",
+        "Sieht aus wie mein Frühstück",
+        "Endlich ein Logo mit Stil",
+      ],
       corpSkill: [
         "{skill} Stufe {level}, schick",
         "Weiterbildung bei {company}, endlich",

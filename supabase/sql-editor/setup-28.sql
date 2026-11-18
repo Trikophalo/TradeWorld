@@ -1692,7 +1692,8 @@ security definer
 set search_path = ''
 as $$
 begin
-  if to_regprocedure('public.world_tax_rate_bps(uuid)') is not null then
+  -- a company without a headquarters (world_tax_rate_bps null) keeps the normal rate
+  if to_regprocedure('public.world_tax_rate_bps(uuid)') is not null and public.world_tax_rate_bps(p_company) is not null then
     return greatest(public.cfg_num(public.listed_cfg(), '{taxes,minRateBps}', 800),
                     public.world_tax_rate_bps(p_company) + public.cfg_num(public.listed_effects(p_company), '{taxRateBps}', 0))::integer;
   end if;
@@ -2163,7 +2164,7 @@ $$;
 --   (ADR-209), star hires, poaching, quits, co-CEOs and the best free talent (ADR-199), clones with a job (ADR-206),
 --   climbers of the rich list and of the company list (ADR-203), the Pleite der Woche, Black Labels, Pack Battle
 --   Twist winners and pack marathons, big Festgeld deposits and their interest (ADR-201), login streaks, company
---   skills and the Wetter auf der Weltkarte. The Börsen-Orakel needs no data.
+--   skills, redrawn logos (ADR-200) and the Wetter auf der Weltkarte. The Börsen-Orakel needs no data.
 -- * news_show_topics(): the latest full definition (5700) plus the call of those candidates and a segue in front of
 --   a topic now and then (news_show_segue()).
 -- * news_show_pick(): the latest full definition (2000); a frame or reason that aired in the last
@@ -2488,7 +2489,17 @@ begin
     join public.companies co on co.id = k.company_id
     join public.player_companies pc on pc.company_id = k.company_id
    where k.ready_at between p_now - p_win and p_now
-     and k.level >= coalesce((ff ->> 'skillMinLevel')::integer, 3);
+     and k.level >= coalesce((ff ->> 'skillMinLevel')::integer, 3)
+  -- ---- a redrawn logo (ADR-200), when the game has it
+  union all
+  select 'corpLogo', pc.founder_id,
+         jsonb_build_object('company', co.name,
+                            'amount', public.format_eur(coalesce((public.config_jsonb('startups') ->> 'logoRedrawCents')::bigint, 0))),
+         'fact:logo:' || pc.company_id::text || ':' || extract(epoch from (to_jsonb(pc) ->> 'logo_redrawn_at')::timestamptz)::bigint::text,
+         extract(epoch from (to_jsonb(pc) ->> 'logo_redrawn_at')::timestamptz)::double precision
+    from public.player_companies pc
+    join public.companies co on co.id = pc.company_id
+   where (to_jsonb(pc) ->> 'logo_redrawn_at')::timestamptz between p_now - p_win and p_now;
 end;
 $$;
 comment on function public.news_show_topic_cands_fresh(timestamptz, interval) is
@@ -3184,37 +3195,5 @@ revoke all on function public.news_show_event_segments(timestamptz, interval) fr
 revoke all on function public.news_show_event_response(public.player_company_events, text) from public, anon, authenticated;
 revoke all on function public.news_shows_fresh_chat() from public, anon, authenticated;
 grant execute on function public.news_show_topics(timestamptz, uuid[], uuid[], jsonb) to service_role;
-
--- ===== supabase/migrations/20261204010410_macro_tax_unplaced.sql =====
--- =============================================================================
--- NEXA · 10410 · Tax rate of a company without a headquarters (ADR-209 with ADR-208)
--- =============================================================================
--- With the world map present, world_tax_rate_bps() is null for a company that has not placed its headquarters yet.
--- macro_tax_rate_bps() (latest full definition from 10100) then fell to the minimum rate instead of the listed rate;
--- it now uses the listed rate whenever the world map has no rate for the company.
--- Idempotent: runs unchanged as supabase/updates/20261204010410_macro_tax_unplaced.sql.
-
--- The base rate: the world map's blended country rate when present (ADR-208), else the listed rate; research on top
-create or replace function public.macro_tax_rate_bps(p_company uuid)
-returns integer
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_world integer;
-begin
-  if to_regprocedure('public.world_tax_rate_bps(uuid)') is not null then
-    v_world := public.world_tax_rate_bps(p_company);
-    if v_world is not null then
-      return greatest(public.cfg_num(public.listed_cfg(), '{taxes,minRateBps}', 800),
-                      v_world + public.cfg_num(public.listed_effects(p_company), '{taxRateBps}', 0))::integer;
-    end if;
-  end if;
-  return public.listed_tax_rate_bps(p_company);
-end;
-$$;
-revoke all on function public.macro_tax_rate_bps(uuid) from public, anon, authenticated;
 
 commit;

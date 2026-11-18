@@ -658,6 +658,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Mehr Nervenkitzel bei Packs und ASP",
         text: "Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-0c67a172",
+        title: "NEXA Nachrichten, dritte Staffel",
+        text: "Mr. Doodle Dangle berichtet jetzt von der Weltkarte (neue Zentralen, Ausbau, Marktführer, Standortgebühren, Tochterfirmen), über Talente…",
+      },
     ],
   },
   {
@@ -983,9 +988,19 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines Packs bleibt gleich.",
       },
       {
+        id: "m0-fundament-d06be564",
+        title: null,
+        text: "Firmenaufgaben laufen wieder zuverlässig: Ein Fehler bei einer einzelnen Aufgabe hält nicht mehr alle Firmen auf, Aufgaben von Leuten, die gegangen…",
+      },
+      {
         id: "m0-fundament-5549c50c",
         title: null,
         text: "Weltkarte: Ab 10 Mio. € Firmenwert setzt du deine Firma im neuen Tab „Standort“ in eines von 22 Ländern, baust die Zentrale bis zum Mega-Campus aus…",
+      },
+      {
+        id: "m0-fundament-0f4829aa",
+        title: null,
+        text: "Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der Firmenkasse neu, höchstens einmal…",
       },
     ],
   },

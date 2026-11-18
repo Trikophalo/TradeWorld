@@ -12,6 +12,7 @@ import type {
   CompanyOverview,
   CompanyPosting,
   GameEngine,
+  LogoRedrawInfo,
   MyCompany,
   Offer,
   TeamMember,
@@ -489,6 +490,13 @@ export const COMPANY_RPC_SCHEMAS = {
   }),
   decline_promotion: z.object({ status: z.literal("declined"), retry_at: iso.nullable() }),
   set_company_logo: wrapped,
+  get_logo_redraw: z.object({
+    cost_cents: num,
+    cooldown_hours: num,
+    redrawn_at: iso.nullable(),
+    available_at: iso.nullable(),
+  }),
+  redraw_company_logo: wrapped.extend({ cost_cents: num }),
   set_company_banner: wrapped,
   report_company_logo: z.object({ reported: z.boolean() }),
   go_public: wrapped,
@@ -778,6 +786,8 @@ type CompanyEngine = Pick<
   | "declinePromotion"
   | "trainEmployee"
   | "setCompanyLogo"
+  | "logoRedraw"
+  | "redrawCompanyLogo"
   | "setCompanyBanner"
   | "reportCompanyLogo"
   | "goPublic"
@@ -1104,6 +1114,26 @@ export const liveCompanyEngine: CompanyEngine = {
 
   async setCompanyLogo(requestId, logo) {
     return requireCompany(await rpc("set_company_logo", { p_request_id: requestId, p_logo: logo }, S.set_company_logo));
+  },
+
+  async logoRedraw(companyId): Promise<LogoRedrawInfo> {
+    const r = await rpc("get_logo_redraw", { p_company_id: companyId }, S.get_logo_redraw);
+    return {
+      costCents: r.cost_cents,
+      cooldownHours: r.cooldown_hours,
+      redrawnAt: r.redrawn_at,
+      availableAt: r.available_at,
+    };
+  },
+
+  async redrawCompanyLogo(requestId, companyId, logo) {
+    return requireCompany(
+      await rpc(
+        "redraw_company_logo",
+        { p_request_id: requestId, p_company_id: companyId, p_pixels: logo },
+        S.redraw_company_logo,
+      ),
+    );
   },
 
   async setCompanyBanner(requestId, banner) {

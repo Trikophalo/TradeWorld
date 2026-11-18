@@ -4,8 +4,13 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der
+  Firmenkasse neu, höchstens einmal am Tag. Das neue Logo erscheint sofort überall und in den Neuigkeiten.
 - Weltkarte: Ab 10 Mio. € Firmenwert setzt du deine Firma im neuen Tab „Standort“ in eines von 22 Ländern, baust die
   Zentrale bis zum Mega-Campus aus, gründest Tochterfirmen und wirst als größte Firma im Land Marktführer.
+
+- Firmenaufgaben laufen wieder zuverlässig: Ein Fehler bei einer einzelnen Aufgabe hält nicht mehr alle Firmen auf,
+  Aufgaben von Leuten, die gegangen sind, werden wieder frei, und Klone bekommen keine Aufgaben mehr.
 - Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines
   Packs bleibt gleich.
 - Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.
@@ -117,6 +122,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
   Münze am Guthaben hüpft bei jeder Änderung.
 
 ## Startseite, Währung zur Wahl, Freundescode
+
+- **NEXA Nachrichten, dritte Staffel (ADR-210):** Mr. Doodle Dangle berichtet jetzt von der Weltkarte (neue Zentralen, Ausbau, Marktführer, Standortgebühren, Tochterfirmen), über Talente (Star-Wechsel, Abwerbungen, Kündigungen, Mit-Geschäftsführung, Transfermarkt), Klone mit Job, Aufsteiger der Ranglisten, die „Pleite der Woche“, Black Labels, Pack Battles mit Twist, Festgeld, Login-Serien, Fertigkeiten und neue Logos. Jedes große Ereignis von außen, das eine Spielerfirma trifft, bekommt eine eigene Meldung mit Land, Lage und Gegenmaßnahme, und später einen Nachtrag. Dazu das Börsen-Orakel, das Wetter auf der Weltkarte, Überleitungen, je Sendung ein eigener Vorspann-Spruch und Abschied und Hunderte neue Sprüche. Der Chat redet über die laufende Meldung, startet Umfragen und flippt bei großen Zügen aus; nichts wiederholt sich innerhalb von sechs Sendungen.
 
 - **Mehr Nervenkitzel bei Packs und ASP (ADR-204):** Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti, Banner und hochzählendem Wert um; One of Ones und Uranium am größten. Auch das ASP-Paket baut mehr Spannung auf: Der Slab kommt verdeckt, ein Scanner läuft über die Note, eine 10 explodiert in Gold, ein Black Label verdunkelt den ganzen Bildschirm. Zehn Packs auf einmal zeigen oben groß Gewinn oder Verlust, darunter die besten Treffer und alle Karten kompakt nach Wert mit Filter. Der Tab „Boni“ ist neu geordnet: Ringe je Bonus-Art, „Als Nächstes“ und aufklappbare Sets.
 

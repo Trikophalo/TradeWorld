@@ -99,11 +99,13 @@ export function demoTopicCandidates(ctx: DemoTopicContext): DemoTopicCandidate[]
                 ? money(fresh.facts.vaultMinCents, 50_000_000)
                 : topic === "pVaultPaid"
                   ? money(fresh.facts.vaultInterestMinCents, 2_000_000)
-                  : topic === "taxLate"
-                    ? money(5_000, 250_000)
-                    : topic === "cardUp" || topic === "cardDown"
-                      ? money(500, 900_000)
-                      : money(100_000, 9_000_000);
+                  : topic === "corpLogo"
+                    ? formatMoney(BALANCE.startups.logoRedrawCents, { whole: true })
+                    : topic === "taxLate"
+                      ? money(5_000, 250_000)
+                      : topic === "cardUp" || topic === "cardDown"
+                        ? money(500, 900_000)
+                        : money(100_000, 9_000_000);
       case "count":
         return topic === "worldSub"
           ? between(1, 6)

@@ -1799,6 +1799,27 @@ select public.set_job_posting_perks(gen_random_uuid(),
 \o
 reset role;
 
+-- Redrawing the company logo (ADR-200)
+\set fx_lr '''f1f1f1f1-0000-4000-8000-0000000002e5'''
+select tests.signup(:fx_lr, 'Fixture_Logo') is not null as ok \gset
+select tests.set_level(:fx_lr, 20);
+select tests.fund(:fx_lr, 20000000, 'fixture:logo-redraw');
+select tests.login_as('authenticated', :fx_lr) is null as ok \gset
+select (public.found_company(gen_random_uuid(), 'Fixture Pinsel', 'Neue Logos', 'tech', '#aa3366', 'garage')
+         -> 'company' ->> 'id') as fx_lrco \gset
+select public.company_deposit(gen_random_uuid(), 6000000) is not null as ok \gset
+\o :fixture_dir/get_logo_redraw.json
+select public.get_logo_redraw(:'fx_lrco');
+\o :fixture_dir/redraw_company_logo.json
+select public.redraw_company_logo(gen_random_uuid(), :'fx_lrco', '{"palette": ["#334455", "#ffffff"], "grid": [
+  "................", "......0000......", ".....011110.....", ".....011110.....", "......0000......", "................",
+  "................", "................", "................", "................", "................", "................",
+  "................", "................", "................", "................"]}');
+\o :fixture_dir/get_logo_redraw_cooldown.json
+select public.get_logo_redraw(:'fx_lrco');
+\o
+reset role;
+
 -- Talente (ADR-199) --------------------------------------------------------------------------------------------------
 select public.talents_ensure() >= 0 as ok \gset
 update public.game_config set value = jsonb_set(value, '{market,shareBps}', '10000') where key = 'talents';

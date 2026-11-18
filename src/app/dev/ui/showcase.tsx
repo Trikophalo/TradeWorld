@@ -58,6 +58,7 @@ import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { CompanySkillsCard } from "@/features/company/components/company-skills";
+import { LogoRedraw } from "@/features/company/components/logo-redraw";
 import { TalentsCard } from "@/features/company/components/talents";
 import { WorldShowcase } from "@/features/company/world/world-showcase";
 import { RisksCard } from "@/features/company/components/risks-card";
@@ -1439,6 +1440,7 @@ export function Showcase() {
         ))}
         <InterviewCard preview={SAMPLE_INTERVIEW} />
         <CompanySkillsCard preview={SAMPLE_COMPANY_SKILLS} />
+        <LogoRedrawShowcase />
         <TalentsCard preview={SAMPLE_TALENTS} previewMarket={SAMPLE_TALENT_MARKET} />
         <WorldShowcase />
         <RisksCard preview={SAMPLE_RISKS} />
@@ -1606,6 +1608,28 @@ function HealthShowcase() {
       <HealthPanel health={health} onAsk={ask} />
       <HealthCompact health={health} onAsk={ask} onShowAll={() => undefined} />
     </>
+  );
+}
+
+/** Redrawing the company logo (ADR-200): available, in the cooldown, too little cash, loading. */
+function LogoRedrawShowcase() {
+  const company = {
+    id: "showcase-logo",
+    color: "#2266cc",
+    cashCents: 12_000_000,
+    unpaidCents: 0,
+    logo: {
+      palette: ["#2266cc", "#ffcc00"],
+      grid: Array.from({ length: 16 }, (_, y) => (y > 3 && y < 12 ? "....00111100...." : "................")),
+    },
+  } as unknown as MyCompany;
+  const info = { costCents: 5_000_000, cooldownHours: 24, redrawnAt: null, availableAt: null };
+  return (
+    <Demo label="Logo neu zeichnen (ADR-200)" className="flex-wrap justify-start gap-4">
+      <LogoRedraw company={company} preview={info} />
+      <LogoRedraw company={company} preview={{ ...info, availableAt: new Date(Date.UTC(2099, 0, 1)).toISOString() }} />
+      <LogoRedraw company={{ ...company, cashCents: 1_000_000 }} preview={info} />
+    </Demo>
   );
 }
 

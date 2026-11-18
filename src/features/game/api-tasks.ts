@@ -15,6 +15,13 @@ import { rpc } from "./rpc";
  */
 const tier = z.enum(["intern", "junior", "senior", "team_lead", "c_level"]);
 const game = z.enum(TASK_GAMES);
+const knownGames: ReadonlySet<string> = new Set(TASK_GAMES);
+
+/**
+ * ADR-211: one task of a game this client does not know yet (the server was updated first) must not break the whole
+ * board. Such tasks are left out here; the AI, the autopilot or the deadline takes care of them.
+ */
+export const isKnownTaskGame = (g: string): g is (typeof TASK_GAMES)[number] => knownGames.has(g);
 
 const tasksSchema = z.object({
   role: z.enum(["founder", "employee"]),
@@ -41,13 +48,19 @@ const tasksSchema = z.object({
         .nullable()
         .transform((v) => v === true),
       open_tasks: z.number(),
+      /** ADR-211: a clone gets no tasks and leads nobody; it is left out of the task board. */
+      is_clone: z
+        .boolean()
+        .nullable()
+        .optional()
+        .transform((v) => v === true),
     }),
   ),
   tasks: z.array(
     z.object({
       id: z.number(),
       key: z.string(),
-      game,
+      game: z.string(),
       branch: z.string(),
       status: z.enum(["open", "assigned", "playing", "ai"]),
       value_cents: z.number(),
@@ -242,32 +255,40 @@ export const toTasks = (r: z.infer<typeof tasksSchema>): CompanyTasks => ({
   aiWorkers: r.ai_workers,
   aiMinutes: r.ai_minutes,
   canUseAi: r.can_use_ai,
-  people: r.people.map((p) => ({
-    nickname: p.nickname,
-    tag: p.tag,
-    tier: p.tier,
-    isMe: p.is_me,
-    supervisor: p.supervisor,
-    reportsToMe: p.reports_to_me,
-    openTasks: p.open_tasks,
-  })),
-  tasks: r.tasks.map((t) => ({
-    id: t.id,
-    key: t.key,
-    game: t.game,
-    branch: t.branch,
-    status: t.status,
-    valueCents: t.value_cents,
-    createdAt: t.created_at,
-    dueAt: t.due_at,
-    assignee: t.assignee,
-    assigneeAi: t.assignee_ai,
-    assignedBy: t.assigned_by,
-    aiDoneAt: t.ai_done_at,
-    openedAt: t.opened_at,
-    mine: t.mine,
-    canDelegate: t.can_delegate,
-  })),
+  people: r.people
+    .filter((p) => !p.is_clone)
+    .map((p) => ({
+      nickname: p.nickname,
+      tag: p.tag,
+      tier: p.tier,
+      isMe: p.is_me,
+      supervisor: p.supervisor,
+      reportsToMe: p.reports_to_me,
+      openTasks: p.open_tasks,
+    })),
+  tasks: r.tasks.flatMap((t) => {
+    const g = t.game;
+    if (!isKnownTaskGame(g)) return [];
+    return [
+      {
+        id: t.id,
+        key: t.key,
+        game: g,
+        branch: t.branch,
+        status: t.status,
+        valueCents: t.value_cents,
+        createdAt: t.created_at,
+        dueAt: t.due_at,
+        assignee: t.assignee,
+        assigneeAi: t.assignee_ai,
+        assignedBy: t.assigned_by,
+        aiDoneAt: t.ai_done_at,
+        openedAt: t.opened_at,
+        mine: t.mine,
+        canDelegate: t.can_delegate,
+      },
+    ];
+  }),
   history: r.history.map((h) => ({
     id: h.id,
     key: h.key,

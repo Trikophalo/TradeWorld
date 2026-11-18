@@ -4918,6 +4918,18 @@ value_cents, revenue_cents, team_size, is_mine }], mine: { rank, value_cents } |
   und Spiegelungen, Skalierung 1 bis 3, in der ganzen Zeichnung und in jeder Farbe, ein Fehlfeld Toleranz.
   Treffer: `logo_forbidden`.
 
+### Logo neu zeichnen (ADR-200)
+
+- `player_companies.logo_redrawn_at timestamptz` (null bis zum ersten bezahlten Neuzeichnen).
+- `redraw_company_logo(p_request_id, p_company_id, p_pixels)` → `{ company, cost_cents }`: nur der Gründer der aktiven
+  Firma (`forbidden`, `company_not_found`), Prüfung wie oben (`invalid_argument`, `logo_forbidden`), höchstens einmal je
+  `startups.logoRedrawCooldownHours` (`locked`), `startups.logoRedrawCents` aus der freien Firmenkasse
+  (`insufficient_funds`), Ledger Firmenkasse → `treasury` (`company_costs`, Schlüssel `logo_redraw:<firma>:<request>`).
+  Setzt `logo`, `logo_version + 1`, `logo_hidden = false`, `logo_redrawn_at`; Feed `logo_redrawn`
+  `{ company, company_id, logo }`. Idempotent.
+- `get_logo_redraw(p_company_id)` → `{ cost_cents, cooldown_hours, redrawn_at, available_at }` (`available_at` nur
+  während der Pause), nur für den Gründer.
+
 ### Neue Fehlerschlüssel
 
 | Schlüssel        | Code    |
@@ -7180,7 +7192,7 @@ RPCs (`authenticated`):
 get_company_tasks() -> TASKS
   {"role": "founder"|"employee", "company": {"id","name","tier","product"}, "my_tier", "auto_ai", "ai_workers",
    "ai_minutes", "can_use_ai",
-   "people": [{"nickname","tag","tier","is_me","supervisor","reports_to_me","open_tasks"}],
+   "people": [{"nickname","tag","tier","is_me","supervisor","reports_to_me","open_tasks","is_clone"}],   -- is_clone seit ADR-211
    "tasks": [{"id","key","game","branch","status","value_cents","created_at","due_at","assignee","assignee_ai",
               "assigned_by","ai_done_at","opened_at","mine","can_delegate"}],
    "history": [{"id","key","status","result_cents","score_bps","ai","done_by","resolved_at"}]}
@@ -8471,6 +8483,23 @@ image_campaign_cost_cents, effect, leader, fee_bps, fee_ready_at, paying_fee, fe
 `places`: Zentralen und Töchter aller Spieler plus bis zu `world.aiOnMap` (12) große KI-Firmen (Land aus
 `hashtext(id)`, nie Marktführer). Alle Schreib-RPCs sind idempotent (`request_id`) und antworten wie `get_world`.
 
+## Nachtrag: Firmenaufgaben laufen weiter, auch wenn eine Aufgabe scheitert (ADR-211)
+
+Migration `20261204008400_company_tasks_sturdy.sql`, Test `supabase/tests/e3_company_tasks.sql`.
+
+- `company_tasks_run_due(p_now)` erledigt jede Aufgabe, jede Firma und jeden Schritt (KI-Ergebnis, offenes Spiel,
+  Rückgabe, Auto-KI, Frist, neue Aufgabe, Autopilot, Aufräumen) in einer eigenen Untertransaktion. Ein Fehler landet in
+  `job_runs` (`job_name = 'company_tasks'`, `status = 'failed'`, `error` = Meldung, `details` = `{step, ref}` mit
+  Aufgaben- oder Firmen-ID; sieben Tage aufbewahrt) und hält die anderen nicht mehr auf. Die Antwort zählt zusätzlich
+  `reopened` und `errors`.
+- Aufgaben im Status `assigned`, deren Empfänger nicht mehr in der Firma ist (gekündigt, entlassen) oder ein Klon ist,
+  werden wieder `open` (`company_task_holder_ok(company, player)`), statt in die Frist und ihre Strafe zu laufen.
+- `company_autopilot_run`: jede Firma in einer eigenen Untertransaktion.
+- `company_task_grade_more`: Eine Antwort ohne Liste (`{}`) gibt 0 statt volle Punkte (`receipts`, `shelf`).
+- Klone (ADR-206): `get_company_tasks().people[].is_clone`; `delegate_company_task` und `set_job_supervisor` lehnen
+  Klone ab (`task_not_allowed`). Der Client blendet Klone in der Aufgabenliste aus und lässt Aufgaben unbekannter
+  Spiele weg, statt die ganze Antwort zu verwerfen.
+
 ## Größe, Risiken, Versicherung, Lobby (ADR-209, Migration `20261204010100_macro_events.sql`)
 
 - `player_companies.insurance_level` (0..2, Index in `game_config.macro.insurance.levels`), `insurance_prev_level`
@@ -8496,3 +8525,23 @@ extra_cost_share}`, `macro_country_factor`, `macro_weight`, `macro_company_count
 | ---------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_company_risks()`                          | Gründer | `{company_id, worth_cents, decades, event_pivot_cents, friction_pivot_cents, saturation_bps, overhead_bps, chance_per_day_bps, crisis_share_bps, unit_cents, exposure[{archetype, bps, insurable, risk}], upcoming[{archetype, from_cents}], ref_revenue_cents, insurance{level, coverage_bps, changed_at, full_from, levels[]}, lobby{level, max, bonus_bps, political_cut_bps, leader}, country}` |
 | `set_company_insurance(p_request_id, p_level)` | Gründer | wie `get_company_risks`; Fehler `invalid_argument`; idempotent je `request_id`                                                                                                                                                                                                                                                                                                                      |
+
+## Nachtrag: NEXA Nachrichten, dritte Staffel (ADR-210, Migration `20261204010400_news_show_fresh.sql`)
+
+Keine neue Tabelle. Alles intern (nur `service_role` bzw. Trigger), Spieler können nichts davon aufrufen:
+
+- `news_show_topic_cands_fresh(p_now, p_win) → table(topic, player_id, vals, ukey, score)`: Kandidaten der neuen
+  Themen aus `company_locations`, `country_lobby`, `company_subsidiaries`, `talent_events`, `talents`, `player_jobs`
+  (`is_clone`), `rich_list_snapshots`, `company_rank_snapshots`, `nexamon_copies` (Note 11), `nexamon_battles`
+  (`twist`), `nexamon_packs`, `vault_deposits`, `login_streaks`, `company_skills`, `player_companies.logo_redrawn_at`.
+- `news_show_event_segments(p_now, p_win) → jsonb` und `news_show_event_response(player_company_events, phase) → text`:
+  je Ereignis von außen eine Meldung (`worldEvent`, `worldEventWon`, `worldEventLost`), Tatsachenschlüssel
+  `fact:event:`, `fact:eventwon:`, `fact:eventlost:` + Ereignis-ID.
+- `news_show_topics()` (vollständig neu, Stand 5700) ruft beide auf; `news_show_segue(jsonb)` setzt eine Überleitung
+  vor den Text.
+- `news_show_pick(text)` (vollständig neu, Stand 2000) schreibt zusätzlich `f:<Art>:<Rahmen>` in `news_show_used`;
+  `news_show_fresh_cutoff(p_exclude bigint)` liefert die Grenze für „in den letzten `fresh.noRepeatShows` Sendungen“.
+- `news_show_fresh_chat(show_id, now) → integer` über Trigger `news_shows_fresh_chat` (AFTER UPDATE OF status,
+  `scheduled` → `aired`): Zeilen erfundener Zuschauer in `news_show_messages` (`player_id` null, `bot_name`), darunter
+  Umfragen vom Konto `newsShow.fresh.chat.polls.host`. Neue Schlüssel in `news_show_used`: `t:<md5>` (Überleitung),
+  `c:<md5>` (Chatzeile, Umfrage).

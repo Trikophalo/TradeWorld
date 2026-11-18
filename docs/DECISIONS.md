@@ -5180,6 +5180,30 @@ wertvollen Karten steigen. Die Pfeile und die 24-h-Prozente zeigen einen Tag lan
 unter dem Ertragswert (wie beim Eigentümer: 3 Mio. gegen 49,4 Mio.), zeigt die Firmenseite das jetzt offen; ob der
 Kurs einer Spieler-AG zu langsam zum fairen Wert findet, ist eine eigene Frage. SQL-Test `d9_toplists.sql`.
 
+## ADR-200: Firmenlogo für 50.000 € neu zeichnen — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Man soll das Profilbild vom Unternehmen für 50.000 € neu machen können.“ Bisher stand
+das Logo nach dem ersten Zeichnen fest (ADR-076); nur ein nach Meldungen ausgeblendetes Logo durfte ersetzt werden.
+
+**Entscheidung.**
+
+- Der **Gründer** kann das Logo seiner aktiven Firma jederzeit neu zeichnen, für `startups.logoRedrawCents`
+  (50.000 €) aus der **Firmenkasse** (frei = Kasse − offene Rechnungen). Buchung Firmenkasse → Staatskasse
+  (`company_costs`, Summe 0), Schlüssel je Anfrage, also idempotent.
+- Dieselben Prüfungen wie beim ersten Logo: `logo_valid` und `logo_has_forbidden_symbol` (`logo_forbidden`).
+- Höchstens einmal je `startups.logoRedrawCooldownHours` (24 h), sonst `locked`. Gespeichert in
+  `player_companies.logo_redrawn_at`.
+- `logo_version` steigt: Meldungen gegen das alte Logo zählen nicht mehr, ein ausgeblendetes Logo ist wieder sichtbar.
+- Neuigkeit `logo_redrawn` („… verkündet: {Firma} hat ein neues Logo.“), mit dem neuen Logo als Symbol.
+- Oberfläche: Controlling → Marke & Firma, Knopf „Logo neu zeichnen · 50.000 €“ statt des gesperrten „Logo
+  zeichnen“. Der Editor startet mit dem jetzigen Logo, „Weiter“ erst nach einer Änderung, dann ein Bestätigungs-Sheet
+  mit alt und neu, Preis und Pause. In der Pause ein Countdown, bei zu wenig Geld ein Hinweis.
+- `get_logo_redraw(firma)` liefert Preis, Pause und den nächsten möglichen Zeitpunkt. Ein eigenes RPC statt eines
+  Feldes in `company_state`, weil eine spätere Migration (`toplists`) `company_state` neu schreibt.
+
+**Folgen.** Das Logo bleibt etwas Bleibendes (der Preis ist spürbar, aber für eine laufende Firma erreichbar), ein
+Fehlgriff ist nicht mehr für immer. Das erste Logo bleibt kostenlos.
+
 ## ADR-204: Große Momente bei Packs und ASP, Ergebnis vieler Packs, neuer Boni-Tab — `Entscheidung (Eigentümer)`
 
 **Kontext.** Der Eigentümer wünscht vier Dinge an der Sammelkarten-Oberfläche: Der Tab „Boni“ ist eine lange Liste
@@ -5281,6 +5305,37 @@ herausragt. Die Gebühr zählt für den Zahler als Fixkosten der Stunde; für de
 kein Umsatz. SQL-Test `e6_world.sql`, Unit-Tests `world.test.ts`, `hq.test.ts`, Mira `assistant/world.test.ts`, E2E
 `world-map.spec.ts`.
 
+## ADR-211: Firmenaufgaben laufen weiter, auch wenn eine einzelne Aufgabe scheitert — `Annahme`
+
+**Kontext.** Der Eigentümer meldet: „Firmenaufgaben funktionieren gerade nicht mehr.“ Nachgestellt auf einer lokalen
+Datenbank wie live (frisch aufgesetzt und über `update-to-latest.sql`, `scripts/apply-updates.sh` und die
+SQL-Editor-Teile von einem Stand vom 26.11. aus, mit offenen Aufgaben aller 32 Spiele): Aufgaben entstehen, die Liste
+lädt, jedes Spiel startet und wird bewertet, Abgeben an Mitarbeiter und KI, Autopilot und Fristen laufen. Die
+Rätsel-Felder des Servers passen in allen 32 Spielen zu denen der Client-Spiele. Ein Fehler, der nur mit den Daten
+live auftritt, ließ sich lokal also nicht erzwingen; die Bauweise erklärt aber, warum er **alle** Firmen trifft:
+`company_tasks_run_due()` (Cron jede Minute) erledigte KI-Ergebnisse, Fristen, neue Aufgaben, den Autopilot aller
+Firmen und das Aufräumen in einer einzigen Transaktion. Ein einziger Fehler irgendwo (eine Aufgabe, eine Firma) rollte
+die ganze Minute zurück – keine neuen Aufgaben, keine KI-Ergebnisse, keine Fristen, für alle, jede Minute, bis die
+Ursache weg war. Gesehen wurde der Fehler nirgends (nur in `cron.job_run_details`). Dabei aufgefallen: Eine Aufgabe für
+einen Klon (ADR-206) konnte niemand öffnen (der Klon sieht die Aufgabenliste nie) und lief in die Strafe; eine Antwort
+ohne Liste (`{}`) bekam bei „Belege prüfen“ und „Regal ordnen“ volle Punkte; eine Aufgabe eines Spiels, das der
+geladene Client noch nicht kennt (Server zuerst aktualisiert), ließ die ganze Liste an der Zod-Prüfung scheitern.
+
+**Entscheidung.**
+
+- Jede Aufgabe, jede Firma und jeder Schritt des Minutenlaufs (und des Autopiloten) läuft in einer eigenen
+  Untertransaktion. Fehler stehen in `job_runs` (`job_name = 'company_tasks'`, mit Meldung, Schritt und ID) und halten
+  die anderen nicht auf; die betroffene Aufgabe wird in der nächsten Minute erneut versucht.
+- Aufgaben, deren Empfänger nicht mehr in der Firma ist (gekündigt, entlassen) oder ein Klon ist, sind binnen einer
+  Minute wieder offen statt bis zur Frist blockiert. Klone bekommen keine Aufgaben und führen niemanden.
+- Fehlt die Liste in der Antwort, gibt es 0 Punkte, wie im TypeScript-Gegenstück.
+- Der Client lässt Aufgaben unbekannter Spiele weg und blendet Klone in der Aufgabenliste aus, statt die Antwort zu
+  verwerfen.
+
+**Folgen.** Ein künftiger Fehler trifft nur noch die eine Aufgabe oder Firma und ist mit einer Abfrage auf `job_runs`
+sichtbar. Der Lauf kostet je Zeile eine Untertransaktion (wenige Aufgaben je Minute). SQL-Test `e3_company_tasks.sql`,
+Unit-Test `src/features/game/api-tasks.test.ts`. Die ADR-Nummer ist vorläufig, falls parallel dieselbe vergeben wurde.
+
 ## ADR-209: Größe hat ihren Preis – Reibung, Ereignisse von außen, Versicherung, Lobby, Steuerstufen — `Entscheidung (Eigentümer)`
 
 **Kontext.** Der Eigentümer: „Gerade wird man mit einer Firma sehr leicht riesig. Am Anfang soll es so bleiben, in
@@ -5343,3 +5398,49 @@ Werkzeugs; die Verhältnisse gelten, die absoluten Tage nicht. Der Steuerberater
 oder Bequeme; der Belegcheck spart ab mittlerer Größe ein Vielfaches. Tests: `src/lib/sim/macro.test.ts`,
 `growth.test.ts`, `listed.test.ts`, SQL `e7_macro_events.sql`, E2E „an event from outside“ in
 `e2e/company-growth.spec.ts`.
+
+## ADR-210: NEXA Nachrichten, dritte Staffel – neue Themen, Ereignisse von außen als eigene Meldung, ein Chat, der mitredet — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Update Mr. Doodle Dangle auch. Auch den Chat, es braucht neuen Content.“ Seit ADR-169
+sind Weltkarte (ADR-208), Ereignisse von außen (ADR-209), Talente (ADR-199), Klone mit Job (ADR-206), Ranglisten
+(ADR-203), Festgeld (ADR-201), Pack-Battle-Modi (ADR-205), Fertigkeiten und Logo neu zeichnen (ADR-200) dazugekommen,
+die Sendung wusste davon nichts. Nachgereicht: Jedes große Ereignis von außen, das eine Spielerfirma trifft, soll eine
+eigene Meldung bekommen, mit Firma, Land, Lage und Gegenmaßnahme, und einen Nachtrag, wenn es vorbei ist.
+
+**Entscheidung.**
+
+- **27 neue Themen** (`src/config/news-topics-fresh.ts`, drei neue Gruppen `world`, `talent`, `rank`): neue Zentrale,
+  Ausbau ab Stufe 2, neuer Marktführer, Standortgebühr, Tochterfirma, Wetter auf der Weltkarte; Star-Einstellung ab
+  Stufe Senior, Abwerbung (beide Firmen), Kündigung, Mit-Geschäftsführung, „Talent-Transfermarkt“ (bestes freies
+  Talent), Klon mit Job; Aufsteiger der Reichenliste und der Top-Unternehmen (ab 3 Plätzen in 24 Stunden), „Pleite der
+  Woche“ (ab 10 % Verlust in 7 Tagen); Black Label, Sieger eines Pack Battles mit Twist, Pack-Marathon (ab 10 Packs);
+  großes Festgeld (ab 5.000 €) und seine Zinsen, Login-Serie (alle 7 Tage), Fertigkeit ab Stufe 3, neues Logo;
+  „Börsen-Orakel“ ohne Daten. Je Thema 3 bis 4 Rahmen und 10 bis 12 Begründungen, Gesichter je Thema. Schwellen in
+  `newsShow.fresh.facts`. `topics.count` steigt auf 4 (Plätze 25, 45, 65, 72).
+- **Ereignisse von außen nie im Los:** `news_show_event_segments()` baut für jedes Ereignis von außen (Schwere ab
+  `facts.eventMinSeverity`) eine eigene Meldung `worldEvent` mit Firma, Land des Hauptsitzes (sonst „Nexa-Stadt“),
+  Lage (angespannt, ernst, verheerend) und Antwort der Firma (`news_show_event_response()`: Versicherungsanteil aus dem
+  Schnappschuss, gewählte Strategie oder „noch keine“, Lobby-Stufe bei Politik, Zöllen und Kartell). Ist es vorbei,
+  folgt `worldEventWon` (gelöst, mit Strategie und neuer Lobby-Stufe) oder `worldEventLost` (Frist abgelaufen, mit
+  Minderung). Höchstens `fresh.events.max` (3) je Sendung an den Plätzen 21 bis 23, neue zuerst, dann nach Schwere;
+  jede Tatsache einmal (`news_show_used`). Sie zählen nicht zu `topics.count`.
+- **Keine Wiederholung in `fresh.noRepeatShows` (6) Sendungen:** `news_show_pick()` (vollständig neu definiert, Stand 2000) merkt sich zusätzlich den Rahmen (`f:<Art>:<Rahmen>`) und nimmt zuerst ein Paar, dessen Rahmen und Begründung in
+  den letzten sechs Sendungen nicht liefen (`news_show_fresh_cutoff()`: Erstellzeit der sechstletzten Sendung). Gleiche
+  Regel für Überleitungen und Chatzeilen; die Demo rechnet dasselbe (`pickScript(…, recent)`).
+- **Mehr Mr. Doodle Dangle:** 24 Überleitungen (vor 60 % der Themen, `news_show_segue()`), 22 neue Abschweifungen ohne
+  echte Personen, je 4 bis 8 neue Begründungen für die klassischen Meldungen. Vorspann-Spruch und Abschied (je 24) und
+  10 neue Laufbandzeilen kommen aus `messages`, gewählt nach der Stunde der Sendung (`showEpisode`,
+  `episodeVariant`): alle sehen dasselbe, 24 Sendungen hintereinander unterscheiden sich.
+- **Chat:** 30 neue Namen (46). Beim Sendestart (Trigger `news_shows_fresh_chat` nach dem Statuswechsel, statt eines
+  Textersatzes in `news_show_start()`) schreibt `news_show_fresh_chat()` je Meldung 2 Zeilen aus dem Topf ihres Themas
+  oder ihrer Art (über 250 Zeilen, höchstens 24 je Sendung), mit 45 % Chance eine Umfrage („Wer wird nächste Woche
+  Marktführer in Japan?“) vom „📊 NEXA-Umfrage“-Konto mit 3 bis 6 Stimmen und nach großen Zügen, Black Labels, Twist-Siegen
+  und gelösten Krisen 4 bis 7 Emote-Zeilen. Gleiche Regel in TS (`src/lib/sim/news-chat.ts`), die Demo nutzt sie. Echte
+  Chatzeilen, Filter und Limits bleiben unberührt; die bisherigen Zuschauerzeilen und der Running Gag laufen weiter.
+- **Grenzen** wie ADR-169: nur Spielgeschehen, erfundene Leute, keine echten Personen oder Marken. Die Namen der
+  Ereignisse (auch Erdbeben, Tsunami) kommen nur über `{event}` aus `fresh.eventNames`, sie sind Spielereignisse.
+
+**Folgen.** Migration `20261204010400_news_show_fresh.sql` (`news_show_topics()` vollständig aus 5700 kopiert, plus
+Aufruf der neuen Kandidaten, der Ereignis-Meldungen und der Überleitung). Tests: `src/lib/sim/news-chat.test.ts`,
+`src/features/news/show/variants.test.ts`, `news-topics.test.ts`, SQL `e8_news_show_content.sql`; `a4` und `9k`
+angepasst (Zahl der Themen, Umfrage-Konto). Der Running Gag bleibt unverändert und steht weiter nicht in den Patchnotes.

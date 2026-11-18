@@ -7,7 +7,7 @@
 --   (ADR-209), star hires, poaching, quits, co-CEOs and the best free talent (ADR-199), clones with a job (ADR-206),
 --   climbers of the rich list and of the company list (ADR-203), the Pleite der Woche, Black Labels, Pack Battle
 --   Twist winners and pack marathons, big Festgeld deposits and their interest (ADR-201), login streaks, company
---   skills and the Wetter auf der Weltkarte. The Börsen-Orakel needs no data.
+--   skills, redrawn logos (ADR-200) and the Wetter auf der Weltkarte. The Börsen-Orakel needs no data.
 -- * news_show_topics(): the latest full definition (5700) plus the call of those candidates and a segue in front of
 --   a topic now and then (news_show_segue()).
 -- * news_show_pick(): the latest full definition (2000); a frame or reason that aired in the last
@@ -332,7 +332,17 @@ begin
     join public.companies co on co.id = k.company_id
     join public.player_companies pc on pc.company_id = k.company_id
    where k.ready_at between p_now - p_win and p_now
-     and k.level >= coalesce((ff ->> 'skillMinLevel')::integer, 3);
+     and k.level >= coalesce((ff ->> 'skillMinLevel')::integer, 3)
+  -- ---- a redrawn logo (ADR-200), when the game has it
+  union all
+  select 'corpLogo', pc.founder_id,
+         jsonb_build_object('company', co.name,
+                            'amount', public.format_eur(coalesce((public.config_jsonb('startups') ->> 'logoRedrawCents')::bigint, 0))),
+         'fact:logo:' || pc.company_id::text || ':' || extract(epoch from (to_jsonb(pc) ->> 'logo_redrawn_at')::timestamptz)::bigint::text,
+         extract(epoch from (to_jsonb(pc) ->> 'logo_redrawn_at')::timestamptz)::double precision
+    from public.player_companies pc
+    join public.companies co on co.id = pc.company_id
+   where (to_jsonb(pc) ->> 'logo_redrawn_at')::timestamptz between p_now - p_win and p_now;
 end;
 $$;
 comment on function public.news_show_topic_cands_fresh(timestamptz, interval) is

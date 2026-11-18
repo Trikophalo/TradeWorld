@@ -879,6 +879,40 @@ export const NEWS_TOPICS_FRESH = {
       "Wenn das so weitergeht, kann die Firma bald alles. Außer bescheiden sein.",
     ],
   },
+  corpLogo: {
+    group: "corp",
+    kind: "corp",
+    weight: 6,
+    tone: "neutral",
+    slots: ["name", "company", "amount"],
+    moods: ["confused", "laughing", "proud"],
+    frames: [
+      {
+        headline: "Neues Logo für {company}",
+        text: "Aus der Abteilung Kunst am Bau: {name} hat das Logo von {company} neu gezeichnet, für {amount} aus der Firmenkasse. {reason}",
+      },
+      {
+        headline: "{company} malt sich neu",
+        text: "Pinsel raus, Pixel rein: {company} hat ein neues Logo, Kostenpunkt {amount}. {reason} Künstler: {name}.",
+      },
+      {
+        headline: "Logo-Wechsel bei {company}",
+        text: "{name} war mit dem alten Logo von {company} nicht mehr zufrieden und zahlt {amount} für ein neues. {reason}",
+      },
+    ],
+    reasons: [
+      "Die Kunden haben es noch nicht bemerkt. Die Kunden bemerken nie etwas.",
+      "Das alte Logo hängt jetzt gerahmt in der Kantine, mit einer Kerze davor.",
+      "Experten sehen darin einen Neuanfang. Ich sehe darin sechzehn Farben und viel Mut.",
+      "Die Designabteilung bestand aus einer Person, einem Bildschirm und sehr viel Kaffee.",
+      "Ein neues Logo macht keine besseren Produkte. Aber es sieht auf den Tassen schöner aus.",
+      "Ich habe es meiner Katze gezeigt. Sie hat sich weggedreht. Das ist bei ihr ein Lob.",
+      "Auf der Weltkarte leuchtet jetzt ein neues Fähnchen. Gleiche Firma, andere Pixel.",
+      "Der Briefkopf wird neu gedruckt, die Visitenkarten auch, die Rechnungen leider ebenfalls.",
+      "Kunst kommt von Können. Pixelkunst kommt von Klicken, sehr viel Klicken.",
+      "Bitte nicht gleich wieder ändern, die Druckerei hat schon Albträume.",
+    ],
+  },
   // ------------------------------------------------------------------ the Börsen-Orakel (no data needed)
   oddOracle: {
     group: "odd",

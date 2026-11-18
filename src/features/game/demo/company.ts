@@ -75,6 +75,7 @@ import {
   type FoundCompanyInput,
   type GameEngine,
   type GameErrorKey,
+  type LogoRedrawInfo,
   type MyCompany,
   type Offer,
 } from "../types";
@@ -173,6 +174,8 @@ export interface DemoCompanyState {
   logo?: CompanyLogoData | null;
   /** Pixel banner (ADR-078). */
   banner?: CompanyLogoData | null;
+  /** Last paid logo redraw, ms (ADR-200). */
+  logoRedrawnAt?: number;
   /** Going public (ADR-067). In the demo AI investors and made-up fellow players subscribe. */
   listing?: {
     status: "subscription" | "listed";
@@ -234,6 +237,8 @@ export interface CompanyHost {
   avatarKey(): string;
   /** Forced loan of the founder (ADR-058). */
   addDebt(cents: number): void;
+  /** Social feed item of the founder (ADR-200: new logo). */
+  feedPost?(kind: string, payload: Record<string, unknown>): void;
   lastDissolution(): DemoDissolution | null;
   setLastDissolution(value: DemoDissolution): void;
   foundingLockedUntil(): number | null;
@@ -1010,6 +1015,8 @@ export function createCompanyEngine(host: CompanyHost) {
     | "declinePromotion"
     | "trainEmployee"
     | "setCompanyLogo"
+    | "logoRedraw"
+    | "redrawCompanyLogo"
     | "setCompanyBanner"
     | "reportCompanyLogo"
     | "goPublic"
@@ -1342,6 +1349,35 @@ export function createCompanyEngine(host: CompanyHost) {
         if (company.logo) throw new GameError("logo_locked");
         if (hasForbiddenSymbol(logo)) throw new GameError("logo_forbidden");
         company.logo = { palette: [...logo.palette], grid: [...logo.grid] };
+      }),
+
+    async logoRedraw(): Promise<LogoRedrawInfo> {
+      const company = own();
+      const cooldownMs = startups.logoRedrawCooldownHours * HOUR_MS;
+      const next = company.logoRedrawnAt === undefined ? null : company.logoRedrawnAt + cooldownMs;
+      return {
+        costCents: startups.logoRedrawCents,
+        cooldownHours: startups.logoRedrawCooldownHours,
+        redrawnAt: company.logoRedrawnAt === undefined ? null : new Date(company.logoRedrawnAt).toISOString(),
+        availableAt: next !== null && next > Date.now() ? new Date(next).toISOString() : null,
+      };
+    },
+
+    redrawCompanyLogo: (requestId, _companyId, logo) =>
+      mutate(requestId, (company) => {
+        if (!isValidLogo(logo)) throw new GameError("invalid_argument");
+        if (hasForbiddenSymbol(logo)) throw new GameError("logo_forbidden");
+        const now = Date.now();
+        const cooldownMs = startups.logoRedrawCooldownHours * HOUR_MS;
+        if (company.logoRedrawnAt !== undefined && company.logoRedrawnAt + cooldownMs > now) {
+          throw new GameError("locked");
+        }
+        const cost = startups.logoRedrawCents;
+        if (company.cashCents - company.unpaidCents < cost) throw new GameError("insufficient_funds");
+        company.cashCents -= cost;
+        company.logo = { palette: [...logo.palette], grid: [...logo.grid] };
+        company.logoRedrawnAt = now;
+        host.feedPost?.("logo_redrawn", { company: company.name, logo: company.logo });
       }),
 
     setCompanyBanner: (requestId, banner) =>

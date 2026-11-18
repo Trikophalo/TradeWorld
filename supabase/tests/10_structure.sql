@@ -189,6 +189,8 @@ select tests.assert(
            'clone_cancel_quit', 'clone_request_raise', 'clone_request_promotion', 'set_job_posting_perks',
            -- the own net worth in parts (ADR-203)
            'get_my_net_worth',
+           -- redraw the company logo (ADR-200)
+           'redraw_company_logo', 'get_logo_redraw',
            -- Talente and Mit-Geschaeftsfuehrung (ADR-199)
            'get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
            'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision',

@@ -26,7 +26,7 @@ import { haptic } from "@/lib/haptics";
 import { DURATION, SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
-import { logoArt } from "@/lib/sim/logo";
+import { isValidLogo, logoArt } from "@/lib/sim/logo";
 import { cn } from "@/lib/utils";
 import { useFeed, useUpdateFeedItem } from "../hooks";
 
@@ -63,6 +63,7 @@ const ICONS: Record<string, PixelArt> = {
   record_dividend: UI_ICONS.markets,
   board_revolt: UI_ICONS.markets,
   research_done: UI_ICONS.upgrade,
+  logo_redrawn: UI_ICONS.art,
   nexamon_pull: UI_ICONS.nexamon,
   nexamon_big_pull: UI_ICONS.nexamon,
   nexamon_black_label: UI_ICONS.nexamon,
@@ -71,6 +72,12 @@ const ICONS: Record<string, PixelArt> = {
   nexamon_master_set: UI_ICONS.nexamon,
   nexamon_hype: UI_ICONS.nexamon,
 };
+
+/** The event's pixel icon; a new company logo shows itself (ADR-200). */
+function feedIcon(item: FeedItem): PixelArt {
+  const logo = item.kind === "logo_redrawn" ? item.payload.logo : undefined;
+  return isValidLogo(logo) ? logoArt(logo) : (ICONS[item.kind] ?? UI_ICONS.bell);
+}
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 const n = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
@@ -182,6 +189,7 @@ function useFeedText() {
       case "record_dividend":
       case "board_revolt":
       case "research_done":
+      case "logo_redrawn":
         return t(item.kind, { company: str(p.company) });
       default:
         return t("other");
@@ -255,7 +263,7 @@ export function FeedRow({ item, compact }: { item: FeedItem; compact?: boolean }
       >
         <Avatar avatarKey={item.actor.avatarKey} size="sm" />
         <span className="absolute -right-1.5 -bottom-1.5 grid size-6 place-items-center rounded-xs border-2 border-bg bg-surface-2">
-          <PixelIcon {...(ICONS[item.kind] ?? UI_ICONS.bell)} scale={1} />
+          <PixelIcon {...feedIcon(item)} scale={1} />
         </span>
       </Link>
       <div className="min-w-0 flex-1">
