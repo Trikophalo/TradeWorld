@@ -13,12 +13,14 @@ import { Delta } from "@/components/ui/delta";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PlayerTag } from "@/components/ui/player-tag";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BALANCE } from "@/config/balance";
 import { engine } from "@/features/game/store";
 import { CompanyLogo } from "@/features/market/components/company-logo";
 import { StartProtestButton } from "@/features/news/protests";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { countryOf, useWorld } from "../world/hooks";
 
 type TierKey = Parameters<ReturnType<typeof useTranslations<"careerTiers">>>[0];
 type ProductKey = Parameters<ReturnType<typeof useTranslations<"products">>>[0];
@@ -40,6 +42,12 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
     retry: false,
   });
   const data = profile.data;
+  // ADR-208: the headquarters on the world map (status on the profile)
+  const tw = useTranslations("world");
+  const world = useWorld();
+  const hq = world.data?.places.find((p) => p.companyId === companyId && p.kind !== "subsidiary") ?? null;
+  const subs = world.data?.places.filter((p) => p.companyId === companyId && p.kind === "subsidiary").length ?? 0;
+  const hqCountry = countryOf(hq?.country);
 
   if (profile.isError) {
     return (
@@ -171,6 +179,19 @@ export function CompanyProfileView({ companyId }: { companyId: string }) {
           )}
         {facts.qualityBps !== null && fact(t("quality"), `${Math.round(facts.qualityBps / 100)} %`)}
         {facts.awarenessBps !== null && fact(t("awareness"), `${Math.round(facts.awarenessBps / 100)} %`)}
+        {hq &&
+          hqCountry &&
+          fact(
+            tw("title"),
+            hqCountry.name,
+            [
+              hq.kind === "hq" ? tw(`tiers.${BALANCE.world.hqTiers[hq.hqTier - 1]?.key ?? "office"}`) : null,
+              subs > 0 ? `${tw("subsidiaries.title")}: ${subs}` : null,
+              hq.leader ? tw("lobby.leader") : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined,
+          )}
       </div>
 
       <div className="flex justify-end">

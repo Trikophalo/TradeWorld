@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MIRA, UI_ICONS } from "@/components/pixel/art";
+import { BALANCE } from "@/config/balance";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,6 +39,7 @@ import { BooksTab } from "./tabs/books-tab";
 import { ControllingTab } from "./tabs/controlling-tab";
 import { DashboardTab, ListedTeaser } from "./tabs/dashboard-tab";
 import { StaffTab } from "./tabs/staff-tab";
+import { LocationTab } from "../world/location-tab";
 import { announceFocus, FirmSection } from "./firm-layout";
 
 const money = (cents: number) => formatMoney(cents, { whole: true });
@@ -70,6 +72,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
   const listed = isListed ? (listedQuery.data ?? null) : null;
   const listedPending = isListed && listedQuery.isPending;
   const teaser = useDisclosed("companyListed");
+  const worldShown = useDisclosed("companyWorld");
   const now = useServerClock();
 
   const [miraOpen, setMiraOpen] = useState(() => current.target === "mira");
@@ -164,6 +167,17 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
       icon: "profile",
       badge: todoItems.filter((x) => x.target.tab === "staff").length,
     },
+    // Standort (ADR-208): before Buchhaltung; locked below world.unlockWorthCents (the tab shows the progress)
+    ...(worldShown || tab === "location"
+      ? ([
+          {
+            value: "location",
+            label: th("location"),
+            icon: "globe",
+            locked: (company.worth?.cents ?? 0) < BALANCE.world.unlockWorthCents,
+          },
+        ] satisfies TabItem[])
+      : []),
     ...(isListed || teaser
       ? ([
           { value: "books", label: th("books"), icon: "portfolio", badge: booksBadge, locked: !isListed },
@@ -253,6 +267,7 @@ export function CompanyDashboard({ company }: { company: MyCompany }) {
             go={go}
           />
         )}
+        {tab === "location" && <LocationTab />}
         {tab === "books" &&
           (listed ? <BooksTab listed={listed} /> : listedPending ? <ListedSkeleton /> : <ListedTeaser focus="books" />)}
         {tab === "board" &&

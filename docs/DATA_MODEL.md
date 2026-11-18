@@ -8430,3 +8430,43 @@ das Organigramm zeigt sie über den KI-Kräften.
 
 Ledger: `company_costs` „Talent: Name“, Schlüssel `talent_wage:<talent>:<firma>:<stunde>`; Fertigkeit der Mit-GF
 „Fertigkeit: Schulung (Mit-GF)“, Schlüssel `talent_coceo_skill:<talent>:<fertigkeit>:<stufe>:<firma>`.
+
+## Weltkarte und Standorte (ADR-208, Migrationen `20261204010000_world_contract.sql` und `20261204010010_world_map.sql`)
+
+Tabellen (RLS an, keine Schreibrechte für Clients, alles über RPCs):
+
+| Tabelle                 | Spalten                                                                                                                                                                | Lesen                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `company_locations`     | `company_id` (PK), `country_key`, `placed_at`, `hq_tier` (1–5), `hq_style` jsonb, `invested_cents`, `moved_at`, `fees_paid_cents`, `fees_received_cents`, `updated_at` | alle Angemeldeten (Karte) |
+| `company_subsidiaries`  | `company_id`, `country_key` (PK zusammen), `opened_at`, `setup_cost_cents`                                                                                             | alle Angemeldeten (Karte) |
+| `company_country_image` | `company_id`, `country_key` (PK), `bonus_bps` (Stand bei `bonus_at`), `bonus_at`, `last_campaign_at`, `spent_cents`                                                    | Gründer und CEO           |
+| `country_lobby`         | `country_key` (PK), `leader_company_id`, `fee_bps`, `fee_set_at`, `collected_cents`, `updated_at`                                                                      | alle Angemeldeten         |
+
+Interne Funktionen (Vertrag mit ADR-209, Signaturen fest): `world_cfg()`, `country_cfg(text) → jsonb` (null bei
+unbekanntem Land), `company_country(uuid) → text`, `country_market_leader(text) → uuid` (größter
+`company_worth_cents` unter aktiven Spielerfirmen mit Zentrale dort, mindestens `lobby.minWorthCents`; Gleichstand:
+früher platziert), `company_is_market_leader(uuid)`, `world_tax_rate_bps(uuid)` (Mischsatz, minus Lobby-Rabatt; null
+ohne Standort). Stunde: `world_hour_effect(firma, stunde)` → `{ placed, country, hq_tier, leader, demand_factor,
+cogs_factor, fixed_factor, tax_rate_bps, subsidiary_share }`, `world_hour_costs(firma, stunde, key)` bucht
+Tochterkosten (an die Haushalte, `key:world:subs`) und die Standortgebühr (an die Kasse des Marktführers,
+`key:world:fee`) aus der freien Kasse; beide über `listed_hour_effect` / `listed_hour_costs`.
+`company_max_employees` zählt die Plätze aller erreichten Zentralen-Stufen mit.
+
+| RPC                                               | Wirkung                                                                 | Fehler                                                                   |
+| ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `get_world()`                                     | `{ company, unlock_worth_cents, me, places[], countries[] }`            | –                                                                        |
+| `world_place_hq(p_request_id, p_country)`         | Bürogebäude, Firmenkasse → Staatskasse                                  | `world_locked`, `world_placed`, `insufficient_funds`, `invalid_argument` |
+| `world_upgrade_hq(p_request_id)`                  | nächste Stufe                                                           | `world_not_placed`, `world_max_tier`, `insufficient_funds`               |
+| `world_relocate_hq(p_request_id, p_country)`      | Umzug, Stufe bleibt                                                     | `locked`, `world_same_country`, `insufficient_funds`                     |
+| `world_save_hq_style(p_request_id, p_style)`      | Stil (unbekannte Felder fallen weg, Werte begrenzt)                     | `world_not_placed`                                                       |
+| `world_open_subsidiary(p_request_id, p_country)`  | Tochter, Gründungspreis wächst                                          | `world_subsidiary_locked`, `world_subsidiary_cap`, `world_same_country`  |
+| `world_close_subsidiary(p_request_id, p_country)` | Tochter schließen, kein Geld zurück                                     | `invalid_argument`                                                       |
+| `world_image_campaign(p_request_id, p_country)`   | Image-Bonus im Land (Zentrale oder Tochter)                             | `world_not_placed`, `locked`, `insufficient_funds`                       |
+| `world_set_location_fee(p_request_id, p_fee_bps)` | Standortgebühr 0 … `lobby.maxFeeBps`, benachrichtigt (`world_location`) | `world_not_leader`, `locked`, `invalid_argument`                         |
+
+`me`: `country, hq_tier, hq_style, invested_cents, placed_at, moved_at, relocate_ready_at, relocation_cost_cents,
+next_tier_cost_cents, subsidiaries[{ country, opened_at, setup_cost_cents, ramp, hourly_cost_cents }],
+next_subsidiary_cost_cents, subsidiary_unlocked, image{ land: { bonus_bps, ready_at, spent_cents } },
+image_campaign_cost_cents, effect, leader, fee_bps, fee_ready_at, paying_fee, fees_paid_cents, fees_received_cents`.
+`places`: Zentralen und Töchter aller Spieler plus bis zu `world.aiOnMap` (12) große KI-Firmen (Land aus
+`hashtext(id)`, nie Marktführer). Alle Schreib-RPCs sind idempotent (`request_id`) und antworten wie `get_world`.

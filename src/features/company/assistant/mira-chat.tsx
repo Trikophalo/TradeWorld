@@ -13,6 +13,7 @@ import { Button, type ButtonState } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BALANCE } from "@/config/balance";
+import { COUNTRIES } from "@/config/countries";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
 import type { CompanyMoves, CompanyTask, MyCompany, PitchMoveKind } from "@/features/game/types";
@@ -31,6 +32,7 @@ import { COMPANY_AUTOPILOT_KEY, useCompanyAutopilot } from "../components/autopi
 import { INTERVIEW_KEY } from "../components/interview-card";
 import { COMPANY_SKILLS_KEY } from "../components/company-skills";
 import { COMPANY_TALENTS_KEY } from "../components/talents";
+import { worldOpenOption, worldTurnLines } from "./world";
 import type { CompanySection } from "../tabs";
 import {
   aiTurn,
@@ -612,6 +614,11 @@ export function MiraChat({
     if (intent.kind === "plan" || intent.kind === "analysis") {
       const turn = intent.kind === "plan" ? planTurn(state, names) : analysisTurn(state, names);
       mira(turn.lines, turn.options);
+      return;
+    }
+    // ADR-208: the countries of the world map, from the config (no Claude)
+    if (intent.kind === "world") {
+      mira(worldTurnLines(COUNTRIES.find((c) => c.key === intent.country) ?? null), [worldOpenOption]);
       return;
     }
     if (intent.kind === "health") {

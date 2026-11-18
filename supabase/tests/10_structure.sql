@@ -191,7 +191,10 @@ select tests.assert(
            'get_my_net_worth',
            -- Talente and Mit-Geschaeftsfuehrung (ADR-199)
            'get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
-           'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision']
+           'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision',
+           -- Weltkarte (ADR-208)
+           'get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
+           'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

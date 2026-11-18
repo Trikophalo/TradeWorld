@@ -25,6 +25,7 @@ import { useCompanyAutopilot } from "../autopilot-card";
 import { COMPANY_MOVES_KEY, moveText } from "../company-moves";
 import { COMPANY_SKILLS_KEY } from "../company-skills";
 import { COMPANY_TALENTS_KEY } from "../talents";
+import { countryOf, useWorld } from "../../world/hooks";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { ChartLink, DashLink, FirmSection, SectionNav, useWhere, type NavItem } from "../firm-layout";
 import { HealthPanel, type AskMira } from "../health-panel";
@@ -251,6 +252,29 @@ function TalentsTile({ go }: { go: Go }) {
   );
 }
 
+/** Standort (ADR-208): country and headquarters, or the way to the world map. */
+function LocationTile({ go, worthCents }: { go: Go; worthCents: number }) {
+  const tw = useTranslations("world");
+  const q = useWorld();
+  const me = q.data?.me ?? null;
+  const country = countryOf(me?.country);
+  const unlock = BALANCE.world.unlockWorthCents;
+  return (
+    <KpiTile go={go} label={tw("dash.label")} testId="location" target={{ tab: "location" }} hint={tw("dash.hint")}>
+      {!q.data
+        ? "–"
+        : me && country
+          ? tw("dash.placed", {
+              country: country.name,
+              tier: tw(`tiers.${BALANCE.world.hqTiers[me.hqTier - 1]?.key ?? "office"}`),
+            })
+          : worthCents >= unlock
+            ? tw("dash.ready")
+            : tw("dash.locked", { pct: Math.floor((Math.max(0, worthCents) / unlock) * 100) })}
+    </KpiTile>
+  );
+}
+
 /** The key numbers as tiles; each one leads to where it is influenced. */
 function KpiGrid({
   company,
@@ -355,6 +379,9 @@ function KpiGrid({
       </Reveal>
       <Reveal feature="companyTalents">
         <TalentsTile go={go} />
+      </Reveal>
+      <Reveal feature="companyWorld">
+        <LocationTile go={go} worthCents={company.worth?.cents ?? 0} />
       </Reveal>
       {reputation && (
         <KpiTile

@@ -5221,3 +5221,62 @@ Spannung aufbauen, vor allem bei einer 10 und dem Black Label. Alles ist reine O
 **Folgen.** Ein großer Treffer kostet in den letzten zwei Plätzen 0,75 bis 2,1 s mehr, ein ASP-Ergebnis bis zu
 rund 1,5 s mehr; beides lässt sich abkürzen. Die Pack-Battle-Ansicht kann `RareReveal` mit `play` und `valueCents`
 einbinden. Die Übertragung großer Züge an Zuschauer (ADR-172) bleibt unverändert.
+
+## ADR-208: Weltkarte – Standort, Zentrale, Tochterfirmen und Länder-Lobby — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer möchte Firmen ab 10 Mio. € Firmenwert auf einer Weltkarte platzieren: ein Land mit
+realistischen Eigenschaften wählen (China billig, aber schwächeres Image; Deutschland teure Arbeit, starkes Image; USA
+große Nachfrage, höhere Steuern …), alle Länder unterm Strich gleich gut. Dazu eine ausbaubare Zentrale (pixelig,
+gestaltbar), später Tochterfirmen in anderen Ländern und ein Marktführer je Land mit Lobby-Bonus und Standortgebühr.
+Alles im neuen Firmen-Tab „Standort“ direkt vor „Buchhaltung“. Parallel entstehen externe Ereignisse und Steuern
+(ADR-209); beide teilen einen Vertrag.
+
+**Entscheidung.**
+
+- **Länder** (`src/config/countries.ts`, `game_config.world.countries`): 22 Länder. Je Land Produktionskosten,
+  Arbeitskosten, Nachfragepotenzial und Image als Basispunkte gegen 10 000, Steuersatz, politisches Risiko,
+  Zollrisiko, Konfliktrisiko (0–100) und Naturgefahren, dazu Kartenposition und Flaggenfarben (Daten).
+- **Balance-Prüfung:** `countryScore` gewichtet jeden Vorteil nach seiner Wirkung auf die Stunde (Wareneinsatz 0,5,
+  Arbeit 0,3, Nachfrage 1, Image 0,5, Steuern 0,2 je Basispunkt; Risiken je Punkt 4/3/6, je Naturgefahr 120). Jedes
+  Land liegt höchstens `balance.tolerance` = 400 Punkte vom Mittel (größte Abweichung heute ≈ 310), und kein Land ist
+  in allen Kosten-, Nachfrage- und Steuerwerten das beste (`world.test.ts`).
+- **Vertrag mit ADR-209** (Migration 10000, Signaturen fest): Tabelle `company_locations` (company_id, country_key,
+  placed_at, hq_tier, hq_style, invested_cents, …), `world_cfg()`, `country_cfg(text) → jsonb`,
+  `company_country(uuid) → text`, `country_market_leader(text) → uuid`, `company_is_market_leader(uuid) → boolean`,
+  dazu in 10010 `world_tax_rate_bps(uuid)` (Mischsatz aus Zentrale und Töchtern, minus Lobby-Rabatt). Steuern und
+  Ereignisse liest ADR-209; diese ADR wendet nur Kosten und Nachfrage an.
+- **Freischaltung:** ab `unlockWorthCents` = 10 Mio. € (`company_worth_cents`, ADR-203). Darunter zeigt der Tab die
+  Karte mit allen Firmen, die Ländereigenschaften und den Fortschritt.
+- **Zentrale:** Bürogebäude 1 Mio. €, dann Bürokomplex 4 Mio., Campus 15 Mio., Tower 60 Mio., Mega-Campus 250 Mio.
+  (Firmenkasse → Staatskasse, Ledger). Jede Stufe bringt Plätze (`company_max_employees`), einen Prestige-Aufschlag auf
+  die Nachfrage (0 bis 4 %) und einmalig Ruf (`company_reputation_bump`), Bekanntheit (nur über
+  `company_awareness_add`) und Zufriedenheit eines Börsenteams; Prestige und Stufe stehen auf dem Firmenprofil. Das
+  Gebäude ist Pixel-Art (`src/components/pixel/hq.ts`, eigene Entwürfe), gestaltbar: Fassade, Dach, Schild (8 Farben),
+  Dachform, Schmuck, Landesfahne; das Schild trägt die Initialen.
+- **Umzug:** 20 % des in die Zentrale gesteckten Geldes, mindestens 0,5 Mio. €, danach 7 Tage Pause; die Stufe bleibt.
+- **Tochterfirmen:** ab 50 Mio. € Firmenwert oder ab Bürokomplex, höchstens 4, nie im Land der Zentrale. Gründung
+  3 Mio. €, jede weitere × 1,6. Laufend 600 € je Stunde, zu Beginn das Dreifache, über 14 Tage fallend. Eine
+  hochgelaufene Tochter macht 15 % des Umsatzes zu den Bedingungen ihres Landes und bringt 5 % Nachfrage aus dem neuen
+  Markt; jede weitere nur 60 % davon (abnehmender Ertrag, harte Grenze).
+- **Image-Kampagne im Land:** 0,5 % des Firmenwerts (mindestens 200 000 €), +5 % Image dort, höchstens +30 %, verblasst
+  um 1 % am Tag, alle 12 Stunden.
+- **Länder-Lobby:** Marktführer ist die aktive Spielerfirma mit dem größten `company_worth_cents` unter allen mit
+  Zentrale im Land (mindestens 10 Mio. €). Sie zahlt 10 % weniger Steuern und spürt politische Ereignisse 30 % schwächer
+  (beides wendet ADR-209 an) und darf eine Standortgebühr bis 3 % des Stundenumsatzes der anderen Spielerfirmen im Land
+  verlangen (Änderung höchstens einmal am Tag, alle werden benachrichtigt). Die Gebühr wird in der Stundenabrechnung nur
+  aus der freien Kasse gezahlt, nie als offene Rechnung (kein Soft-Lock), und verfällt, sobald jemand anderes führt.
+  Ausweg: wachsen oder umziehen. KI-Firmen stehen nur auf der Karte (Land aus ihrer ID), führen nie und kassieren nie.
+- **Stundenabrechnung:** `player_company_close_hour` bleibt unverändert. `listed_hour_effect` (volle Kopie aus 8300)
+  multipliziert `world_hour_effect` in Nachfrage, Wareneinsatz und Fixkosten; `listed_hour_costs` (volle Kopie aus 5400) bucht vorher `world_hour_costs` (Tochterkosten, Gebühr) für jede Spielerfirma. Fehler darin landen in
+  `company_close_warn`, die Stunde läuft weiter. Die Faktoren bleiben zwischen 0,6 und 1,6.
+- **Oberfläche:** Tab „Standort“ vor „Buchhaltung“ (`tabs.ts`, alte Links bleiben gültig, neue Ziele `world-hq`,
+  `world-lobby`, `world-subsidiaries`, `world-map`), Kachel auf dem Dashboard, Offenlegung `companyWorld` ab Level 9.
+  Karte mit Ziehen und Zoomen (Zwei-Finger, Mausrad, Knöpfe; ganzzahlige Stufen), alle Länder zusätzlich als Liste.
+  Mira beantwortet Fragen zu Ländern aus der Konfiguration, ohne Claude.
+
+**Folgen.** Ein Spieler hat mit 22 Ländern echte Wahl ohne Pflichtland; wer früh groß wird, kann in seinem Land
+kassieren, aber höchstens 3 % und nur so lange er führt. Mit 4 Spielern funktioniert alles, auch wenn alle im selben
+Land sitzen. Neue Länder oder Werte ändern nur die Konfiguration; die Balance-Prüfung schlägt Alarm, wenn ein Land
+herausragt. Die Gebühr zählt für den Zahler als Fixkosten der Stunde; für den Marktführer ist sie Geld in der Kasse,
+kein Umsatz. SQL-Test `e6_world.sql`, Unit-Tests `world.test.ts`, `hq.test.ts`, Mira `assistant/world.test.ts`, E2E
+`world-map.spec.ts`.

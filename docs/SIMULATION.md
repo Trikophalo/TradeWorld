@@ -1187,3 +1187,26 @@ Formeln in `src/lib/sim/nexamon-battle.ts`, gleich in PL/pgSQL (Migration 9700).
   Fixkosten 1 − x, Qualität + x / 10 000).
 - Mit-GF: Strategie nach Stil (vorsichtig: höchste Abmilderung; risikofreudig: −10 × Schritte + Abmilderung;
   ausgewogen: Abmilderung / (1 + Schritte)); Ausgabegrenze = Restbudget des Tages (vorsichtig × 50 %).
+
+## Nachtrag: Weltkarte und Standorte (ADR-208)
+
+Formeln in `src/lib/sim/world.ts`, gespiegelt in `world_hour_effect` und `world_hour_costs` (Migration 10010). Alle
+Länderwerte sind Basispunkte gegen 10 000.
+
+- Land: Nachfrage = `demandPotential` × (1 + (`image` + Kampagnenbonus − 10 000) × `imageDemandWeightBps` / 10⁸),
+  Wareneinsatz = `productionCost`, Fixkosten = `labourCost`, Steuer = `taxRate`.
+- Tochter i (0 = älteste): Anlauf r = min(1, Stunden seit Gründung / `rampUpHours`), Anteil sᵢ = `revenueShareBps` ×
+  (`diminishingBps` / 10 000)ⁱ × r, Marktbonus mᵢ = `demandBonusBps` × (…)ⁱ × r; höchstens `subsidiaries.max` Töchter,
+  Σ s ≤ 0,9.
+- Gemischter Faktor = (1 − Σ s) × Zentrale + Σ sᵢ × Landᵢ (für Nachfrage, Wareneinsatz, Fixkosten und Steuer).
+- Nachfrage-Faktor = gemischte Nachfrage × (1 + `hqTiers[t].demandBps` / 10 000) × (1 + Σ mᵢ); alle Faktoren auf
+  [`minFactorBps`, `maxFactorBps`] = [0,6; 1,6] begrenzt.
+- Steuersatz des Marktführers × (10 000 − `lobby.taxDiscountBps`) / 10 000 (angewendet von ADR-209).
+- Laufende Tochterkosten je Stunde = `hourlyCostCents` × (`rampUpCostMultiplier` − (`rampUpCostMultiplier` − 1) × r),
+  gerundet.
+- Standortgebühr je Stunde = ⌊eigener Umsatz der Stunde × min(`fee_bps`, `maxFeeBps`) / 10 000⌋, höchstens die freie
+  Kasse; nur solange der Marktführer, der sie festgelegt hat, noch führt.
+- Image-Bonus nach d Tagen = max(0, Bonus − `decayPerDayBps` × d); Kampagne: min(`maxBonusBps`, Bonus + `gainBps`).
+
+Die Faktoren multipliziert `listed_hour_effect` mit Ruf, Börsentermen und Fertigkeiten; die Kosten bucht
+`listed_hour_costs` vor den Börsenkosten und zählt sie zu den Fixkosten der Stunde.

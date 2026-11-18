@@ -4,1085 +4,179 @@ begin;
 -- Wait for a running market tick, keep scheduled jobs out until commit (avoids deadlocks).
 select pg_advisory_xact_lock(7311001);
 
--- ===== supabase/updates/20261204009810_clone_jobs_rpcs.sql =====
--- ===== idempotent copy of migrations/20261204009810_clone_jobs_rpcs.sql =====
+-- ===== supabase/updates/20261204010010_world_map.sql =====
+-- ===== idempotent copy of migrations/20261204010010_world_map.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
 -- =============================================================================
--- NEXA · 9810 · The job RPCs serve the clone, pay follows the skills (ADR-206)
+-- NEXA · 10010 · Weltkarte: headquarters, subsidiaries, image campaigns, country lobby (ADR-208)
 -- =============================================================================
--- Latest full definitions (as of 9800) with these changes:
--- * job_state, quit_job, cancel_quit, request_promotion, request_raise, get_employer: "the player's job" is the job of
---   the holder job_acting_clone() names (own job by default, the clone's inside a clone_* wrapper). job_state also
---   returns is_clone, holder_name, skill_pay_bps, profit_share_bps, stock_grant_chance_bps and rewards.
--- * sign_contract, apply_for_job: applications and jobs carry the holder; the clone never at the founder's own company
---   (clone_own_company), owner and clone never at the same company (clone_same_company), the founder rule of ADR-066
---   only for the own job; a signed job takes the posting's profit share and stock grant extras.
--- * get_job_board: skill_pay_bps, market_salary_cents_per_hour, profit_share_bps, stock_grant_chance_bps, the posting's
---   extras, own_company, my_clone_application and has_clone; my_application is the own one.
--- * The AI ceiling (apply_for_job, sign_contract, job_state, promotion_apply, get_job_board) is job_pay_ceiling():
---   relevant branch scores and all learned skills (jobs.skillPay) instead of the capped match score.
--- * company_full_time_check, player_company_team, company_task_member: the clone's job is no side job of the founder.
--- * get_player_card: clone_job; get_company_team: is_clone; application_json: for_clone; chat_company_of,
---   company_event_company_for, get_company_floor prefer the own job.
--- Idempotent: runs unchanged as supabase/updates/20261204009810_clone_jobs_rpcs.sql.
-
-create or replace function public.job_state(p_player uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  j        public.player_jobs;
-  v_match  integer;
-  v_base   bigint;
-  v_max    integer;
-  v_ai     boolean;
-  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
-  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
-  v_factor integer;
-  v_bonus  bigint;
-  v_next   timestamptz;
-  v_open   boolean;
-begin
-  select * into j from public.player_jobs where player_id = p_player and status = 'active' and is_clone = public.job_acting_clone();
-  if j.id is null then
-    return jsonb_build_object('job', null);
-  end if;
-  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
-  v_match := public.job_match_score(public.player_branch_scores(p_player), j.required);
-  v_max := greatest(0, public.config_double('jobs', '{raiseRequest,maxRaiseBpsPerScore}', 300)::integer * (v_match - j.raise_base_score));
-  if v_ai then
-    v_base := coalesce((public.career_tier(j.tier::text) ->> 'salaryCentsPerHour')::bigint, j.salary_cents_per_hour);
-    v_max := least(v_max, greatest(0, floor((public.job_pay_ceiling(p_player, v_base, j.required)::numeric / j.salary_cents_per_hour - 1) * 10000)::integer));
-  end if;
-  -- player companies: pay factor of the quarter x share the company could pay at the last payout
-  select pc.pay_factor_bps * j.pay_factor_bps / 10000,
-         coalesce((select sum(sp.bonus_cents) from public.salary_payouts sp join public.game_quarters gq on gq.id = pc.last_closed_quarter_id
-                    where sp.player_job_id = j.id and sp.bonus_cents > 0 and sp.period_end = gq.ends_at), 0)
-    into v_factor, v_bonus
-    from public.player_companies pc where pc.company_id = j.company_id and pc.status = 'active';
-  v_factor := coalesce(v_factor, j.pay_factor_bps);
-  -- automatic work (ADR-064): no new work tasks
-  v_next := null;
-  v_open := false;
-  return jsonb_build_object('job', jsonb_build_object(
-    'id', j.id,
-    'company', public.company_json(j.company_id),
-    'tier', j.tier,
-    'title_key', j.title_key,
-    'title', case when j.title_key is null then j.title end,
-    'required', j.required,
-    'salary_cents_per_hour', j.salary_cents_per_hour,
-    'pay_factor_bps', v_factor,
-    'effective_salary_cents_per_hour', j.salary_cents_per_hour * v_factor / 10000,
-    'last_bonus_cents', coalesce(v_bonus, 0),
-    'next_work_task_at', v_next,
-    'work_task_open', v_open,
-    'productivity_bps', public.job_productivity_bps(v_match),
-    'started_at', j.started_at,
-    'paid_hours_today', case when j.paid_day = v_today then round(j.paid_minutes_today / 60.0, 2) else 0 end,
-    'paid_hours_cap', public.player_paid_hours_cap(p_player),
-    'earned_total_cents', j.earned_total_cents,
-    'raise_available_at', case when j.raise_requested_at is null
-                                    or j.raise_requested_at + make_interval(secs => v_cool * 86400) <= now() then null
-                               else j.raise_requested_at + make_interval(secs => v_cool * 86400) end,
-    'raise_max_bps', v_max,
-    'pending_raise', case when j.pending_raise_bps is not null
-                          then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
-    'quit_cost_cents', 0,
-    'quit_now_cost_cents', round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint,
-    'notice_ends_at', j.notice_ends_at,
-    'signature', j.signature,
-    'rank_hours', round(j.rank_minutes / 60.0, 1),
-    'promotion', public.promotion_state(j.id),
-    -- ADR-103: presence and what it does to the pay
-    'presence', public.presence_json(p_player),
-    -- ADR-206: clone, skill pay, profit share, employee shares
-    'is_clone', j.is_clone,
-    'holder_name', public.job_holder_name(p_player, j.is_clone),
-    'skill_pay_bps', public.job_skill_pay_bps(public.player_branch_scores(p_player), public.player_skill_count(p_player), j.required),
-    'profit_share_bps', public.job_profit_share_bps(j.tier::text, j.profit_share_bonus_bps),
-    'stock_grant_chance_bps', public.job_stock_grant_bps(j.tier::text, j.stock_grant_bonus_bps),
-    'rewards', public.job_rewards_json(j.id)));
-end;
-$function$
-;
-
-create or replace function public.quit_job(p_request_id uuid, p_immediate boolean DEFAULT false)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  j        public.player_jobs;
-  v_cost   bigint;
-  v_cash   bigint;
-begin
-  v_player := public.require_player();
-  if p_request_id is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'quit_job');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  perform public.lock_player_accounts(v_player);
-  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
-  if j.id is null then
-    perform public.api_error('no_active_job');
-  end if;
-  if not coalesce(p_immediate, false) then
-    if j.notice_ends_at is null then
-      update public.player_jobs
-         set notice_ends_at = now() + make_interval(secs => public.config_double('jobs', '{quitNoticeHours}', 24) * 3600)
-       where id = j.id
-      returning * into j;
-    end if;
-    return public.request_complete(v_player, p_request_id, jsonb_build_object('notice_ends_at', j.notice_ends_at));
-  end if;
-  -- at once: jobs.quitNowCostHours x contract wage to the employer
-  perform public.accrue_job_salary(j.id);
-  select * into j from public.player_jobs where id = j.id;
-  v_cost := round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint;
-  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash';
-  if coalesce(v_cash, 0) < v_cost then
-    perform public.api_error('insufficient_funds');
-  end if;
-  if v_cost > 0 then
-    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.company_cash_account(j.company_id),
-                                   v_cost, 'transfer', 'Sofortige Kündigung', 'player_job', j.id, 'quit:' || j.id::text, v_player);
-  end if;
-  update public.player_jobs set status = 'ended', ended_at = now(), end_reason = 'quit' where id = j.id;
-  perform public.company_system_message(j.company_id,
-    public.job_holder_name(v_player, j.is_clone) || ' hat gekündigt.');
-  return public.request_complete(v_player, p_request_id, jsonb_build_object('ended', true, 'paid_cents', v_cost));
-end;
-$function$
-;
-
-create or replace function public.cancel_quit(p_request_id uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  j        public.player_jobs;
-begin
-  v_player := public.require_player();
-  if p_request_id is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'cancel_quit');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
-  if j.id is null then
-    perform public.api_error('no_active_job');
-  end if;
-  if j.notice_ends_at is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  update public.player_jobs set notice_ends_at = null where id = j.id;
-  return public.request_complete(v_player, p_request_id, public.job_state(v_player));
-end;
-$function$
-;
-
-create or replace function public.request_promotion(p_request_id uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  j        public.player_jobs;
-  c        public.companies;
-  v_state  jsonb;
-  v_next   text;
-  v_wage   bigint;
-  v_chance integer;
-  v_retry  timestamptz;
-  v_res    jsonb;
-  v_nick   text;
-  v_boss   uuid;
-begin
-  v_player := public.require_player();
-  if p_request_id is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'request_promotion');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
-  if j.id is null then
-    perform public.api_error('no_active_job');
-  end if;
-  v_state := public.promotion_state(j.id);
-  if v_state ->> 'pending_since' is not null then
-    perform public.api_error('promotion_pending');
-  end if;
-  if v_state ->> 'retry_at' is not null then
-    perform public.api_error('promotion_too_soon');
-  end if;
-  if not coalesce((v_state ->> 'ready')::boolean, false) then
-    perform public.api_error('promotion_not_ready');
-  end if;
-  v_next := v_state ->> 'next_tier';
-  v_wage := (v_state ->> 'next_salary_cents_per_hour')::bigint;
-  select * into c from public.companies where id = j.company_id;
-
-  if c.is_ai then
-    v_chance := coalesce((v_state ->> 'chance_bps')::integer, 0);
-    -- promotionGranted: u x 10 000 < chance
-    if random() * 10000 < v_chance then
-      v_res := public.promotion_apply(j.id, v_wage);
-      return public.request_complete(v_player, p_request_id, jsonb_build_object(
-        'status', 'promoted', 'tier', v_res ->> 'tier', 'salary_cents_per_hour', (v_res ->> 'salary_cents_per_hour')::bigint,
-        'retry_at', null, 'chance_bps', v_chance));
-    end if;
-    v_retry := now() + make_interval(secs => public.cfg_num(public.promotion_cfg(), '{retryHours}', 24) * 3600);
-    update public.player_jobs set promotion_retry_at = v_retry where id = j.id;
-    return public.request_complete(v_player, p_request_id, jsonb_build_object(
-      'status', 'declined', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
-      'retry_at', v_retry, 'chance_bps', v_chance));
-  end if;
-
-  -- player boss: the request waits for promote_employee / decline_promotion (founder and CEO are told)
-  update public.player_jobs set pending_promotion_at = now() where id = j.id;
-  select p.nickname into v_nick from public.profiles p where p.id = v_player;
-  for v_boss in select distinct x from unnest(array[c.founder_id, c.ceo_id]) x where x is not null and x <> v_player loop
-    perform public.social_notify(v_boss, 'promotion_request',
-      v_nick || ' bittet um Beförderung ' || public.career_tier_phrase(v_next),
-      'Die Anforderungen sind erfüllt. Neuer Lohn mindestens ' || public.format_eur(v_wage) || ' pro Stunde.',
-      jsonb_build_object('player_job_id', j.id, 'company_id', c.id, 'nickname', v_nick, 'tier', j.tier, 'next_tier', v_next,
-                         'min_salary_cents_per_hour', v_wage),
-      '/company', 'promotion_request:' || j.id::text || ':' || floor(extract(epoch from now()))::bigint::text);
-  end loop;
-  return public.request_complete(v_player, p_request_id, jsonb_build_object(
-    'status', 'pending', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
-    'retry_at', null, 'chance_bps', null));
-end;
-$function$
-;
-
-create or replace function public.request_raise(p_request_id uuid, p_raise_bps integer)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  j        public.player_jobs;
-  v_state  jsonb;
-  v_ai     boolean;
-  v_new    bigint;
-  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_raise_bps is null or p_raise_bps < 1 then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'request_raise');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
-  if j.id is null then
-    perform public.api_error('no_active_job');
-  end if;
-  if j.raise_requested_at is not null and j.raise_requested_at + make_interval(secs => v_cool * 86400) > now() then
-    perform public.api_error('raise_too_soon');
-  end if;
-  v_state := public.job_state(v_player) -> 'job';
-  if p_raise_bps > (v_state ->> 'raise_max_bps')::integer then
-    perform public.api_error('raise_too_high');
-  end if;
-  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
-  v_new := round(j.salary_cents_per_hour * (1 + p_raise_bps / 10000.0))::bigint;
-  if v_ai then
-    update public.player_jobs
-       set salary_cents_per_hour = v_new, raise_requested_at = now(), last_raise_at = now(),
-           raise_base_score = public.job_match_score(public.player_branch_scores(v_player), j.required),
-           pending_raise_bps = null, pending_raise_at = null
-     where id = j.id;
-    return public.request_complete(v_player, p_request_id, jsonb_build_object('status', 'accepted', 'salary_cents_per_hour', v_new));
-  end if;
-  update public.player_jobs
-     set raise_requested_at = now(), pending_raise_bps = p_raise_bps, pending_raise_at = now()
-   where id = j.id;
-  return public.request_complete(v_player, p_request_id,
-    jsonb_build_object('status', 'pending', 'salary_cents_per_hour', j.salary_cents_per_hour));
-end;
-$function$
-;
-
-create or replace function public.get_employer()
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid := public.require_player();
-  j        public.player_jobs;
-  c        public.companies;
-  pc       public.player_companies;
-  v_last   jsonb;
-begin
-  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone();
-  if j.id is null then
-    return jsonb_build_object('employer', null);
-  end if;
-  select * into c from public.companies where id = j.company_id;
-  select * into pc from public.player_companies where company_id = j.company_id and status = 'active';
-  if c.is_ai then
-    select jsonb_build_object('label', 'J' || gq.game_year || ' Q' || gq.quarter, 'revenue_cents', r.revenue_cents,
-                              'profit_cents', r.net_income_cents)
-      into v_last
-      from public.company_quarter_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
-     where r.company_id = c.id order by gq.ends_at desc limit 1;
-  else
-    select jsonb_build_object('label', r.label, 'revenue_cents', r.revenue_cents, 'profit_cents', r.operating_profit_cents)
-      into v_last
-      from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
-     where r.company_id = c.id order by gq.ends_at desc limit 1;
-  end if;
-  return jsonb_build_object('employer', jsonb_build_object(
-    'company', public.company_json(c.id),
-    'kind', case when c.is_ai then 'ai' else 'player' end,
-    'product_key', case when pc.company_id is not null then public.company_product(c.id) ->> 'key' end,
-    'stage', case when pc.company_id is not null then public.company_stage(c.id) end,
-    'tier', pc.tier,
-    'founder', case when pc.company_id is not null then (select pr.nickname from public.profiles pr where pr.id = pc.founder_id) end,
-    'team_size', (select count(*) from public.player_jobs x where x.company_id = c.id and x.status = 'active')::integer
-                 + case when pc.company_id is not null then 1 else 0 end,
-    'last_quarter', v_last,
-    'pay_factor_bps', coalesce(pc.pay_factor_bps, 10000)));
-end;
-$function$
-;
-
-create or replace function public.sign_contract(p_request_id uuid, p_application_id uuid, p_signature text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  a        public.job_applications;
-  p        public.job_postings;
-  v_scores jsonb;
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_signature is null or char_length(p_signature) < 1 or char_length(p_signature) > 8000 then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'sign_contract');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  perform 1 from public.profiles pr where pr.id = v_player for update;
-  select * into a from public.job_applications where id = p_application_id and player_id = v_player for update;
-  if a.id is null then
-    perform public.api_error('application_not_found');
-  end if;
-  if a.status <> 'offered' then
-    perform public.api_error('application_not_offered');
-  end if;
-  if a.offer_expires_at <= now() then
-    perform public.api_error('offer_expired');
-  end if;
-  -- ADR-206: an application of the clone is signed by the clone and the other way round
-  if a.for_clone <> public.job_acting_clone() then
-    perform public.api_error('application_not_found');
-  end if;
-  if exists (select 1 from public.player_jobs j where j.player_id = v_player and j.status = 'active' and j.is_clone = public.job_acting_clone()) then
-    perform public.api_error('job_active_exists');
-  end if;
-  select * into p from public.job_postings where id = a.posting_id;
-  -- ADR-206: owner and clone never work at the same company; the clone never at the owner's company
-  if exists (select 1 from public.player_jobs j where j.player_id = v_player and j.status = 'active'
-                and j.company_id = p.company_id and j.is_clone <> public.job_acting_clone()) then
-    perform public.api_error('clone_same_company');
-  end if;
-  if public.job_acting_clone() then
-    if exists (select 1 from public.player_companies pc where pc.founder_id = v_player and pc.company_id = p.company_id) then
-      perform public.api_error('clone_own_company');
-    end if;
-  -- founders: a job elsewhere only while the company has fewer than fullTimeFromEmployees people (ADR-066)
-  elsif exists (select 1 from public.player_companies pc where pc.founder_id = v_player and pc.status = 'active'
-                and (pc.company_id = p.company_id
-                     or public.company_headcount(pc.company_id) >= public.config_double('startups', '{fullTimeFromEmployees}', 5))) then
-    perform public.api_error('owns_company');
-  end if;
-  -- player companies: players with an active job there + AI workers <= max employees (tier and expansion, ADR-083)
-  if exists (select 1 from public.player_companies pc where pc.company_id = p.company_id and pc.status = 'active'
-                and (select count(*) from public.player_jobs j where j.company_id = pc.company_id and j.status = 'active')
-                    + pc.ai_workers + 1 > public.company_max_employees(pc.company_id)) then
-    perform public.api_error('employee_limit');
-  end if;
-  if p.slots is not null
-     and (select count(*) from public.player_jobs j where j.posting_id = p.id and j.status = 'active') >= p.slots then
-    perform public.api_error('job_not_found');
-  end if;
-  v_scores := public.player_branch_scores(v_player);
-  insert into public.player_jobs (player_id, company_id, request_id, tier, title, title_key, required, salary_cents_per_hour,
-                                  ceiling_cents_per_hour, raise_base_score, posting_id, application_id, signature,
-                                  last_paid_at, started_at, paid_day, paid_minutes_today,
-                                  is_clone, profit_share_bonus_bps, stock_grant_bonus_bps)
-  values (v_player, p.company_id, p_request_id, p.tier, coalesce(p.title, p.title_key), p.title_key, p.required,
-          a.offer_salary_cents_per_hour,
-          case when p.is_ai then public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required) end,
-          public.job_match_score(v_scores, p.required), p.id, a.id, p_signature,
-          public.game_now(), public.game_now(), (public.game_now() at time zone 'Europe/Berlin')::date, 0,
-          public.job_acting_clone(), coalesce(p.profit_share_bps, 0), coalesce(p.stock_grant_bps, 0));
-  update public.job_applications set status = 'signed', signature = p_signature where id = a.id;
-  update public.job_applications set status = 'closed'
-   where player_id = v_player and id <> a.id and status in ('pending', 'offered') and for_clone = a.for_clone;
-  perform public.company_system_message(p.company_id,
-    public.job_holder_name(v_player, public.job_acting_clone()) || ' ist jetzt im Team.');
-  perform public.company_full_time_check(p.company_id);
-  return public.request_complete(v_player, p_request_id, public.job_state(v_player));
-end;
-$function$
-;
-
-create or replace function public.apply_for_job(p_request_id uuid, p_posting_id uuid, p_salary_wish_cents_per_hour bigint, p_message text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  p        public.job_postings;
-  v_tier   jsonb;
-  v_scores jsonb;
-  v_level  integer;
-  v_id     uuid := gen_random_uuid();
-  v_msg    text := nullif(btrim(coalesce(p_message, '')), '');
-begin
-  v_player := public.require_player();
-  if p_request_id is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'apply_for_job');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  if not public.rate_limit_hit(v_player, 'player_action',
-           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
-    perform public.api_error('rate_limited');
-  end if;
-  select * into p from public.job_postings where id = p_posting_id;
-  if p.id is null or p.status <> 'open' or (p.expires_at is not null and p.expires_at <= now()) then
-    perform public.api_error('job_not_found');
-  end if;
-  if not p.is_ai and (p_salary_wish_cents_per_hour is null or p_salary_wish_cents_per_hour < 1) then
-    perform public.api_error('invalid_argument');
-  end if;
-  if v_msg is not null and char_length(v_msg) > public.config_double('jobs', '{applicationMessageMaxLength}', 140) then
-    perform public.api_error('invalid_argument');
-  end if;
-  if public.text_has_profanity(v_msg) then
-    perform public.api_error('name_profanity');
-  end if;
-  v_tier := public.career_tier(p.tier::text);
-  select pr.level into v_level from public.profiles pr where pr.id = v_player;
-  if v_level < coalesce((v_tier ->> 'minLevel')::integer, 1) then
-    perform public.api_error('job_level_too_low');
-  end if;
-  -- ADR-206: the clone never works at a company the player founded
-  if public.job_acting_clone() and exists (select 1 from public.player_companies pc
-                                           where pc.founder_id = v_player and pc.company_id = p.company_id) then
-    perform public.api_error('clone_own_company');
-  end if;
-  v_scores := public.player_branch_scores(v_player);
-  if not public.job_skills_ok(v_scores, p.required)
-     or exists (select 1 from unnest(p.required_skills) k
-                 where not exists (select 1 from public.player_skills s where s.player_id = v_player and s.skill_key = k)) then
-    perform public.api_error('job_skills_missing');
-  end if;
-  -- AI employers offer the personal ceiling; a wish is ignored (ADR-064)
-  if p.is_ai then
-    p_salary_wish_cents_per_hour := public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required);
-  end if;
-  perform 1 from public.profiles pr where pr.id = v_player for update;
-  if exists (select 1 from public.job_applications a
-              where a.player_id = v_player and a.posting_id = p.id and a.for_clone = public.job_acting_clone()
-                and (a.status = 'pending' or (a.status = 'offered' and a.offer_expires_at > now()))) then
-    perform public.api_error('application_exists');
-  end if;
-  if (select count(*) from public.job_applications a
-       where a.player_id = v_player and a.for_clone = public.job_acting_clone()
-         and (a.status = 'pending' or (a.status = 'offered' and a.offer_expires_at > now())))
-     >= public.config_double('jobs', '{maxOpenApplications}', 5) then
-    perform public.api_error('application_limit');
-  end if;
-
-  insert into public.job_applications (id, posting_id, player_id, request_id, salary_wish_cents_per_hour, message, status,
-                                       offer_salary_cents_per_hour, offer_expires_at, for_clone)
-  values (v_id, p.id, v_player, p_request_id, p_salary_wish_cents_per_hour, v_msg,
-          case when p.is_ai then 'offered' else 'pending' end,
-          case when p.is_ai then least(p_salary_wish_cents_per_hour,
-                                       public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required)) end,
-          case when p.is_ai then now() + make_interval(secs => public.config_double('jobs', '{offerValidHours}', 48) * 3600) end,
-          public.job_acting_clone());
-  return public.request_complete(v_player, p_request_id, public.application_json(v_id));
-end;
-$function$
-;
-
-create or replace function public.get_job_board()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player uuid;
-  v_scores jsonb;
-  v_level  integer;
-  v_skills integer;
-  v_clone  boolean;
-begin
-  v_player := public.require_player();
-  perform public.refresh_ai_job_postings();
-  v_scores := public.player_branch_scores(v_player);
-  select p.level into v_level from public.profiles p where p.id = v_player;
-  v_skills := public.player_skill_count(v_player);
-  v_clone := exists (select 1 from public.player_clones c where c.player_id = v_player);
-  return jsonb_build_object(
-    'postings', coalesce((
-      select jsonb_agg(jsonb_build_object(
-               'id', p.id, 'company', public.company_json(p.company_id), 'tier', p.tier,
-               'title_key', p.title_key, 'title', p.title,
-               'min_level', coalesce((public.career_tier(p.tier::text) ->> 'minLevel')::integer, 1),
-               'required', p.required,
-               'required_skills', to_jsonb(p.required_skills),
-               'salary_cents_per_hour', p.salary_cents_per_hour,
-               'max_salary_cents_per_hour', case when p.is_ai then round(p.salary_cents_per_hour::numeric
-                                                    * public.job_skill_pay_bps(v_scores, v_skills, p.required) / 10000)::bigint end,
-               -- ADR-206: what the skills are worth for this role, profit share and chance for employee shares
-               'skill_pay_bps', public.job_skill_pay_bps(v_scores, v_skills, p.required),
-               'market_salary_cents_per_hour', round(coalesce((public.career_tier(p.tier::text) ->> 'salaryCentsPerHour')::bigint,
-                                                              p.salary_cents_per_hour)::numeric
-                                                     * public.job_skill_pay_bps(v_scores, v_skills, p.required) / 10000)::bigint,
-               'profit_share_bps', public.job_profit_share_bps(p.tier::text, p.profit_share_bps),
-               'stock_grant_chance_bps', public.job_stock_grant_bps(p.tier::text, p.stock_grant_bps),
-               'posting_profit_share_bps', p.profit_share_bps,
-               'posting_stock_grant_bps', p.stock_grant_bps,
-               'own_company', exists (select 1 from public.player_companies pc
-                                       where pc.founder_id = v_player and pc.company_id = p.company_id),
-               'my_clone_application', case when v_clone then (select jsonb_build_object('id', a.id,
-                                          'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end)
-                                    from public.job_applications a
-                                   where a.posting_id = p.id and a.player_id = v_player and a.for_clone
-                                   order by a.created_at desc limit 1) end,
-               'match_score', public.job_match_score(v_scores, p.required),
-               'eligible', v_level >= coalesce((public.career_tier(p.tier::text) ->> 'minLevel')::integer, 1)
-                           and public.job_skills_ok(v_scores, p.required)
-                           and not exists (select 1 from unnest(p.required_skills) k
-                                            where not exists (select 1 from public.player_skills s
-                                                               where s.player_id = v_player and s.skill_key = k)),
-               'slots_open', case when p.slots is null
-                                  then public.config_double('jobs', '{aiSlotsOpen}', 99)::integer  -- unlimited (AI)
-                                  else greatest(0, p.slots - (select count(*) from public.player_jobs j
-                                                               where j.posting_id = p.id and j.status = 'active'))::integer end,
-               'posted_at', p.posted_at, 'expires_at', p.expires_at,
-               'my_application', (select jsonb_build_object('id', a.id,
-                                          'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end)
-                                    from public.job_applications a
-                                   where a.posting_id = p.id and a.player_id = v_player and not a.for_clone
-                                   order by a.created_at desc limit 1))
-             order by p.is_ai, p.salary_cents_per_hour desc, p.posted_at desc, p.id)
-        from public.job_postings p
-       where p.status = 'open' and (p.expires_at is null or p.expires_at > now())), '[]'::jsonb),
-    'next_refresh_at', (public.current_game_quarter()).ends_at,
-    'has_clone', v_clone);
-end;
-$function$
-;
-
-create or replace function public.company_full_time_check(p_company uuid)
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  pc    public.player_companies;
-  j     public.player_jobs;
-begin
-  select * into pc from public.player_companies where company_id = p_company and status = 'active';
-  if pc.company_id is null
-     or public.company_headcount(p_company) < public.config_double('startups', '{fullTimeFromEmployees}', 5) then
-    return false;
-  end if;
-  select * into j from public.player_jobs
-   where player_id = pc.founder_id and status = 'active' and not is_clone and notice_ends_at is null for update;
-  if j.id is null then
-    return false;
-  end if;
-  update public.player_jobs
-     set notice_ends_at = now() + make_interval(secs => public.config_double('jobs', '{quitNoticeHours}', 24) * 3600)
-   where id = j.id;
-  perform public.company_system_message(p_company,
-    'Ab ' || public.config_double('startups', '{fullTimeFromEmployees}', 5)::integer || ' Mitarbeitern arbeitet '
-    || (select pr.nickname from public.profiles pr where pr.id = pc.founder_id) || ' Vollzeit in der Firma.');
-  return true;
-end;
-$function$
-;
-
-create or replace function public.player_company_team(p_company uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  pc       public.player_companies;
-  v_sector text;
-  v_list   jsonb;
-  v_req    jsonb;
-  v_fs     jsonb;
-  v_found  integer;
-  v_prod   bigint;
-  v_score  integer;
-  v_emp    integer := 0;
-  v_s      jsonb;
-  r        record;
-begin
-  select * into pc from public.player_companies where company_id = p_company;
-  if pc.company_id is null then
-    return null;
-  end if;
-  select c.sector_key into v_sector from public.companies c where c.id = p_company;
-  v_list := coalesce(public.config_jsonb('jobs', array['sectorBranches', v_sector]), '[]'::jsonb);
-  select coalesce(jsonb_agg(jsonb_build_object('branch', b, 'min_score', 0) order by o), '[]'::jsonb) into v_req
-    from jsonb_array_elements_text(v_list) with ordinality x(b, o) where o <= 2;
-  v_fs := public.player_branch_scores(pc.founder_id);
-  v_found := public.job_productivity_bps(public.job_match_score(v_fs, v_req));
-  -- founderFactor: half productivity while the founder works elsewhere (ADR-066)
-  if exists (select 1 from public.player_jobs x where x.player_id = pc.founder_id and x.status = 'active' and not x.is_clone and x.company_id <> p_company) then
-    v_found := round(v_found * public.config_double('startups', '{sideJobFounderFactor}', 0.5))::integer;
-  end if;
-  select coalesce(sum(coalesce((v_fs ->> b)::integer, 0)), 0) into v_score from jsonb_array_elements_text(v_list) b;
-  v_prod := v_found;
-  for r in select j.player_id, j.required from public.player_jobs j where j.company_id = p_company and j.status = 'active' loop
-    v_s := public.player_branch_scores(r.player_id);
-    v_prod := v_prod + public.job_productivity_bps(public.job_match_score(v_s, r.required));
-    v_score := v_score + (select coalesce(sum(coalesce((v_s ->> b)::integer, 0)), 0) from jsonb_array_elements_text(v_list) b);
-    v_emp := v_emp + 1;
-  end loop;
-  v_prod := v_prod + pc.ai_workers * 10000;
-  return jsonb_build_object(
-    'founder_productivity_bps', v_found,
-    'team_productivity_bps', v_prod,
-    'employees', v_emp,
-    'team_sector_score', v_score,
-    'stage', public.company_stage(p_company),
-    'capacity_cents', round(v_prod / 10000.0
-                            * public.config_double('startups', array['capacityCentsPerProductivity', v_sector], 250000)
-                            * (1 + public.config_double('startups', '{stages,capacityBonusPerStage}', 0.25) * public.company_stage(p_company)))::bigint);
-end;
-$function$
-;
-
-create or replace function public.get_player_card(p_nickname text)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  p      public.profiles;
-  v_job  jsonb;
-  v_cjob jsonb;
-  v_pod  integer := least(3, greatest(0, public.config_double('social', '{league,podium}', 3)::integer));
-begin
-  perform public.require_player();
-  select * into p from public.profiles x where x.id = public.player_by_handle(p_nickname);
-  if p.id is null then
-    perform public.api_error('player_not_found');
-  end if;
-  select jsonb_build_object('company_name', c.name, 'title_key', j.title_key, 'title', case when j.title_key is null then j.title end,
-                            'tier', j.tier, 'since', j.started_at)
-    into v_job
-    from public.player_jobs j join public.companies c on c.id = j.company_id
-   where j.player_id = p.id and j.status = 'active' and not j.is_clone;
-  -- ADR-206: the clone's job, shown as "Klon von ..."
-  select jsonb_build_object('company_name', c.name, 'title_key', j.title_key, 'title', case when j.title_key is null then j.title end,
-                            'tier', j.tier, 'since', j.started_at)
-    into v_cjob
-    from public.player_jobs j join public.companies c on c.id = j.company_id
-   where j.player_id = p.id and j.status = 'active' and j.is_clone;
-  return jsonb_build_object(
-    'nickname',        p.nickname,
-    'tag',             p.tag,
-    'avatar_key',      p.avatar_key,
-    'level',           p.level,
-    'rank',            public.player_rich_rank(p.id),
-    'net_worth_cents', public.player_net_worth_cents(p.id),
-    'streak_days',     public.player_streak_days(p.id),
-    'skills_learned',  (select count(*) from public.player_skills s where s.player_id = p.id)::integer,
-    'branch_scores',   public.player_branch_scores(p.id),
-    'top_skills',      coalesce((select jsonb_agg(jsonb_build_object('key', x.skill_key, 'tier', x.tier) order by x.tier desc, x.learned_at)
-                                   from (select s.skill_key, s.learned_at, (public.skill_node(s.skill_key) ->> 'tier')::integer as tier
-                                           from public.player_skills s where s.player_id = p.id
-                                          order by 3 desc nulls last, s.learned_at limit 3) x), '[]'::jsonb),
-    'job',             v_job,
-    'clone_job',       v_cjob,
-    'company',         (select jsonb_build_object('name', c.name, 'ticker', c.ticker)
-                          from public.player_companies pc join public.companies c on c.id = pc.company_id
-                         where pc.founder_id = p.id and pc.status = 'active'),
-    'trophies',        (select jsonb_build_object('gold',   count(*) filter (where e.rank = 1),
-                                                  'silver', count(*) filter (where e.rank = 2),
-                                                  'bronze', count(*) filter (where e.rank = 3))
-                          from public.league_entries e join public.league_seasons ls on ls.id = e.season_id
-                         where e.player_id = p.id and ls.status = 'finished' and e.rank between 1 and v_pod),
-    'member_since',    p.created_at,
-    'accessories',     public.player_worn_accessories(p.id),
-    'trust',           public.player_trust(p.id));
-end;
-$function$
-;
-
-create or replace function public.chat_company_of(p_player uuid)
- RETURNS uuid
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select coalesce(
-    (select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'),
-    (select j.company_id from public.player_jobs j
-       join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
-      where j.player_id = p_player and j.status = 'active' order by j.is_clone limit 1));
-$function$
-;
-
-create or replace function public.company_event_company_for(p_player uuid, p_company uuid)
- RETURNS uuid
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select case
-    when p_company is null then coalesce(
-      (select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'),
-      (select j.company_id from public.player_jobs j
-         join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
-        where j.player_id = p_player and j.status = 'active' order by j.is_clone, j.started_at desc limit 1))
-    else (select pc.company_id from public.player_companies pc
-           where pc.company_id = p_company and pc.status = 'active'
-             and (pc.founder_id = p_player
-                  or exists (select 1 from public.player_jobs j
-                              where j.company_id = p_company and j.player_id = p_player and j.status = 'active')))
-  end;
-$function$
-;
-
-create or replace function public.company_task_member(p_player uuid)
- RETURNS TABLE(company_id uuid, is_founder boolean, tier text, job_id uuid)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select pc.company_id, true, 'c_level'::text, null::uuid
-    from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'
-  union all
-  select j.company_id, false, j.tier::text, j.id
-    from public.player_jobs j
-    join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
-   where j.player_id = p_player and j.status = 'active' and not j.is_clone
-  limit 1;
-$function$
-;
-
-create or replace function public.get_company_floor()
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  v_player  uuid := public.require_player();
-  v_company uuid := public.chat_company_of(v_player);
-  v_max     integer := greatest(2, coalesce(public.config_double('startups', '{chat,floorMaxMembers}', 24), 24)::integer);
-  v_secs    integer := coalesce(public.config_double('startups', '{chat,bubbleSeconds}', 120), 120)::integer;
-  v_ai      boolean := false;
-  v_online  interval := make_interval(mins => coalesce(public.config_double('social', '{onlineMinutes}', 10), 10)::integer);
-  c         public.companies;
-  v_members jsonb;
-  v_workers integer := 0;
-begin
-  if v_company is null then
-    select j.company_id into v_company
-      from public.player_jobs j join public.companies co on co.id = j.company_id and co.is_ai
-     where j.player_id = v_player and j.status = 'active'
-     order by j.is_clone
-     limit 1;
-    v_ai := v_company is not null;
-  end if;
-  if v_company is null then
-    return jsonb_build_object('company', null, 'chat', false, 'ai_workers', 0, 'bubble_seconds', v_secs,
-                              'members', '[]'::jsonb);
-  end if;
-  select * into c from public.companies where id = v_company;
-
-  if v_ai then
-    select coalesce(jsonb_agg(public.company_floor_member_json(x.player_id, v_player, 'employee', x.title, v_company, false)
-                              order by x.ord), '[]'::jsonb)
-      into v_members
-      from (select j.player_id, j.title,
-                   row_number() over (order by (j.player_id = v_player) desc,
-                                               coalesce(p.last_active_at > public.game_now() - v_online, false) desc,
-                                               p.last_active_at desc nulls last, lower(p.nickname), j.player_id) as ord
-              from public.player_jobs j join public.profiles p on p.id = j.player_id
-             where j.company_id = v_company and j.status = 'active' and not p.is_deactivated) x
-     where x.ord <= v_max;
-  else
-    select coalesce(pc.ai_workers, 0) into v_workers from public.player_companies pc where pc.company_id = v_company;
-    select coalesce(jsonb_agg(public.company_floor_member_json(x.player_id, v_player, x.role, x.title, v_company, true)
-                              order by x.ord, x.nick, x.player_id), '[]'::jsonb)
-      into v_members
-      from (select pc.founder_id as player_id, 'founder' as role, null::text as title, 0 as ord, ''::text as nick
-              from public.player_companies pc
-             where pc.company_id = v_company and pc.status = 'active' and pc.founder_id is not null
-            union all
-            select j.player_id, 'employee', j.title, 1, lower(p.nickname)
-              from public.player_jobs j join public.profiles p on p.id = j.player_id
-             where j.company_id = v_company and j.status = 'active' and not p.is_deactivated) x;
-  end if;
-
-  return jsonb_build_object(
-    'company', jsonb_build_object('name', c.name, 'color', c.brand_color, 'kind', case when v_ai then 'ai' else 'player' end,
-                                  'logo', case when v_ai then null else public.company_logo(c.id) end),
-    'chat', not v_ai,
-    'ai_workers', v_workers,
-    'bubble_seconds', v_secs,
-    'members', v_members);
-end;
-$function$
-;
-
-create or replace function public.application_json(p_application_id uuid)
- RETURNS jsonb
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-  select jsonb_build_object(
-           'id', a.id,
-           'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end,
-           'posting', public.posting_json(a.posting_id),
-           'salary_wish_cents_per_hour', a.salary_wish_cents_per_hour,
-           'offer_salary_cents_per_hour', a.offer_salary_cents_per_hour,
-           'offer_expires_at', a.offer_expires_at,
-           'message', a.message,
-           'created_at', a.created_at,
-           'updated_at', a.updated_at,
-           'for_clone', a.for_clone)
-    from public.job_applications a where a.id = p_application_id;
-$function$
-;
-
-create or replace function public.promotion_apply(p_job_id uuid, p_salary bigint)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-declare
-  j       public.player_jobs;
-  c       public.companies;
-  v_next  text;
-  v_main  text;
-  v_req   jsonb;
-  v_ai    boolean;
-  v_match integer;
-begin
-  select * into j from public.player_jobs where id = p_job_id and status = 'active' for update;
-  v_next := public.career_next_tier(j.tier::text);
-  if j.id is null or v_next is null then
-    perform public.api_error('promotion_not_ready');
-  end if;
-  if p_salary is null or p_salary < 1 then
-    perform public.api_error('invalid_argument');
-  end if;
-  select * into c from public.companies where id = j.company_id;
-  v_ai := coalesce(c.is_ai, false);
-  v_main := j.required -> 0 ->> 'branch';
-  v_req := case when v_ai and v_main is not null then public.ai_job_required(v_main, v_next) else j.required end;
-  v_match := public.job_match_score(public.player_branch_scores(j.player_id), v_req);
-  update public.player_jobs
-     set tier = v_next::public.job_tier,
-         salary_cents_per_hour = p_salary,
-         rank_minutes = 0,
-         promoted_at = now(),
-         pending_promotion_at = null,
-         promotion_retry_at = null,
-         raise_base_score = v_match,
-         pending_raise_bps = null,
-         pending_raise_at = null,
-         required = v_req,
-         title_key = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
-                          else title_key end,
-         title = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
-                      else title end,
-         ceiling_cents_per_hour = case when v_ai
-                                       then public.job_pay_ceiling(j.player_id, coalesce((public.career_tier(v_next) ->> 'salaryCentsPerHour')::bigint,
-                                                                              p_salary), v_req)
-                                       else ceiling_cents_per_hour end
-   where id = j.id;
-  perform public.feed_post(j.player_id, 'promoted', jsonb_build_object('tier', v_next, 'company', c.name),
-                           'promoted:' || j.id::text || ':' || v_next);
-  perform public.social_notify(j.player_id, 'promotion_result', 'Befördert!',
-    'Beförderung ' || public.career_tier_phrase(v_next) || ' bei ' || c.name || '. Neuer Lohn: '
-      || public.format_eur(p_salary) || ' pro Stunde.',
-    jsonb_build_object('status', 'promoted', 'player_job_id', j.id, 'company', c.name, 'tier', v_next,
-                       'salary_cents_per_hour', p_salary),
-    '/job', 'promotion_result:' || j.id::text || ':' || v_next);
-  return jsonb_build_object('tier', v_next, 'salary_cents_per_hour', p_salary);
-end;
-$function$
-;
-
-create or replace function public.get_company_team(p_company_id uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-begin
-  perform public.require_company_owner(p_company_id);
-  return jsonb_build_object('members', coalesce((
-    select jsonb_agg(jsonb_build_object(
-             'player_job_id', j.id, 'nickname', pr.nickname, 'is_clone', j.is_clone, 'avatar_key', pr.avatar_key,
-             'title', coalesce(j.title, j.title_key), 'salary_cents_per_hour', j.salary_cents_per_hour,
-             'productivity_bps', public.job_productivity_bps(public.job_match_score(public.player_branch_scores(pr.id), j.required)),
-             'started_at', j.started_at,
-             'notice_ends_at', j.notice_ends_at,
-             'skills', coalesce((select jsonb_agg(s.skill_key order by s.skill_key) from public.player_skills s
-                                  where s.player_id = pr.id), '[]'::jsonb),
-             'pending_raise', case when j.pending_raise_bps is not null
-                                   then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
-             'tier', j.tier,
-             'rank_hours', round(j.rank_minutes / 60.0, 1),
-             'promotion', (select jsonb_build_object('next_tier', ps -> 'next_tier', 'requirements', ps -> 'requirements',
-                                                     'ready', ps -> 'ready', 'pending_since', ps -> 'pending_since',
-                                                     'next_salary_cents_per_hour', ps -> 'next_salary_cents_per_hour')
-                             from (select public.promotion_state(j.id) as ps) x))
-             order by j.started_at, j.id)
-      from public.player_jobs j join public.profiles pr on pr.id = j.player_id
-     where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb));
-end;
-$function$
-;
-
--- ===== supabase/updates/20261204009900_nexamon_titans_rebalance.sql =====
--- ===== idempotent copy of migrations/20261204009900_nexamon_titans_rebalance.sql =====
--- (the migration itself is written idempotently; keep both files identical below this line)
+-- Builds on 10000 (company_locations, country_cfg, company_country, country_market_leader).
+--   * Headquarters: placed from world.unlockWorthCents (company_worth_cents), tier 1 costs hqTiers[0].costCents from
+--     the company cash to the treasury; upgrades to tiers 2..5 (exponential prices) give seats (company_max_employees),
+--     a prestige demand term, and once per tier reputation (company_reputation_bump), awareness
+--     (company_awareness_add) and satisfaction of a listed team. Relocation: a share of the money invested, cooldown.
+--   * Subsidiaries (company_subsidiaries): from subsidiaries.unlockWorthCents or HQ tier >= unlockHqTier, at most
+--     subsidiaries.max, never in the HQ country; growing setup price; running costs × rampUpCostMultiplier at the
+--     start, falling to × 1 over rampUpHours; a share of the revenue at the country's terms (diminishing per
+--     subsidiary) and the demand of a new market.
+--   * Image campaigns (company_country_image): a bonus on the country's image baseline, capped, fading by the day.
+--   * Lobby (country_lobby): the market leader of a country (country_market_leader) sets a Standortgebühr of at most
+--     lobby.maxFeeBps of the hourly own revenue of every other active player company with its HQ there; paid in the
+--     hourly close from the free cash only (never a bill), company cash to company cash. The fee lapses when the
+--     leadership changes. AI companies only appear on the map (deterministic country, never in a table, never fees).
+--   * The hourly close: listed_hour_effect (latest full definition from 8300) multiplies world_hour_effect into
+--     demand, goods and fixed costs; listed_hour_costs (latest full definition from 5400) books world_hour_costs
+--     (subsidiaries and the fee) first, for every player company. player_company_close_hour stays untouched.
+--   * world_tax_rate_bps(company): blended tax rate of HQ and subsidiaries, minus the lobby discount (for ADR-209).
+-- RPCs: get_world, world_place_hq, world_upgrade_hq, world_relocate_hq, world_save_hq_style, world_open_subsidiary,
+-- world_close_subsidiary, world_image_campaign, world_set_location_fee. Idempotent.
 -- =============================================================================
--- NEXA · 9900 · Nexamon: Titans Revenge diamond x 1.3, uranium x 0.918828, the pack's value unchanged (ADR-207)
--- =============================================================================
--- The start prices come from game_config.nexamon_cards (TITAN_REBALANCE_FACTOR in src/config/nexamon/titans-draft.ts).
--- nexamon_sync() moves the start price of every card to the new catalogue, but the market value only of cards that
--- never moved. So an existing database gets one relative push here, like the Prismatic Peak scaling (migration 5500):
--- * nexamon_scale_card_values(set, rarity, num, den): start price, market value, the day's reference and the value
---   history (nexamon_value_points) of every card of that set and rarity x num / den (half-even), and the AI sellers'
---   asking prices after it (nexamon_ai_ask_cents of the copy's value). Copies and slabs have no value of their own
---   (card value x condition or grade factor), they follow at once. Players' own listings keep the price their owner
---   chose. Past sales (nexamon_sales) stay as they were.
--- * Titans Revenge diamond x 13/10, uranium x 918828/1000000: the market drift of every card stays (relative), the
---   ratios inside a rarity too. At catalogue values the pack keeps its expected value (89.901 EUR, +0,4 ct).
--- * Then the catalogue hash is cleared: the next nexamon_sync() puts the start prices (and the values of cards that
---   never moved) exactly on the new catalogue, whichever ran first. Values of moved cards only change here.
--- * Runs once (public.data_migrations 'nexamon_titans_rebalance_207'), however often the update script is executed.
--- Idempotent: runs unchanged as supabase/updates/20261204009900_nexamon_titans_rebalance.sql.
 
-create or replace function public.nexamon_scale_card_values(p_set text, p_rarity text, p_num bigint, p_den bigint)
-returns integer
-language plpgsql
+-- ---------------------------------------------------------------------------
+-- A. Notification type and tables
+-- ---------------------------------------------------------------------------
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('world_location', 'company', 'Standort', 'Standortgebühren und Neuigkeiten aus dem Land deiner Firmenzentrale.',
+        'notif_company', true, false, false, 215)
+on conflict (key) do nothing;
+
+alter table public.company_locations add column if not exists fees_paid_cents bigint not null default 0;
+alter table public.company_locations add column if not exists fees_received_cents bigint not null default 0;
+
+create table if not exists public.company_subsidiaries (
+  company_id       uuid not null references public.companies(id) on delete cascade,
+  country_key      text not null,
+  opened_at        timestamptz not null default now(),
+  setup_cost_cents bigint not null default 0 check (setup_cost_cents >= 0),
+  primary key (company_id, country_key)
+);
+comment on table public.company_subsidiaries is
+  'Tochterfirmen of a player company (ADR-208): one per country, never in the HQ country. Readable by everyone (map).';
+alter table public.company_subsidiaries enable row level security;
+drop policy if exists company_subsidiaries_read on public.company_subsidiaries;
+create policy company_subsidiaries_read on public.company_subsidiaries for select to authenticated using (true);
+revoke insert, update, delete on public.company_subsidiaries from anon, authenticated;
+
+create table if not exists public.company_country_image (
+  company_id       uuid not null references public.companies(id) on delete cascade,
+  country_key      text not null,
+  bonus_bps        integer not null default 0 check (bonus_bps >= 0),
+  bonus_at         timestamptz not null default now(),
+  last_campaign_at timestamptz,
+  spent_cents      bigint not null default 0 check (spent_cents >= 0),
+  primary key (company_id, country_key)
+);
+comment on table public.company_country_image is
+  'Image bonus of a company in a country from Image-Kampagnen (ADR-208); bonus_bps as of bonus_at, fades by the day.';
+alter table public.company_country_image enable row level security;
+drop policy if exists company_country_image_own on public.company_country_image;
+create policy company_country_image_own on public.company_country_image for select to authenticated
+  using (exists (select 1 from public.companies c
+                  where c.id = company_country_image.company_id and (select auth.uid()) in (c.founder_id, c.ceo_id)));
+revoke insert, update, delete on public.company_country_image from anon, authenticated;
+
+create table if not exists public.country_lobby (
+  country_key       text primary key,
+  leader_company_id uuid references public.companies(id) on delete set null,
+  fee_bps           integer not null default 0 check (fee_bps >= 0 and fee_bps <= 10000),
+  fee_set_at        timestamptz,
+  collected_cents   bigint not null default 0,
+  updated_at        timestamptz not null default now()
+);
+comment on table public.country_lobby is
+  'Standortgebühr of a country (ADR-208): set by the market leader; it only applies while that company still leads.';
+create index if not exists country_lobby_leader_idx on public.country_lobby (leader_company_id);
+alter table public.country_lobby enable row level security;
+drop policy if exists country_lobby_read on public.country_lobby;
+create policy country_lobby_read on public.country_lobby for select to authenticated using (true);
+revoke insert, update, delete on public.country_lobby from anon, authenticated;
+drop trigger if exists set_updated_at on public.country_lobby;
+create trigger set_updated_at before update on public.country_lobby
+  for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- B. Pure-ish helpers (mirrors of src/lib/sim/world.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.world_hq_tier_cfg(p_tier integer)
+returns jsonb
+language sql
+stable
 security definer
 set search_path = ''
 as $$
-declare
-  v_n integer;
-begin
-  if p_num is null or p_den is null or p_num <= 0 or p_den <= 0 then
-    raise exception 'nexamon_scale_card_values: factor must be positive' using errcode = '22023';
-  end if;
-  update public.nexamon_cards k
-     set start_e4   = greatest(1, public.div_round_half_even(k.start_e4::numeric * p_num, p_den)),
-         value_e4   = greatest(1, public.div_round_half_even(k.value_e4::numeric * p_num, p_den)),
-         day_ref_e4 = greatest(1, public.div_round_half_even(k.day_ref_e4::numeric * p_num, p_den)),
-         updated_at = now()
-   where k.set_key = p_set and k.rarity = p_rarity;
-  get diagnostics v_n = row_count;
-
-  update public.nexamon_value_points p
-     set value_e4 = greatest(1, public.div_round_half_even(p.value_e4::numeric * p_num, p_den))
-    from public.nexamon_cards k
-   where k.card_key = p.card_key and k.set_key = p_set and k.rarity = p_rarity;
-
-  update public.nexamon_listings l
-     set price_cents = public.nexamon_ai_ask_cents(
-           public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade::double precision, k.card_key))
-    from public.nexamon_copies c, public.nexamon_cards k
-   where l.seller_ai is not null and c.id = l.copy_id and k.card_key = l.card_key
-     and k.set_key = p_set and k.rarity = p_rarity;
-  return v_n;
-end;
-$$;
-revoke all on function public.nexamon_scale_card_values(text, text, bigint, bigint) from public, anon, authenticated;
-comment on function public.nexamon_scale_card_values(text, text, bigint, bigint) is
-  'Rebalance (ADR-207): start price, market value, day reference and value history of every card of a set and rarity '
-  'x num / den (half-even); AI listings re-priced, player listings untouched. Returns the cards scaled. Internal.';
-
-do $$
-begin
-  if exists (select 1 from public.data_migrations where key = 'nexamon_titans_rebalance_207') then
-    return;
-  end if;
-  perform public.nexamon_scale_card_values('titans_revenge', 'diamond', 13, 10);
-  perform public.nexamon_scale_card_values('titans_revenge', 'uranium', 918828, 1000000);
-  update public.nexamon_meta set catalogue_hash = null;
-  insert into public.data_migrations (key) values ('nexamon_titans_rebalance_207') on conflict do nothing;
-end
+  select x.t from jsonb_array_elements(coalesce(public.config_jsonb('world', '{hqTiers}'), '[]'::jsonb)) x(t)
+   where (x.t ->> 'tier')::integer = p_tier limit 1;
 $$;
 
--- ===== supabase/updates/20261204010200_talents_after_clone.sql =====
--- ===== idempotent copy of migrations/20261204010200_talents_after_clone.sql =====
--- (the migration itself is written idempotently; keep both files identical below this line)
--- =============================================================================
--- NEXA · 10200 · Talente im Organigramm, nach Klon und Jobs (ADR-199, ADR-206)
--- =============================================================================
--- Talents lead their Stelle and stand above the AI workers in the hierarchy. get_company_org (full copy of the latest
--- definition from 20261204000100_company_tasks.sql, unchanged otherwise) now also returns the talents of the company:
--- Mit-Geschäftsführer first, then by tier (Legende first), then by Stelle. Runs after the clone/jobs migrations
--- (9800/9810); none of the team or job functions they rewrote carry talent logic, so nothing else is re-applied.
--- Idempotent (create or replace).
+-- countryFactors: demand, goods, fixed and tax of one country for a company with this image bonus
+create or replace function public.world_country_factors(p_country jsonb, p_bonus_bps double precision)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_country is null then null else jsonb_build_object(
+    'demand', (p_country ->> 'demandPotentialBps')::double precision / 10000.0
+              * (1 + ((p_country ->> 'imageBps')::double precision + greatest(0, coalesce(p_bonus_bps, 0)) - 10000)
+                     * public.cfg_num(public.world_cfg(), '{effects,imageDemandWeightBps}', 5000) / 100000000.0),
+    'cogs', (p_country ->> 'productionCostBps')::double precision / 10000.0,
+    'fixed', (p_country ->> 'labourCostBps')::double precision / 10000.0,
+    'tax', (p_country ->> 'taxRateBps')::double precision) end;
+$$;
 
-create or replace function public.get_company_org(p_company_id uuid)
+create or replace function public.world_ramp(p_hours double precision)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when public.cfg_num(public.world_cfg(), '{subsidiaries,rampUpHours}', 336) <= 0 then 1.0
+              else least(1.0, greatest(0.0, coalesce(p_hours, 0)) / public.cfg_num(public.world_cfg(), '{subsidiaries,rampUpHours}', 336)) end;
+$$;
+
+create or replace function public.world_subsidiary_hourly_cost(p_hours double precision)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(public.cfg_num(public.world_cfg(), '{subsidiaries,hourlyCostCents}', 60000)
+               * (public.cfg_num(public.world_cfg(), '{subsidiaries,rampUpCostMultiplier}', 3)
+                  - (public.cfg_num(public.world_cfg(), '{subsidiaries,rampUpCostMultiplier}', 3) - 1) * public.world_ramp(p_hours)))::bigint;
+$$;
+
+create or replace function public.world_subsidiary_setup_cost(p_n integer)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select floor(public.cfg_num(public.world_cfg(), '{subsidiaries,setupCostCents}', 300000000)
+               * power(public.cfg_num(public.world_cfg(), '{subsidiaries,setupGrowthBps}', 16000) / 10000.0, greatest(0, p_n - 1)))::bigint;
+$$;
+
+-- the image bonus of a company in a country at a time (fades by decayPerDayBps a day)
+create or replace function public.world_image_bonus_bps(p_company uuid, p_country text, p_at timestamptz)
+returns double precision
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select round(greatest(0, i.bonus_bps - public.cfg_num(public.world_cfg(), '{imageCampaign,decayPerDayBps}', 100)
+                                  * greatest(0, extract(epoch from (p_at - i.bonus_at)) / 86400.0)))
+                     from public.company_country_image i where i.company_id = p_company and i.country_key = p_country), 0);
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. The terms of the hour (worldHourEffect)
+-- ---------------------------------------------------------------------------
+create or replace function public.world_hour_effect(p_company uuid, p_hour_start timestamptz)
 returns jsonb
 language plpgsql
 stable
@@ -1090,41 +184,938 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_player uuid := public.require_player();
-  pc       public.player_companies;
-  c        public.companies;
+  cfg      jsonb := public.world_cfg();
+  l        public.company_locations;
+  v_home   jsonb;
+  v_f      jsonb;
+  v_dim    double precision := public.cfg_num(cfg, '{subsidiaries,diminishingBps}', 6000) / 10000.0;
+  v_share0 double precision := public.cfg_num(cfg, '{subsidiaries,revenueShareBps}', 1500) / 10000.0;
+  v_bonus0 double precision := public.cfg_num(cfg, '{subsidiaries,demandBonusBps}', 500) / 10000.0;
+  v_max    integer := public.cfg_num(cfg, '{subsidiaries,max}', 4)::integer;
+  v_min    double precision := public.cfg_num(cfg, '{effects,minFactorBps}', 6000) / 10000.0;
+  v_maxf   double precision := public.cfg_num(cfg, '{effects,maxFactorBps}', 16000) / 10000.0;
+  v_total  double precision := 0;
+  v_market double precision := 0;
+  v_d      double precision := 0;
+  v_c      double precision := 0;
+  v_x      double precision := 0;
+  v_t      double precision := 0;
+  v_s      double precision;
+  v_r      double precision;
+  v_i      integer := 0;
+  v_tier   double precision;
+  v_lead   boolean;
+  v_tax    integer;
+  s        record;
 begin
-  select * into pc from public.player_companies where company_id = p_company_id and status = 'active';
+  select * into l from public.company_locations where company_id = p_company;
+  v_home := public.world_country_factors(public.country_cfg(l.country_key),
+                                         public.world_image_bonus_bps(p_company, l.country_key, p_hour_start));
+  if l.company_id is null or v_home is null then
+    return jsonb_build_object('demand_factor', 1, 'cogs_factor', 1, 'fixed_factor', 1, 'tax_rate_bps', null,
+                              'subsidiary_share', 0, 'placed', false);
+  end if;
+  for s in select x.country_key, x.opened_at from public.company_subsidiaries x
+            where x.company_id = p_company order by x.opened_at, x.country_key limit v_max loop
+    v_f := public.world_country_factors(public.country_cfg(s.country_key),
+                                        public.world_image_bonus_bps(p_company, s.country_key, p_hour_start));
+    continue when v_f is null;
+    v_r := public.world_ramp(extract(epoch from (p_hour_start - s.opened_at)) / 3600.0);
+    v_s := v_share0 * power(v_dim, v_i) * v_r;
+    v_market := v_market + v_bonus0 * power(v_dim, v_i) * v_r;
+    v_total := v_total + v_s;
+    v_d := v_d + v_s * (v_f ->> 'demand')::double precision;
+    v_c := v_c + v_s * (v_f ->> 'cogs')::double precision;
+    v_x := v_x + v_s * (v_f ->> 'fixed')::double precision;
+    v_t := v_t + v_s * (v_f ->> 'tax')::double precision;
+    v_i := v_i + 1;
+  end loop;
+  if v_total > 0.9 then  -- never reached with the shipped values; keeps the blend a blend
+    v_d := v_d * 0.9 / v_total; v_c := v_c * 0.9 / v_total; v_x := v_x * 0.9 / v_total; v_t := v_t * 0.9 / v_total;
+    v_total := 0.9;
+  end if;
+  v_d := (1 - v_total) * (v_home ->> 'demand')::double precision + v_d;
+  v_c := (1 - v_total) * (v_home ->> 'cogs')::double precision + v_c;
+  v_x := (1 - v_total) * (v_home ->> 'fixed')::double precision + v_x;
+  v_t := (1 - v_total) * (v_home ->> 'tax')::double precision + v_t;
+  v_tier := coalesce((public.world_hq_tier_cfg(l.hq_tier) ->> 'demandBps')::double precision, 0) / 10000.0;
+  v_lead := public.company_is_market_leader(p_company);
+  v_tax := round(v_t)::integer;
+  if v_lead then
+    v_tax := round(v_tax * (10000 - public.cfg_num(cfg, '{lobby,taxDiscountBps}', 1000)) / 10000.0)::integer;
+  end if;
+  return jsonb_build_object(
+    'placed', true, 'country', l.country_key, 'hq_tier', l.hq_tier, 'leader', v_lead,
+    'demand_factor', least(v_maxf, greatest(v_min, v_d * (1 + v_tier) * (1 + v_market))),
+    'cogs_factor', least(v_maxf, greatest(v_min, v_c)),
+    'fixed_factor', least(v_maxf, greatest(v_min, v_x)),
+    'tax_rate_bps', v_tax,
+    'subsidiary_share', v_total);
+end;
+$$;
+comment on function public.world_hour_effect(uuid, timestamptz) is
+  'Country terms of the hour (ADR-208, src/lib/sim/world.ts worldHourEffect): demand, goods and fixed-cost factors of '
+  'HQ country and subsidiaries, the blended tax rate; neutral when not placed.';
+
+create or replace function public.world_tax_rate_bps(p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (public.world_hour_effect(p_company, public.game_now()) ->> 'tax_rate_bps')::integer;
+$$;
+comment on function public.world_tax_rate_bps(uuid) is
+  'Tax rate of a placed company (ADR-208): blended over HQ and subsidiaries, minus the lobby discount of a market '
+  'leader. Null when not placed. Contract with ADR-209.';
+
+-- ---------------------------------------------------------------------------
+-- D. Costs of the hour: subsidiaries and the Standortgebühr (from the free cash only)
+-- ---------------------------------------------------------------------------
+create or replace function public.world_hour_costs(p_company uuid, p_hour_start timestamptz, p_key text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l       public.company_locations;
+  pc      public.player_companies;
+  lb      public.country_lobby;
+  v_acc   uuid;
+  v_left  bigint;
+  v_subs  bigint := 0;
+  v_pay   bigint;
+  v_rev   bigint;
+  v_fee   bigint := 0;
+  v_lead  uuid;
+  v_name  text;
+  s       record;
+begin
+  select * into l from public.company_locations where company_id = p_company for update;
+  if l.company_id is null then
+    return 0;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company;
+  v_acc := public.company_cash_account(p_company);
+  select greatest(0, a.balance_cents) into v_left from public.ledger_accounts a where a.id = v_acc;
+  v_left := coalesce(v_left, 0);
+  -- subsidiaries: what the cash allows, never a bill
+  for s in select x.opened_at from public.company_subsidiaries x where x.company_id = p_company loop
+    v_subs := v_subs + public.world_subsidiary_hourly_cost(extract(epoch from (p_hour_start - s.opened_at)) / 3600.0);
+  end loop;
+  v_pay := least(v_subs, v_left);
+  if v_pay > 0 then
+    perform public.ledger_transfer(v_acc, public.ledger_system_account('households'), v_pay, 'company_costs',
+                                   'Tochterfirmen: laufende Kosten', 'company', p_company, p_key || ':world:subs',
+                                   pc.founder_id, jsonb_build_object('cat', 'world'));
+    v_left := v_left - v_pay;
+  end if;
+  -- Standortgebühr: the leader of the HQ country (another company, still leading) takes its share of the own revenue
+  v_lead := public.country_market_leader(l.country_key);
+  select * into lb from public.country_lobby where country_key = l.country_key;
+  if v_lead is not null and v_lead <> p_company and lb.leader_company_id = v_lead and lb.fee_bps > 0 then
+    select coalesce(sum(e.amount_cents), 0) into v_rev
+      from public.ledger_transactions t join public.ledger_entries e on e.transaction_id = t.id and e.account_id = v_acc
+     where t.idempotency_key = p_key || ':revenue';
+    v_fee := least(floor(greatest(0, v_rev) * least(lb.fee_bps, public.cfg_num(public.world_cfg(), '{lobby,maxFeeBps}', 300)) / 10000.0)::bigint,
+                   v_left);
+    if v_fee > 0 then
+      v_name := coalesce(public.country_cfg(l.country_key) ->> 'name', l.country_key);
+      perform public.ledger_transfer(v_acc, public.company_cash_account(v_lead), v_fee, 'company_costs',
+                                     'Standortgebühr ' || v_name, 'company', p_company, p_key || ':world:fee',
+                                     pc.founder_id, jsonb_build_object('cat', 'world', 'leader', v_lead));
+      update public.company_locations set fees_paid_cents = fees_paid_cents + v_fee where company_id = p_company;
+      update public.company_locations set fees_received_cents = fees_received_cents + v_fee where company_id = v_lead;
+      update public.country_lobby set collected_cents = collected_cents + v_fee, updated_at = now()
+       where country_key = l.country_key;
+    end if;
+  end if;
+  return v_pay + v_fee;
+end;
+$$;
+comment on function public.world_hour_costs(uuid, timestamptz, text) is
+  'Hourly close (ADR-208): running costs of the subsidiaries and the Standortgebühr to the market leader, from the '
+  'free cash only; returns the sum (counted as fixed costs of the hour).';
+
+-- ---------------------------------------------------------------------------
+-- E. Hooks in the hourly close: full copies of the latest definitions plus the world terms
+-- ---------------------------------------------------------------------------
+-- listed_hour_effect: latest definition from 20261204008300_company_skills.sql, plus world_hour_effect
+create or replace function public.listed_hour_effect(p_company uuid, p_hour_start timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l    public.listed_companies;
+  v_df double precision := 1;
+  v_r  jsonb;
+  v_sk jsonb;
+  v_w  jsonb;
+begin
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    begin
+      v_df := public.company_reputation_demand_factor(
+                (select pc.reputation from public.player_companies pc where pc.company_id = p_company));
+    exception when others then
+      v_df := 1;
+    end;
+    v_r := jsonb_build_object('awareness_add', 0, 'quality_add', 0, 'demand_factor', coalesce(v_df, 1), 'capacity_factor', 1,
+                              'cogs_factor', 1, 'fixed_factor', 1, 'listed', false);
+  else
+    v_r := public.listed_hour_effect_calc(public.listed_effects(p_company), l.satisfaction, l.reputation)
+           || jsonb_build_object('listed', true);
+  end if;
+  -- ADR-194: Fertigkeiten; a failure never stops the close
+  begin
+    v_sk := public.company_skills_hour_effect(p_company, p_hour_start);
+    v_r := v_r || jsonb_build_object(
+      'demand_factor', (v_r ->> 'demand_factor')::double precision * (v_sk ->> 'demand_factor')::double precision,
+      'capacity_factor', (v_r ->> 'capacity_factor')::double precision * (v_sk ->> 'capacity_factor')::double precision,
+      'cogs_factor', (v_r ->> 'cogs_factor')::double precision * (v_sk ->> 'cogs_factor')::double precision,
+      'fixed_factor', (v_r ->> 'fixed_factor')::double precision * (v_sk ->> 'fixed_factor')::double precision,
+      'quality_add', (v_r ->> 'quality_add')::double precision + (v_sk ->> 'quality_add')::double precision,
+      'skills', v_sk);
+  exception when others then
+    null;
+  end;
+  -- ADR-208: Weltkarte (country of the HQ, subsidiaries, prestige); a failure never stops the close
+  begin
+    v_w := public.world_hour_effect(p_company, p_hour_start);
+    if coalesce((v_w ->> 'placed')::boolean, false) then
+      v_r := v_r || jsonb_build_object(
+        'demand_factor', (v_r ->> 'demand_factor')::double precision * (v_w ->> 'demand_factor')::double precision,
+        'cogs_factor', (v_r ->> 'cogs_factor')::double precision * (v_w ->> 'cogs_factor')::double precision,
+        'fixed_factor', (v_r ->> 'fixed_factor')::double precision * (v_w ->> 'fixed_factor')::double precision,
+        'world', v_w);
+    end if;
+  exception when others then
+    perform public.company_close_warn(p_company, 'world_effect', sqlerrm);
+  end;
+  return v_r;
+end;
+$$;
+revoke all on function public.listed_hour_effect(uuid, timestamptz) from public, anon, authenticated;
+
+-- listed_hour_costs: latest definition from 20261204005400_listed_companies.sql, plus world_hour_costs first (for every
+-- player company, listed or not)
+create or replace function public.listed_hour_costs(p_company uuid, p_hour_start timestamptz, p_key text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l        public.listed_companies;
+  pc       public.player_companies;
+  v_acc    uuid;
+  v_hh     uuid := public.ledger_system_account('households');
+  v_ref    bigint;
+  v_heads  integer;
+  v_left   bigint;
+  v_up     bigint;
+  v_cat    text;
+  v_sums   jsonb := '{}'::jsonb;
+  v_total  bigint := 0;
+  v_world  bigint := 0;
+  v_amount bigint;
+  r        record;
+begin
+  -- ADR-208: subsidiaries and the Standortgebühr; a failure never stops the close
+  begin
+    v_world := coalesce(public.world_hour_costs(p_company, p_hour_start, p_key), 0);
+  exception when others then
+    v_world := 0;
+    perform public.company_close_warn(p_company, 'world_costs', sqlerrm);
+  end;
+  l := public.listed_ensure(p_company);
+  if l.company_id is null then
+    return v_world;
+  end if;
+  select * into pc from public.player_companies where company_id = p_company;
+  v_acc := public.company_cash_account(p_company);
+  v_ref := public.listed_ref_revenue(p_company);
+  v_heads := public.company_headcount(p_company);
+  select greatest(0, a.balance_cents) into v_left from public.ledger_accounts a where a.id = v_acc;
+  for r in select ci.key, ci.kind, ci.level, ci.status from public.company_investments ci
+            where ci.company_id = p_company and ci.status in ('active', 'paused') and ci.level > 0 and ci.kind <> 'action'
+            order by array_position(array['product', 'region', 'machine', 'acquisition', 'licence', 'research', 'benefit'], ci.kind), ci.key loop
+    v_up := public.listed_item_upkeep(public.listed_item(r.key), r.level, v_ref, v_heads);
+    continue when public.listed_item(r.key) is null;
+    if v_up <= v_left then
+      v_left := v_left - v_up;
+      if v_up > 0 then
+        v_cat := public.listed_kind_category(r.kind);
+        v_sums := v_sums || jsonb_build_object(v_cat, coalesce((v_sums ->> v_cat)::bigint, 0) + v_up);
+      end if;
+      if r.status = 'paused' then
+        update public.company_investments set status = 'active' where company_id = p_company and key = r.key;
+      end if;
+    elsif r.status = 'active' then
+      update public.company_investments set status = 'paused' where company_id = p_company and key = r.key;
+    end if;
+  end loop;
+  -- the tax advisor leaves when the wage cannot be paid
+  if l.advisor then
+    v_up := public.listed_advisor_wage(v_ref);
+    if v_up <= v_left then
+      v_left := v_left - v_up;
+      v_sums := v_sums || jsonb_build_object('advisor', v_up);
+    else
+      update public.listed_companies set advisor = false where company_id = p_company;
+      perform public.social_notify(pc.founder_id, 'tax_office', 'Steuerberater hat gekündigt',
+        'Die Kasse reichte nicht für das Honorar. Du machst die Bücher wieder selbst.',
+        jsonb_build_object('company_id', p_company), '/company', 'advisor-gone:' || p_key);
+    end if;
+  end if;
+  for v_cat, v_amount in select k, v::bigint from jsonb_each_text(v_sums) x(k, v) loop
+    perform public.ledger_transfer(v_acc, v_hh, v_amount, 'company_costs',
+      case v_cat when 'product' then 'Produkte: laufende Kosten' when 'expansion' then 'Standorte und Anlagen: laufende Kosten'
+                 when 'benefit' then 'Benefits fürs Team' when 'advisor' then 'Steuerberater' else 'Laufende Kosten' end,
+      'company', p_company, p_key || ':lx:' || v_cat, pc.founder_id, jsonb_build_object('cat', v_cat));
+    v_total := v_total + v_amount;
+    if v_cat = 'benefit' then
+      update public.company_budgets set amount_cents = greatest(0, amount_cents - v_amount), updated_at = now()
+       where company_id = p_company and purpose = 'benefits';
+    end if;
+  end loop;
+  update public.listed_companies set last_upkeep = v_sums, ref_revenue_cents = v_ref where company_id = p_company;
+  return v_total + v_world;
+end;
+$$;
+revoke all on function public.listed_hour_costs(uuid, timestamptz, text) from public, anon, authenticated;
+
+-- places: tier + expansion (ADR-083/191) + the seats of the headquarters (ADR-208)
+create or replace function public.company_max_employees(p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((public.company_tier_cfg(pc.tier) ->> 'maxEmployees')::integer, 0)
+       + public.config_double('startups', '{expansion,employeesPerLevel}', 10)::integer * pc.expansion_level
+       + coalesce((select sum((public.world_hq_tier_cfg(t.n) ->> 'seats')::integer)
+                     from public.company_locations l, generate_series(1, l.hq_tier) t(n)
+                    where l.company_id = p_company), 0)::integer
+    from public.player_companies pc where pc.company_id = p_company;
+$$;
+comment on function public.company_max_employees(uuid) is
+  'Places for players and AI workers (maxEmployees of the tier + employeesPerLevel × expansion level, ADR-083, + the '
+  'seats of every headquarters tier reached, ADR-208).';
+
+-- ---------------------------------------------------------------------------
+-- F. Read model
+-- ---------------------------------------------------------------------------
+create or replace function public.world_free_cash(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select a.balance_cents from public.ledger_accounts a where a.id = public.company_cash_account(p_company)), 0)
+       - coalesce((select pc.unpaid_cents from public.player_companies pc where pc.company_id = p_company), 0);
+$$;
+
+create or replace function public.world_json(p_player uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.world_cfg();
+  v_now   timestamptz := public.game_now();
+  pc      public.player_companies;
+  c       public.companies;
+  l       public.company_locations;
+  lb      public.country_lobby;
+  v_worth bigint;
+  v_me    jsonb := null;
+  v_subs  jsonb;
+  v_img   jsonb;
+  v_n     integer;
+  v_lead  uuid;
+  v_eff   jsonb;
+  v_pay   jsonb := null;
+  v_places jsonb;
+  v_ai    jsonb;
+  v_ctry  jsonb;
+  v_ai_n  integer := coalesce((cfg ->> 'aiOnMap')::integer, 12);
+begin
+  select * into pc from public.player_companies where founder_id = p_player and status = 'active';
+  if pc.company_id is not null then
+    select * into c from public.companies where id = pc.company_id;
+    select * into l from public.company_locations where company_id = pc.company_id;
+    v_worth := coalesce(public.company_worth_cents(pc.company_id), 0);
+    if l.company_id is not null then
+      select coalesce(jsonb_agg(jsonb_build_object(
+               'country', s.country_key, 'opened_at', s.opened_at, 'setup_cost_cents', s.setup_cost_cents,
+               'ramp', public.world_ramp(extract(epoch from (v_now - s.opened_at)) / 3600.0),
+               'hourly_cost_cents', public.world_subsidiary_hourly_cost(extract(epoch from (v_now - s.opened_at)) / 3600.0))
+             order by s.opened_at, s.country_key), '[]'::jsonb)
+        into v_subs from public.company_subsidiaries s where s.company_id = pc.company_id;
+      select count(*) into v_n from public.company_subsidiaries s where s.company_id = pc.company_id;
+      select coalesce(jsonb_object_agg(i.country_key, jsonb_build_object(
+               'bonus_bps', public.world_image_bonus_bps(pc.company_id, i.country_key, v_now),
+               'ready_at', i.last_campaign_at + make_interval(hours => public.cfg_num(cfg, '{imageCampaign,cooldownHours}', 12)::integer),
+               'spent_cents', i.spent_cents)), '{}'::jsonb)
+        into v_img from public.company_country_image i where i.company_id = pc.company_id;
+      v_lead := public.country_market_leader(l.country_key);
+      v_eff := public.world_hour_effect(pc.company_id, v_now);
+      select * into lb from public.country_lobby where country_key = l.country_key;
+      if v_lead is not null and v_lead <> pc.company_id and lb.leader_company_id = v_lead and lb.fee_bps > 0 then
+        v_pay := jsonb_build_object('fee_bps', lb.fee_bps, 'leader_id', v_lead,
+                                    'leader_name', (select x.name from public.companies x where x.id = v_lead));
+      end if;
+      v_me := jsonb_build_object(
+        'country', l.country_key, 'hq_tier', l.hq_tier, 'hq_style', l.hq_style, 'invested_cents', l.invested_cents,
+        'placed_at', l.placed_at, 'moved_at', l.moved_at,
+        'relocate_ready_at', coalesce(l.moved_at, l.placed_at)
+                             + make_interval(hours => public.cfg_num(cfg, '{relocation,cooldownHours}', 168)::integer),
+        'relocation_cost_cents', greatest(public.cfg_num(cfg, '{relocation,minCostCents}', 50000000)::bigint,
+                                          floor(l.invested_cents * public.cfg_num(cfg, '{relocation,costBpsOfInvested}', 2000) / 10000.0)::bigint),
+        'next_tier_cost_cents', (public.world_hq_tier_cfg(l.hq_tier + 1) ->> 'costCents')::bigint,
+        'subsidiaries', v_subs,
+        'next_subsidiary_cost_cents', case when v_n < public.cfg_num(cfg, '{subsidiaries,max}', 4)
+                                           then public.world_subsidiary_setup_cost(v_n + 1) end,
+        'subsidiary_unlocked', v_worth >= public.cfg_num(cfg, '{subsidiaries,unlockWorthCents}', 5000000000)::bigint
+                               or l.hq_tier >= public.cfg_num(cfg, '{subsidiaries,unlockHqTier}', 2)::integer,
+        'image', v_img,
+        'image_campaign_cost_cents', greatest(public.cfg_num(cfg, '{imageCampaign,minCostCents}', 20000000)::bigint,
+                                              floor(greatest(0, v_worth) * public.cfg_num(cfg, '{imageCampaign,costBpsOfWorth}', 50) / 10000.0)::bigint),
+        'effect', v_eff,
+        'leader', v_lead = pc.company_id,
+        'fee_bps', case when v_lead = pc.company_id and lb.leader_company_id = pc.company_id then lb.fee_bps else 0 end,
+        'fee_ready_at', case when v_lead = pc.company_id and lb.leader_company_id = pc.company_id then
+                          lb.fee_set_at + make_interval(hours => public.cfg_num(cfg, '{lobby,feeChangeCooldownHours}', 24)::integer) end,
+        'paying_fee', v_pay,
+        'fees_paid_cents', l.fees_paid_cents, 'fees_received_cents', l.fees_received_cents);
+    end if;
+  end if;
+
+  -- everything on the map: player headquarters and subsidiaries, a few large AI companies for flavor
+  select coalesce(jsonb_agg(x.p order by x.worth desc nulls last, x.id), '[]'::jsonb) into v_places
+    from (select jsonb_build_object(
+                   'company_id', cl.company_id, 'name', co.name, 'owner', pr.nickname, 'country', cl.country_key,
+                   'kind', 'hq', 'hq_tier', cl.hq_tier, 'hq_style', cl.hq_style,
+                   'worth_cents', public.company_worth_cents(cl.company_id), 'sector', co.sector_key,
+                   'brand_color', co.brand_color, 'mine', co.founder_id = p_player,
+                   'leader', public.country_market_leader(cl.country_key) = cl.company_id) as p,
+                 public.company_worth_cents(cl.company_id) as worth, cl.company_id as id
+            from public.company_locations cl
+            join public.companies co on co.id = cl.company_id and co.dissolved_at is null
+            join public.player_companies ppc on ppc.company_id = cl.company_id and ppc.status = 'active'
+            left join public.profiles pr on pr.id = co.founder_id
+          union all
+          select jsonb_build_object(
+                   'company_id', cs.company_id, 'name', co.name, 'owner', pr.nickname, 'country', cs.country_key,
+                   'kind', 'subsidiary', 'hq_tier', 0, 'hq_style', coalesce(cl.hq_style, '{}'::jsonb), 'worth_cents', null,
+                   'sector', co.sector_key, 'brand_color', co.brand_color, 'mine', co.founder_id = p_player, 'leader', false),
+                 null, cs.company_id
+            from public.company_subsidiaries cs
+            join public.companies co on co.id = cs.company_id and co.dissolved_at is null
+            left join public.company_locations cl on cl.company_id = cs.company_id
+            left join public.profiles pr on pr.id = co.founder_id) x;
+  -- AI companies sit in a country picked from their id (stable), only on the map; they never lead or collect
+  with ctry as (select x.c ->> 'key' as key, x.n - 1 as i
+                  from jsonb_array_elements(coalesce(cfg -> 'countries', '[]'::jsonb)) with ordinality x(c, n)),
+       ai as (select co.id, co.name, co.sector_key, co.brand_color, q.last_price_e4 * co.shares_outstanding / 100 as worth
+                from public.companies co join public.security_quotes q on q.security_id = co.security_id
+               where co.is_ai and co.dissolved_at is null and co.security_id is not null
+               order by q.last_price_e4 * co.shares_outstanding desc, co.id limit v_ai_n)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'company_id', ai.id, 'name', ai.name, 'owner', null,
+           'country', (select ctry.key from ctry where ctry.i = abs(hashtext(ai.id::text)) % greatest(1, (select count(*) from ctry))),
+           'kind', 'ai', 'hq_tier', 0, 'hq_style', '{}'::jsonb, 'worth_cents', ai.worth, 'sector', ai.sector_key,
+           'brand_color', ai.brand_color, 'mine', false, 'leader', false) order by ai.worth desc, ai.id), '[]'::jsonb)
+    into v_ai from ai;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'key', x.c ->> 'key',
+           'leader_id', public.country_market_leader(x.c ->> 'key'),
+           'fee_bps', coalesce((select cl.fee_bps from public.country_lobby cl
+                                 where cl.country_key = x.c ->> 'key'
+                                   and cl.leader_company_id = public.country_market_leader(x.c ->> 'key')), 0))), '[]'::jsonb)
+    into v_ctry from jsonb_array_elements(coalesce(cfg -> 'countries', '[]'::jsonb)) x(c);
+  return jsonb_build_object(
+    'company', case when pc.company_id is null then null
+                    else jsonb_build_object('id', pc.company_id, 'name', c.name, 'worth_cents', v_worth,
+                                            'free_cash_cents', public.world_free_cash(pc.company_id),
+                                            'listed', c.phase = 'listed') end,
+    'unlock_worth_cents', public.cfg_num(cfg, '{unlockWorthCents}', 1000000000)::bigint,
+    'me', v_me,
+    'places', v_places || v_ai,
+    'countries', v_ctry);
+end;
+$$;
+
+create or replace function public.get_world()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return public.world_json(public.require_player());
+end;
+$$;
+comment on function public.get_world() is
+  'RPC (ADR-208): the world map (every HQ and subsidiary, a few AI companies, leaders and fees per country) and the '
+  'own location (tier, style, prices, subsidiaries, image, effect of the hour, lobby).';
+
+-- ---------------------------------------------------------------------------
+-- G. Writes
+-- ---------------------------------------------------------------------------
+-- the own active company, locked; errors company_not_found
+create or replace function public.world_own_company(p_player uuid)
+returns public.player_companies
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pc public.player_companies;
+begin
+  select * into pc from public.player_companies where founder_id = p_player and status = 'active' for update;
   if pc.company_id is null then
     perform public.api_error('company_not_found');
   end if;
-  select * into c from public.companies where id = p_company_id;
-  -- open to every player (ADR-125): the org chart shows who works where, nothing more
-  return jsonb_build_object(
-    'company', jsonb_build_object('id', c.id, 'name', c.name, 'tier', pc.tier),
-    'founder', (select jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key,
-                                          'is_me', p.id = v_player)
-                  from public.profiles p where p.id = pc.founder_id),
-    'members', coalesce((
-      select jsonb_agg(jsonb_build_object('nickname', p.nickname, 'tag', p.tag, 'avatar_key', p.avatar_key, 'tier', j.tier,
-                                          'title', coalesce(j.title, j.title_key), 'since', j.started_at,
-                                          'is_me', j.player_id = v_player,
-                                          'supervisor', (select s.nickname from public.profiles s where s.id = j.supervisor_id))
-                       order by case j.tier::text when 'c_level' then 5 when 'team_lead' then 4 when 'senior' then 3
-                                                  when 'junior' then 2 else 1 end desc, j.started_at, p.nickname)
-        from public.player_jobs j join public.profiles p on p.id = j.player_id
-       where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb),
-    -- Talente (ADR-199): above the AI workers; public facts only (no wage, no satisfaction)
-    'talents', coalesce((
-      select jsonb_agg(jsonb_build_object('key', t.talent_key, 'first_name', t.first_name, 'last_name', t.last_name,
-                                          'avatar_key', t.avatar_key, 'role', t.role_key, 'tier', t.tier,
-                                          'is_coceo', t.is_coceo, 'since', t.hired_at)
-                       order by t.is_coceo desc, t.tier desc, t.role_key, t.talent_key)
-        from public.talents t
-       where t.company_id = p_company_id), '[]'::jsonb),
-    'ai_workers', pc.ai_workers,
-    'ai_worker_skills', to_jsonb(coalesce(pc.ai_worker_skills, '{}'::text[])));
+  return pc;
 end;
 $$;
+
+-- pay from the free cash of the company to the treasury
+create or replace function public.world_pay(p_company uuid, p_player uuid, p_cents bigint, p_text text, p_key text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_free bigint;
+begin
+  if coalesce(p_cents, 0) <= 0 then
+    return;
+  end if;
+  perform 1 from public.ledger_accounts a where a.id = public.company_cash_account(p_company) for update;
+  v_free := public.world_free_cash(p_company);
+  if v_free < p_cents then
+    perform public.api_error('insufficient_funds');
+  end if;
+  perform public.ledger_transfer(public.company_cash_account(p_company), public.ledger_system_account('treasury'), p_cents,
+                                 'company_costs', p_text, 'company', p_company, p_key, p_player, jsonb_build_object('cat', 'world'));
+end;
+$$;
+
+-- the once-per-tier rewards: reputation, awareness, satisfaction of a listed team, seats
+create or replace function public.world_tier_reached(p_company uuid, p_tier integer)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  t jsonb := public.world_hq_tier_cfg(p_tier);
+begin
+  if t is null then
+    return;
+  end if;
+  perform public.company_reputation_bump(p_company, coalesce((t ->> 'reputationPoints')::double precision, 0));
+  perform public.company_awareness_add(p_company, 'world_hq', coalesce((t ->> 'awarenessAdd')::double precision, 0));
+  update public.listed_companies
+     set satisfaction = least(100.0, satisfaction + coalesce((t ->> 'satisfactionPoints')::double precision, 0))
+   where company_id = p_company;
+  update public.companies set max_employees = max_employees where id = p_company;  -- company_seats_guard recomputes
+end;
+$$;
+
+create or replace function public.world_place_hq(p_request_id uuid, p_country text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  pc       public.player_companies;
+  v_cost   bigint;
+  v_name   text;
+begin
+  if p_request_id is null or public.country_cfg(p_country) is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_place_hq');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  if exists (select 1 from public.company_locations l where l.company_id = pc.company_id) then
+    perform public.api_error('world_placed');
+  end if;
+  if coalesce(public.company_worth_cents(pc.company_id), 0) < public.cfg_num(public.world_cfg(), '{unlockWorthCents}', 1000000000) then
+    perform public.api_error('world_locked');
+  end if;
+  v_cost := (public.world_hq_tier_cfg(1) ->> 'costCents')::bigint;
+  v_name := public.country_cfg(p_country) ->> 'name';
+  perform public.world_pay(pc.company_id, v_player, v_cost, 'Firmenzentrale: ' || v_name,
+                           'world:hq:' || pc.company_id::text || ':' || p_request_id::text);
+  insert into public.company_locations (company_id, country_key, hq_tier, invested_cents, placed_at)
+  values (pc.company_id, p_country, 1, v_cost, public.game_now());
+  delete from public.company_subsidiaries where company_id = pc.company_id and country_key = p_country;
+  perform public.world_tier_reached(pc.company_id, 1);
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+end;
+$$;
+
+create or replace function public.world_upgrade_hq(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  pc       public.player_companies;
+  l        public.company_locations;
+  v_next   jsonb;
+begin
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_upgrade_hq');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  select * into l from public.company_locations where company_id = pc.company_id for update;
+  if l.company_id is null then
+    perform public.api_error('world_not_placed');
+  end if;
+  v_next := public.world_hq_tier_cfg(l.hq_tier + 1);
+  if v_next is null then
+    perform public.api_error('world_max_tier');
+  end if;
+  perform public.world_pay(pc.company_id, v_player, (v_next ->> 'costCents')::bigint, 'Firmenzentrale: Ausbau',
+                           'world:upgrade:' || pc.company_id::text || ':' || p_request_id::text);
+  update public.company_locations set hq_tier = l.hq_tier + 1, invested_cents = invested_cents + (v_next ->> 'costCents')::bigint
+   where company_id = pc.company_id;
+  perform public.world_tier_reached(pc.company_id, l.hq_tier + 1);
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+end;
+$$;
+
+create or replace function public.world_relocate_hq(p_request_id uuid, p_country text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  cfg      jsonb := public.world_cfg();
+  pc       public.player_companies;
+  l        public.company_locations;
+  v_cost   bigint;
+begin
+  if p_request_id is null or public.country_cfg(p_country) is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_relocate_hq');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  select * into l from public.company_locations where company_id = pc.company_id for update;
+  if l.company_id is null then
+    perform public.api_error('world_not_placed');
+  end if;
+  if l.country_key = p_country
+     or exists (select 1 from public.company_subsidiaries s where s.company_id = pc.company_id and s.country_key = p_country) then
+    perform public.api_error('world_same_country');
+  end if;
+  if coalesce(l.moved_at, l.placed_at) + make_interval(hours => public.cfg_num(cfg, '{relocation,cooldownHours}', 168)::integer)
+     > public.game_now() then
+    perform public.api_error('locked');
+  end if;
+  v_cost := greatest(public.cfg_num(cfg, '{relocation,minCostCents}', 50000000)::bigint,
+                     floor(l.invested_cents * public.cfg_num(cfg, '{relocation,costBpsOfInvested}', 2000) / 10000.0)::bigint);
+  perform public.world_pay(pc.company_id, v_player, v_cost, 'Umzug nach ' || (public.country_cfg(p_country) ->> 'name'),
+                           'world:move:' || pc.company_id::text || ':' || p_request_id::text);
+  update public.company_locations set country_key = p_country, moved_at = public.game_now()
+   where company_id = pc.company_id;
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+end;
+$$;
+
+create or replace function public.world_save_hq_style(p_request_id uuid, p_style jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  cfg      jsonb := public.world_cfg();
+  pc       public.player_companies;
+  v_style  jsonb;
+begin
+  if p_request_id is null or p_style is null or jsonb_typeof(p_style) <> 'object' then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_save_hq_style');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  if not exists (select 1 from public.company_locations l where l.company_id = pc.company_id) then
+    perform public.api_error('world_not_placed');
+  end if;
+  -- only known fields, clamped to the options of src/config/countries.ts HQ_STYLE_OPTIONS
+  v_style := jsonb_build_object(
+    'wall', least(7, greatest(0, coalesce((p_style ->> 'wall')::integer, 0))),
+    'roof', least(7, greatest(0, coalesce((p_style ->> 'roof')::integer, 0))),
+    'sign', least(7, greatest(0, coalesce((p_style ->> 'sign')::integer, 0))),
+    'roofKind', case when p_style ->> 'roofKind' in ('flat', 'gable', 'dome', 'antenna', 'garden') then p_style ->> 'roofKind' else 'flat' end,
+    'deco', case when p_style ->> 'deco' in ('none', 'trees', 'fountain', 'statue', 'flags', 'lights') then p_style ->> 'deco' else 'none' end,
+    'flag', coalesce((p_style ->> 'flag')::boolean, true));
+  update public.company_locations set hq_style = v_style where company_id = pc.company_id;
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+exception when invalid_text_representation then
+  perform public.api_error('invalid_argument');
+end;
+$$;
+
+create or replace function public.world_open_subsidiary(p_request_id uuid, p_country text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  cfg      jsonb := public.world_cfg();
+  pc       public.player_companies;
+  l        public.company_locations;
+  v_n      integer;
+  v_cost   bigint;
+begin
+  if p_request_id is null or public.country_cfg(p_country) is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_open_subsidiary');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  select * into l from public.company_locations where company_id = pc.company_id for update;
+  if l.company_id is null then
+    perform public.api_error('world_not_placed');
+  end if;
+  if not (coalesce(public.company_worth_cents(pc.company_id), 0) >= public.cfg_num(cfg, '{subsidiaries,unlockWorthCents}', 5000000000)
+          or l.hq_tier >= public.cfg_num(cfg, '{subsidiaries,unlockHqTier}', 2)) then
+    perform public.api_error('world_subsidiary_locked');
+  end if;
+  if l.country_key = p_country
+     or exists (select 1 from public.company_subsidiaries s where s.company_id = pc.company_id and s.country_key = p_country) then
+    perform public.api_error('world_same_country');
+  end if;
+  select count(*) into v_n from public.company_subsidiaries s where s.company_id = pc.company_id;
+  if v_n >= public.cfg_num(cfg, '{subsidiaries,max}', 4) then
+    perform public.api_error('world_subsidiary_cap');
+  end if;
+  v_cost := public.world_subsidiary_setup_cost(v_n + 1);
+  perform public.world_pay(pc.company_id, v_player, v_cost, 'Tochterfirma: ' || (public.country_cfg(p_country) ->> 'name'),
+                           'world:sub:' || pc.company_id::text || ':' || p_request_id::text);
+  insert into public.company_subsidiaries (company_id, country_key, opened_at, setup_cost_cents)
+  values (pc.company_id, p_country, public.game_now(), v_cost);
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+end;
+$$;
+
+create or replace function public.world_close_subsidiary(p_request_id uuid, p_country text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  pc       public.player_companies;
+begin
+  if p_request_id is null or p_country is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_close_subsidiary');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  delete from public.company_subsidiaries where company_id = pc.company_id and country_key = p_country;
+  if not found then
+    perform public.api_error('invalid_argument');
+  end if;
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+end;
+$$;
+
+create or replace function public.world_image_campaign(p_request_id uuid, p_country text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  cfg      jsonb := public.world_cfg();
+  pc       public.player_companies;
+  i        public.company_country_image;
+  v_now    timestamptz := public.game_now();
+  v_cost   bigint;
+  v_bonus  integer;
+begin
+  if p_request_id is null or public.country_cfg(p_country) is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_image_campaign');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  if not exists (select 1 from public.company_locations l where l.company_id = pc.company_id and l.country_key = p_country)
+     and not exists (select 1 from public.company_subsidiaries s where s.company_id = pc.company_id and s.country_key = p_country) then
+    perform public.api_error('world_not_placed');
+  end if;
+  select * into i from public.company_country_image x where x.company_id = pc.company_id and x.country_key = p_country for update;
+  if i.last_campaign_at + make_interval(hours => public.cfg_num(cfg, '{imageCampaign,cooldownHours}', 12)::integer) > v_now then
+    perform public.api_error('locked');
+  end if;
+  v_cost := greatest(public.cfg_num(cfg, '{imageCampaign,minCostCents}', 20000000)::bigint,
+                     floor(greatest(0, coalesce(public.company_worth_cents(pc.company_id), 0))
+                           * public.cfg_num(cfg, '{imageCampaign,costBpsOfWorth}', 50) / 10000.0)::bigint);
+  perform public.world_pay(pc.company_id, v_player, v_cost, 'Image-Kampagne: ' || (public.country_cfg(p_country) ->> 'name'),
+                           'world:image:' || pc.company_id::text || ':' || p_request_id::text);
+  v_bonus := round(least(public.cfg_num(cfg, '{imageCampaign,maxBonusBps}', 3000),
+                         public.world_image_bonus_bps(pc.company_id, p_country, v_now)
+                         + public.cfg_num(cfg, '{imageCampaign,gainBps}', 500)))::integer;
+  insert into public.company_country_image as x (company_id, country_key, bonus_bps, bonus_at, last_campaign_at, spent_cents)
+  values (pc.company_id, p_country, v_bonus, v_now, v_now, v_cost)
+  on conflict (company_id, country_key) do update
+    set bonus_bps = excluded.bonus_bps, bonus_at = excluded.bonus_at, last_campaign_at = excluded.last_campaign_at,
+        spent_cents = x.spent_cents + excluded.spent_cents;
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+end;
+$$;
+
+create or replace function public.world_set_location_fee(p_request_id uuid, p_fee_bps integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+  v_replay jsonb;
+  cfg      jsonb := public.world_cfg();
+  pc       public.player_companies;
+  l        public.company_locations;
+  lb       public.country_lobby;
+  v_name   text;
+  r        record;
+begin
+  if p_request_id is null or p_fee_bps is null or p_fee_bps < 0
+     or p_fee_bps > public.cfg_num(cfg, '{lobby,maxFeeBps}', 300) then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'world_set_location_fee');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  pc := public.world_own_company(v_player);
+  select * into l from public.company_locations where company_id = pc.company_id;
+  if l.company_id is null then
+    perform public.api_error('world_not_placed');
+  end if;
+  if public.country_market_leader(l.country_key) is distinct from pc.company_id then
+    perform public.api_error('world_not_leader');
+  end if;
+  select * into lb from public.country_lobby where country_key = l.country_key for update;
+  if lb.leader_company_id = pc.company_id and lb.fee_set_at
+       + make_interval(hours => public.cfg_num(cfg, '{lobby,feeChangeCooldownHours}', 24)::integer) > public.game_now() then
+    perform public.api_error('locked');
+  end if;
+  insert into public.country_lobby (country_key, leader_company_id, fee_bps, fee_set_at, updated_at)
+  values (l.country_key, pc.company_id, p_fee_bps, public.game_now(), now())
+  on conflict (country_key) do update
+    set leader_company_id = excluded.leader_company_id, fee_bps = excluded.fee_bps, fee_set_at = excluded.fee_set_at,
+        updated_at = now(),
+        collected_cents = case when country_lobby.leader_company_id = excluded.leader_company_id
+                               then country_lobby.collected_cents else 0 end;
+  -- every other player company with its HQ there hears about it
+  v_name := public.country_cfg(l.country_key) ->> 'name';
+  for r in select co.founder_id, co.id from public.company_locations x
+             join public.companies co on co.id = x.company_id
+             join public.player_companies ppc on ppc.company_id = x.company_id and ppc.status = 'active'
+            where x.country_key = l.country_key and x.company_id <> pc.company_id loop
+    perform public.social_notify(r.founder_id, 'world_location', 'Standortgebühr in ' || v_name,
+      (select c.name from public.companies c where c.id = pc.company_id) || ' führt den Markt in ' || v_name
+        || ' an und verlangt jetzt ' || to_char(p_fee_bps / 100.0, 'FM990.0') || ' % deines Stundenumsatzes. '
+        || 'Wachse an ihr vorbei oder zieh um.',
+      jsonb_build_object('country', l.country_key, 'fee_bps', p_fee_bps, 'leader_id', pc.company_id),
+      '/company?tab=location', 'world-fee:' || l.country_key || ':' || p_request_id::text);
+  end loop;
+  return public.request_complete(v_player, p_request_id, public.world_json(v_player));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- H. Grants
+-- ---------------------------------------------------------------------------
+revoke all on function public.world_hq_tier_cfg(integer) from public, anon, authenticated;
+revoke all on function public.world_country_factors(jsonb, double precision) from public, anon, authenticated;
+revoke all on function public.world_ramp(double precision) from public, anon, authenticated;
+revoke all on function public.world_subsidiary_hourly_cost(double precision) from public, anon, authenticated;
+revoke all on function public.world_subsidiary_setup_cost(integer) from public, anon, authenticated;
+revoke all on function public.world_image_bonus_bps(uuid, text, timestamptz) from public, anon, authenticated;
+revoke all on function public.world_hour_effect(uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.world_tax_rate_bps(uuid) from public, anon, authenticated;
+revoke all on function public.world_hour_costs(uuid, timestamptz, text) from public, anon, authenticated;
+revoke all on function public.company_max_employees(uuid) from public, anon, authenticated;
+revoke all on function public.world_free_cash(uuid) from public, anon, authenticated;
+revoke all on function public.world_json(uuid) from public, anon, authenticated;
+revoke all on function public.world_own_company(uuid) from public, anon, authenticated;
+revoke all on function public.world_pay(uuid, uuid, bigint, text, text) from public, anon, authenticated;
+revoke all on function public.world_tier_reached(uuid, integer) from public, anon, authenticated;
+revoke all on function public.get_world() from public, anon;
+grant execute on function public.get_world() to authenticated;
+revoke all on function public.world_place_hq(uuid, text) from public, anon;
+grant execute on function public.world_place_hq(uuid, text) to authenticated;
+revoke all on function public.world_upgrade_hq(uuid) from public, anon;
+grant execute on function public.world_upgrade_hq(uuid) to authenticated;
+revoke all on function public.world_relocate_hq(uuid, text) from public, anon;
+grant execute on function public.world_relocate_hq(uuid, text) to authenticated;
+revoke all on function public.world_save_hq_style(uuid, jsonb) from public, anon;
+grant execute on function public.world_save_hq_style(uuid, jsonb) to authenticated;
+revoke all on function public.world_open_subsidiary(uuid, text) from public, anon;
+grant execute on function public.world_open_subsidiary(uuid, text) to authenticated;
+revoke all on function public.world_close_subsidiary(uuid, text) from public, anon;
+grant execute on function public.world_close_subsidiary(uuid, text) to authenticated;
+revoke all on function public.world_image_campaign(uuid, text) from public, anon;
+grant execute on function public.world_image_campaign(uuid, text) to authenticated;
+revoke all on function public.world_set_location_fee(uuid, integer) from public, anon;
+grant execute on function public.world_set_location_fee(uuid, integer) to authenticated;
 
 commit;

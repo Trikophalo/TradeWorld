@@ -3,1473 +3,6 @@
 begin;
 
 
--- ===== supabase/migrations/20261204008900_talents.sql =====
--- =============================================================================
--- NEXA · 8900 · Talente: named specialists for 15 Stellen, talent market, offers, poaching (ADR-199)
--- =============================================================================
--- * talents: the pool from game_config "talents" (src/config/talents.ts), synced by talents_ensure(), plus the state
---   of each talent (employer, contract, satisfaction, rest). Game-generated people, not players; AI companies never
---   employ talents. One talent per Stelle (role) and company.
--- * talent_offer(request, key, wage, benefits): hires a free talent on the market when every demand is met
---   (src/lib/sim/talents.ts talentOfferChecks); for a talent of another player company it opens a poaching offer when
---   the offer beats the current contract by poach.marginBps + loyalty; the owner may counter within
---   poach.counterMinutes (talent_counter); otherwise talent_offers_settle moves the talent.
--- * talent_dismiss(request, key). get_talent_market(role) and get_company_talents() for the page.
--- * talents_run_due(now) (cron every minute): wage and benefits per full hour through the ledger (company cash ->
---   households, sum 0), satisfaction per hour, warning and quitting, awareness (Marketing) through
---   company_awareness_add, reputation (Recht) through company_reputation_bump, then talents_coceo_run (8910 hook).
--- * talents_hour_effect(company): the capped terms; listed_hour_effect (full copy of the 8300 definition) multiplies
---   them in, so the hourly close (7720) and the fair value of listed companies take them without being redefined.
--- Idempotent: runs unchanged as supabase/updates/20261204008900_talents.sql.
-
--- ---------------------------------------------------------------------------
--- A. Schema
--- ---------------------------------------------------------------------------
-create table if not exists public.talents (
-  talent_key        text primary key check (talent_key ~ '^[a-z0-9_]+$'),
-  role_key          text not null,
-  tier              smallint not null check (tier between 0 and 4),
-  first_name        text not null,
-  last_name         text not null,
-  avatar_key        text not null,
-  traits            text[] not null default '{}',
-  wage_demand_cents bigint not null check (wage_demand_cents > 0),
-  benefit_demands   text[] not null default '{}',
-  min_reputation    integer not null default 0,
-  min_awareness_bps integer not null default 0,
-  min_form          smallint not null default 0,
-  effect_bps        integer not null default 0,
-  company_id        uuid references public.companies (id) on delete set null,
-  wage_cents        bigint check (wage_cents is null or wage_cents > 0),
-  benefits          text[] not null default '{}',
-  hired_at          timestamptz,
-  paid_until        timestamptz,
-  satisfaction_bps  integer not null default 0 check (satisfaction_bps between 0 and 10000),
-  warned_at         timestamptz,
-  resting_until     timestamptz,
-  is_coceo          boolean not null default false,
-  coceo_autonomy    text not null default 'advise' check (coceo_autonomy in ('advise', 'decide')),
-  coceo_budget_cents bigint not null default 0 check (coceo_budget_cents >= 0),
-  coceo_spent_day   date,
-  coceo_spent_cents bigint not null default 0,
-  updated_at        timestamptz not null default now()
-);
-create unique index if not exists talents_company_role_idx on public.talents (company_id, role_key) where company_id is not null;
-create index if not exists talents_role_idx on public.talents (role_key, tier);
-alter table public.talents enable row level security;
-drop policy if exists talents_read on public.talents;
-create policy talents_read on public.talents for select to authenticated using (true);
-revoke insert, update, delete on public.talents from anon, authenticated;
-grant select on public.talents to authenticated;
-drop trigger if exists set_updated_at on public.talents;
-create trigger set_updated_at before update on public.talents for each row execute function public.set_updated_at();
-comment on table public.talents is
-  'Talente (ADR-199): game-generated specialists for the 15 Stellen; pool from game_config "talents", state server-only.';
-
-create table if not exists public.talent_offers (
-  id           uuid primary key default gen_random_uuid(),
-  talent_key   text not null references public.talents (talent_key) on delete cascade,
-  from_company uuid not null references public.companies (id) on delete cascade,
-  to_company   uuid references public.companies (id) on delete cascade,
-  wage_cents   bigint not null check (wage_cents > 0),
-  benefits     text[] not null default '{}',
-  cost_cents   bigint not null,
-  status       text not null default 'pending' check (status in ('pending', 'accepted', 'countered', 'failed', 'cancelled')),
-  expires_at   timestamptz not null,
-  created_by   uuid,
-  created_at   timestamptz not null default now(),
-  settled_at   timestamptz
-);
-create unique index if not exists talent_offers_pending_idx on public.talent_offers (talent_key) where status = 'pending';
-create index if not exists talent_offers_talent_idx on public.talent_offers (talent_key);
-create index if not exists talent_offers_from_idx on public.talent_offers (from_company);
-create index if not exists talent_offers_to_idx on public.talent_offers (to_company);
-alter table public.talent_offers enable row level security;
-drop policy if exists talent_offers_own on public.talent_offers;
-create policy talent_offers_own on public.talent_offers for select to authenticated
-  using (exists (select 1 from public.companies c
-                  where c.id in (talent_offers.from_company, talent_offers.to_company)
-                    and (select auth.uid()) in (c.founder_id, c.ceo_id)));
-revoke insert, update, delete on public.talent_offers from anon, authenticated;
-grant select on public.talent_offers to authenticated;
-
-create table if not exists public.talent_events (
-  id          bigint generated always as identity primary key,
-  company_id  uuid not null references public.companies (id) on delete cascade,
-  talent_key  text not null references public.talents (talent_key) on delete cascade,
-  kind        text not null check (kind ~ '^[a-z_]+$'),
-  payload     jsonb not null default '{}'::jsonb,
-  cost_cents  bigint not null default 0,
-  reversible  boolean not null default false,
-  undone_at   timestamptz,
-  created_at  timestamptz not null default now()
-);
-create index if not exists talent_events_company_idx on public.talent_events (company_id, created_at desc);
-create index if not exists talent_events_talent_idx on public.talent_events (talent_key);
-alter table public.talent_events enable row level security;
-drop policy if exists talent_events_own on public.talent_events;
-create policy talent_events_own on public.talent_events for select to authenticated
-  using (exists (select 1 from public.companies c
-                  where c.id = talent_events.company_id and (select auth.uid()) in (c.founder_id, c.ceo_id)));
-revoke insert, update, delete on public.talent_events from anon, authenticated;
-grant select on public.talent_events to authenticated;
-
-create table if not exists public.talent_hours (
-  talent_key       text not null references public.talents (talent_key) on delete cascade,
-  hour_start       timestamptz not null,
-  company_id       uuid not null references public.companies (id) on delete cascade,
-  cost_cents       bigint not null,
-  paid             boolean not null,
-  satisfaction_bps integer not null,
-  primary key (talent_key, hour_start)
-);
-create index if not exists talent_hours_company_idx on public.talent_hours (company_id, hour_start);
-alter table public.talent_hours enable row level security;
-drop policy if exists talent_hours_own on public.talent_hours;
-create policy talent_hours_own on public.talent_hours for select to authenticated
-  using (exists (select 1 from public.companies c
-                  where c.id = talent_hours.company_id and (select auth.uid()) in (c.founder_id, c.ceo_id)));
-revoke insert, update, delete on public.talent_hours from anon, authenticated;
-grant select on public.talent_hours to authenticated;
-
-create table if not exists public.talent_company_hours (
-  company_id uuid not null references public.companies (id) on delete cascade,
-  hour_start timestamptz not null,
-  awareness  double precision not null default 0,
-  reputation double precision not null default 0,
-  primary key (company_id, hour_start)
-);
-alter table public.talent_company_hours enable row level security;
-revoke all on public.talent_company_hours from anon, authenticated;
-
-insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
-                                       sort_order)
-values ('company_talent', 'company', 'Talente', 'Abwerbeversuche, unzufriedene Talente, Kündigungen und Entscheidungen der Mit-Geschäftsführung.',
-        'notif_company', true, true, false, 214)
-on conflict (key) do nothing;
-
--- ---------------------------------------------------------------------------
--- B. Config, pool and facts
--- ---------------------------------------------------------------------------
-create or replace function public.talents_cfg()
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select coalesce((select value from public.game_config where key = 'talents'), '{}'::jsonb);
-$$;
-
--- Syncs the pool from the config: new talents are added, the generated fields of existing ones follow the config.
-create or replace function public.talents_ensure()
-returns integer
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_pool jsonb := coalesce(public.talents_cfg() -> 'pool', '[]'::jsonb);
-  v_n    integer;
-begin
-  if jsonb_array_length(v_pool) = (select count(*) from public.talents) then
-    return 0;
-  end if;
-  insert into public.talents as t (talent_key, role_key, tier, first_name, last_name, avatar_key, traits, wage_demand_cents,
-                                   benefit_demands, min_reputation, min_awareness_bps, min_form, effect_bps)
-  select p ->> 'key', p ->> 'role', (p ->> 'tier')::smallint, p ->> 'firstName', p ->> 'lastName', p ->> 'avatar',
-         array(select jsonb_array_elements_text(p -> 'traits')), (p ->> 'wageCents')::bigint,
-         array(select jsonb_array_elements_text(p -> 'benefits')), (p ->> 'minReputation')::integer,
-         (p ->> 'minAwarenessBps')::integer, (p ->> 'minForm')::smallint, (p ->> 'effectBps')::integer
-    from jsonb_array_elements(v_pool) p
-  on conflict (talent_key) do update
-    set role_key = excluded.role_key, tier = excluded.tier, first_name = excluded.first_name,
-        last_name = excluded.last_name, avatar_key = excluded.avatar_key, traits = excluded.traits,
-        wage_demand_cents = excluded.wage_demand_cents, benefit_demands = excluded.benefit_demands,
-        min_reputation = excluded.min_reputation, min_awareness_bps = excluded.min_awareness_bps,
-        min_form = excluded.min_form, effect_bps = excluded.effect_bps;
-  get diagnostics v_n = row_count;
-  return v_n;
-end;
-$$;
-
-create or replace function public.talent_trait_num(p_traits text[], p_field text)
-returns double precision
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select coalesce(sum((tr ->> p_field)::double precision), 0)
-    from jsonb_array_elements(coalesce(public.talents_cfg() -> 'traits', '[]'::jsonb)) tr
-   where tr ->> 'key' = any (coalesce(p_traits, '{}'::text[]));
-$$;
-
--- talentOfferCost: wage + Σ wage × benefitCostBps / 10 000 (wages are whole euros, so exact)
-create or replace function public.talent_offer_cost(p_wage bigint, p_benefits text[])
-returns bigint
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select p_wage + coalesce((select sum(p_wage * coalesce((public.talents_cfg() -> 'benefitCostBps' ->> b)::bigint, 0) / 10000)
-                              from (select distinct unnest(coalesce(p_benefits, '{}'::text[])) b) x), 0)::bigint;
-$$;
-
-create or replace function public.talent_form_rank(p_company uuid)
-returns integer
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select case when exists (select 1 from public.listed_companies l where l.company_id = p_company) then 4
-              else coalesce((select case pc.tier::text when 'garage' then 0 when 'small_business' then 1 when 'gmbh' then 2
-                                                       when 'ag' then 3 else 4 end
-                               from public.player_companies pc where pc.company_id = p_company), 0) end;
-$$;
-
--- Free cash (open bills first), reputation, awareness, legal form, expansion of a player company
-create or replace function public.talent_company_facts(p_company uuid)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select jsonb_build_object(
-           'reputation', coalesce(pc.reputation, 50),
-           'awareness_bps', round(coalesce(pc.awareness, 0) * 10000)::integer,
-           'form_rank', public.talent_form_rank(p_company),
-           'expansion_level', coalesce(pc.expansion_level, 0),
-           'free_cash_cents', greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a
-                                                     where a.owner_company_id = p_company and a.kind = 'company_cash'), 0)
-                                          - coalesce(pc.unpaid_cents, 0)))
-    from public.player_companies pc where pc.company_id = p_company;
-$$;
-
--- talentOfferChecks: [{key, ok}] in the order of the client list; p_extra_cash adds back money already committed
-create or replace function public.talent_check_offer(p_talent public.talents, p_wage bigint, p_benefits text[], p_facts jsonb)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select jsonb_build_array(
-    jsonb_build_object('key', 'wage', 'ok', p_wage >= p_talent.wage_demand_cents),
-    jsonb_build_object('key', 'benefits', 'ok', coalesce(p_talent.benefit_demands <@ coalesce(p_benefits, '{}'::text[]), true)),
-    jsonb_build_object('key', 'reputation', 'ok', (p_facts ->> 'reputation')::double precision >= p_talent.min_reputation),
-    jsonb_build_object('key', 'awareness', 'ok', (p_facts ->> 'awareness_bps')::integer >= p_talent.min_awareness_bps),
-    jsonb_build_object('key', 'form', 'ok', (p_facts ->> 'form_rank')::integer >= p_talent.min_form),
-    jsonb_build_object('key', 'office', 'ok', not ('office' = any (coalesce(p_benefits, '{}'::text[])))
-                                               or (p_facts ->> 'expansion_level')::integer >= 1),
-    jsonb_build_object('key', 'cash', 'ok', (p_facts ->> 'free_cash_cents')::bigint
-                         >= public.talent_offer_cost(p_wage, p_benefits)
-                            * coalesce((public.talents_cfg() ->> 'cashCoverHours')::integer, 12)));
-$$;
-
-create or replace function public.talent_checks_ok(p_checks jsonb)
-returns boolean
-language sql
-immutable
-set search_path = ''
-as $$
-  select not exists (select 1 from jsonb_array_elements(p_checks) c where not (c ->> 'ok')::boolean);
-$$;
-
--- talentPoachMinCost
-create or replace function public.talent_poach_min_cost(p_talent public.talents)
-returns bigint
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select ceil(public.talent_offer_cost(p_talent.wage_cents, p_talent.benefits)
-              * greatest(0, 10000 + public.cfg_num(public.talents_cfg(), '{poach,marginBps}', 1500)
-                            + public.talent_trait_num(p_talent.traits, 'loyaltyBps')) / 10000.0)::bigint;
-$$;
-
--- A free talent is on the market unless resting or rotated out for this Berlin day (market.shareBps)
-create or replace function public.talent_status(p_talent public.talents, p_now timestamptz)
-returns text
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select case
-    when p_talent.company_id is not null then 'employed'
-    when p_talent.resting_until > p_now then 'resting'
-    when abs(hashtext(p_talent.talent_key || ':' || ((p_now at time zone 'Europe/Berlin')::date)::text)) % 10000
-         >= public.cfg_num(public.talents_cfg(), '{market,shareBps}', 6500) then 'off_market'
-    else 'available' end;
-$$;
-
-create or replace function public.talent_name(p_talent public.talents)
-returns text
-language sql
-immutable
-set search_path = ''
-as $$
-  select p_talent.first_name || ' ' || p_talent.last_name;
-$$;
-
-create or replace function public.talent_log(p_company uuid, p_talent text, p_kind text, p_payload jsonb,
-                                             p_cost bigint default 0, p_reversible boolean default false)
-returns bigint
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_id bigint;
-begin
-  insert into public.talent_events (company_id, talent_key, kind, payload, cost_cents, reversible)
-  values (p_company, p_talent, p_kind, coalesce(p_payload, '{}'::jsonb), coalesce(p_cost, 0), coalesce(p_reversible, false))
-  returning id into v_id;
-  begin
-    perform public.company_news_add(p_company, 'talent_' || p_kind, coalesce(p_payload, '{}'::jsonb));
-  exception when others then
-    null;
-  end;
-  return v_id;
-end;
-$$;
-
-create or replace function public.talent_notify_founder(p_company uuid, p_title text, p_body text, p_payload jsonb, p_dedupe text)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  perform public.social_notify((select pc.founder_id from public.player_companies pc where pc.company_id = p_company),
-                               'company_talent', p_title, p_body, coalesce(p_payload, '{}'::jsonb),
-                               '/company?tab=staff&section=talents', p_dedupe);
-end;
-$$;
-
--- Internal: the talent starts at the company with this contract
-create or replace function public.talent_hire_into(p_key text, p_company uuid, p_wage bigint, p_benefits text[], p_now timestamptz)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  update public.talents
-     set company_id = p_company, wage_cents = p_wage,
-         benefits = array(select distinct unnest(coalesce(p_benefits, '{}'::text[])) order by 1),
-         hired_at = p_now, paid_until = p_now,
-         satisfaction_bps = public.cfg_num(public.talents_cfg(), '{satisfaction,startBps}', 7000)::integer,
-         warned_at = null, resting_until = null, is_coceo = false, coceo_autonomy = 'advise', coceo_budget_cents = 0,
-         coceo_spent_cents = 0, coceo_spent_day = null
-   where talent_key = p_key;
-end;
-$$;
-
--- Internal: the talent leaves (quit, dismissed); rests before returning to the market. Pending offers for it end.
-create or replace function public.talent_release(p_key text, p_now timestamptz, p_rest boolean default true)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  update public.talents
-     set company_id = null, wage_cents = null, benefits = '{}', hired_at = null, paid_until = null, satisfaction_bps = 0,
-         warned_at = null, is_coceo = false, coceo_budget_cents = 0,
-         resting_until = case when p_rest then p_now + make_interval(
-                           hours => public.cfg_num(public.talents_cfg(), '{market,restHours}', 12)::integer) end
-   where talent_key = p_key;
-end;
-$$;
-
--- ---------------------------------------------------------------------------
--- C. Effect in the hourly close
--- ---------------------------------------------------------------------------
--- talentsEffectBps + talentsHourFactors: the summed, capped effect of the filled Stellen
-create or replace function public.talents_hour_effect(p_company uuid)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  cfg jsonb := public.talents_cfg();
-  v   jsonb := '{}'::jsonb;
-  r   record;
-  k   text;
-begin
-  for r in select ro ->> 'effect' as eff, sum(t.effect_bps) as bps
-             from public.talents t
-             join jsonb_array_elements(coalesce(cfg -> 'roles', '[]'::jsonb)) ro on ro ->> 'key' = t.role_key
-            where t.company_id = p_company
-            group by 1
-  loop
-    v := v || jsonb_build_object(r.eff, least(r.bps, public.cfg_num(cfg, array['capBps', r.eff], 0)));
-  end loop;
-  foreach k in array array['demand', 'capacity', 'cogs', 'fixed', 'quality', 'awareness', 'reputation', 'morale'] loop
-    if not v ? k then
-      v := v || jsonb_build_object(k, 0);
-    end if;
-  end loop;
-  return jsonb_build_object('bps', v,
-    'demand_factor', 1 + (v ->> 'demand')::double precision / 10000.0,
-    'capacity_factor', 1 + (v ->> 'capacity')::double precision / 10000.0,
-    'cogs_factor', 1 - (v ->> 'cogs')::double precision / 10000.0,
-    'fixed_factor', 1 - (v ->> 'fixed')::double precision / 10000.0,
-    'quality_add', (v ->> 'quality')::double precision / 10000.0);
-end;
-$$;
-
--- The terms of the hour (7300, 8300): listed companies as before; private companies get their reputation's demand
--- factor (ADR-183); both multiplied with the Fertigkeiten (ADR-194) and, ADR-199, with the Talente.
-create or replace function public.listed_hour_effect(p_company uuid, p_hour_start timestamptz)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  l    public.listed_companies;
-  v_df double precision := 1;
-  v_r  jsonb;
-  v_sk jsonb;
-  v_tl jsonb;
-begin
-  l := public.listed_ensure(p_company);
-  if l.company_id is null then
-    begin
-      v_df := public.company_reputation_demand_factor(
-                (select pc.reputation from public.player_companies pc where pc.company_id = p_company));
-    exception when others then
-      v_df := 1;
-    end;
-    v_r := jsonb_build_object('awareness_add', 0, 'quality_add', 0, 'demand_factor', coalesce(v_df, 1), 'capacity_factor', 1,
-                              'cogs_factor', 1, 'fixed_factor', 1, 'listed', false);
-  else
-    v_r := public.listed_hour_effect_calc(public.listed_effects(p_company), l.satisfaction, l.reputation)
-           || jsonb_build_object('listed', true);
-  end if;
-  -- ADR-194: Fertigkeiten; a failure never stops the close
-  begin
-    v_sk := public.company_skills_hour_effect(p_company, p_hour_start);
-    v_r := v_r || jsonb_build_object(
-      'demand_factor', (v_r ->> 'demand_factor')::double precision * (v_sk ->> 'demand_factor')::double precision,
-      'capacity_factor', (v_r ->> 'capacity_factor')::double precision * (v_sk ->> 'capacity_factor')::double precision,
-      'cogs_factor', (v_r ->> 'cogs_factor')::double precision * (v_sk ->> 'cogs_factor')::double precision,
-      'fixed_factor', (v_r ->> 'fixed_factor')::double precision * (v_sk ->> 'fixed_factor')::double precision,
-      'quality_add', (v_r ->> 'quality_add')::double precision + (v_sk ->> 'quality_add')::double precision,
-      'skills', v_sk);
-  exception when others then
-    null;
-  end;
-  -- ADR-199: Talente of the filled Stellen; a failure never stops the close
-  begin
-    v_tl := public.talents_hour_effect(p_company);
-    v_r := v_r || jsonb_build_object(
-      'demand_factor', (v_r ->> 'demand_factor')::double precision * (v_tl ->> 'demand_factor')::double precision,
-      'capacity_factor', (v_r ->> 'capacity_factor')::double precision * (v_tl ->> 'capacity_factor')::double precision,
-      'cogs_factor', (v_r ->> 'cogs_factor')::double precision * (v_tl ->> 'cogs_factor')::double precision,
-      'fixed_factor', (v_r ->> 'fixed_factor')::double precision * (v_tl ->> 'fixed_factor')::double precision,
-      'quality_add', (v_r ->> 'quality_add')::double precision + (v_tl ->> 'quality_add')::double precision,
-      'talents', v_tl);
-  exception when others then
-    null;
-  end;
-  return v_r;
-end;
-$$;
-
--- ---------------------------------------------------------------------------
--- D. Reads
--- ---------------------------------------------------------------------------
-create or replace function public.talent_json(t public.talents, p_now timestamptz, p_company uuid)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select jsonb_build_object(
-    'key', t.talent_key, 'role', t.role_key, 'tier', t.tier, 'first_name', t.first_name, 'last_name', t.last_name,
-    'avatar', t.avatar_key, 'traits', to_jsonb(t.traits), 'wage_demand_cents', t.wage_demand_cents,
-    'benefit_demands', to_jsonb(t.benefit_demands), 'min_reputation', t.min_reputation,
-    'min_awareness_bps', t.min_awareness_bps, 'min_form', t.min_form, 'effect_bps', t.effect_bps,
-    'status', case when t.company_id is not null and t.company_id = p_company then 'mine' else public.talent_status(t, p_now) end,
-    'employer', case when t.company_id is not null then
-                  jsonb_build_object('company_id', t.company_id, 'name', (select c.name from public.companies c where c.id = t.company_id)) end,
-    'poach_min_cost_cents', case when t.company_id is not null then public.talent_poach_min_cost(t) end,
-    'offer_pending', exists (select 1 from public.talent_offers o where o.talent_key = t.talent_key and o.status = 'pending'),
-    'resting_until', case when t.resting_until > p_now then t.resting_until end,
-    'is_coceo', t.is_coceo);
-$$;
-
-create or replace function public.talent_own_json(t public.talents, p_now timestamptz)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select public.talent_json(t, p_now, t.company_id) || jsonb_build_object(
-    'wage_cents', t.wage_cents, 'benefits', to_jsonb(t.benefits),
-    'cost_cents', public.talent_offer_cost(t.wage_cents, t.benefits),
-    'hired_at', t.hired_at, 'satisfaction_bps', t.satisfaction_bps, 'warned', t.warned_at is not null,
-    'coceo_autonomy', t.coceo_autonomy, 'coceo_budget_cents', t.coceo_budget_cents,
-    'coceo_spent_cents', case when t.coceo_spent_day = (p_now at time zone 'Europe/Berlin')::date then t.coceo_spent_cents else 0 end);
-$$;
-
-create or replace function public.talent_my_company(p_player uuid)
-returns uuid
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active' limit 1;
-$$;
-
-create or replace function public.get_talent_market(p_role text default null)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid := public.require_player();
-  v_co     uuid;
-  v_now    timestamptz := public.game_now();
-begin
-  perform public.talents_ensure();
-  v_co := public.talent_my_company(v_player);
-  return jsonb_build_object(
-    'company_id', v_co,
-    'facts', case when v_co is not null then public.talent_company_facts(v_co) end,
-    'talents', coalesce((select jsonb_agg(public.talent_json(t, v_now, v_co) order by t.role_key, t.tier desc, t.talent_key)
-                           from public.talents t where p_role is null or t.role_key = p_role), '[]'::jsonb));
-end;
-$$;
-comment on function public.get_talent_market(text) is 'RPC: the talent market (ADR-199), one Stelle or all.';
-
-create or replace function public.company_talents_json(p_company uuid)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  cfg   jsonb := public.talents_cfg();
-  v_now timestamptz := public.game_now();
-  v_out jsonb := '[]'::jsonb;
-  ro    jsonb;
-  t     public.talents;
-begin
-  for ro in select x from jsonb_array_elements(coalesce(cfg -> 'roles', '[]'::jsonb)) x loop
-    t := null;
-    select * into t from public.talents x where x.company_id = p_company and x.role_key = ro ->> 'key';
-    v_out := v_out || jsonb_build_array(jsonb_build_object(
-      'role', ro ->> 'key', 'effect', ro ->> 'effect',
-      'talent', case when t.talent_key is not null then public.talent_own_json(t, v_now) end));
-  end loop;
-  return jsonb_build_object(
-    'company_id', p_company,
-    'facts', public.talent_company_facts(p_company),
-    'seats', v_out,
-    'effect', public.talents_hour_effect(p_company),
-    'cap_bps', coalesce(cfg -> 'capBps', '{}'::jsonb),
-    'coceo_max', coalesce((cfg #>> '{coCeo,max}')::integer, 2),
-    'incoming', coalesce((select jsonb_agg(jsonb_build_object(
-                    'id', o.id, 'talent_key', o.talent_key, 'from_name', (select c.name from public.companies c where c.id = o.from_company),
-                    'wage_cents', o.wage_cents, 'benefits', to_jsonb(o.benefits), 'cost_cents', o.cost_cents, 'expires_at', o.expires_at)
-                    order by o.expires_at)
-                  from public.talent_offers o where o.to_company = p_company and o.status = 'pending'), '[]'::jsonb),
-    'outgoing', coalesce((select jsonb_agg(jsonb_build_object(
-                    'id', o.id, 'talent_key', o.talent_key, 'to_name', (select c.name from public.companies c where c.id = o.to_company),
-                    'cost_cents', o.cost_cents, 'expires_at', o.expires_at) order by o.expires_at)
-                  from public.talent_offers o where o.from_company = p_company and o.status = 'pending'), '[]'::jsonb),
-    'events', coalesce((select jsonb_agg(jsonb_build_object(
-                    'id', e.id, 'talent_key', e.talent_key, 'kind', e.kind, 'payload', e.payload, 'cost_cents', e.cost_cents,
-                    'reversible', e.reversible and e.undone_at is null, 'created_at', e.created_at) order by e.id desc)
-                  from (select * from public.talent_events x where x.company_id = p_company order by x.id desc limit 20) e), '[]'::jsonb));
-end;
-$$;
-
-create or replace function public.get_company_talents()
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid := public.require_player();
-  v_co     uuid;
-begin
-  perform public.talents_ensure();
-  v_co := public.talent_my_company(v_player);
-  if v_co is null then
-    perform public.api_error('company_not_found');
-  end if;
-  return public.company_talents_json(v_co);
-end;
-$$;
-comment on function public.get_company_talents() is 'RPC: the 15 Stellen of the own company with their talents (ADR-199).';
-
--- ---------------------------------------------------------------------------
--- E. Writes
--- ---------------------------------------------------------------------------
-create or replace function public.talent_offer(p_request_id uuid, p_talent_key text, p_wage_cents bigint, p_benefits text[])
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  cfg      jsonb := public.talents_cfg();
-  v_co     uuid;
-  t        public.talents;
-  v_now    timestamptz := public.game_now();
-  v_ben    text[];
-  v_checks jsonb;
-  v_cost   bigint;
-  v_min    bigint;
-  v_offer  uuid;
-  v_status text;
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_talent_key is null or p_wage_cents is null or p_wage_cents <= 0 or p_wage_cents % 100 <> 0 then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_ben := array(select distinct b from unnest(coalesce(p_benefits, '{}'::text[])) b
-                  where coalesce(cfg -> 'benefitCostBps', '{}'::jsonb) ? b order by 1);
-  if cardinality(v_ben) <> (select count(distinct b) from unnest(coalesce(p_benefits, '{}'::text[])) b) then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'talent_offer');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  perform public.talents_ensure();
-  v_co := public.talent_my_company(v_player);
-  if v_co is null then
-    perform public.api_error('company_not_found');
-  end if;
-  perform 1 from public.player_companies where company_id = v_co for update;
-  select * into t from public.talents where talent_key = p_talent_key for update;
-  if t.talent_key is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  if t.company_id = v_co then
-    perform public.api_error('already_hired');
-  end if;
-  if exists (select 1 from public.talents x where x.company_id = v_co and x.role_key = t.role_key) then
-    perform public.api_error('seat_taken');
-  end if;
-  v_checks := public.talent_check_offer(t, p_wage_cents, v_ben, public.talent_company_facts(v_co));
-  v_cost := public.talent_offer_cost(p_wage_cents, v_ben);
-  if t.company_id is null then
-    v_status := public.talent_status(t, v_now);
-    if v_status <> 'available' then
-      perform public.api_error('not_available');
-    end if;
-    if not public.talent_checks_ok(v_checks) then
-      perform public.api_error('demands_not_met');
-    end if;
-    perform public.talent_hire_into(t.talent_key, v_co, p_wage_cents, v_ben, v_now);
-    perform public.talent_log(v_co, t.talent_key, 'hired',
-      jsonb_build_object('name', public.talent_name(t), 'role', t.role_key, 'tier', t.tier, 'wage_cents', p_wage_cents));
-    return public.request_complete(v_player, p_request_id,
-             public.company_talents_json(v_co) || jsonb_build_object('result', 'hired', 'talent_key', t.talent_key));
-  end if;
-  -- poaching from another player company
-  if exists (select 1 from public.talent_offers o where o.talent_key = t.talent_key and o.status = 'pending') then
-    perform public.api_error('offer_pending');
-  end if;
-  if not public.talent_checks_ok(v_checks) then
-    perform public.api_error('demands_not_met');
-  end if;
-  v_min := public.talent_poach_min_cost(t);
-  if v_cost < v_min then
-    perform public.api_error('offer_too_low');
-  end if;
-  insert into public.talent_offers (talent_key, from_company, to_company, wage_cents, benefits, cost_cents, expires_at, created_by)
-  values (t.talent_key, v_co, t.company_id, p_wage_cents, v_ben, v_cost,
-          v_now + make_interval(mins => public.cfg_num(cfg, '{poach,counterMinutes}', 15)::integer), v_player)
-  returning id into v_offer;
-  perform public.talent_notify_founder(t.company_id, 'Abwerbeversuch',
-    (select c.name from public.companies c where c.id = v_co) || ' will ' || public.talent_name(t)
-      || ' abwerben. Du kannst innerhalb von ' || public.cfg_num(cfg, '{poach,counterMinutes}', 15)::integer
-      || ' Minuten nachbessern.',
-    jsonb_build_object('offer_id', v_offer, 'talent_key', t.talent_key), 'talent:poach:' || v_offer::text);
-  return public.request_complete(v_player, p_request_id,
-           public.company_talents_json(v_co) || jsonb_build_object('result', 'pending', 'talent_key', t.talent_key,
-                                                                   'offer_id', v_offer));
-end;
-$$;
-comment on function public.talent_offer(uuid, text, bigint, text[]) is
-  'RPC: offer to a talent (ADR-199): hires a free one when all demands are met, opens a poaching offer for one of '
-  'another player company. Errors demands_not_met, offer_too_low, offer_pending, seat_taken, not_available.';
-
--- The owner answers a poaching offer: the new contract must cost at least as much as the poacher's offer
-create or replace function public.talent_counter(p_request_id uuid, p_offer_id uuid, p_wage_cents bigint, p_benefits text[])
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  v_co     uuid;
-  o        public.talent_offers;
-  t        public.talents;
-  v_ben    text[];
-  v_now    timestamptz := public.game_now();
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_offer_id is null or p_wage_cents is null or p_wage_cents <= 0 or p_wage_cents % 100 <> 0 then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'talent_counter');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  v_co := public.talent_my_company(v_player);
-  select * into o from public.talent_offers where id = p_offer_id for update;
-  if o.id is null or v_co is null or o.to_company is distinct from v_co then
-    perform public.api_error('invalid_argument');
-  end if;
-  if o.status <> 'pending' or o.expires_at <= v_now then
-    perform public.api_error('offer_closed');
-  end if;
-  select * into t from public.talents where talent_key = o.talent_key for update;
-  v_ben := array(select distinct b from unnest(coalesce(p_benefits, '{}'::text[])) b
-                  where coalesce(public.talents_cfg() -> 'benefitCostBps', '{}'::jsonb) ? b order by 1);
-  if p_wage_cents < t.wage_demand_cents or not (t.benefit_demands <@ v_ben)
-     or public.talent_offer_cost(p_wage_cents, v_ben) < o.cost_cents then
-    perform public.api_error('offer_too_low');
-  end if;
-  update public.talents
-     set wage_cents = p_wage_cents, benefits = v_ben,
-         satisfaction_bps = least(10000, satisfaction_bps
-                                 + public.cfg_num(public.talents_cfg(), '{satisfaction,counterBonusBps}', 1000)::integer),
-         warned_at = null
-   where talent_key = t.talent_key;
-  update public.talent_offers set status = 'countered', settled_at = v_now where id = o.id;
-  perform public.talent_log(v_co, t.talent_key, 'countered',
-    jsonb_build_object('name', public.talent_name(t), 'role', t.role_key, 'wage_cents', p_wage_cents));
-  perform public.talent_notify_founder(o.from_company, 'Abwerben gescheitert',
-    public.talent_name(t) || ' bleibt: der Arbeitgeber hat nachgebessert.',
-    jsonb_build_object('offer_id', o.id, 'talent_key', t.talent_key), 'talent:countered:' || o.id::text);
-  return public.request_complete(v_player, p_request_id, public.company_talents_json(v_co));
-end;
-$$;
-comment on function public.talent_counter(uuid, uuid, bigint, text[]) is
-  'RPC: counter-offer of the current employer within poach.counterMinutes (ADR-199). Errors offer_closed, offer_too_low.';
-
-create or replace function public.talent_dismiss(p_request_id uuid, p_talent_key text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  v_co     uuid;
-  t        public.talents;
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_talent_key is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'talent_dismiss');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  v_co := public.talent_my_company(v_player);
-  select * into t from public.talents where talent_key = p_talent_key for update;
-  if v_co is null or t.company_id is distinct from v_co then
-    perform public.api_error('invalid_argument');
-  end if;
-  perform public.talent_release(t.talent_key, public.game_now(), true);
-  perform public.talent_log(v_co, t.talent_key, 'dismissed', jsonb_build_object('name', public.talent_name(t), 'role', t.role_key));
-  return public.request_complete(v_player, p_request_id, public.company_talents_json(v_co));
-end;
-$$;
-
--- ---------------------------------------------------------------------------
--- F. Background: offers, wages, satisfaction, quitting
--- ---------------------------------------------------------------------------
--- Expired poaching offers: the talent moves when the poacher still meets every demand and the seat is free
-create or replace function public.talent_offers_settle(p_now timestamptz)
-returns integer
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  o    public.talent_offers;
-  t    public.talents;
-  v_n  integer := 0;
-begin
-  for o in select * from public.talent_offers where status = 'pending' and expires_at <= p_now order by expires_at for update skip locked loop
-    select * into t from public.talents where talent_key = o.talent_key for update;
-    if exists (select 1 from public.player_companies pc where pc.company_id = o.from_company and pc.status = 'active')
-       and not exists (select 1 from public.talents x where x.company_id = o.from_company and x.role_key = t.role_key)
-       and public.talent_checks_ok(public.talent_check_offer(t, o.wage_cents, o.benefits, public.talent_company_facts(o.from_company)))
-       and (t.company_id is null or t.company_id = o.to_company) then
-      if t.company_id is not null then
-        perform public.talent_log(t.company_id, t.talent_key, 'poached',
-          jsonb_build_object('name', public.talent_name(t), 'role', t.role_key,
-                             'to_name', (select c.name from public.companies c where c.id = o.from_company)));
-        perform public.talent_notify_founder(t.company_id, 'Talent abgeworben',
-          public.talent_name(t) || ' wechselt zu ' || (select c.name from public.companies c where c.id = o.from_company) || '.',
-          jsonb_build_object('talent_key', t.talent_key), 'talent:poached:' || o.id::text);
-      end if;
-      perform public.talent_hire_into(t.talent_key, o.from_company, o.wage_cents, o.benefits, p_now);
-      perform public.talent_log(o.from_company, t.talent_key, 'hired',
-        jsonb_build_object('name', public.talent_name(t), 'role', t.role_key, 'tier', t.tier, 'wage_cents', o.wage_cents,
-                           'poached', true));
-      perform public.talent_notify_founder(o.from_company, 'Talent gewonnen',
-        public.talent_name(t) || ' fängt bei dir an.', jsonb_build_object('talent_key', t.talent_key),
-        'talent:won:' || o.id::text);
-      update public.talent_offers set status = 'accepted', settled_at = p_now where id = o.id;
-    else
-      update public.talent_offers set status = 'failed', settled_at = p_now where id = o.id;
-      perform public.talent_notify_founder(o.from_company, 'Abwerben gescheitert',
-        public.talent_name(t) || ' kommt nicht: Forderungen beim Wechsel nicht mehr erfüllt.',
-        jsonb_build_object('talent_key', t.talent_key), 'talent:failed:' || o.id::text);
-    end if;
-    v_n := v_n + 1;
-  end loop;
-  return v_n;
-end;
-$$;
-
--- One full hour of one talent: wage and benefits through the ledger, satisfaction, warning, quitting
-create or replace function public.talent_hour(p_key text, p_hour_start timestamptz)
-returns text
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  cfg     jsonb := public.talents_cfg();
-  t       public.talents;
-  pc      public.player_companies;
-  v_facts jsonb;
-  v_cost  bigint;
-  v_free  bigint;
-  v_paid  boolean;
-  v_morale double precision;
-  v_dec   double precision := 1;
-  v_loss  double precision := 0;
-  v_sat   integer;
-  tr      text;
-begin
-  select * into t from public.talents where talent_key = p_key for update;
-  if t.company_id is null then
-    return 'gone';
-  end if;
-  select * into pc from public.player_companies where company_id = t.company_id;
-  if pc.company_id is null or pc.status <> 'active' then
-    perform public.talent_release(t.talent_key, p_hour_start + interval '1 hour', true);
-    return 'gone';
-  end if;
-  v_cost := public.talent_offer_cost(t.wage_cents, t.benefits);
-  select a.balance_cents - pc.unpaid_cents into v_free
-    from public.ledger_accounts a where a.owner_company_id = t.company_id and a.kind = 'company_cash' for update;
-  v_paid := coalesce(v_free, 0) >= v_cost;
-  if v_paid and v_cost > 0 then
-    perform public.ledger_transfer(public.company_cash_account(t.company_id), public.ledger_system_account('households'),
-                                   v_cost, 'company_costs', 'Talent: ' || public.talent_name(t), 'company', t.company_id,
-                                   'talent_wage:' || t.talent_key || ':' || t.company_id::text || ':'
-                                     || extract(epoch from p_hour_start)::bigint::text, pc.founder_id);
-  end if;
-  v_facts := public.talent_company_facts(t.company_id);
-  -- talentSatisfactionStep
-  foreach tr in array t.traits loop
-    v_dec := v_dec * coalesce((select (x ->> 'decayPct')::double precision
-                                 from jsonb_array_elements(coalesce(cfg -> 'traits', '[]'::jsonb)) x where x ->> 'key' = tr), 100) / 100.0;
-  end loop;
-  if not v_paid then v_loss := v_loss + public.cfg_num(cfg, '{satisfaction,unpaidBps}', 2500); end if;
-  if (v_facts ->> 'reputation')::double precision < t.min_reputation then
-    v_loss := v_loss + public.cfg_num(cfg, '{satisfaction,reputationBps}', 800);
-  end if;
-  if (v_facts ->> 'awareness_bps')::integer < t.min_awareness_bps then
-    v_loss := v_loss + public.cfg_num(cfg, '{satisfaction,awarenessBps}', 400);
-  end if;
-  if not (t.benefit_demands <@ t.benefits) then
-    v_loss := v_loss + public.cfg_num(cfg, '{satisfaction,benefitBps}', 600);
-  end if;
-  v_morale := case when t.role_key = 'hr' then 0
-                   else (public.talents_hour_effect(t.company_id) #>> '{bps,morale}')::double precision end;
-  v_sat := greatest(0, least(10000, t.satisfaction_bps
-             + case when v_loss > 0 then -round(v_loss * v_dec)::integer else public.cfg_num(cfg, '{satisfaction,gainBps}', 250)::integer end
-             + greatest(0, coalesce(v_morale, 0))::integer));
-  insert into public.talent_hours (talent_key, hour_start, company_id, cost_cents, paid, satisfaction_bps)
-  values (t.talent_key, p_hour_start, t.company_id, v_cost, v_paid, v_sat)
-  on conflict do nothing;
-  update public.talents set satisfaction_bps = v_sat, paid_until = p_hour_start + interval '1 hour' where talent_key = t.talent_key;
-  if v_sat <= public.cfg_num(cfg, '{satisfaction,quitBps}', 1000) then
-    perform public.talent_release(t.talent_key, p_hour_start + interval '1 hour', true);
-    perform public.talent_log(t.company_id, t.talent_key, 'quit',
-      jsonb_build_object('name', public.talent_name(t), 'role', t.role_key, 'paid', v_paid));
-    perform public.talent_notify_founder(t.company_id, 'Kündigung', public.talent_name(t) || ' hat gekündigt.',
-      jsonb_build_object('talent_key', t.talent_key), 'talent:quit:' || t.talent_key || ':' || extract(epoch from p_hour_start)::bigint::text);
-    return 'quit';
-  end if;
-  if v_sat < public.cfg_num(cfg, '{satisfaction,warnBps}', 3500) and t.warned_at is null then
-    update public.talents set warned_at = p_hour_start + interval '1 hour' where talent_key = t.talent_key;
-    perform public.talent_log(t.company_id, t.talent_key, 'warned',
-      jsonb_build_object('name', public.talent_name(t), 'role', t.role_key, 'satisfaction_bps', v_sat, 'paid', v_paid));
-    perform public.talent_notify_founder(t.company_id, 'Talent unzufrieden',
-      public.talent_name(t) || ' ist unzufrieden und denkt über eine Kündigung nach.',
-      jsonb_build_object('talent_key', t.talent_key), 'talent:warn:' || t.talent_key || ':' || extract(epoch from p_hour_start)::bigint::text);
-  elsif v_sat >= public.cfg_num(cfg, '{satisfaction,warnBps}', 3500) then
-    update public.talents set warned_at = null where talent_key = t.talent_key and warned_at is not null;
-  end if;
-  return case when v_paid then 'paid' else 'unpaid' end;
-end;
-$$;
-
--- Marketing (awareness) and Recht (reputation) once per company and hour, capped
-create or replace function public.talent_company_hour(p_company uuid, p_hour_start timestamptz)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_bps jsonb := public.talents_hour_effect(p_company) -> 'bps';
-  v_aw  double precision := coalesce((v_bps ->> 'awareness')::double precision, 0) / 10000.0;
-  v_rp  double precision := coalesce((v_bps ->> 'reputation')::double precision, 0) / 100.0;
-  v_ok  boolean;
-begin
-  if v_aw <= 0 and v_rp <= 0 then
-    return;
-  end if;
-  insert into public.talent_company_hours (company_id, hour_start, awareness, reputation)
-  values (p_company, p_hour_start, v_aw, v_rp)
-  on conflict do nothing
-  returning true into v_ok;
-  if not coalesce(v_ok, false) then
-    return;
-  end if;
-  if v_aw > 0 then
-    perform public.company_awareness_add(p_company, 'talents', v_aw);
-  end if;
-  if v_rp > 0 then
-    perform public.company_reputation_bump(p_company, v_rp);
-  end if;
-end;
-$$;
-
--- Hook of the Mit-Geschäftsführung (8910 replaces it)
-create or replace function public.talents_coceo_run(p_now timestamptz)
-returns integer
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  return 0;
-end;
-$$;
-
-create or replace function public.talents_run_due(p_now timestamptz default null)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_now   timestamptz := coalesce(p_now, public.game_now());
-  r       record;
-  v_hour  timestamptz;
-  v_n     integer := 0;
-  v_off   integer := 0;
-  v_co    integer := 0;
-  v_res   text;
-  v_steps integer;
-begin
-  perform public.talents_ensure();
-  v_off := public.talent_offers_settle(v_now);
-  for r in select t.talent_key, t.company_id from public.talents t
-            where t.company_id is not null and t.paid_until + interval '1 hour' <= v_now
-            order by t.paid_until
-  loop
-    v_steps := 0;
-    loop
-      select t.paid_until into v_hour from public.talents t where t.talent_key = r.talent_key and t.company_id = r.company_id;
-      exit when v_hour is null or v_hour + interval '1 hour' > v_now or v_steps >= 48;
-      begin
-        v_res := public.talent_hour(r.talent_key, v_hour);
-      exception when others then
-        perform public.job_run_warn('talent_hour', r.talent_key || ': ' || sqlerrm);
-        exit;
-      end;
-      perform public.talent_company_hour(r.company_id, date_trunc('hour', v_hour));
-      v_n := v_n + 1;
-      v_steps := v_steps + 1;
-      exit when v_res in ('quit', 'gone');
-    end loop;
-  end loop;
-  begin
-    v_co := public.talents_coceo_run(v_now);
-  exception when others then
-    perform public.job_run_warn('talents_coceo', sqlerrm);
-  end;
-  return jsonb_build_object('hours', v_n, 'offers', v_off, 'coceo', v_co);
-end;
-$$;
-
--- warning row in job_runs (as company_hour_step); missing table: ignore
-create or replace function public.job_run_warn(p_job text, p_message text)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  begin
-    insert into public.job_runs (job_name, run_key, status, finished_at, error)
-    values (p_job, gen_random_uuid()::text, 'failed', now(), left(p_message, 500));
-  exception when others then
-    raise warning '%: %', p_job, p_message;
-  end;
-end;
-$$;
-
--- ---------------------------------------------------------------------------
--- G. Grants and schedule
--- ---------------------------------------------------------------------------
-do $do$
-declare
-  f text;
-begin
-  foreach f in array array['public.talents_cfg()', 'public.talents_ensure()', 'public.talent_trait_num(text[], text)',
-                           'public.talent_offer_cost(bigint, text[])', 'public.talent_form_rank(uuid)',
-                           'public.talent_company_facts(uuid)',
-                           'public.talent_check_offer(public.talents, bigint, text[], jsonb)', 'public.talent_checks_ok(jsonb)',
-                           'public.talent_poach_min_cost(public.talents)', 'public.talent_status(public.talents, timestamptz)',
-                           'public.talent_name(public.talents)', 'public.talent_log(uuid, text, text, jsonb, bigint, boolean)',
-                           'public.talent_notify_founder(uuid, text, text, jsonb, text)',
-                           'public.talent_hire_into(text, uuid, bigint, text[], timestamptz)',
-                           'public.talent_release(text, timestamptz, boolean)', 'public.talents_hour_effect(uuid)',
-                           'public.listed_hour_effect(uuid, timestamptz)',
-                           'public.talent_json(public.talents, timestamptz, uuid)', 'public.talent_own_json(public.talents, timestamptz)',
-                           'public.talent_my_company(uuid)', 'public.company_talents_json(uuid)',
-                           'public.talent_offers_settle(timestamptz)', 'public.talent_hour(text, timestamptz)',
-                           'public.talent_company_hour(uuid, timestamptz)', 'public.talents_coceo_run(timestamptz)',
-                           'public.talents_run_due(timestamptz)', 'public.job_run_warn(text, text)'] loop
-    execute format('revoke all on function %s from public, anon, authenticated', f);
-  end loop;
-  foreach f in array array['public.get_talent_market(text)', 'public.get_company_talents()',
-                           'public.talent_offer(uuid, text, bigint, text[])', 'public.talent_counter(uuid, uuid, bigint, text[])',
-                           'public.talent_dismiss(uuid, text)'] loop
-    execute format('revoke all on function %s from public, anon', f);
-    execute format('grant execute on function %s to authenticated', f);
-  end loop;
-  if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-talents';
-    perform cron.schedule('nexa-talents', '* * * * *', 'select public.talents_run_due()');
-  end if;
-end;
-$do$;
-
--- ===== supabase/migrations/20261204008910_talent_coceo.sql =====
--- =============================================================================
--- NEXA · 8910 · Mit-Geschäftsführung durch Talente (ADR-199)
--- =============================================================================
--- * talent_coceo_appoint(request, key, wage, autonomy, budget): an own talent of tier >= coCeo.minTier (trait
---   "leader": one lower) becomes Mit-Geschäftsführer (at most coCeo.max). Needs "say" (Mitspracherecht) and a wage of
---   at least the demand x (1 + coCeo.wageBonusBps). Autonomy "advise" (only recommends) or "decide" (acts within the
---   day budget, at most coCeo.maxBudgetCents). talent_coceo_set changes autonomy and budget or removes the role.
--- * talents_coceo_run(now) (replaces the 8900 hook, called by talents_run_due): once per hour and Mit-GF:
---   1. responds to an open company event waiting coCeo.eventDelayMinutes: strategy by personality (talentCoCeoPick;
---      cautious = highest mitigation, bold = fewest steps); "advise" only logs the recommendation;
---   2. switches the existing autopilot (ADR-180) on, unless the owner undid that before;
---   3. learns the cheapest learnable Fertigkeit (ADR-194, same rules and ledger booking) within the remaining day
---      budget (cautious: half of it) and the free cash beyond talentsCashCover.
---   Every decision: talent_events ('decision' / 'advice'), company news, a notification with the name.
--- * talent_undo_decision(request, id): undoes a reversible decision (event strategy before a step, autopilot).
--- Idempotent: runs unchanged as supabase/updates/20261204008910_talent_coceo.sql.
-
-alter table public.talents add column if not exists coceo_last_run timestamptz;
-
-create or replace function public.talent_coceo_style(p_traits text[])
-returns text
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select coalesce((select tr ->> 'style'
-                     from unnest(coalesce(p_traits, '{}'::text[])) with ordinality u(k, n)
-                     join jsonb_array_elements(coalesce(public.talents_cfg() -> 'traits', '[]'::jsonb)) tr on tr ->> 'key' = u.k
-                    where tr ? 'style' order by u.n limit 1), 'balanced');
-$$;
-
--- talentCoCeoPick
-create or replace function public.talent_coceo_pick(p_strategies jsonb, p_style text)
-returns text
-language sql
-stable
-set search_path = ''
-as $$
-  select s ->> 'key'
-    from jsonb_array_elements(coalesce(p_strategies, '[]'::jsonb)) with ordinality x(s, n)
-   order by case p_style
-              when 'cautious' then coalesce((s ->> 'mitigation')::double precision, 0)
-              when 'bold' then -jsonb_array_length(coalesce(s -> 'steps', '[]'::jsonb)) * 10
-                               + coalesce((s ->> 'mitigation')::double precision, 0)
-              else coalesce((s ->> 'mitigation')::double precision, 0) / (1 + jsonb_array_length(coalesce(s -> 'steps', '[]'::jsonb)))
-            end desc, n
-   limit 1;
-$$;
-
-create or replace function public.talent_coceo_eligible(t public.talents)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select t.tier >= public.cfg_num(public.talents_cfg(), '{coCeo,minTier}', 2)
-                   - case when exists (select 1 from jsonb_array_elements(coalesce(public.talents_cfg() -> 'traits', '[]'::jsonb)) tr
-                                        where tr ->> 'key' = any (t.traits) and (tr ->> 'leader')::boolean) then 1 else 0 end;
-$$;
-
-create or replace function public.talent_coceo_appoint(p_request_id uuid, p_talent_key text, p_wage_cents bigint,
-                                                       p_autonomy text, p_budget_cents bigint)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  cfg      jsonb := public.talents_cfg();
-  v_co     uuid;
-  t        public.talents;
-  v_min    bigint;
-  v_ben    text[];
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_talent_key is null or p_wage_cents is null or p_wage_cents % 100 <> 0
-     or p_autonomy not in ('advise', 'decide') or p_budget_cents is null or p_budget_cents < 0
-     or p_budget_cents > public.cfg_num(cfg, '{coCeo,maxBudgetCents}', 10000000) then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'talent_coceo_appoint');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  v_co := public.talent_my_company(v_player);
-  perform 1 from public.player_companies where company_id = v_co for update;
-  select * into t from public.talents where talent_key = p_talent_key for update;
-  if v_co is null or t.company_id is distinct from v_co then
-    perform public.api_error('invalid_argument');
-  end if;
-  if t.is_coceo then
-    perform public.api_error('already_hired');
-  end if;
-  if not public.talent_coceo_eligible(t) then
-    perform public.api_error('not_eligible');
-  end if;
-  if (select count(*) from public.talents x where x.company_id = v_co and x.is_coceo)
-     >= public.cfg_num(cfg, '{coCeo,max}', 2) then
-    perform public.api_error('coceo_full');
-  end if;
-  v_min := ceil(t.wage_demand_cents * (10000 + public.cfg_num(cfg, '{coCeo,wageBonusBps}', 3000)) / 10000.0 / 100.0)::bigint * 100;
-  if p_wage_cents < greatest(v_min, t.wage_cents) then
-    perform public.api_error('offer_too_low');
-  end if;
-  v_ben := array(select distinct b from unnest(t.benefits || array['say']) b order by 1);
-  if public.talent_offer_cost(p_wage_cents, v_ben) * coalesce((cfg ->> 'cashCoverHours')::integer, 12)
-     > (public.talent_company_facts(v_co) ->> 'free_cash_cents')::bigint then
-    perform public.api_error('insufficient_funds');
-  end if;
-  update public.talents
-     set is_coceo = true, wage_cents = p_wage_cents, benefits = v_ben, coceo_autonomy = p_autonomy,
-         coceo_budget_cents = p_budget_cents, coceo_last_run = null
-   where talent_key = t.talent_key;
-  perform public.talent_log(v_co, t.talent_key, 'coceo_appointed',
-    jsonb_build_object('name', public.talent_name(t), 'role', t.role_key, 'autonomy', p_autonomy, 'budget_cents', p_budget_cents,
-                       'wage_cents', p_wage_cents));
-  return public.request_complete(v_player, p_request_id, public.company_talents_json(v_co));
-end;
-$$;
-comment on function public.talent_coceo_appoint(uuid, text, bigint, text, bigint) is
-  'RPC: appoints an own talent as Mit-Geschäftsführer (ADR-199). Errors not_eligible, coceo_full, offer_too_low, insufficient_funds.';
-
-create or replace function public.talent_coceo_set(p_request_id uuid, p_talent_key text, p_autonomy text, p_budget_cents bigint,
-                                                   p_remove boolean default false)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  v_co     uuid;
-  t        public.talents;
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_talent_key is null
-     or (not coalesce(p_remove, false) and (p_autonomy not in ('advise', 'decide') or p_budget_cents is null or p_budget_cents < 0
-         or p_budget_cents > public.cfg_num(public.talents_cfg(), '{coCeo,maxBudgetCents}', 10000000))) then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'talent_coceo_set');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  v_co := public.talent_my_company(v_player);
-  select * into t from public.talents where talent_key = p_talent_key for update;
-  if v_co is null or t.company_id is distinct from v_co or not t.is_coceo then
-    perform public.api_error('invalid_argument');
-  end if;
-  if coalesce(p_remove, false) then
-    update public.talents set is_coceo = false, coceo_budget_cents = 0 where talent_key = t.talent_key;
-    perform public.talent_log(v_co, t.talent_key, 'coceo_removed', jsonb_build_object('name', public.talent_name(t)));
-  else
-    update public.talents set coceo_autonomy = p_autonomy, coceo_budget_cents = p_budget_cents where talent_key = t.talent_key;
-  end if;
-  return public.request_complete(v_player, p_request_id, public.company_talents_json(v_co));
-end;
-$$;
-
-create or replace function public.talent_undo_decision(p_request_id uuid, p_event_id bigint)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_player uuid;
-  v_replay jsonb;
-  v_co     uuid;
-  e        public.talent_events;
-  ev       public.player_company_events;
-begin
-  v_player := public.require_player();
-  if p_request_id is null or p_event_id is null then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'talent_undo_decision');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  v_co := public.talent_my_company(v_player);
-  select * into e from public.talent_events where id = p_event_id for update;
-  if v_co is null or e.company_id is distinct from v_co or not e.reversible or e.undone_at is not null then
-    perform public.api_error('invalid_argument');
-  end if;
-  case e.payload ->> 'action'
-    when 'autopilot_on' then
-      update public.company_autopilot set enabled = false, updated_at = now() where company_id = v_co;
-    when 'event_strategy' then
-      select * into ev from public.player_company_events where id = (e.payload ->> 'event_id')::uuid for update;
-      if ev.id is null or ev.status not in ('open', 'accepted')
-         or exists (select 1 from public.company_event_steps s where s.event_id = ev.id) then
-        perform public.api_error('locked');
-      end if;
-      update public.player_company_events set strategy = null, status = 'open' where id = ev.id;
-    else
-      perform public.api_error('invalid_argument');
-  end case;
-  update public.talent_events set undone_at = now() where id = e.id;
-  return public.request_complete(v_player, p_request_id, public.company_talents_json(v_co));
-end;
-$$;
-comment on function public.talent_undo_decision(uuid, bigint) is
-  'RPC: the owner undoes a reversible decision of a Mit-Geschäftsführer (ADR-199). Errors locked, invalid_argument.';
-
--- One decision: log, news and a notification with the name
-create or replace function public.talent_coceo_said(t public.talents, p_kind text, p_payload jsonb, p_text text,
-                                                    p_cost bigint, p_reversible boolean)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_id bigint;
-begin
-  v_id := public.talent_log(t.company_id, t.talent_key, p_kind,
-            p_payload || jsonb_build_object('name', public.talent_name(t), 'text', p_text), p_cost, p_reversible);
-  perform public.talent_notify_founder(t.company_id,
-    case when p_kind = 'advice' then 'Empfehlung der Mit-Geschäftsführung' else 'Entscheidung der Mit-Geschäftsführung' end,
-    public.talent_name(t) || ' (Mit-GF) ' || p_text, jsonb_build_object('talent_key', t.talent_key, 'event_id', v_id),
-    'talent:coceo:' || v_id::text);
-end;
-$$;
-
-create or replace function public.talents_coceo_run(p_now timestamptz)
-returns integer
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  cfg     jsonb := public.talents_cfg();
-  scfg    jsonb := public.company_skills_cfg();
-  t       public.talents;
-  pc      public.player_companies;
-  ev      public.player_company_events;
-  v_style text;
-  v_pick  text;
-  v_day   date := (p_now at time zone 'Europe/Berlin')::date;
-  v_spent bigint;
-  v_limit bigint;
-  v_free  bigint;
-  v_cover bigint;
-  v_n     integer := 0;
-  s       jsonb;
-  cs      public.company_skills;
-  v_lvl   integer;
-  v_need  text;
-  v_cost  bigint;
-  v_best  jsonb;
-  v_bestc bigint;
-  v_hours double precision;
-  v_max   integer := coalesce((scfg ->> 'maxLevel')::integer, 5);
-begin
-  for t in select * from public.talents x
-            where x.is_coceo and x.company_id is not null
-              and (x.coceo_last_run is null or x.coceo_last_run <= p_now - interval '1 hour')
-            order by x.talent_key for update skip locked
-  loop
-    select * into pc from public.player_companies where company_id = t.company_id and status = 'active';
-    continue when pc.company_id is null;
-    update public.talents set coceo_last_run = p_now where talent_key = t.talent_key;
-    v_style := public.talent_coceo_style(t.traits);
-    v_spent := case when t.coceo_spent_day = v_day then t.coceo_spent_cents else 0 end;
-
-    -- 1. company event without a response
-    ev := null;
-    select * into ev from public.player_company_events e
-     where e.company_id = t.company_id and e.status = 'open' and e.strategy is null
-       and e.started_at <= p_now - make_interval(mins => public.cfg_num(cfg, '{coCeo,eventDelayMinutes}', 30)::integer)
-     order by e.started_at desc limit 1;
-    if ev.id is not null
-       and not exists (select 1 from public.talent_events x where x.company_id = t.company_id
-                         and x.kind in ('decision', 'advice') and x.payload ->> 'event_id' = ev.id::text) then
-      v_pick := public.talent_coceo_pick(ev.definition -> 'strategies', v_style);
-      if v_pick is not null then
-        if t.coceo_autonomy = 'decide' then
-          update public.player_company_events set strategy = v_pick,
-                 status = case when jsonb_array_length(coalesce((select s2 -> 'steps' from jsonb_array_elements(ev.definition -> 'strategies') s2
-                                                                   where s2 ->> 'key' = v_pick limit 1), '[]'::jsonb)) = 0
-                               then 'accepted' else status end
-           where id = ev.id;
-          perform public.talent_coceo_said(t, 'decision',
-            jsonb_build_object('action', 'event_strategy', 'event_id', ev.id, 'strategy', v_pick, 'style', v_style),
-            'hat auf das Ereignis reagiert: Strategie „' || v_pick || '“.', 0, true);
-        else
-          perform public.talent_coceo_said(t, 'advice',
-            jsonb_build_object('action', 'event_strategy', 'event_id', ev.id, 'strategy', v_pick, 'style', v_style),
-            'empfiehlt für das Ereignis die Strategie „' || v_pick || '“.', 0, false);
-        end if;
-        v_n := v_n + 1;
-      end if;
-    end if;
-
-    continue when t.coceo_autonomy <> 'decide';
-
-    -- 2. the autopilot (ADR-180), unless the owner undid that before
-    if not coalesce((select a.enabled from public.company_autopilot a where a.company_id = t.company_id), false)
-       and not exists (select 1 from public.talent_events x where x.company_id = t.company_id
-                         and x.payload ->> 'action' = 'autopilot_on') then
-      insert into public.company_autopilot as a (company_id, enabled, enabled_at, updated_at)
-      values (t.company_id, true, p_now, now())
-      on conflict (company_id) do update set enabled = true, enabled_at = excluded.enabled_at, updated_at = now();
-      perform public.talent_coceo_said(t, 'decision', jsonb_build_object('action', 'autopilot_on'),
-        'hat den Autopiloten eingeschaltet.', 0, true);
-      v_n := v_n + 1;
-    end if;
-
-    -- 3. the cheapest learnable Fertigkeit within the budget
-    v_limit := case when v_style = 'cautious'
-                    then (greatest(0, t.coceo_budget_cents - v_spent) * public.cfg_num(cfg, '{coCeo,cautiousSpendBps}', 5000) / 10000)::bigint
-                    else greatest(0, t.coceo_budget_cents - v_spent) end;
-    continue when v_limit <= 0;
-    select a.balance_cents - pc.unpaid_cents into v_free
-      from public.ledger_accounts a where a.owner_company_id = t.company_id and a.kind = 'company_cash' for update;
-    v_cover := coalesce((select sum(public.talent_offer_cost(x.wage_cents, x.benefits)) from public.talents x
-                          where x.company_id = t.company_id), 0) * coalesce((cfg ->> 'cashCoverHours')::integer, 12);
-    v_best := null;
-    v_bestc := null;
-    for s in select x from jsonb_array_elements(coalesce(scfg -> 'skills', '[]'::jsonb)) x loop
-      cs := null;
-      select * into cs from public.company_skills k where k.company_id = t.company_id and k.skill_key = s ->> 'key';
-      v_lvl := coalesce(cs.level, 0);
-      continue when v_lvl >= v_max or cs.ready_at > p_now;
-      v_need := s -> 'requires' ->> v_lvl;
-      continue when v_need is not null and not (v_need = any (public.company_held_skills(t.company_id)));
-      v_cost := coalesce((scfg -> 'costCentsByLevel' ->> v_lvl)::bigint, 0);
-      continue when v_cost > v_limit or v_cost > coalesce(v_free, 0) - v_cover;
-      if v_bestc is null or v_cost < v_bestc then
-        v_best := s || jsonb_build_object('_level', v_lvl);
-        v_bestc := v_cost;
-      end if;
-    end loop;
-    if v_best is not null then
-      v_lvl := (v_best ->> '_level')::integer;
-      v_hours := coalesce((scfg -> 'trainingHoursByLevel' ->> v_lvl)::double precision, 0);
-      if v_bestc > 0 then
-        perform public.ledger_transfer(public.company_cash_account(t.company_id), public.ledger_system_account('households'),
-                                       v_bestc, 'company_costs', 'Fertigkeit: Schulung (Mit-GF)', 'company', t.company_id,
-                                       'talent_coceo_skill:' || t.talent_key || ':' || (v_best ->> 'key') || ':' || (v_lvl + 1)::text
-                                         || ':' || t.company_id::text, pc.founder_id);
-      end if;
-      insert into public.company_skills as k (company_id, skill_key, level, ready_at, spent_cents, updated_at)
-      values (t.company_id, v_best ->> 'key', v_lvl + 1, p_now + make_interval(secs => v_hours * 3600), v_bestc, now())
-      on conflict (company_id, skill_key) do update
-        set level = k.level + 1, ready_at = excluded.ready_at, spent_cents = k.spent_cents + excluded.spent_cents, updated_at = now();
-      update public.talents set coceo_spent_day = v_day, coceo_spent_cents = v_spent + v_bestc where talent_key = t.talent_key;
-      perform public.talent_coceo_said(t, 'decision',
-        jsonb_build_object('action', 'skill', 'skill_key', v_best ->> 'key', 'level', v_lvl + 1),
-        'hat die Fertigkeit „' || (v_best ->> 'key') || '“ auf Stufe ' || (v_lvl + 1) || ' gebracht.', v_bestc, false);
-      v_n := v_n + 1;
-    end if;
-  end loop;
-  return v_n;
-end;
-$$;
-
-do $do$
-declare
-  f text;
-begin
-  foreach f in array array['public.talent_coceo_style(text[])', 'public.talent_coceo_pick(jsonb, text)',
-                           'public.talent_coceo_eligible(public.talents)',
-                           'public.talent_coceo_said(public.talents, text, jsonb, text, bigint, boolean)',
-                           'public.talents_coceo_run(timestamptz)'] loop
-    execute format('revoke all on function %s from public, anon, authenticated', f);
-  end loop;
-  foreach f in array array['public.talent_coceo_appoint(uuid, text, bigint, text, bigint)',
-                           'public.talent_coceo_set(uuid, text, text, bigint, boolean)',
-                           'public.talent_undo_decision(uuid, bigint)'] loop
-    execute format('revoke all on function %s from public, anon', f);
-    execute format('grant execute on function %s to authenticated', f);
-  end loop;
-end;
-$do$;
-
 -- ===== supabase/migrations/20261204009500_toplists.sql =====
 -- =============================================================================
 -- NEXA · 9500 · Toplists: one valuation per list, every asset class in the net worth (ADR-203)
@@ -3588,5 +2121,1182 @@ begin
   end loop;
 end;
 $do$;
+
+-- ===== supabase/migrations/20261204009810_clone_jobs_rpcs.sql =====
+-- =============================================================================
+-- NEXA · 9810 · The job RPCs serve the clone, pay follows the skills (ADR-206)
+-- =============================================================================
+-- Latest full definitions (as of 9800) with these changes:
+-- * job_state, quit_job, cancel_quit, request_promotion, request_raise, get_employer: "the player's job" is the job of
+--   the holder job_acting_clone() names (own job by default, the clone's inside a clone_* wrapper). job_state also
+--   returns is_clone, holder_name, skill_pay_bps, profit_share_bps, stock_grant_chance_bps and rewards.
+-- * sign_contract, apply_for_job: applications and jobs carry the holder; the clone never at the founder's own company
+--   (clone_own_company), owner and clone never at the same company (clone_same_company), the founder rule of ADR-066
+--   only for the own job; a signed job takes the posting's profit share and stock grant extras.
+-- * get_job_board: skill_pay_bps, market_salary_cents_per_hour, profit_share_bps, stock_grant_chance_bps, the posting's
+--   extras, own_company, my_clone_application and has_clone; my_application is the own one.
+-- * The AI ceiling (apply_for_job, sign_contract, job_state, promotion_apply, get_job_board) is job_pay_ceiling():
+--   relevant branch scores and all learned skills (jobs.skillPay) instead of the capped match score.
+-- * company_full_time_check, player_company_team, company_task_member: the clone's job is no side job of the founder.
+-- * get_player_card: clone_job; get_company_team: is_clone; application_json: for_clone; chat_company_of,
+--   company_event_company_for, get_company_floor prefer the own job.
+-- Idempotent: runs unchanged as supabase/updates/20261204009810_clone_jobs_rpcs.sql.
+
+create or replace function public.job_state(p_player uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  j        public.player_jobs;
+  v_match  integer;
+  v_base   bigint;
+  v_max    integer;
+  v_ai     boolean;
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
+  v_factor integer;
+  v_bonus  bigint;
+  v_next   timestamptz;
+  v_open   boolean;
+begin
+  select * into j from public.player_jobs where player_id = p_player and status = 'active' and is_clone = public.job_acting_clone();
+  if j.id is null then
+    return jsonb_build_object('job', null);
+  end if;
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+  v_match := public.job_match_score(public.player_branch_scores(p_player), j.required);
+  v_max := greatest(0, public.config_double('jobs', '{raiseRequest,maxRaiseBpsPerScore}', 300)::integer * (v_match - j.raise_base_score));
+  if v_ai then
+    v_base := coalesce((public.career_tier(j.tier::text) ->> 'salaryCentsPerHour')::bigint, j.salary_cents_per_hour);
+    v_max := least(v_max, greatest(0, floor((public.job_pay_ceiling(p_player, v_base, j.required)::numeric / j.salary_cents_per_hour - 1) * 10000)::integer));
+  end if;
+  -- player companies: pay factor of the quarter x share the company could pay at the last payout
+  select pc.pay_factor_bps * j.pay_factor_bps / 10000,
+         coalesce((select sum(sp.bonus_cents) from public.salary_payouts sp join public.game_quarters gq on gq.id = pc.last_closed_quarter_id
+                    where sp.player_job_id = j.id and sp.bonus_cents > 0 and sp.period_end = gq.ends_at), 0)
+    into v_factor, v_bonus
+    from public.player_companies pc where pc.company_id = j.company_id and pc.status = 'active';
+  v_factor := coalesce(v_factor, j.pay_factor_bps);
+  -- automatic work (ADR-064): no new work tasks
+  v_next := null;
+  v_open := false;
+  return jsonb_build_object('job', jsonb_build_object(
+    'id', j.id,
+    'company', public.company_json(j.company_id),
+    'tier', j.tier,
+    'title_key', j.title_key,
+    'title', case when j.title_key is null then j.title end,
+    'required', j.required,
+    'salary_cents_per_hour', j.salary_cents_per_hour,
+    'pay_factor_bps', v_factor,
+    'effective_salary_cents_per_hour', j.salary_cents_per_hour * v_factor / 10000,
+    'last_bonus_cents', coalesce(v_bonus, 0),
+    'next_work_task_at', v_next,
+    'work_task_open', v_open,
+    'productivity_bps', public.job_productivity_bps(v_match),
+    'started_at', j.started_at,
+    'paid_hours_today', case when j.paid_day = v_today then round(j.paid_minutes_today / 60.0, 2) else 0 end,
+    'paid_hours_cap', public.player_paid_hours_cap(p_player),
+    'earned_total_cents', j.earned_total_cents,
+    'raise_available_at', case when j.raise_requested_at is null
+                                    or j.raise_requested_at + make_interval(secs => v_cool * 86400) <= now() then null
+                               else j.raise_requested_at + make_interval(secs => v_cool * 86400) end,
+    'raise_max_bps', v_max,
+    'pending_raise', case when j.pending_raise_bps is not null
+                          then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
+    'quit_cost_cents', 0,
+    'quit_now_cost_cents', round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint,
+    'notice_ends_at', j.notice_ends_at,
+    'signature', j.signature,
+    'rank_hours', round(j.rank_minutes / 60.0, 1),
+    'promotion', public.promotion_state(j.id),
+    -- ADR-103: presence and what it does to the pay
+    'presence', public.presence_json(p_player),
+    -- ADR-206: clone, skill pay, profit share, employee shares
+    'is_clone', j.is_clone,
+    'holder_name', public.job_holder_name(p_player, j.is_clone),
+    'skill_pay_bps', public.job_skill_pay_bps(public.player_branch_scores(p_player), public.player_skill_count(p_player), j.required),
+    'profit_share_bps', public.job_profit_share_bps(j.tier::text, j.profit_share_bonus_bps),
+    'stock_grant_chance_bps', public.job_stock_grant_bps(j.tier::text, j.stock_grant_bonus_bps),
+    'rewards', public.job_rewards_json(j.id)));
+end;
+$function$
+;
+
+create or replace function public.quit_job(p_request_id uuid, p_immediate boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  v_cost   bigint;
+  v_cash   bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'quit_job');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform public.lock_player_accounts(v_player);
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if not coalesce(p_immediate, false) then
+    if j.notice_ends_at is null then
+      update public.player_jobs
+         set notice_ends_at = now() + make_interval(secs => public.config_double('jobs', '{quitNoticeHours}', 24) * 3600)
+       where id = j.id
+      returning * into j;
+    end if;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('notice_ends_at', j.notice_ends_at));
+  end if;
+  -- at once: jobs.quitNowCostHours x contract wage to the employer
+  perform public.accrue_job_salary(j.id);
+  select * into j from public.player_jobs where id = j.id;
+  v_cost := round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint;
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash';
+  if coalesce(v_cash, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.company_cash_account(j.company_id),
+                                   v_cost, 'transfer', 'Sofortige Kündigung', 'player_job', j.id, 'quit:' || j.id::text, v_player);
+  end if;
+  update public.player_jobs set status = 'ended', ended_at = now(), end_reason = 'quit' where id = j.id;
+  perform public.company_system_message(j.company_id,
+    public.job_holder_name(v_player, j.is_clone) || ' hat gekündigt.');
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('ended', true, 'paid_cents', v_cost));
+end;
+$function$
+;
+
+create or replace function public.cancel_quit(p_request_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'cancel_quit');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if j.notice_ends_at is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  update public.player_jobs set notice_ends_at = null where id = j.id;
+  return public.request_complete(v_player, p_request_id, public.job_state(v_player));
+end;
+$function$
+;
+
+create or replace function public.request_promotion(p_request_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  c        public.companies;
+  v_state  jsonb;
+  v_next   text;
+  v_wage   bigint;
+  v_chance integer;
+  v_retry  timestamptz;
+  v_res    jsonb;
+  v_nick   text;
+  v_boss   uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'request_promotion');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  v_state := public.promotion_state(j.id);
+  if v_state ->> 'pending_since' is not null then
+    perform public.api_error('promotion_pending');
+  end if;
+  if v_state ->> 'retry_at' is not null then
+    perform public.api_error('promotion_too_soon');
+  end if;
+  if not coalesce((v_state ->> 'ready')::boolean, false) then
+    perform public.api_error('promotion_not_ready');
+  end if;
+  v_next := v_state ->> 'next_tier';
+  v_wage := (v_state ->> 'next_salary_cents_per_hour')::bigint;
+  select * into c from public.companies where id = j.company_id;
+
+  if c.is_ai then
+    v_chance := coalesce((v_state ->> 'chance_bps')::integer, 0);
+    -- promotionGranted: u x 10 000 < chance
+    if random() * 10000 < v_chance then
+      v_res := public.promotion_apply(j.id, v_wage);
+      return public.request_complete(v_player, p_request_id, jsonb_build_object(
+        'status', 'promoted', 'tier', v_res ->> 'tier', 'salary_cents_per_hour', (v_res ->> 'salary_cents_per_hour')::bigint,
+        'retry_at', null, 'chance_bps', v_chance));
+    end if;
+    v_retry := now() + make_interval(secs => public.cfg_num(public.promotion_cfg(), '{retryHours}', 24) * 3600);
+    update public.player_jobs set promotion_retry_at = v_retry where id = j.id;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object(
+      'status', 'declined', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
+      'retry_at', v_retry, 'chance_bps', v_chance));
+  end if;
+
+  -- player boss: the request waits for promote_employee / decline_promotion (founder and CEO are told)
+  update public.player_jobs set pending_promotion_at = now() where id = j.id;
+  select p.nickname into v_nick from public.profiles p where p.id = v_player;
+  for v_boss in select distinct x from unnest(array[c.founder_id, c.ceo_id]) x where x is not null and x <> v_player loop
+    perform public.social_notify(v_boss, 'promotion_request',
+      v_nick || ' bittet um Beförderung ' || public.career_tier_phrase(v_next),
+      'Die Anforderungen sind erfüllt. Neuer Lohn mindestens ' || public.format_eur(v_wage) || ' pro Stunde.',
+      jsonb_build_object('player_job_id', j.id, 'company_id', c.id, 'nickname', v_nick, 'tier', j.tier, 'next_tier', v_next,
+                         'min_salary_cents_per_hour', v_wage),
+      '/company', 'promotion_request:' || j.id::text || ':' || floor(extract(epoch from now()))::bigint::text);
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'status', 'pending', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
+    'retry_at', null, 'chance_bps', null));
+end;
+$function$
+;
+
+create or replace function public.request_raise(p_request_id uuid, p_raise_bps integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  v_state  jsonb;
+  v_ai     boolean;
+  v_new    bigint;
+  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_raise_bps is null or p_raise_bps < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'request_raise');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if j.raise_requested_at is not null and j.raise_requested_at + make_interval(secs => v_cool * 86400) > now() then
+    perform public.api_error('raise_too_soon');
+  end if;
+  v_state := public.job_state(v_player) -> 'job';
+  if p_raise_bps > (v_state ->> 'raise_max_bps')::integer then
+    perform public.api_error('raise_too_high');
+  end if;
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+  v_new := round(j.salary_cents_per_hour * (1 + p_raise_bps / 10000.0))::bigint;
+  if v_ai then
+    update public.player_jobs
+       set salary_cents_per_hour = v_new, raise_requested_at = now(), last_raise_at = now(),
+           raise_base_score = public.job_match_score(public.player_branch_scores(v_player), j.required),
+           pending_raise_bps = null, pending_raise_at = null
+     where id = j.id;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('status', 'accepted', 'salary_cents_per_hour', v_new));
+  end if;
+  update public.player_jobs
+     set raise_requested_at = now(), pending_raise_bps = p_raise_bps, pending_raise_at = now()
+   where id = j.id;
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('status', 'pending', 'salary_cents_per_hour', j.salary_cents_per_hour));
+end;
+$function$
+;
+
+create or replace function public.get_employer()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid := public.require_player();
+  j        public.player_jobs;
+  c        public.companies;
+  pc       public.player_companies;
+  v_last   jsonb;
+begin
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone();
+  if j.id is null then
+    return jsonb_build_object('employer', null);
+  end if;
+  select * into c from public.companies where id = j.company_id;
+  select * into pc from public.player_companies where company_id = j.company_id and status = 'active';
+  if c.is_ai then
+    select jsonb_build_object('label', 'J' || gq.game_year || ' Q' || gq.quarter, 'revenue_cents', r.revenue_cents,
+                              'profit_cents', r.net_income_cents)
+      into v_last
+      from public.company_quarter_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+     where r.company_id = c.id order by gq.ends_at desc limit 1;
+  else
+    select jsonb_build_object('label', r.label, 'revenue_cents', r.revenue_cents, 'profit_cents', r.operating_profit_cents)
+      into v_last
+      from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+     where r.company_id = c.id order by gq.ends_at desc limit 1;
+  end if;
+  return jsonb_build_object('employer', jsonb_build_object(
+    'company', public.company_json(c.id),
+    'kind', case when c.is_ai then 'ai' else 'player' end,
+    'product_key', case when pc.company_id is not null then public.company_product(c.id) ->> 'key' end,
+    'stage', case when pc.company_id is not null then public.company_stage(c.id) end,
+    'tier', pc.tier,
+    'founder', case when pc.company_id is not null then (select pr.nickname from public.profiles pr where pr.id = pc.founder_id) end,
+    'team_size', (select count(*) from public.player_jobs x where x.company_id = c.id and x.status = 'active')::integer
+                 + case when pc.company_id is not null then 1 else 0 end,
+    'last_quarter', v_last,
+    'pay_factor_bps', coalesce(pc.pay_factor_bps, 10000)));
+end;
+$function$
+;
+
+create or replace function public.sign_contract(p_request_id uuid, p_application_id uuid, p_signature text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  a        public.job_applications;
+  p        public.job_postings;
+  v_scores jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_signature is null or char_length(p_signature) < 1 or char_length(p_signature) > 8000 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'sign_contract');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.profiles pr where pr.id = v_player for update;
+  select * into a from public.job_applications where id = p_application_id and player_id = v_player for update;
+  if a.id is null then
+    perform public.api_error('application_not_found');
+  end if;
+  if a.status <> 'offered' then
+    perform public.api_error('application_not_offered');
+  end if;
+  if a.offer_expires_at <= now() then
+    perform public.api_error('offer_expired');
+  end if;
+  -- ADR-206: an application of the clone is signed by the clone and the other way round
+  if a.for_clone <> public.job_acting_clone() then
+    perform public.api_error('application_not_found');
+  end if;
+  if exists (select 1 from public.player_jobs j where j.player_id = v_player and j.status = 'active' and j.is_clone = public.job_acting_clone()) then
+    perform public.api_error('job_active_exists');
+  end if;
+  select * into p from public.job_postings where id = a.posting_id;
+  -- ADR-206: owner and clone never work at the same company; the clone never at the owner's company
+  if exists (select 1 from public.player_jobs j where j.player_id = v_player and j.status = 'active'
+                and j.company_id = p.company_id and j.is_clone <> public.job_acting_clone()) then
+    perform public.api_error('clone_same_company');
+  end if;
+  if public.job_acting_clone() then
+    if exists (select 1 from public.player_companies pc where pc.founder_id = v_player and pc.company_id = p.company_id) then
+      perform public.api_error('clone_own_company');
+    end if;
+  -- founders: a job elsewhere only while the company has fewer than fullTimeFromEmployees people (ADR-066)
+  elsif exists (select 1 from public.player_companies pc where pc.founder_id = v_player and pc.status = 'active'
+                and (pc.company_id = p.company_id
+                     or public.company_headcount(pc.company_id) >= public.config_double('startups', '{fullTimeFromEmployees}', 5))) then
+    perform public.api_error('owns_company');
+  end if;
+  -- player companies: players with an active job there + AI workers <= max employees (tier and expansion, ADR-083)
+  if exists (select 1 from public.player_companies pc where pc.company_id = p.company_id and pc.status = 'active'
+                and (select count(*) from public.player_jobs j where j.company_id = pc.company_id and j.status = 'active')
+                    + pc.ai_workers + 1 > public.company_max_employees(pc.company_id)) then
+    perform public.api_error('employee_limit');
+  end if;
+  if p.slots is not null
+     and (select count(*) from public.player_jobs j where j.posting_id = p.id and j.status = 'active') >= p.slots then
+    perform public.api_error('job_not_found');
+  end if;
+  v_scores := public.player_branch_scores(v_player);
+  insert into public.player_jobs (player_id, company_id, request_id, tier, title, title_key, required, salary_cents_per_hour,
+                                  ceiling_cents_per_hour, raise_base_score, posting_id, application_id, signature,
+                                  last_paid_at, started_at, paid_day, paid_minutes_today,
+                                  is_clone, profit_share_bonus_bps, stock_grant_bonus_bps)
+  values (v_player, p.company_id, p_request_id, p.tier, coalesce(p.title, p.title_key), p.title_key, p.required,
+          a.offer_salary_cents_per_hour,
+          case when p.is_ai then public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required) end,
+          public.job_match_score(v_scores, p.required), p.id, a.id, p_signature,
+          public.game_now(), public.game_now(), (public.game_now() at time zone 'Europe/Berlin')::date, 0,
+          public.job_acting_clone(), coalesce(p.profit_share_bps, 0), coalesce(p.stock_grant_bps, 0));
+  update public.job_applications set status = 'signed', signature = p_signature where id = a.id;
+  update public.job_applications set status = 'closed'
+   where player_id = v_player and id <> a.id and status in ('pending', 'offered') and for_clone = a.for_clone;
+  perform public.company_system_message(p.company_id,
+    public.job_holder_name(v_player, public.job_acting_clone()) || ' ist jetzt im Team.');
+  perform public.company_full_time_check(p.company_id);
+  return public.request_complete(v_player, p_request_id, public.job_state(v_player));
+end;
+$function$
+;
+
+create or replace function public.apply_for_job(p_request_id uuid, p_posting_id uuid, p_salary_wish_cents_per_hour bigint, p_message text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  p        public.job_postings;
+  v_tier   jsonb;
+  v_scores jsonb;
+  v_level  integer;
+  v_id     uuid := gen_random_uuid();
+  v_msg    text := nullif(btrim(coalesce(p_message, '')), '');
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'apply_for_job');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  select * into p from public.job_postings where id = p_posting_id;
+  if p.id is null or p.status <> 'open' or (p.expires_at is not null and p.expires_at <= now()) then
+    perform public.api_error('job_not_found');
+  end if;
+  if not p.is_ai and (p_salary_wish_cents_per_hour is null or p_salary_wish_cents_per_hour < 1) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if v_msg is not null and char_length(v_msg) > public.config_double('jobs', '{applicationMessageMaxLength}', 140) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if public.text_has_profanity(v_msg) then
+    perform public.api_error('name_profanity');
+  end if;
+  v_tier := public.career_tier(p.tier::text);
+  select pr.level into v_level from public.profiles pr where pr.id = v_player;
+  if v_level < coalesce((v_tier ->> 'minLevel')::integer, 1) then
+    perform public.api_error('job_level_too_low');
+  end if;
+  -- ADR-206: the clone never works at a company the player founded
+  if public.job_acting_clone() and exists (select 1 from public.player_companies pc
+                                           where pc.founder_id = v_player and pc.company_id = p.company_id) then
+    perform public.api_error('clone_own_company');
+  end if;
+  v_scores := public.player_branch_scores(v_player);
+  if not public.job_skills_ok(v_scores, p.required)
+     or exists (select 1 from unnest(p.required_skills) k
+                 where not exists (select 1 from public.player_skills s where s.player_id = v_player and s.skill_key = k)) then
+    perform public.api_error('job_skills_missing');
+  end if;
+  -- AI employers offer the personal ceiling; a wish is ignored (ADR-064)
+  if p.is_ai then
+    p_salary_wish_cents_per_hour := public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required);
+  end if;
+  perform 1 from public.profiles pr where pr.id = v_player for update;
+  if exists (select 1 from public.job_applications a
+              where a.player_id = v_player and a.posting_id = p.id and a.for_clone = public.job_acting_clone()
+                and (a.status = 'pending' or (a.status = 'offered' and a.offer_expires_at > now()))) then
+    perform public.api_error('application_exists');
+  end if;
+  if (select count(*) from public.job_applications a
+       where a.player_id = v_player and a.for_clone = public.job_acting_clone()
+         and (a.status = 'pending' or (a.status = 'offered' and a.offer_expires_at > now())))
+     >= public.config_double('jobs', '{maxOpenApplications}', 5) then
+    perform public.api_error('application_limit');
+  end if;
+
+  insert into public.job_applications (id, posting_id, player_id, request_id, salary_wish_cents_per_hour, message, status,
+                                       offer_salary_cents_per_hour, offer_expires_at, for_clone)
+  values (v_id, p.id, v_player, p_request_id, p_salary_wish_cents_per_hour, v_msg,
+          case when p.is_ai then 'offered' else 'pending' end,
+          case when p.is_ai then least(p_salary_wish_cents_per_hour,
+                                       public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required)) end,
+          case when p.is_ai then now() + make_interval(secs => public.config_double('jobs', '{offerValidHours}', 48) * 3600) end,
+          public.job_acting_clone());
+  return public.request_complete(v_player, p_request_id, public.application_json(v_id));
+end;
+$function$
+;
+
+create or replace function public.get_job_board()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_scores jsonb;
+  v_level  integer;
+  v_skills integer;
+  v_clone  boolean;
+begin
+  v_player := public.require_player();
+  perform public.refresh_ai_job_postings();
+  v_scores := public.player_branch_scores(v_player);
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  v_skills := public.player_skill_count(v_player);
+  v_clone := exists (select 1 from public.player_clones c where c.player_id = v_player);
+  return jsonb_build_object(
+    'postings', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id, 'company', public.company_json(p.company_id), 'tier', p.tier,
+               'title_key', p.title_key, 'title', p.title,
+               'min_level', coalesce((public.career_tier(p.tier::text) ->> 'minLevel')::integer, 1),
+               'required', p.required,
+               'required_skills', to_jsonb(p.required_skills),
+               'salary_cents_per_hour', p.salary_cents_per_hour,
+               'max_salary_cents_per_hour', case when p.is_ai then round(p.salary_cents_per_hour::numeric
+                                                    * public.job_skill_pay_bps(v_scores, v_skills, p.required) / 10000)::bigint end,
+               -- ADR-206: what the skills are worth for this role, profit share and chance for employee shares
+               'skill_pay_bps', public.job_skill_pay_bps(v_scores, v_skills, p.required),
+               'market_salary_cents_per_hour', round(coalesce((public.career_tier(p.tier::text) ->> 'salaryCentsPerHour')::bigint,
+                                                              p.salary_cents_per_hour)::numeric
+                                                     * public.job_skill_pay_bps(v_scores, v_skills, p.required) / 10000)::bigint,
+               'profit_share_bps', public.job_profit_share_bps(p.tier::text, p.profit_share_bps),
+               'stock_grant_chance_bps', public.job_stock_grant_bps(p.tier::text, p.stock_grant_bps),
+               'posting_profit_share_bps', p.profit_share_bps,
+               'posting_stock_grant_bps', p.stock_grant_bps,
+               'own_company', exists (select 1 from public.player_companies pc
+                                       where pc.founder_id = v_player and pc.company_id = p.company_id),
+               'my_clone_application', case when v_clone then (select jsonb_build_object('id', a.id,
+                                          'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end)
+                                    from public.job_applications a
+                                   where a.posting_id = p.id and a.player_id = v_player and a.for_clone
+                                   order by a.created_at desc limit 1) end,
+               'match_score', public.job_match_score(v_scores, p.required),
+               'eligible', v_level >= coalesce((public.career_tier(p.tier::text) ->> 'minLevel')::integer, 1)
+                           and public.job_skills_ok(v_scores, p.required)
+                           and not exists (select 1 from unnest(p.required_skills) k
+                                            where not exists (select 1 from public.player_skills s
+                                                               where s.player_id = v_player and s.skill_key = k)),
+               'slots_open', case when p.slots is null
+                                  then public.config_double('jobs', '{aiSlotsOpen}', 99)::integer  -- unlimited (AI)
+                                  else greatest(0, p.slots - (select count(*) from public.player_jobs j
+                                                               where j.posting_id = p.id and j.status = 'active'))::integer end,
+               'posted_at', p.posted_at, 'expires_at', p.expires_at,
+               'my_application', (select jsonb_build_object('id', a.id,
+                                          'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end)
+                                    from public.job_applications a
+                                   where a.posting_id = p.id and a.player_id = v_player and not a.for_clone
+                                   order by a.created_at desc limit 1))
+             order by p.is_ai, p.salary_cents_per_hour desc, p.posted_at desc, p.id)
+        from public.job_postings p
+       where p.status = 'open' and (p.expires_at is null or p.expires_at > now())), '[]'::jsonb),
+    'next_refresh_at', (public.current_game_quarter()).ends_at,
+    'has_clone', v_clone);
+end;
+$function$
+;
+
+create or replace function public.company_full_time_check(p_company uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pc    public.player_companies;
+  j     public.player_jobs;
+begin
+  select * into pc from public.player_companies where company_id = p_company and status = 'active';
+  if pc.company_id is null
+     or public.company_headcount(p_company) < public.config_double('startups', '{fullTimeFromEmployees}', 5) then
+    return false;
+  end if;
+  select * into j from public.player_jobs
+   where player_id = pc.founder_id and status = 'active' and not is_clone and notice_ends_at is null for update;
+  if j.id is null then
+    return false;
+  end if;
+  update public.player_jobs
+     set notice_ends_at = now() + make_interval(secs => public.config_double('jobs', '{quitNoticeHours}', 24) * 3600)
+   where id = j.id;
+  perform public.company_system_message(p_company,
+    'Ab ' || public.config_double('startups', '{fullTimeFromEmployees}', 5)::integer || ' Mitarbeitern arbeitet '
+    || (select pr.nickname from public.profiles pr where pr.id = pc.founder_id) || ' Vollzeit in der Firma.');
+  return true;
+end;
+$function$
+;
+
+create or replace function public.player_company_team(p_company uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pc       public.player_companies;
+  v_sector text;
+  v_list   jsonb;
+  v_req    jsonb;
+  v_fs     jsonb;
+  v_found  integer;
+  v_prod   bigint;
+  v_score  integer;
+  v_emp    integer := 0;
+  v_s      jsonb;
+  r        record;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
+    return null;
+  end if;
+  select c.sector_key into v_sector from public.companies c where c.id = p_company;
+  v_list := coalesce(public.config_jsonb('jobs', array['sectorBranches', v_sector]), '[]'::jsonb);
+  select coalesce(jsonb_agg(jsonb_build_object('branch', b, 'min_score', 0) order by o), '[]'::jsonb) into v_req
+    from jsonb_array_elements_text(v_list) with ordinality x(b, o) where o <= 2;
+  v_fs := public.player_branch_scores(pc.founder_id);
+  v_found := public.job_productivity_bps(public.job_match_score(v_fs, v_req));
+  -- founderFactor: half productivity while the founder works elsewhere (ADR-066)
+  if exists (select 1 from public.player_jobs x where x.player_id = pc.founder_id and x.status = 'active' and not x.is_clone and x.company_id <> p_company) then
+    v_found := round(v_found * public.config_double('startups', '{sideJobFounderFactor}', 0.5))::integer;
+  end if;
+  select coalesce(sum(coalesce((v_fs ->> b)::integer, 0)), 0) into v_score from jsonb_array_elements_text(v_list) b;
+  v_prod := v_found;
+  for r in select j.player_id, j.required from public.player_jobs j where j.company_id = p_company and j.status = 'active' loop
+    v_s := public.player_branch_scores(r.player_id);
+    v_prod := v_prod + public.job_productivity_bps(public.job_match_score(v_s, r.required));
+    v_score := v_score + (select coalesce(sum(coalesce((v_s ->> b)::integer, 0)), 0) from jsonb_array_elements_text(v_list) b);
+    v_emp := v_emp + 1;
+  end loop;
+  v_prod := v_prod + pc.ai_workers * 10000;
+  return jsonb_build_object(
+    'founder_productivity_bps', v_found,
+    'team_productivity_bps', v_prod,
+    'employees', v_emp,
+    'team_sector_score', v_score,
+    'stage', public.company_stage(p_company),
+    'capacity_cents', round(v_prod / 10000.0
+                            * public.config_double('startups', array['capacityCentsPerProductivity', v_sector], 250000)
+                            * (1 + public.config_double('startups', '{stages,capacityBonusPerStage}', 0.25) * public.company_stage(p_company)))::bigint);
+end;
+$function$
+;
+
+create or replace function public.get_player_card(p_nickname text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  p      public.profiles;
+  v_job  jsonb;
+  v_cjob jsonb;
+  v_pod  integer := least(3, greatest(0, public.config_double('social', '{league,podium}', 3)::integer));
+begin
+  perform public.require_player();
+  select * into p from public.profiles x where x.id = public.player_by_handle(p_nickname);
+  if p.id is null then
+    perform public.api_error('player_not_found');
+  end if;
+  select jsonb_build_object('company_name', c.name, 'title_key', j.title_key, 'title', case when j.title_key is null then j.title end,
+                            'tier', j.tier, 'since', j.started_at)
+    into v_job
+    from public.player_jobs j join public.companies c on c.id = j.company_id
+   where j.player_id = p.id and j.status = 'active' and not j.is_clone;
+  -- ADR-206: the clone's job, shown as "Klon von ..."
+  select jsonb_build_object('company_name', c.name, 'title_key', j.title_key, 'title', case when j.title_key is null then j.title end,
+                            'tier', j.tier, 'since', j.started_at)
+    into v_cjob
+    from public.player_jobs j join public.companies c on c.id = j.company_id
+   where j.player_id = p.id and j.status = 'active' and j.is_clone;
+  return jsonb_build_object(
+    'nickname',        p.nickname,
+    'tag',             p.tag,
+    'avatar_key',      p.avatar_key,
+    'level',           p.level,
+    'rank',            public.player_rich_rank(p.id),
+    'net_worth_cents', public.player_net_worth_cents(p.id),
+    'streak_days',     public.player_streak_days(p.id),
+    'skills_learned',  (select count(*) from public.player_skills s where s.player_id = p.id)::integer,
+    'branch_scores',   public.player_branch_scores(p.id),
+    'top_skills',      coalesce((select jsonb_agg(jsonb_build_object('key', x.skill_key, 'tier', x.tier) order by x.tier desc, x.learned_at)
+                                   from (select s.skill_key, s.learned_at, (public.skill_node(s.skill_key) ->> 'tier')::integer as tier
+                                           from public.player_skills s where s.player_id = p.id
+                                          order by 3 desc nulls last, s.learned_at limit 3) x), '[]'::jsonb),
+    'job',             v_job,
+    'clone_job',       v_cjob,
+    'company',         (select jsonb_build_object('name', c.name, 'ticker', c.ticker)
+                          from public.player_companies pc join public.companies c on c.id = pc.company_id
+                         where pc.founder_id = p.id and pc.status = 'active'),
+    'trophies',        (select jsonb_build_object('gold',   count(*) filter (where e.rank = 1),
+                                                  'silver', count(*) filter (where e.rank = 2),
+                                                  'bronze', count(*) filter (where e.rank = 3))
+                          from public.league_entries e join public.league_seasons ls on ls.id = e.season_id
+                         where e.player_id = p.id and ls.status = 'finished' and e.rank between 1 and v_pod),
+    'member_since',    p.created_at,
+    'accessories',     public.player_worn_accessories(p.id),
+    'trust',           public.player_trust(p.id));
+end;
+$function$
+;
+
+create or replace function public.chat_company_of(p_player uuid)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select coalesce(
+    (select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'),
+    (select j.company_id from public.player_jobs j
+       join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
+      where j.player_id = p_player and j.status = 'active' order by j.is_clone limit 1));
+$function$
+;
+
+create or replace function public.company_event_company_for(p_player uuid, p_company uuid)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select case
+    when p_company is null then coalesce(
+      (select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'),
+      (select j.company_id from public.player_jobs j
+         join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
+        where j.player_id = p_player and j.status = 'active' order by j.is_clone, j.started_at desc limit 1))
+    else (select pc.company_id from public.player_companies pc
+           where pc.company_id = p_company and pc.status = 'active'
+             and (pc.founder_id = p_player
+                  or exists (select 1 from public.player_jobs j
+                              where j.company_id = p_company and j.player_id = p_player and j.status = 'active')))
+  end;
+$function$
+;
+
+create or replace function public.company_task_member(p_player uuid)
+ RETURNS TABLE(company_id uuid, is_founder boolean, tier text, job_id uuid)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select pc.company_id, true, 'c_level'::text, null::uuid
+    from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'
+  union all
+  select j.company_id, false, j.tier::text, j.id
+    from public.player_jobs j
+    join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
+   where j.player_id = p_player and j.status = 'active' and not j.is_clone
+  limit 1;
+$function$
+;
+
+create or replace function public.get_company_floor()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player  uuid := public.require_player();
+  v_company uuid := public.chat_company_of(v_player);
+  v_max     integer := greatest(2, coalesce(public.config_double('startups', '{chat,floorMaxMembers}', 24), 24)::integer);
+  v_secs    integer := coalesce(public.config_double('startups', '{chat,bubbleSeconds}', 120), 120)::integer;
+  v_ai      boolean := false;
+  v_online  interval := make_interval(mins => coalesce(public.config_double('social', '{onlineMinutes}', 10), 10)::integer);
+  c         public.companies;
+  v_members jsonb;
+  v_workers integer := 0;
+begin
+  if v_company is null then
+    select j.company_id into v_company
+      from public.player_jobs j join public.companies co on co.id = j.company_id and co.is_ai
+     where j.player_id = v_player and j.status = 'active'
+     order by j.is_clone
+     limit 1;
+    v_ai := v_company is not null;
+  end if;
+  if v_company is null then
+    return jsonb_build_object('company', null, 'chat', false, 'ai_workers', 0, 'bubble_seconds', v_secs,
+                              'members', '[]'::jsonb);
+  end if;
+  select * into c from public.companies where id = v_company;
+
+  if v_ai then
+    select coalesce(jsonb_agg(public.company_floor_member_json(x.player_id, v_player, 'employee', x.title, v_company, false)
+                              order by x.ord), '[]'::jsonb)
+      into v_members
+      from (select j.player_id, j.title,
+                   row_number() over (order by (j.player_id = v_player) desc,
+                                               coalesce(p.last_active_at > public.game_now() - v_online, false) desc,
+                                               p.last_active_at desc nulls last, lower(p.nickname), j.player_id) as ord
+              from public.player_jobs j join public.profiles p on p.id = j.player_id
+             where j.company_id = v_company and j.status = 'active' and not p.is_deactivated) x
+     where x.ord <= v_max;
+  else
+    select coalesce(pc.ai_workers, 0) into v_workers from public.player_companies pc where pc.company_id = v_company;
+    select coalesce(jsonb_agg(public.company_floor_member_json(x.player_id, v_player, x.role, x.title, v_company, true)
+                              order by x.ord, x.nick, x.player_id), '[]'::jsonb)
+      into v_members
+      from (select pc.founder_id as player_id, 'founder' as role, null::text as title, 0 as ord, ''::text as nick
+              from public.player_companies pc
+             where pc.company_id = v_company and pc.status = 'active' and pc.founder_id is not null
+            union all
+            select j.player_id, 'employee', j.title, 1, lower(p.nickname)
+              from public.player_jobs j join public.profiles p on p.id = j.player_id
+             where j.company_id = v_company and j.status = 'active' and not p.is_deactivated) x;
+  end if;
+
+  return jsonb_build_object(
+    'company', jsonb_build_object('name', c.name, 'color', c.brand_color, 'kind', case when v_ai then 'ai' else 'player' end,
+                                  'logo', case when v_ai then null else public.company_logo(c.id) end),
+    'chat', not v_ai,
+    'ai_workers', v_workers,
+    'bubble_seconds', v_secs,
+    'members', v_members);
+end;
+$function$
+;
+
+create or replace function public.application_json(p_application_id uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select jsonb_build_object(
+           'id', a.id,
+           'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end,
+           'posting', public.posting_json(a.posting_id),
+           'salary_wish_cents_per_hour', a.salary_wish_cents_per_hour,
+           'offer_salary_cents_per_hour', a.offer_salary_cents_per_hour,
+           'offer_expires_at', a.offer_expires_at,
+           'message', a.message,
+           'created_at', a.created_at,
+           'updated_at', a.updated_at,
+           'for_clone', a.for_clone)
+    from public.job_applications a where a.id = p_application_id;
+$function$
+;
+
+create or replace function public.promotion_apply(p_job_id uuid, p_salary bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  j       public.player_jobs;
+  c       public.companies;
+  v_next  text;
+  v_main  text;
+  v_req   jsonb;
+  v_ai    boolean;
+  v_match integer;
+begin
+  select * into j from public.player_jobs where id = p_job_id and status = 'active' for update;
+  v_next := public.career_next_tier(j.tier::text);
+  if j.id is null or v_next is null then
+    perform public.api_error('promotion_not_ready');
+  end if;
+  if p_salary is null or p_salary < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into c from public.companies where id = j.company_id;
+  v_ai := coalesce(c.is_ai, false);
+  v_main := j.required -> 0 ->> 'branch';
+  v_req := case when v_ai and v_main is not null then public.ai_job_required(v_main, v_next) else j.required end;
+  v_match := public.job_match_score(public.player_branch_scores(j.player_id), v_req);
+  update public.player_jobs
+     set tier = v_next::public.job_tier,
+         salary_cents_per_hour = p_salary,
+         rank_minutes = 0,
+         promoted_at = now(),
+         pending_promotion_at = null,
+         promotion_retry_at = null,
+         raise_base_score = v_match,
+         pending_raise_bps = null,
+         pending_raise_at = null,
+         required = v_req,
+         title_key = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
+                          else title_key end,
+         title = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
+                      else title end,
+         ceiling_cents_per_hour = case when v_ai
+                                       then public.job_pay_ceiling(j.player_id, coalesce((public.career_tier(v_next) ->> 'salaryCentsPerHour')::bigint,
+                                                                              p_salary), v_req)
+                                       else ceiling_cents_per_hour end
+   where id = j.id;
+  perform public.feed_post(j.player_id, 'promoted', jsonb_build_object('tier', v_next, 'company', c.name),
+                           'promoted:' || j.id::text || ':' || v_next);
+  perform public.social_notify(j.player_id, 'promotion_result', 'Befördert!',
+    'Beförderung ' || public.career_tier_phrase(v_next) || ' bei ' || c.name || '. Neuer Lohn: '
+      || public.format_eur(p_salary) || ' pro Stunde.',
+    jsonb_build_object('status', 'promoted', 'player_job_id', j.id, 'company', c.name, 'tier', v_next,
+                       'salary_cents_per_hour', p_salary),
+    '/job', 'promotion_result:' || j.id::text || ':' || v_next);
+  return jsonb_build_object('tier', v_next, 'salary_cents_per_hour', p_salary);
+end;
+$function$
+;
+
+create or replace function public.get_company_team(p_company_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  perform public.require_company_owner(p_company_id);
+  return jsonb_build_object('members', coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'player_job_id', j.id, 'nickname', pr.nickname, 'is_clone', j.is_clone, 'avatar_key', pr.avatar_key,
+             'title', coalesce(j.title, j.title_key), 'salary_cents_per_hour', j.salary_cents_per_hour,
+             'productivity_bps', public.job_productivity_bps(public.job_match_score(public.player_branch_scores(pr.id), j.required)),
+             'started_at', j.started_at,
+             'notice_ends_at', j.notice_ends_at,
+             'skills', coalesce((select jsonb_agg(s.skill_key order by s.skill_key) from public.player_skills s
+                                  where s.player_id = pr.id), '[]'::jsonb),
+             'pending_raise', case when j.pending_raise_bps is not null
+                                   then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
+             'tier', j.tier,
+             'rank_hours', round(j.rank_minutes / 60.0, 1),
+             'promotion', (select jsonb_build_object('next_tier', ps -> 'next_tier', 'requirements', ps -> 'requirements',
+                                                     'ready', ps -> 'ready', 'pending_since', ps -> 'pending_since',
+                                                     'next_salary_cents_per_hour', ps -> 'next_salary_cents_per_hour')
+                             from (select public.promotion_state(j.id) as ps) x))
+             order by j.started_at, j.id)
+      from public.player_jobs j join public.profiles pr on pr.id = j.player_id
+     where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb));
+end;
+$function$
+;
+
+-- ===== supabase/migrations/20261204009900_nexamon_titans_rebalance.sql =====
+-- =============================================================================
+-- NEXA · 9900 · Nexamon: Titans Revenge diamond x 1.3, uranium x 0.918828, the pack's value unchanged (ADR-207)
+-- =============================================================================
+-- The start prices come from game_config.nexamon_cards (TITAN_REBALANCE_FACTOR in src/config/nexamon/titans-draft.ts).
+-- nexamon_sync() moves the start price of every card to the new catalogue, but the market value only of cards that
+-- never moved. So an existing database gets one relative push here, like the Prismatic Peak scaling (migration 5500):
+-- * nexamon_scale_card_values(set, rarity, num, den): start price, market value, the day's reference and the value
+--   history (nexamon_value_points) of every card of that set and rarity x num / den (half-even), and the AI sellers'
+--   asking prices after it (nexamon_ai_ask_cents of the copy's value). Copies and slabs have no value of their own
+--   (card value x condition or grade factor), they follow at once. Players' own listings keep the price their owner
+--   chose. Past sales (nexamon_sales) stay as they were.
+-- * Titans Revenge diamond x 13/10, uranium x 918828/1000000: the market drift of every card stays (relative), the
+--   ratios inside a rarity too. At catalogue values the pack keeps its expected value (89.901 EUR, +0,4 ct).
+-- * Then the catalogue hash is cleared: the next nexamon_sync() puts the start prices (and the values of cards that
+--   never moved) exactly on the new catalogue, whichever ran first. Values of moved cards only change here.
+-- * Runs once (public.data_migrations 'nexamon_titans_rebalance_207'), however often the update script is executed.
+-- Idempotent: runs unchanged as supabase/updates/20261204009900_nexamon_titans_rebalance.sql.
+
+create or replace function public.nexamon_scale_card_values(p_set text, p_rarity text, p_num bigint, p_den bigint)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_n integer;
+begin
+  if p_num is null or p_den is null or p_num <= 0 or p_den <= 0 then
+    raise exception 'nexamon_scale_card_values: factor must be positive' using errcode = '22023';
+  end if;
+  update public.nexamon_cards k
+     set start_e4   = greatest(1, public.div_round_half_even(k.start_e4::numeric * p_num, p_den)),
+         value_e4   = greatest(1, public.div_round_half_even(k.value_e4::numeric * p_num, p_den)),
+         day_ref_e4 = greatest(1, public.div_round_half_even(k.day_ref_e4::numeric * p_num, p_den)),
+         updated_at = now()
+   where k.set_key = p_set and k.rarity = p_rarity;
+  get diagnostics v_n = row_count;
+
+  update public.nexamon_value_points p
+     set value_e4 = greatest(1, public.div_round_half_even(p.value_e4::numeric * p_num, p_den))
+    from public.nexamon_cards k
+   where k.card_key = p.card_key and k.set_key = p_set and k.rarity = p_rarity;
+
+  update public.nexamon_listings l
+     set price_cents = public.nexamon_ai_ask_cents(
+           public.nexamon_copy_value_cents(k.value_e4, c.condition, c.grade::double precision, k.card_key))
+    from public.nexamon_copies c, public.nexamon_cards k
+   where l.seller_ai is not null and c.id = l.copy_id and k.card_key = l.card_key
+     and k.set_key = p_set and k.rarity = p_rarity;
+  return v_n;
+end;
+$$;
+revoke all on function public.nexamon_scale_card_values(text, text, bigint, bigint) from public, anon, authenticated;
+comment on function public.nexamon_scale_card_values(text, text, bigint, bigint) is
+  'Rebalance (ADR-207): start price, market value, day reference and value history of every card of a set and rarity '
+  'x num / den (half-even); AI listings re-priced, player listings untouched. Returns the cards scaled. Internal.';
+
+do $$
+begin
+  if exists (select 1 from public.data_migrations where key = 'nexamon_titans_rebalance_207') then
+    return;
+  end if;
+  perform public.nexamon_scale_card_values('titans_revenge', 'diamond', 13, 10);
+  perform public.nexamon_scale_card_values('titans_revenge', 'uranium', 918828, 1000000);
+  update public.nexamon_meta set catalogue_hash = null;
+  insert into public.data_migrations (key) values ('nexamon_titans_rebalance_207') on conflict do nothing;
+end
+$$;
+
+-- ===== supabase/migrations/20261204010000_world_contract.sql =====
+-- =============================================================================
+-- NEXA · 10000 · Weltkarte: locations and country config, the shared contract (ADR-208)
+-- =============================================================================
+-- From a company value of world.unlockWorthCents (company_worth_cents, ADR-203) a player company places its
+-- headquarters in one of the countries of game_config "world".countries (src/config/countries.ts). This migration
+-- holds only what other parts read (taxes and external events, ADR-209):
+--   company_locations       one row per placed company: country, headquarters tier and style, money invested
+--   world_cfg()             game_config "world"
+--   country_cfg(country)    the traits of one country (jsonb from the config), null when unknown
+--   company_country(company) the country of the headquarters, null when not placed
+--   country_market_leader(country) the leading player company of a country (largest company_worth_cents, at least
+--                           lobby.minWorthCents), null when none; AI companies never lead
+--   company_is_market_leader(company)
+-- The signatures are a contract: keep them exactly. Idempotent (if not exists, create or replace).
+-- =============================================================================
+
+create table if not exists public.company_locations (
+  company_id     uuid primary key references public.companies(id) on delete cascade,
+  country_key    text not null,
+  placed_at      timestamptz not null default now(),
+  hq_tier        smallint not null default 1 check (hq_tier between 1 and 10),
+  hq_style       jsonb not null default '{}'::jsonb,
+  invested_cents bigint not null default 0 check (invested_cents >= 0),
+  moved_at       timestamptz,
+  updated_at     timestamptz not null default now()
+);
+create index if not exists company_locations_country_idx on public.company_locations (country_key);
+comment on table public.company_locations is
+  'Headquarters of a player company on the world map (ADR-208): country, tier (1..5), style of the pixel building, '
+  'money paid for it (base of the relocation price). Readable by every signed-in player (the map shows all).';
+alter table public.company_locations enable row level security;
+drop policy if exists company_locations_read on public.company_locations;
+create policy company_locations_read on public.company_locations for select to authenticated using (true);
+revoke insert, update, delete on public.company_locations from anon, authenticated;
+drop trigger if exists set_updated_at on public.company_locations;
+create trigger set_updated_at before update on public.company_locations
+  for each row execute function public.set_updated_at();
+
+create or replace function public.world_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('world'), '{}'::jsonb);
+$$;
+comment on function public.world_cfg() is 'game_config "world" (ADR-208, src/config/countries.ts).';
+
+create or replace function public.country_cfg(p_country text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select x.c from jsonb_array_elements(coalesce(public.config_jsonb('world', '{countries}'), '[]'::jsonb)) x(c)
+   where x.c ->> 'key' = p_country
+   limit 1;
+$$;
+comment on function public.country_cfg(text) is
+  'Traits of a country (ADR-208): key, name, map, productionCostBps, labourCostBps, demandPotentialBps, imageBps, '
+  'taxRateBps, politicalRisk, tariffExposure, disasterRisk[], warRisk. Null for an unknown key. Contract with ADR-209.';
+
+create or replace function public.company_country(p_company uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select l.country_key from public.company_locations l where l.company_id = p_company;
+$$;
+comment on function public.company_country(uuid) is
+  'Country of the headquarters of a company (ADR-208), null when not placed. Contract with ADR-209.';
+
+create or replace function public.country_market_leader(p_country text)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select x.company_id
+    from (select l.company_id, public.company_worth_cents(l.company_id) as worth, l.placed_at
+            from public.company_locations l
+            join public.player_companies pc on pc.company_id = l.company_id and pc.status = 'active'
+           where l.country_key = p_country) x
+   where x.worth >= coalesce((public.config_jsonb('world', '{lobby,minWorthCents}'))::bigint, 0)
+   order by x.worth desc, x.placed_at, x.company_id
+   limit 1;
+$$;
+comment on function public.country_market_leader(text) is
+  'Marktführer of a country (ADR-208): the active player company with the largest company_worth_cents among those '
+  'with their headquarters there (at least lobby.minWorthCents; ties: placed first). Null when none.';
+
+create or replace function public.company_is_market_leader(p_company uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.country_market_leader(public.company_country(p_company)) = p_company, false);
+$$;
+comment on function public.company_is_market_leader(uuid) is
+  'Whether a company leads the country of its headquarters (lobby bonus, ADR-208). Contract with ADR-209.';
+
+revoke all on function public.world_cfg() from public, anon, authenticated;
+revoke all on function public.country_cfg(text) from public, anon, authenticated;
+revoke all on function public.company_country(uuid) from public, anon, authenticated;
+revoke all on function public.country_market_leader(text) from public, anon, authenticated;
+revoke all on function public.company_is_market_leader(uuid) from public, anon, authenticated;
 
 commit;

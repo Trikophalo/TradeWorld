@@ -1036,7 +1036,15 @@
     "clone_exists": "Du hast schon einen Klon. Mehr als einen gibt es nicht.",
     "clone_missing": "Du hast noch keinen Klon. Erschaffe ihn im Job-Tab.",
     "clone_own_company": "Dein Klon arbeitet nicht in deiner eigenen Firma. Such ihm eine Stelle bei einer anderen Firma.",
-    "clone_same_company": "Du und dein Klon arbeitet nicht in derselben Firma. Wähle eine andere Firma."
+    "clone_same_company": "Du und dein Klon arbeitet nicht in derselben Firma. Wähle eine andere Firma.",
+    "world_locked": "Die Weltkarte öffnet sich ab 10 Mio. € Firmenwert.",
+    "world_placed": "Deine Firma hat schon eine Zentrale. Du kannst sie umziehen.",
+    "world_not_placed": "Dafür braucht deine Firma erst einen Standort auf der Weltkarte.",
+    "world_max_tier": "Deine Zentrale ist schon auf der höchsten Stufe.",
+    "world_subsidiary_locked": "Tochterfirmen gibt es ab 50 Mio. € Firmenwert oder mit einem Bürokomplex.",
+    "world_subsidiary_cap": "Mehr Tochterfirmen geht nicht. Schließe eine, um ein neues Land zu öffnen.",
+    "world_same_country": "In diesem Land ist deine Firma schon.",
+    "world_not_leader": "Nur der Marktführer eines Landes legt die Standortgebühr fest."
   },
   "locks": {
     "level": "Level {level}",
@@ -8437,7 +8445,7 @@
       }
     },
     "open": {
-      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} skills {Zu den Fertigkeiten} other {Hinschauen}}"
+      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} skills {Zu den Fertigkeiten} location {Zum Standort} other {Hinschauen}}"
     },
     "advice": {
       "distress": "Alarm: Die Firma hat {unpaid} offene Rechnungen. Bleiben sie offen, droht die Insolvenz. Zahl Geld ein, bevor die Schonfrist abläuft.",
@@ -8556,6 +8564,13 @@
       "todo": "Offen: {tasks, plural, =0 {keine Aufgabe} one {eine Aufgabe} other {# Aufgaben}}{event, select, crisis {, eine Krise} chance {, eine Chance} other {}}.",
       "best": "Mein wichtigster Tipp:",
       "calm": "Gerade gibt es nichts, was sich lohnt anzupacken."
+    },
+    "world": {
+      "about": "Ab {amount} Firmenwert platzierst du deine Firma auf der Weltkarte. Jedes Land hat Vor- und Nachteile, keins ist das beste. Später kommen Tochterfirmen in anderen Ländern dazu.",
+      "tip": "Frag mich nach einem Land, zum Beispiel: „Wie ist China?“",
+      "country": "{name}: Produktion {production}, Arbeit {labour}, Nachfrage {demand}, Image {image}, Steuern {tax}.",
+      "strength": "Stärke: {best, select, production {günstige Produktion} labour {günstige Arbeit} demand {große Nachfrage} image {gutes Image} tax {niedrige Steuern} other {{best}}}. Schwäche: {worst, select, production {teure Produktion} labour {teure Arbeit} demand {kleine Nachfrage} image {schwaches Image} tax {hohe Steuern} other {{worst}}}.",
+      "risks": "Risiken (0 bis 100): Politik {political}, Zölle {tariff}, Konflikte {war}, {disasters, plural, =0 {keine Naturgefahren} one {eine Naturgefahr} other {# Naturgefahren}}."
     }
   },
   "newsShow": {
@@ -10155,7 +10170,8 @@
       "controlling": "Controlling",
       "staff": "Mitarbeiter",
       "books": "Buchhaltung",
-      "board": "Geschäftsrat"
+      "board": "Geschäftsrat",
+      "location": "Standort"
     },
     "charts": {
       "gaugeLabel": "{label}: {value} von 100, {zone}",
@@ -11541,6 +11557,199 @@
       "label": "Stellen",
       "value": "{filled}/{total}",
       "hint": "{warn} unzufrieden"
+    }
+  },
+  "world": {
+    "title": "Standort",
+    "tabText": "Wähle das Land deiner Zentrale, bau sie aus und erobere mit Tochterfirmen neue Märkte.",
+    "empty": "Die Weltkarte lädt gerade nicht. Versuch es gleich noch einmal.",
+    "locked": {
+      "title": "Weltkarte ab 10 Mio. € Firmenwert",
+      "text": "Wächst deine Firma auf {amount}, platzierst du sie auf der Weltkarte. Jedes Land hat eigene Stärken und Schwächen.",
+      "progress": "Firmenwert {now} von {target}",
+      "preview": "So sieht die Welt gerade aus. Tippe auf ein Land, um seine Eigenschaften zu sehen."
+    },
+    "choose": {
+      "title": "Wähle ein Land für deine Zentrale",
+      "text": "Tippe auf ein Land. Kein Land ist das beste: Günstige Produktion bezahlst du mit schwächerem Image, große Nachfrage mit höheren Steuern.",
+      "cost": "Ein Bürogebäude kostet {amount} aus der Firmenkasse."
+    },
+    "map": {
+      "label": "Weltkarte",
+      "zoomIn": "Hineinzoomen",
+      "zoomOut": "Herauszoomen",
+      "reset": "Ansicht zurücksetzen",
+      "hint": "Ziehen zum Verschieben, mit zwei Fingern oder dem Mausrad zoomen.",
+      "companies": "{count, plural, =0 {keine Firma} one {# Firma} other {# Firmen}}",
+      "marker": "{country}: {companies}",
+      "legendHq": "Zentrale",
+      "legendSub": "Tochterfirma",
+      "legendAi": "KI-Firma",
+      "legendMine": "Deine Firma",
+      "countries": "Alle Länder"
+    },
+    "traits": {
+      "title": "Eigenschaften",
+      "production": "Produktionskosten",
+      "labour": "Arbeitskosten",
+      "demand": "Nachfrage",
+      "image": "Image",
+      "tax": "Steuersatz",
+      "risks": "Risiken",
+      "political": "Politik",
+      "tariff": "Zölle",
+      "war": "Konflikte",
+      "disaster": "Naturgefahren",
+      "none": "keine",
+      "better": "Vorteil",
+      "worse": "Nachteil",
+      "neutral": "normal",
+      "riskLow": "gering",
+      "riskMid": "mittel",
+      "riskHigh": "hoch",
+      "pct": "{sign}{pct} %"
+    },
+    "disasters": {
+      "earthquake": "Erdbeben",
+      "flood": "Hochwasser",
+      "storm": "Stürme",
+      "wildfire": "Waldbrände",
+      "drought": "Dürre"
+    },
+    "tiers": {
+      "office": "Bürogebäude",
+      "complex": "Bürokomplex",
+      "campus": "Campus",
+      "tower": "Tower",
+      "mega": "Mega-Campus",
+      "subsidiary": "Tochterfirma"
+    },
+    "hq": {
+      "title": "Deine Zentrale",
+      "in": "in {country}",
+      "tier": "Stufe {tier} von {max}",
+      "upgrade": "Ausbauen: {name}",
+      "upgradeCost": "Kostet {amount} aus der Firmenkasse",
+      "maxed": "Höchste Stufe erreicht. Mehr geht nicht.",
+      "seats": "+{count} Plätze",
+      "prestige": "Prestige {points}",
+      "demandBonus": "Nachfrage +{pct} %",
+      "nextGives": "Die nächste Stufe bringt",
+      "edit": "Gestalten",
+      "upgraded": "{name} eröffnet!",
+      "upgradedText": "Mehr Platz, mehr Ansehen, mehr Bekanntheit.",
+      "placed": "Zentrale in {country} eröffnet",
+      "placedText": "Ab der nächsten Stunde gelten die Bedingungen des Landes.",
+      "noCash": "Dafür reicht die freie Firmenkasse nicht."
+    },
+    "effect": {
+      "title": "Wirkung jede Stunde",
+      "text": "So verändern Land, Zentrale und Tochterfirmen deine Stundenabrechnung.",
+      "demand": "Nachfrage",
+      "cogs": "Wareneinsatz",
+      "fixed": "Fixkosten",
+      "tax": "Steuersatz",
+      "share": "Umsatz über Töchter"
+    },
+    "relocate": {
+      "button": "Hierhin umziehen",
+      "cost": "Umzug: {amount}",
+      "cooldown": "Umzug wieder möglich in",
+      "done": "Umzug nach {country} geschafft",
+      "doneText": "Die Zentrale behält ihre Stufe."
+    },
+    "subsidiaries": {
+      "title": "Tochterfirmen",
+      "text": "Eine Tochter macht einen Teil deines Umsatzes zu den Bedingungen ihres Landes und öffnet einen neuen Markt. Anfangs teuer, auf lange Sicht lohnend.",
+      "locked": "Tochterfirmen gibt es ab 50 Mio. € Firmenwert oder mit einem Bürokomplex.",
+      "count": "{count} von {max}",
+      "open": "Tochter gründen",
+      "openCost": "Gründung: {amount}",
+      "ramp": "Anlauf {pct} %",
+      "hourly": "{amount} pro Stunde",
+      "close": "Schließen",
+      "closeHint": "Die Gründungskosten bekommst du nicht zurück.",
+      "opened": "Tochterfirma in {country} gegründet",
+      "openedText": "Die ersten Wochen kostet sie mehr, dann trägt sie sich.",
+      "closed": "Tochter in {country} geschlossen",
+      "empty": "Noch keine Tochter. Wähle auf der Karte ein Land.",
+      "full": "Alle Plätze sind belegt."
+    },
+    "image": {
+      "title": "Image-Kampagne",
+      "text": "Gezielte Werbung im Land hebt dort dein Image und damit die Nachfrage. Der Effekt verblasst langsam.",
+      "button": "Kampagne starten",
+      "cost": "Kostet {amount}",
+      "bonus": "Image-Bonus +{pct} %",
+      "ready": "Nächste Kampagne in",
+      "done": "Image-Kampagne in {country} läuft",
+      "doneText": "Dein Image dort steigt um {pct} %."
+    },
+    "lobby": {
+      "title": "Länder-Lobby",
+      "leader": "Marktführer",
+      "leaderText": "Du bist die größte Firma in {country}: weniger Steuern, schwächere Folgen politischer Ereignisse. Du darfst eine Standortgebühr von anderen Spielerfirmen im Land verlangen.",
+      "fee": "Standortgebühr",
+      "feeValue": "{pct} % vom Stundenumsatz",
+      "feeSave": "Gebühr festlegen",
+      "feeSaved": "Standortgebühr: {pct} %",
+      "feeSavedText": "Die anderen Firmen in {country} werden benachrichtigt.",
+      "feeCooldown": "Änderung wieder möglich in",
+      "received": "Bisher eingenommen: {amount}",
+      "paying": "{leader} führt den Markt in {country} an und verlangt {pct} % deines Stundenumsatzes.",
+      "payingHint": "Wachse an ihr vorbei oder zieh in ein anderes Land.",
+      "paid": "Bisher gezahlt: {amount}",
+      "free": "Niemand verlangt eine Standortgebühr von dir.",
+      "notLeader": "Wirst du die größte Firma in {country}, bekommst du den Lobby-Bonus.",
+      "leaderIs": "Marktführer: {name}",
+      "noLeader": "Noch kein Marktführer"
+    },
+    "country": {
+      "here": "Hier sitzt deine Zentrale",
+      "sub": "Hier sitzt eine deiner Töchter",
+      "companies": "Firmen hier",
+      "noCompanies": "Noch keine Firma hier.",
+      "place": "Zentrale hier bauen",
+      "placeCost": "Bürogebäude: {amount}",
+      "lockedHint": "Ab 10 Mio. € Firmenwert kannst du hier bauen.",
+      "mine": "Du",
+      "ai": "KI",
+      "by": "von {owner}"
+    },
+    "editor": {
+      "title": "Zentrale gestalten",
+      "text": "Farben, Dach, Schmuck und Fahne. Das Schild trägt die Initialen deiner Firma.",
+      "wall": "Fassade",
+      "roof": "Dach",
+      "sign": "Schild",
+      "roofKind": "Dachform",
+      "deco": "Schmuck",
+      "flag": "Landesfahne zeigen",
+      "save": "Speichern",
+      "saved": "Zentrale neu gestaltet",
+      "color": "Farbe {n}",
+      "roofs": {
+        "flat": "Flach",
+        "gable": "Giebel",
+        "dome": "Kuppel",
+        "antenna": "Antenne",
+        "garden": "Dachgarten"
+      },
+      "decos": {
+        "none": "Nichts",
+        "trees": "Bäume",
+        "fountain": "Brunnen",
+        "statue": "Statue",
+        "flags": "Fahnen",
+        "lights": "Laternen"
+      }
+    },
+    "dash": {
+      "label": "Standort",
+      "hint": "Land, Zentrale und Tochterfirmen",
+      "placed": "{country} · {tier}",
+      "ready": "Weltkarte offen",
+      "locked": "{pct} % bis zur Weltkarte"
     }
   }
 }

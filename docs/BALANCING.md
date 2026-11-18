@@ -1754,3 +1754,27 @@ Deckel: Nachfrage +35 %, Kapazität +35 %, Wareneinsatz −15 %, Fixkosten −25
 15 Minuten. Markt: 65 % der freien Talente je Tag, Pause 12 h, Kassendeckung 12 h. Mit-GF: höchstens 2, ab Senior
 (Führungskraft ab Profi), +30 % Lohn, Budget ≤ 100.000 € je Tag, Ereignis nach 30 Minuten, vorsichtig 50 % des
 Restbudgets.
+
+## Weltkarte und Standorte (ADR-208)
+
+`world` in `src/config/countries.ts`. Freischaltung ab 10 Mio. € Firmenwert.
+
+| Zentrale    | Preis      | Plätze | Nachfrage | einmalig Ruf / Bekanntheit / Zufriedenheit | Prestige |
+| ----------- | ---------- | ------ | --------- | ------------------------------------------ | -------- |
+| Bürogebäude | 1 Mio. €   | +5     | 0 %       | +1 / +1 % / +1                             | 1        |
+| Bürokomplex | 4 Mio. €   | +15    | +1 %      | +2 / +2 % / +2                             | 3        |
+| Campus      | 15 Mio. €  | +40    | +2 %      | +3 / +3 % / +3                             | 7        |
+| Tower       | 60 Mio. €  | +100   | +3 %      | +4 / +4 % / +4                             | 15       |
+| Mega-Campus | 250 Mio. € | +250   | +4 %      | +5 / +5 % / +5                             | 30       |
+
+Umzug 20 % des Investierten, mindestens 0,5 Mio. €, 7 Tage Pause. Tochterfirmen ab 50 Mio. € oder Bürokomplex,
+höchstens 4: Gründung 3 / 4,8 / 7,68 / 12,29 Mio. €, laufend 600 €/h (Start 1 800 €/h, 14 Tage Anlauf), Umsatzanteil
+15 % / 9 % / 5,4 % / 3,2 %, Marktbonus 5 % / 3 % / 1,8 % / 1,1 %. Image-Kampagne 0,5 % des Firmenwerts (mindestens
+200 000 €), +5 %, höchstens +30 %, −1 % am Tag, alle 12 h. Lobby: Gebühr bis 3 % des Stundenumsatzes, Änderung alle
+24 h, Marktführer ab 10 Mio. €, Steuerrabatt 10 %, politische Ereignisse −30 %.
+
+**Länder-Balance.** Punkte je Basispunkt Vorteil: Wareneinsatz 0,5, Arbeit 0,3, Nachfrage 1, Image 0,5, Steuern 0,2
+(gegen 25 %); Abzug je Risikopunkt Politik 4, Zölle 3, Konflikte 6, je Naturgefahr 120. Mittel ≈ 113 Punkte, alle 22
+Länder innerhalb ±312 (Grenze 400): China +307 (Produktion −16 %, Image −24 %), USA +297 (Nachfrage +20 %, Steuern 34 %),
+Deutschland +7 (Arbeit +25 %, Image +25 %), Schweiz −258 (Steuern 15 %, Arbeit +25 %), Irland −253 (Steuern 12,5 %,
+Nachfrage −5 %). Ein Land, das neue Werte bekommt, muss die Prüfung in `src/lib/sim/world.test.ts` bestehen.

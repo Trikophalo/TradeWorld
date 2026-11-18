@@ -969,6 +969,17 @@ Arbeitsaufgaben, Missionen, Wochen-Challenge, Erfolge, Lebensstil-Galerie, Freun
 
 Customizing ist rein kosmetisch und wird ausschließlich erspielt.
 
+### 24.8 Weltkarte und Standort (ADR-208)
+
+Ab 10 Mio. € Firmenwert setzt der Gründer seine Firma im Firmen-Tab **Standort** (vor der Buchhaltung) auf eine
+pixelige Weltkarte mit 22 Ländern. Jedes Land hat echte Stärken und Schwächen (China: günstige Produktion, schwächeres
+Image; Deutschland: teure Arbeit, starkes Image; USA: große Nachfrage, höhere Steuern), unterm Strich sind alle gleich
+gut. Die Zentrale wächst vom Bürogebäude über Bürokomplex, Campus und Tower bis zum Mega-Campus (mehr Plätze, Prestige,
+Ruf) und wird im Editor gestaltet. Später kommen bis zu vier Tochterfirmen in anderen Ländern dazu: teuer im Anlauf,
+auf Dauer lohnend, mit abnehmendem Ertrag. Image-Kampagnen heben das Ansehen in einem Land. Die größte Firma eines
+Landes ist Marktführer: Lobby-Bonus und eine begrenzte Standortgebühr von den anderen Spielerfirmen dort. Wer zahlt,
+kann vorbeiwachsen oder umziehen. Die Karte zeigt alle Firmen aller Spieler; ein Tipp führt zum Firmenprofil.
+
 ---
 
 ## 25. Offene Designfragen

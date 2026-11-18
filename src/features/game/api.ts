@@ -22,6 +22,7 @@ import { TOPLIST_RPC_SCHEMAS, liveToplistEngine } from "./api-toplists";
 import { COMPANY_SKILLS_RPC_SCHEMAS, liveCompanySkillsEngine } from "./api-company-skills";
 import { VAULT_RPC_SCHEMAS, liveVaultEngine } from "./api-vault";
 import { TALENT_RPC_SCHEMAS, liveTalentEngine } from "./api-talents";
+import { liveWorldEngine, WORLD_RPC_SCHEMAS } from "./api-world";
 import { INTERVIEW_RPC_SCHEMAS, liveInterviewEngine } from "./api-interviews";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
@@ -524,6 +525,7 @@ export const RPC_SCHEMAS = {
   ...COMPANY_SKILLS_RPC_SCHEMAS,
   ...VAULT_RPC_SCHEMAS,
   ...TALENT_RPC_SCHEMAS,
+  ...WORLD_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
@@ -569,6 +571,7 @@ export const liveEngine: GameEngine = {
   ...liveCompanySkillsEngine,
   ...liveVaultEngine,
   ...liveTalentEngine,
+  ...liveWorldEngine,
   ...liveInterviewEngine,
   ...liveBattleEngine,
   ...liveNexamonEngine,

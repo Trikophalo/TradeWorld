@@ -4,6 +4,8 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Weltkarte: Ab 10 Mio. € Firmenwert setzt du deine Firma im neuen Tab „Standort“ in eines von 22 Ländern, baust die
+  Zentrale bis zum Mega-Campus aus, gründest Tochterfirmen und wirst als größte Firma im Land Marktführer.
 - Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines
   Packs bleibt gleich.
 - Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.
