@@ -7192,7 +7192,7 @@ RPCs (`authenticated`):
 get_company_tasks() -> TASKS
   {"role": "founder"|"employee", "company": {"id","name","tier","product"}, "my_tier", "auto_ai", "ai_workers",
    "ai_minutes", "can_use_ai",
-   "people": [{"nickname","tag","tier","is_me","supervisor","reports_to_me","open_tasks"}],
+   "people": [{"nickname","tag","tier","is_me","supervisor","reports_to_me","open_tasks","is_clone"}],   -- is_clone seit ADR-211
    "tasks": [{"id","key","game","branch","status","value_cents","created_at","due_at","assignee","assignee_ai",
               "assigned_by","ai_done_at","opened_at","mine","can_delegate"}],
    "history": [{"id","key","status","result_cents","score_bps","ai","done_by","resolved_at"}]}
@@ -8482,3 +8482,20 @@ next_subsidiary_cost_cents, subsidiary_unlocked, image{ land: { bonus_bps, ready
 image_campaign_cost_cents, effect, leader, fee_bps, fee_ready_at, paying_fee, fees_paid_cents, fees_received_cents`.
 `places`: Zentralen und Töchter aller Spieler plus bis zu `world.aiOnMap` (12) große KI-Firmen (Land aus
 `hashtext(id)`, nie Marktführer). Alle Schreib-RPCs sind idempotent (`request_id`) und antworten wie `get_world`.
+
+## Nachtrag: Firmenaufgaben laufen weiter, auch wenn eine Aufgabe scheitert (ADR-211)
+
+Migration `20261204008400_company_tasks_sturdy.sql`, Test `supabase/tests/e3_company_tasks.sql`.
+
+- `company_tasks_run_due(p_now)` erledigt jede Aufgabe, jede Firma und jeden Schritt (KI-Ergebnis, offenes Spiel,
+  Rückgabe, Auto-KI, Frist, neue Aufgabe, Autopilot, Aufräumen) in einer eigenen Untertransaktion. Ein Fehler landet in
+  `job_runs` (`job_name = 'company_tasks'`, `status = 'failed'`, `error` = Meldung, `details` = `{step, ref}` mit
+  Aufgaben- oder Firmen-ID; sieben Tage aufbewahrt) und hält die anderen nicht mehr auf. Die Antwort zählt zusätzlich
+  `reopened` und `errors`.
+- Aufgaben im Status `assigned`, deren Empfänger nicht mehr in der Firma ist (gekündigt, entlassen) oder ein Klon ist,
+  werden wieder `open` (`company_task_holder_ok(company, player)`), statt in die Frist und ihre Strafe zu laufen.
+- `company_autopilot_run`: jede Firma in einer eigenen Untertransaktion.
+- `company_task_grade_more`: Eine Antwort ohne Liste (`{}`) gibt 0 statt volle Punkte (`receipts`, `shelf`).
+- Klone (ADR-206): `get_company_tasks().people[].is_clone`; `delegate_company_task` und `set_job_supervisor` lehnen
+  Klone ab (`task_not_allowed`). Der Client blendet Klone in der Aufgabenliste aus und lässt Aufgaben unbekannter
+  Spiele weg, statt die ganze Antwort zu verwerfen.
