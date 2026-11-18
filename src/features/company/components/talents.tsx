@@ -46,6 +46,8 @@ import { useCompanyRefresh } from "../hooks";
 
 export const COMPANY_TALENTS_KEY = ["company", "talents"] as const;
 export const TALENT_MARKET_KEY = ["company", "talentMarket"] as const;
+/** The org chart lists the talents (ADR-199); every hire, dismissal and co-CEO change refreshes it. */
+const ORG_KEY = ["company", "org"] as const;
 
 const cfg = BALANCE.talents;
 
@@ -603,6 +605,7 @@ function TalentSheet({
       client.setQueryData(COMPANY_TALENTS_KEY, await engine.dismissTalent(crypto.randomUUID(), talent.key));
       toast.success(t("detail.dismissed", { name: talentName(talent) }));
       void client.invalidateQueries({ queryKey: TALENT_MARKET_KEY });
+      void client.invalidateQueries({ queryKey: ORG_KEY });
       void refresh();
       onClose();
     } catch (error) {
@@ -823,6 +826,7 @@ function OfferSheet({
       else next = await engine.offerTalent(id, talent.key, wageCents, benefits);
       client.setQueryData(COMPANY_TALENTS_KEY, next);
       void client.invalidateQueries({ queryKey: TALENT_MARKET_KEY });
+      void client.invalidateQueries({ queryKey: ORG_KEY });
       haptic("success");
       void playSound("success");
       const name = talentName(talent);
@@ -968,6 +972,7 @@ function CoCeoPanel({ talent }: { talent: OwnTalent }) {
           remove,
         ),
       );
+      void client.invalidateQueries({ queryKey: ORG_KEY });
       toast.success(remove ? t("coceo.removed") : t("coceo.saved"));
       setState("success");
     } catch (error) {

@@ -68,6 +68,11 @@ test("Talente: find a talent for an empty Stelle, offer, hire", async ({ page },
   await expect(seat).toContainText(name);
   await expect(card.getByTestId("talents-total")).toContainText("1 von 15 Stellen besetzt");
 
+  // the talent leads its Stelle: in the org chart above the AI workers
+  const org = page.getByTestId("org-chart");
+  await org.scrollIntoViewIfNeeded();
+  await expect(org.locator('[data-level="talents"]').getByTestId("org-talent")).toContainText(name);
+
   if (SHOTS) {
     for (const theme of ["light", "dark"] as const) {
       await setTheme(page, theme);
@@ -80,6 +85,10 @@ test("Talente: find a talent for an empty Stelle, offer, hire", async ({ page },
       await c.getByRole("radio", { name: "Talentmarkt" }).click();
       await expect(c.getByTestId("talent-market").locator("[data-status]").first()).toBeVisible();
       await page.screenshot({ path: `${SHOTS}/talents-market-${info.project.name}-${theme}.png` });
+      const o = page.getByTestId("org-chart");
+      await o.scrollIntoViewIfNeeded();
+      await expect(o.getByTestId("org-talent")).toHaveCount(1);
+      await o.screenshot({ path: `${SHOTS}/talents-org-${info.project.name}-${theme}.png` });
     }
   }
 });

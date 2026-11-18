@@ -4499,8 +4499,12 @@ können auch Mit-Geschäftsführer werden und Entscheidungen treffen.“
   Talent wird unzufrieden. Zufriedenheit: +2,5 % wenn alles erfüllt, sonst −25 % (unbezahlt), −8 % (Ruf zu niedrig),
   −4 % (Bekanntheit), −6 % (Benefits fehlen), mal Empfindlichkeit der Eigenschaften, plus HR. Unter 35 %: Warnung an den
   Chef; bei 10 % Kündigung, die Wirkung endet sofort.
-- **Hierarchie:** Talente leiten ihre Stelle, KI-Kräfte berichten an sie (Anzeige im Stellenraster und Talentblatt);
-  das Organigramm der Spieler-Mitarbeiter (ADR-104) bleibt unverändert.
+- **Hierarchie:** Talente leiten ihre Stelle, KI-Kräfte berichten an sie (Anzeige im Stellenraster und Talentblatt).
+  Im Organigramm (ADR-104, `get_company_org`, für alle Spieler offen) stehen die Talente als eigene Ebene unter den
+  Spieler-Rängen und über den KI-Kräften, Mit-Geschäftsführer zuerst und markiert; gezeigt werden nur Name, Porträt,
+  Stelle und Stufe (kein Lohn, keine Zufriedenheit). Migration `20261204010200_talents_after_clone.sql` kopiert dafür
+  die letzte Fassung aus 0100 (Aufgaben); sie läuft nach Klon und Jobs (ADR-206, 9800/9810), deren neu geschriebene
+  Team- und Jobfunktionen keine Talent-Logik tragen.
 - **Mit-Geschäftsführung:** ab Senior (Führungskraft ab Profi), höchstens 2 je Firma, Lohn ≥ Forderung × 1,3 und
   Mitspracherecht. Befugnis „Beraten“ (nur Empfehlungen) oder „Entscheiden“ mit Tagesbudget (≤ 100.000 €). Einmal je
   Stunde: auf ein offenes Ereignis nach 30 Minuten eine Strategie wählen (vorsichtig = höchste Abmilderung,

@@ -8362,5 +8362,9 @@ pending|accepted|countered|failed|cancelled, expires_at, created_by, created_at,
 | `talent_coceo_set(p_request_id, p_talent_key, p_autonomy, p_budget_cents, p_remove)`         | wie `get_company_talents`                                                                                                                                                                                                             |
 | `talent_undo_decision(p_request_id, p_event_id)`                                             | wie `get_company_talents`; `locked`                                                                                                                                                                                                   |
 
+`get_company_org(p_company_id)` (Migration `20261204010200_talents_after_clone.sql`) trägt zusätzlich `talents: [{ key,
+first_name, last_name, avatar_key, role, tier, is_coceo, since }]` (Mit-GF zuerst, dann Stufe absteigend, dann Stelle);
+das Organigramm zeigt sie über den KI-Kräften.
+
 Ledger: `company_costs` „Talent: Name“, Schlüssel `talent_wage:<talent>:<firma>:<stunde>`; Fertigkeit der Mit-GF
 „Fertigkeit: Schulung (Mit-GF)“, Schlüssel `talent_coceo_skill:<talent>:<fertigkeit>:<stufe>:<firma>`.
