@@ -16,12 +16,12 @@ import {
 } from "./progression.ts";
 
 describe("xp curve", () => {
-  it("keeps level 2 at the tutorial reward and is 2.5 × the spec curve after (ADR-055)", () => {
+  it("keeps level 2 at the tutorial reward and is 2 × the spec curve after (ADR-055, ADR-202)", () => {
     expect(xpForNextLevel(1)).toBe(100);
-    expect(xpForNextLevel(2)).toBe(707);
-    expect(xpForNextLevel(10)).toBe(7906); // spec: ca. 3160 × 2.5
-    expect(xpForNextLevel(20)).toBe(22_361);
-    expect(xpForNextLevel(50)).toBe(88_388);
+    expect(xpForNextLevel(2)).toBe(566);
+    expect(xpForNextLevel(10)).toBe(6325); // spec: ca. 3160 × 2 (ADR-202, was × 2.5)
+    expect(xpForNextLevel(20)).toBe(17_889);
+    expect(xpForNextLevel(50)).toBe(70_711);
   });
 
   it("is strictly increasing", () => {
@@ -36,8 +36,8 @@ describe("xp curve", () => {
   it("accumulates total xp", () => {
     expect(totalXpForLevel(1)).toBe(0);
     expect(totalXpForLevel(2)).toBe(100);
-    expect(totalXpForLevel(3)).toBe(100 + 707);
-    expect(totalXpForLevel(10)).toBe(27_612);
+    expect(totalXpForLevel(3)).toBe(100 + 566);
+    expect(totalXpForLevel(10)).toBe(22_109);
   });
 
   it("levelFromTotalXp is the inverse of totalXpForLevel", () => {
@@ -58,8 +58,8 @@ describe("xp curve", () => {
 
   it("reports progress inside a level", () => {
     const p = levelProgress(150);
-    expect(p).toMatchObject({ level: 2, xpIntoLevel: 50, xpForNext: 707, isMaxLevel: false });
-    expect(p.progress).toBeCloseTo(50 / 707);
+    expect(p).toMatchObject({ level: 2, xpIntoLevel: 50, xpForNext: 566, isMaxLevel: false });
+    expect(p.progress).toBeCloseTo(50 / 566);
     expect(levelProgress(totalXpForLevel(77) + 10)).toMatchObject({ level: 77, xpIntoLevel: 10, isMaxLevel: false });
   });
 });
@@ -138,11 +138,11 @@ describe("xp sources", () => {
 });
 
 describe("mission XP grow with the level (ADR-142)", () => {
-  it("scales 1 + 0.15 per level, capped", async () => {
+  it("scales 1 + 0.18 per level, capped (ADR-202, was 0.15)", async () => {
     const { missionXpScale, missionBaseXp } = await import("./progression.ts");
     expect(missionXpScale(1)).toBe(1);
-    expect(missionXpScale(10)).toBeCloseTo(2.35);
+    expect(missionXpScale(10)).toBeCloseTo(2.62);
     expect(missionXpScale(200)).toBe(BALANCE.progression.missionXpScaleMax);
-    expect(missionBaseXp(200, 11)).toBe(500);
+    expect(missionBaseXp(200, 11)).toBe(560);
   });
 });

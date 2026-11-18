@@ -562,6 +562,16 @@ export interface ProgressionConfig {
   readonly missionCountScaleMax: number;
   /** ADR-166: how often per Berlin day a player may swap the open quick, daily and weekly missions. */
   readonly missionResetsPerDay: number;
+  /** ADR-202: how often per Berlin day a player may skip one open quick, daily or weekly mission, free. */
+  readonly missionSkipsPerDay: number;
+  /** ADR-202: the draw of quick, daily and weekly missions (repeats, cooldown, feature weights). */
+  readonly missionDraw: {
+    readonly recentDraws: { readonly quick: number; readonly daily: number; readonly weekly: number };
+    readonly cooldownHours: { readonly quick: number; readonly daily: number; readonly weekly: number };
+    readonly featureWeightBps: number;
+    readonly newFeatureLevels: number;
+    readonly newFeatureWeightBps: number;
+  };
   /**
    * ADR-166: missions never ask for money the player does not have. Money targets are clamped to a share of the
    * player's means when the mission is assigned; purchases need the cheapest offer to be affordable.
@@ -2289,15 +2299,19 @@ export const BALANCE = {
   progression: {
     // Owner feedback: the first levels were too fast. Level 2 stays at the tutorial reward,
     // after that every level needs 2.5 times the XP of the old curve (ADR-055).
+    // ADR-202: then too slow later on: 250 -> 200 (every level from 2 on needs 20 % less XP; nobody loses a level).
     firstLevelXp: 100,
-    xpBase: 250,
+    xpBase: 200,
     xpExponent: 1.5,
     maxLevel: 10_000,
     prestige: { fromLevel: 50, titleEveryLevels: 10 },
     missionTargetScalePerLevel: 0.2,
     missionTargetScaleMax: 5,
-    /** ADR-142: mission XP x (1 + perLevel x (level - 1)), at most max: level 10 = x2.35, level 30 = x5.35. */
-    missionXpScalePerLevel: 0.15,
+    /**
+     * ADR-142: mission XP x (1 + perLevel x (level - 1)), at most max. ADR-202: 0.15 -> 0.18,
+     * level 10 = x2.62, level 30 = x6.22, the cap 8 from level 40.
+     */
+    missionXpScalePerLevel: 0.18,
     missionXpScaleMax: 8,
     /**
      * ADR-159: counted missions get harder with the level: targets of daily and weekly missions (and quick missions
@@ -2307,6 +2321,20 @@ export const BALANCE = {
     missionCountScaleMax: 3,
     /** ADR-166: one swap of the open missions per real (Berlin) day. */
     missionResetsPerDay: 1,
+    /** ADR-202: and one free skip of a single open mission per real (Berlin) day. */
+    missionSkipsPerDay: 1,
+    /**
+     * ADR-202: the draw avoids repeats. A template among the last `recentDraws` draws of its kind, or drawn within
+     * `cooldownHours`, only comes when nothing fresh is doable. Missions of an unlocked feature weigh
+     * x featureWeightBps, of a feature unlocked within the last `newFeatureLevels` levels x newFeatureWeightBps.
+     */
+    missionDraw: {
+      recentDraws: { quick: 12, daily: 9, weekly: 6 },
+      cooldownHours: { quick: 48, daily: 96, weekly: 504 },
+      featureWeightBps: 15_000,
+      newFeatureLevels: 5,
+      newFeatureWeightBps: 25_000,
+    },
     /** ADR-166: a buy fits into half the cash; volume and profit follow cash plus positions. */
     missionAfford: {
       buyShareBps: 5_000,

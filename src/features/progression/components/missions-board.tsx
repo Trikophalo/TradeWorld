@@ -66,7 +66,7 @@ export function MissionsBoard() {
                 <div className="space-y-2">
                   {group.missions.length === 0 && <p className="text-sm text-fg-3">{t("empty")}</p>}
                   {group.missions.map((mission) => (
-                    <MissionItem key={mission.id} mission={mission} />
+                    <MissionItem key={mission.id} mission={mission} skippable={kind !== "milestone"} />
                   ))}
                 </div>
                 {kind === "daily" && streak > 0 && (

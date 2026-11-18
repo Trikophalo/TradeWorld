@@ -618,6 +618,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Grundeinkommen stark ausbaubar",
         text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-e3f3e70c",
+        title: "Schneller aufsteigen, abwechslungsreichere Missionen",
+        text: "Jedes Level ab Level 2 braucht 20 % weniger XP, Missionen bringen mit dem Level mehr XP: Ein aktiver Spieler steigt etwa 1,3- bis 1,4-mal so schnell…",
+      },
     ],
   },
   {

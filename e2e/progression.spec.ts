@@ -86,6 +86,22 @@ test("the open missions can be re-rolled once per day (ADR-166)", async ({ page 
   await expect(page.getByTestId("missions-reset-button")).toBeDisabled();
 });
 
+test("one open mission can be skipped for free once per day (ADR-202)", async ({ page }) => {
+  await preparePlayer(page);
+  await page.goto("/missions");
+  await expect(page.getByText("Sieh dir 3 Aktien an")).toBeVisible();
+  await expect(page.getByTestId("missions-skip-hint")).toContainText("einmal am Tag");
+  // milestones have no skip; quick, daily and weekly missions do
+  await expect(page.getByTestId("mission-skip")).toHaveCount(9);
+  await page.getByRole("button", { name: "Sieh dir 3 Aktien an gegen eine andere Mission tauschen" }).click();
+  await expect(page.getByText("Mission getauscht").first()).toBeVisible();
+  await expect(page.getByText("Sieh dir 3 Aktien an")).toHaveCount(0);
+  // the full re-roll stays, the single skip rests until tomorrow
+  await expect(page.getByTestId("mission-skip")).toHaveCount(0);
+  await expect(page.getByTestId("missions-skip-hint")).toContainText("Wieder in");
+  await expect(page.getByTestId("missions-reset-button")).toBeEnabled();
+});
+
 test("rankings: Forbes 100 of real players, everyone with the AI tycoons, top companies (ADR-074)", async ({
   page,
 }) => {

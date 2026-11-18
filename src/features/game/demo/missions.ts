@@ -783,6 +783,16 @@ export function resetAvailableOn(state: MissionResetState | undefined, today: st
   return resetStateOn(state, today).used < BALANCE.progression.missionResetsPerDay;
 }
 
+/** ADR-202: the free skip of one mission per Berlin day (same shape as the reset). */
+export function skipAvailableOn(state: MissionResetState | undefined, today: string): boolean {
+  return resetStateOn(state, today).used < BALANCE.progression.missionSkipsPerDay;
+}
+
+/** Only an open quick, daily or weekly mission can be skipped; milestones stay. */
+export function skippable(mission: { kind: MissionKind; status: string }): boolean {
+  return mission.kind !== "milestone" && mission.status === "active";
+}
+
 /**
  * Splits the missions for a reset: open quick, daily and weekly ones go; finished ones (waiting for their claim or
  * claimed) and milestones stay.

@@ -11,8 +11,17 @@ describe("missionRoute", () => {
     expect(missionRoute("M_NEXAMON_FIRST_TEN")).toBe("/nexamon");
   });
 
+  it("leads crypto, NFT and upgrade missions to their pages (ADR-202)", () => {
+    expect(missionRoute("q_crypto_buy")).toBe("/crypto");
+    expect(missionRoute("w_crypto_coins")).toBe("/crypto");
+    expect(missionRoute("q_nft_mint")).toBe("/nfts");
+    expect(missionRoute("q_nft_offer")).toBe("/nfts");
+    expect(missionRoute("q_upgrade")).toBe("/upgrades");
+    expect(missionRoute("m_upgrades_10")).toBe("/upgrades");
+  });
+
   it("leaves all other missions without a link", () => {
-    const others = MISSION_TEMPLATES.filter((m) => m.requires !== "nexamon");
+    const others = MISSION_TEMPLATES.filter((m) => m.requires !== "nexamon" && !m.key.split("_").includes("nft"));
     expect(others.length).toBeGreaterThan(10);
     for (const mission of others) expect(missionRoute(mission.key), mission.key).toBeNull();
     expect(missionRoute("")).toBeNull();

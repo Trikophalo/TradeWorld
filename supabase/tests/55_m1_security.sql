@@ -92,7 +92,7 @@ select tests.assert(
                    'list_nexamon_cards', 'unlist_nexamon_cards', 'bulk_sell_nexamon', 'instant_sell_nexamon', 'buy_nexamon_packs',
                    'create_nexamon_pack_battle', 'join_nexamon_pack_battle']
           -- mission reset (a2)
-          || array['reset_missions']
+          || array['reset_missions', 'skip_mission']
           -- listed companies (a3)
           || array['get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
                    'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',

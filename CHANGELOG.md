@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Schneller aufsteigen, abwechslungsreichere Missionen (ADR-202):** Jedes Level ab Level 2 braucht 20 % weniger XP, Missionen bringen mit dem Level mehr XP: Ein aktiver Spieler steigt etwa 1,3- bis 1,4-mal so schnell auf, niemand verliert ein Level. 52 neue Missionen für Krypto, Short-Positionen, Merkliste, Nexamon (Packs, ASP, Sofortverkauf, Markt, Pack Battles), NFTs, News-Aktionen, Werbekampagnen, Firmen-Fertigkeiten, Verbesserungen, Arbeitsaufgaben, Tagesbelohnung und Feed. Dieselbe Mission kommt nicht ständig wieder, neu freigeschaltete Bereiche kommen öfter dran, und jede Mission ist machbar: Wird eine unmöglich (zum Beispiel ohne Firma), ersetzt sie sich selbst. Einmal am Tag kannst du eine einzelne Mission kostenlos tauschen.
+
 - **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro Stunde); die Preise steigen von 3.000 € bis rund 259.500 €.
 
 - **KI kauft auch teure Karten (ADR-195):** Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab. Bis 15 % über Wert klappt es nur manchmal, eher bei beliebten Karten; darüber nie.
