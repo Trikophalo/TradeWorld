@@ -1,6 +1,6 @@
 {
   "battle": {
-    "id": "a9d84a31-beda-44ac-9947-9d9c436f40f9",
+    "id": "05fede6c-b7b3-4426-ab27-4066d15bcce9",
     "me": "opponent",
     "set": "mystic_energy",
     "mode": "multi",
@@ -19,10 +19,10 @@
             "pack": 1,
             "slot": 1,
             "rarity": "common",
-            "serial": 12,
-            "card_key": "me-011",
-            "condition": "near_mint",
-            "value_cents": 390
+            "serial": 17,
+            "card_key": "me-007",
+            "condition": "good",
+            "value_cents": 161
           },
           {
             "idx": 2,
@@ -30,10 +30,10 @@
             "pack": 1,
             "slot": 2,
             "rarity": "common",
-            "serial": 20,
-            "card_key": "me-001",
-            "condition": "near_mint",
-            "value_cents": 420
+            "serial": 12,
+            "card_key": "me-022",
+            "condition": "mint",
+            "value_cents": 240
           },
           {
             "idx": 3,
@@ -41,32 +41,32 @@
             "pack": 1,
             "slot": 3,
             "rarity": "common",
-            "serial": 14,
-            "card_key": "me-017",
-            "condition": "good",
-            "value_cents": 180
+            "serial": 12,
+            "card_key": "me-013",
+            "condition": "mint",
+            "value_cents": 160
           },
           {
             "idx": 4,
             "set": "mystic_energy",
             "pack": 1,
             "slot": 4,
-            "rarity": "common",
-            "serial": 14,
-            "card_key": "me-048",
-            "condition": "near_mint",
-            "value_cents": 110
+            "rarity": "rare",
+            "serial": 10,
+            "card_key": "me-058",
+            "condition": "mint",
+            "value_cents": 902
           },
           {
             "idx": 5,
             "set": "mystic_energy",
             "pack": 1,
             "slot": 5,
-            "rarity": "rare",
-            "serial": 9,
-            "card_key": "me-058",
-            "condition": "mint",
-            "value_cents": 902
+            "rarity": "common",
+            "serial": 14,
+            "card_key": "me-025",
+            "condition": "near_mint",
+            "value_cents": 150
           },
           {
             "idx": 6,
@@ -74,10 +74,10 @@
             "pack": 2,
             "slot": 1,
             "rarity": "common",
-            "serial": 10,
-            "card_key": "sa-022",
-            "condition": "mint",
-            "value_cents": 4508
+            "serial": 8,
+            "card_key": "sa-028",
+            "condition": "near_mint",
+            "value_cents": 3804
           },
           {
             "idx": 7,
@@ -85,10 +85,10 @@
             "pack": 2,
             "slot": 2,
             "rarity": "common",
-            "serial": 7,
-            "card_key": "sa-009",
-            "condition": "good",
-            "value_cents": 810
+            "serial": 8,
+            "card_key": "sa-006",
+            "condition": "mint",
+            "value_cents": 1602
           },
           {
             "idx": 8,
@@ -97,9 +97,9 @@
             "slot": 3,
             "rarity": "common",
             "serial": 7,
-            "card_key": "sa-032",
+            "card_key": "sa-013",
             "condition": "near_mint",
-            "value_cents": 1500
+            "value_cents": 1101
           },
           {
             "idx": 9,
@@ -108,25 +108,26 @@
             "slot": 4,
             "rarity": "rare",
             "serial": 5,
-            "card_key": "sa-052",
-            "condition": "near_mint",
-            "value_cents": 9500
+            "card_key": "sa-060",
+            "condition": "good",
+            "value_cents": 16200
           },
           {
             "idx": 10,
             "set": "super_apex",
             "pack": 2,
             "slot": 5,
-            "rarity": "common",
-            "serial": 7,
-            "card_key": "sa-018",
-            "condition": "mint",
-            "value_cents": 2400
+            "rarity": "rare",
+            "serial": 5,
+            "card_key": "sa-057",
+            "condition": "near_mint",
+            "value_cents": 4800
           }
         ],
-        "cents": 20720,
+        "cents": 29120,
         "is_me": false,
-        "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] }
+        "player": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
+        "score_cents": 29120
       },
       {
         "seat": 1,
@@ -137,10 +138,10 @@
             "pack": 1,
             "slot": 1,
             "rarity": "common",
-            "serial": 11,
-            "card_key": "me-021",
+            "serial": 12,
+            "card_key": "me-039",
             "condition": "near_mint",
-            "value_cents": 170
+            "value_cents": 380
           },
           {
             "idx": 2,
@@ -148,10 +149,10 @@
             "pack": 1,
             "slot": 2,
             "rarity": "common",
-            "serial": 11,
-            "card_key": "me-031",
+            "serial": 14,
+            "card_key": "me-017",
             "condition": "near_mint",
-            "value_cents": 160
+            "value_cents": 200
           },
           {
             "idx": 3,
@@ -159,10 +160,10 @@
             "pack": 1,
             "slot": 3,
             "rarity": "common",
-            "serial": 11,
-            "card_key": "me-026",
+            "serial": 18,
+            "card_key": "me-007",
             "condition": "good",
-            "value_cents": 225
+            "value_cents": 161
           },
           {
             "idx": 4,
@@ -170,10 +171,10 @@
             "pack": 1,
             "slot": 4,
             "rarity": "common",
-            "serial": 15,
-            "card_key": "me-017",
-            "condition": "mint",
-            "value_cents": 200
+            "serial": 16,
+            "card_key": "me-019",
+            "condition": "good",
+            "value_cents": 171
           },
           {
             "idx": 5,
@@ -181,10 +182,10 @@
             "pack": 1,
             "slot": 5,
             "rarity": "common",
-            "serial": 21,
-            "card_key": "me-001",
-            "condition": "mint",
-            "value_cents": 420
+            "serial": 15,
+            "card_key": "me-012",
+            "condition": "good",
+            "value_cents": 198
           },
           {
             "idx": 6,
@@ -193,9 +194,9 @@
             "slot": 1,
             "rarity": "common",
             "serial": 7,
-            "card_key": "sa-017",
-            "condition": "mint",
-            "value_cents": 600
+            "card_key": "sa-029",
+            "condition": "near_mint",
+            "value_cents": 501
           },
           {
             "idx": 7,
@@ -204,9 +205,9 @@
             "slot": 2,
             "rarity": "common",
             "serial": 8,
-            "card_key": "sa-029",
-            "condition": "good",
-            "value_cents": 450
+            "card_key": "sa-038",
+            "condition": "near_mint",
+            "value_cents": 2102
           },
           {
             "idx": 8,
@@ -214,10 +215,10 @@
             "pack": 2,
             "slot": 3,
             "rarity": "common",
-            "serial": 8,
-            "card_key": "sa-004",
+            "serial": 9,
+            "card_key": "sa-026",
             "condition": "mint",
-            "value_cents": 4200
+            "value_cents": 4813
           },
           {
             "idx": 9,
@@ -226,48 +227,54 @@
             "slot": 4,
             "rarity": "rare",
             "serial": 5,
-            "card_key": "sa-056",
+            "card_key": "sa-051",
             "condition": "near_mint",
-            "value_cents": 7500
+            "value_cents": 22000
           },
           {
             "idx": 10,
             "set": "super_apex",
             "pack": 2,
             "slot": 5,
-            "rarity": "common",
-            "serial": 8,
-            "card_key": "sa-019",
-            "condition": "mint",
-            "value_cents": 800
+            "rarity": "prisma",
+            "serial": 3,
+            "card_key": "sa-074",
+            "condition": "near_mint",
+            "value_cents": 12234763
           }
         ],
-        "cents": 14725,
+        "cents": 12265289,
         "is_me": true,
-        "player": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] }
+        "player": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] },
+        "score_cents": 12265289
       }
     ],
+    "twist": false,
     "status": "done",
-    "winner": "challenger",
-    "ends_at": "2026-11-17T20:01:37.134069+00:00",
-    "live_id": "9375ce18-e752-4371-9e96-68281ac78cd2",
+    "twists": [],
+    "winner": "opponent",
+    "ends_at": "2026-11-18T00:15:00.082899+00:00",
+    "live_id": "c47276c9-e9ee-4272-8106-e78227e77975",
     "my_seat": 1,
+    "reverse": false,
     "slot_ms": 1800,
     "tear_ms": 2400,
     "viewers": 0,
     "opponent": { "level": 12, "nickname": "Fixture_PackB", "avatar_key": "rookie", "accessories": [] },
-    "coin_seed": 852484942,
-    "decide_at": "2026-11-17T20:01:29.134069+00:00",
+    "twist_ms": 0,
+    "coin_seed": 1667583278,
+    "decide_at": "2026-11-18T00:14:52.082899+00:00",
     "reactions": [],
-    "starts_at": "2026-11-17T20:01:06.334069+00:00",
+    "starts_at": "2026-11-18T00:14:29.282899+00:00",
     "tie_break": "value",
     "challenger": { "level": 12, "nickname": "Fixture_PackA", "avatar_key": "rookie", "accessories": [] },
-    "created_at": "2026-11-17T20:02:03.307065+00:00",
-    "expires_at": "2026-11-17T20:04:03.307065+00:00",
-    "accepted_at": "2026-11-17T20:01:03.334069+00:00",
+    "created_at": "2026-11-18T00:15:26.236371+00:00",
+    "expires_at": "2026-11-18T00:17:26.236371+00:00",
+    "twist_seed": null,
+    "accepted_at": "2026-11-18T00:14:26.282899+00:00",
     "price_cents": 55000,
-    "server_time": "2026-11-17T20:02:03.435513+00:00",
-    "winner_seat": 0,
+    "server_time": "2026-11-18T00:15:26.524505+00:00",
+    "winner_seat": 1,
     "abort_reason": null,
     "opponent_cards": [
       {
@@ -276,10 +283,10 @@
         "pack": 1,
         "slot": 1,
         "rarity": "common",
-        "serial": 11,
-        "card_key": "me-021",
+        "serial": 12,
+        "card_key": "me-039",
         "condition": "near_mint",
-        "value_cents": 170
+        "value_cents": 380
       },
       {
         "idx": 2,
@@ -287,10 +294,10 @@
         "pack": 1,
         "slot": 2,
         "rarity": "common",
-        "serial": 11,
-        "card_key": "me-031",
+        "serial": 14,
+        "card_key": "me-017",
         "condition": "near_mint",
-        "value_cents": 160
+        "value_cents": 200
       },
       {
         "idx": 3,
@@ -298,10 +305,10 @@
         "pack": 1,
         "slot": 3,
         "rarity": "common",
-        "serial": 11,
-        "card_key": "me-026",
+        "serial": 18,
+        "card_key": "me-007",
         "condition": "good",
-        "value_cents": 225
+        "value_cents": 161
       },
       {
         "idx": 4,
@@ -309,10 +316,10 @@
         "pack": 1,
         "slot": 4,
         "rarity": "common",
-        "serial": 15,
-        "card_key": "me-017",
-        "condition": "mint",
-        "value_cents": 200
+        "serial": 16,
+        "card_key": "me-019",
+        "condition": "good",
+        "value_cents": 171
       },
       {
         "idx": 5,
@@ -320,10 +327,10 @@
         "pack": 1,
         "slot": 5,
         "rarity": "common",
-        "serial": 21,
-        "card_key": "me-001",
-        "condition": "mint",
-        "value_cents": 420
+        "serial": 15,
+        "card_key": "me-012",
+        "condition": "good",
+        "value_cents": 198
       },
       {
         "idx": 6,
@@ -332,9 +339,9 @@
         "slot": 1,
         "rarity": "common",
         "serial": 7,
-        "card_key": "sa-017",
-        "condition": "mint",
-        "value_cents": 600
+        "card_key": "sa-029",
+        "condition": "near_mint",
+        "value_cents": 501
       },
       {
         "idx": 7,
@@ -343,9 +350,9 @@
         "slot": 2,
         "rarity": "common",
         "serial": 8,
-        "card_key": "sa-029",
-        "condition": "good",
-        "value_cents": 450
+        "card_key": "sa-038",
+        "condition": "near_mint",
+        "value_cents": 2102
       },
       {
         "idx": 8,
@@ -353,10 +360,10 @@
         "pack": 2,
         "slot": 3,
         "rarity": "common",
-        "serial": 8,
-        "card_key": "sa-004",
+        "serial": 9,
+        "card_key": "sa-026",
         "condition": "mint",
-        "value_cents": 4200
+        "value_cents": 4813
       },
       {
         "idx": 9,
@@ -365,23 +372,23 @@
         "slot": 4,
         "rarity": "rare",
         "serial": 5,
-        "card_key": "sa-056",
+        "card_key": "sa-051",
         "condition": "near_mint",
-        "value_cents": 7500
+        "value_cents": 22000
       },
       {
         "idx": 10,
         "set": "super_apex",
         "pack": 2,
         "slot": 5,
-        "rarity": "common",
-        "serial": 8,
-        "card_key": "sa-019",
-        "condition": "mint",
-        "value_cents": 800
+        "rarity": "prisma",
+        "serial": 3,
+        "card_key": "sa-074",
+        "condition": "near_mint",
+        "value_cents": 12234763
       }
     ],
-    "opponent_cents": 14725,
+    "opponent_cents": 12265289,
     "challenger_cards": [
       {
         "idx": 1,
@@ -389,10 +396,10 @@
         "pack": 1,
         "slot": 1,
         "rarity": "common",
-        "serial": 12,
-        "card_key": "me-011",
-        "condition": "near_mint",
-        "value_cents": 390
+        "serial": 17,
+        "card_key": "me-007",
+        "condition": "good",
+        "value_cents": 161
       },
       {
         "idx": 2,
@@ -400,10 +407,10 @@
         "pack": 1,
         "slot": 2,
         "rarity": "common",
-        "serial": 20,
-        "card_key": "me-001",
-        "condition": "near_mint",
-        "value_cents": 420
+        "serial": 12,
+        "card_key": "me-022",
+        "condition": "mint",
+        "value_cents": 240
       },
       {
         "idx": 3,
@@ -411,32 +418,32 @@
         "pack": 1,
         "slot": 3,
         "rarity": "common",
-        "serial": 14,
-        "card_key": "me-017",
-        "condition": "good",
-        "value_cents": 180
+        "serial": 12,
+        "card_key": "me-013",
+        "condition": "mint",
+        "value_cents": 160
       },
       {
         "idx": 4,
         "set": "mystic_energy",
         "pack": 1,
         "slot": 4,
-        "rarity": "common",
-        "serial": 14,
-        "card_key": "me-048",
-        "condition": "near_mint",
-        "value_cents": 110
+        "rarity": "rare",
+        "serial": 10,
+        "card_key": "me-058",
+        "condition": "mint",
+        "value_cents": 902
       },
       {
         "idx": 5,
         "set": "mystic_energy",
         "pack": 1,
         "slot": 5,
-        "rarity": "rare",
-        "serial": 9,
-        "card_key": "me-058",
-        "condition": "mint",
-        "value_cents": 902
+        "rarity": "common",
+        "serial": 14,
+        "card_key": "me-025",
+        "condition": "near_mint",
+        "value_cents": 150
       },
       {
         "idx": 6,
@@ -444,10 +451,10 @@
         "pack": 2,
         "slot": 1,
         "rarity": "common",
-        "serial": 10,
-        "card_key": "sa-022",
-        "condition": "mint",
-        "value_cents": 4508
+        "serial": 8,
+        "card_key": "sa-028",
+        "condition": "near_mint",
+        "value_cents": 3804
       },
       {
         "idx": 7,
@@ -455,10 +462,10 @@
         "pack": 2,
         "slot": 2,
         "rarity": "common",
-        "serial": 7,
-        "card_key": "sa-009",
-        "condition": "good",
-        "value_cents": 810
+        "serial": 8,
+        "card_key": "sa-006",
+        "condition": "mint",
+        "value_cents": 1602
       },
       {
         "idx": 8,
@@ -467,9 +474,9 @@
         "slot": 3,
         "rarity": "common",
         "serial": 7,
-        "card_key": "sa-032",
+        "card_key": "sa-013",
         "condition": "near_mint",
-        "value_cents": 1500
+        "value_cents": 1101
       },
       {
         "idx": 9,
@@ -478,22 +485,22 @@
         "slot": 4,
         "rarity": "rare",
         "serial": 5,
-        "card_key": "sa-052",
-        "condition": "near_mint",
-        "value_cents": 9500
+        "card_key": "sa-060",
+        "condition": "good",
+        "value_cents": 16200
       },
       {
         "idx": 10,
         "set": "super_apex",
         "pack": 2,
         "slot": 5,
-        "rarity": "common",
-        "serial": 7,
-        "card_key": "sa-018",
-        "condition": "mint",
-        "value_cents": 2400
+        "rarity": "rare",
+        "serial": 5,
+        "card_key": "sa-057",
+        "condition": "near_mint",
+        "value_cents": 4800
       }
     ],
-    "challenger_cents": 20720
+    "challenger_cents": 29120
   }
 }
