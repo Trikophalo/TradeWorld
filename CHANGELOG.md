@@ -4,6 +4,10 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Aktien ohne Tagesgrenze: Kurse steigen und fallen an einem Tag so weit, wie der Markt sie trägt. Dafür wehrt sich der
+  Markt gegen Übertreibungen: Heiß gelaufene Aktien ziehen Gewinnmitnahmen, Leerverkäufer-Reports, Abstufungen,
+  Sonderprüfungen, Insider-Verdacht, Margin Calls, Blasenwarnungen und Marktkorrekturen an, je heißer, desto öfter
+  und härter. Abgestürzte Aktien locken Schnäppchenjäger. Alles steht vorher in den Börsen-News.
 - Flyer für kleine Firmen: Solange deine Firma eine Garage ist oder weniger als 1 Mio. € wert, kostet die
   Flyer-Kampagne höchstens 2.000 €. So kann sich jede neue Garage ihre erste Kampagne leisten, auch mit großem Markt.
 - Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der

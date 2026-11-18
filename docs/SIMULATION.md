@@ -1083,7 +1083,7 @@ Spieleraktien bekommen drei zusätzliche Regeln; Formeln in `src/lib/sim/startup
 fairNach      = (Firmenwert × Reputationsfaktor + neue Aktien × Ausgabepreis) / (Aktien + neue Aktien)   # postIssueFairCents
 aiFaktor      = Ausgabepreis ≤ fairNach × aiMaxPremiumBps / 10 000 ? 1 : 0                              # issueAiFactor
 KI-Zeichnung  = angeboten × aiFaktor × (aiTakeBase + aiTakePerQuality × Qualität)
-Tagesband     = clamp(Kurs, Vortagesschluss / 1,3, Vortagesschluss × 1,3)    # nur Spielerfirmen, playerStockBandE4
+Tagesband     = clamp(Kurs, Vortagesschluss / 1,3, Vortagesschluss × 1,3)    # nur Spielerfirmen, playerStockBandE4; seit ADR-214 aus
 Halteprämie   = FV × (1 + 0,15 × tanh((Spielerbestand − Bestand des Gründers) in Cent / (20 × depth)))
 ```
 
@@ -1231,3 +1231,25 @@ Formeln in `src/lib/sim/macro.ts`, Werte in `BALANCE.macro`; Postgres spiegelt s
 - Steuer: `progressiveTaxCents(taxable, rate, Stunden)` = Satz auf alles + `extraBps` auf den Teil über
   `fromCentsPerDay × Stunden / 24`. Steuerberater: `advisorRateBps = 150 × 2,4^log10(ref / 1.000 €)`, höchstens 3.000.
 - Wachstums-Werkzeug: `src/lib/sim/growth.ts` (`runGrowth`, `medianReach`), Ausgabe `scripts/growth-harness.ts`.
+
+## Nachtrag: Marktkräfte von außen, kein Tagesband (ADR-214)
+
+`src/lib/sim/market-forces.ts`, Werte `game_config.marketForces`, SQL `market_force_*` und `market_forces_run`
+(Migration `20261204010900_stock_unbounded.sql`). Kein Tagesband mehr (`dailyBandBps` = 0). Je Minute und Aktie ohne
+offenen Hinweis:
+
+```
+prem   = ln(Kurs / fairer Wert),  g24 = ln(Kurs / Kurs vor 24 h),  g7 = ln(Kurs / Kurs vor 7 Tagen)   (1-h-Kerzen)
+heat   = min(4, max(0, prem − 0,25)/0,5 + [prem ≥ −0,1] × (max(0, g24 − 0,2)/0,4 + max(0, g7 − 0,5)/0,8))
+cold   = min(4, max(0, −prem − 0,3)/0,6 + max(0, −g24 − 0,3)/0,5)
+Chance = 1 − exp(−min(3; 0,012 + 0,9 × heat + 0,35 × cold) / 60)
+Gewicht: hot weight × heat (ab minHeat) · cold weight × cold · any weight (nie gegen die Richtung)
+Bewegung = (min + u × (max − min)) × (1 + 0,45 × heat bzw. cold), höchstens 4.500 bp
+Stimmung += Richtung × Bewegung / 10 000 × 2   (geklemmt auf −1..1)
+Welle  = 1 − exp(−min(1; 0,02 + 0,25 × Ø heat der heißen Aktien) / 60), höchstens 6 Aktien, 300..1.000 bp × (1 + 0,45 × heat)
+```
+
+Die Bewegung trifft nach 3 bis 15 Minuten zu 85 % ein und wirkt wie `event_price_shock`, aber ohne fairen Wert,
+Ereignisfaktor und EMAs (`market_force_shock`): Der Kurs nähert sich dem Anker, Momentum-Händler sehen den Rückschlag,
+die Kleinanleger folgen der Stimmung. Messung: `scripts/stock-heat-harness.ts` (`simulateStockPath`, echtes
+`stepMarketTick`), Ergebnisse in docs/BALANCING.md.

@@ -91660,6 +91660,484 @@ begin
   end loop;
 end;
 $$;
+-- ===== idempotent copy of migrations/20261204010900_stock_unbounded.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 010900 · Stocks without a daily limit, market forces against overheated stocks (ADR-214)
+-- =============================================================================
+-- The owner: "Aktien sollen unendlich steigen und sinken können am Tag ohne Grenze. Aber es steigt gerade zu schnell.
+-- Es soll mehr Ereignisse von außen geben, welche das verhindern oder verlangsamen."
+--
+-- 1. No daily band: trading.playerStocks.dailyBandBps is 0 in game_config (src/config/balance.ts). market_tick_at and
+--    market_order_plan already treat 0 as "no band" (ADR-170/ADR-189), so the tick and the fair-fill path run as for
+--    any other stock; the per-tick circuit breaker maxTickReturnBps (and with it the fair fill of big orders) stays.
+-- 2. Market forces: once a minute (inside stock_news_run_due) every listed stock without an open hint may draw a force
+--    from outside: profit taking, analyst downgrade, short-seller report, insider probe, margin calls, special audit,
+--    capital-increase rumours, bubble warning; bargain hunters, buyback rumours and upgrades for stocks far below their
+--    value; a small background rate (rotation, fund entry) for every stock. Chance and size grow with the heat of the
+--    stock (price / fair value, 24-hour and 7-day gain). Waves hit several hot stocks at once (market correction,
+--    sector correction, rate fears) or lift the coldest (relief rally). Formulas = src/lib/sim/market-forces.ts.
+--    Every force is a stock hint with a lead (stock_tips.source = 'market', ADR-119): announced in the stock news and the
+--    news feed, settled by stock_news_run_due through market_force_shock(), which moves the price and the mood
+--    (sentiment) but never the fair value.
+-- 3. stock_news_run_due: the 1200 definition plus (a) market hints do not hold back the ordinary news rhythm,
+--    (b) they settle through market_force_shock, (c) market_forces_run() at the end.
+--
+-- Values: game_config.marketForces (src/config/market-forces.ts). Without that row no force is drawn.
+-- New internal functions: market_force_heat, market_force_chance_per_hour, market_force_weight, market_force_pick,
+-- market_force_move_bps, market_force_shock, market_forces_run. No new RPCs, no new error keys.
+-- Idempotent: runs unchanged as supabase/updates/20261204010900_stock_unbounded.sql.
+
+alter table public.stock_tips add column if not exists source text not null default 'news';
+alter table public.stock_tips add column if not exists force_key text;
+alter table public.stock_tips add column if not exists sentiment_delta double precision not null default 0;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'stock_tips_source_check') then
+    alter table public.stock_tips add constraint stock_tips_source_check check (source in ('news', 'market'));
+  end if;
+end;
+$$;
+comment on column public.stock_tips.source is
+  'news: ordinary stock news (ADR-119); market: a market force against an overheated or a fallen stock (ADR-214).';
+comment on column public.stock_tips.force_key is 'Key of the market force (game_config marketForces.forces[].key or wave:<kind>).';
+comment on column public.stock_tips.sentiment_delta is 'Mood change applied with a market force when it comes true (ADR-214).';
+create index if not exists stock_tips_source_published_idx on public.stock_tips (source, published_at desc);
+
+-- -----------------------------------------------------------------------------
+-- Formulas (src/lib/sim/market-forces.ts)
+-- -----------------------------------------------------------------------------
+
+-- stockHeat: heat and cold of a stock; p_p24 / p_p7 null while there is no history
+create or replace function public.market_force_heat(p_price bigint, p_fair bigint, p_p24 bigint, p_p7 bigint, p_cfg jsonb,
+                                                    out heat double precision, out cold double precision)
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  h       jsonb := coalesce(p_cfg -> 'heat', '{}'::jsonb);
+  v_prem  double precision := case when p_fair > 0 and p_price > 0 then ln(p_price::double precision / p_fair) else 0 end;
+  v_g24   double precision := case when p_p24 > 0 and p_price > 0 then ln(p_price::double precision / p_p24) else 0 end;
+  v_g7    double precision := case when p_p7 > 0 and p_price > 0 then ln(p_price::double precision / p_p7) else 0 end;
+  v_max   double precision := public.cfg_num(h, '{maxHeat}', 4);
+  v_gains double precision := 0;
+begin
+  if v_prem >= -public.cfg_num(h, '{gainGate}', 0.1) then
+    v_gains := greatest(0, v_g24 - public.cfg_num(h, '{gain24hFree}', 0.2)) / public.cfg_num(h, '{gain24hScale}', 0.4)
+             + greatest(0, v_g7 - public.cfg_num(h, '{gain7dFree}', 0.5)) / public.cfg_num(h, '{gain7dScale}', 0.8);
+  end if;
+  heat := least(v_max, greatest(0, v_prem - public.cfg_num(h, '{premiumFree}', 0.25)) / public.cfg_num(h, '{premiumScale}', 0.5)
+                       + v_gains);
+  cold := least(v_max, greatest(0, -v_prem - public.cfg_num(h, '{discountFree}', 0.3)) / public.cfg_num(h, '{discountScale}', 0.6)
+                       + greatest(0, -v_g24 - public.cfg_num(h, '{loss24hFree}', 0.3)) / public.cfg_num(h, '{loss24hScale}', 0.5));
+end;
+$$;
+
+-- forceChancePerHour
+create or replace function public.market_force_chance_per_hour(p_heat double precision, p_cold double precision, p_cfg jsonb)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select least(public.cfg_num(p_cfg, '{chance,maxPerHour}', 3),
+               public.cfg_num(p_cfg, '{chance,basePerHour}', 0.012)
+               + public.cfg_num(p_cfg, '{chance,perHeatPerHour}', 0.9) * p_heat
+               + public.cfg_num(p_cfg, '{chance,perColdPerHour}', 0.35) * p_cold);
+$$;
+
+-- forceWeight
+create or replace function public.market_force_weight(p_force jsonb, p_heat double precision, p_cold double precision)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_force ->> 'when'
+           when 'hot' then case when p_heat > 0 and p_heat >= coalesce((p_force ->> 'minHeat')::double precision, 0)
+                                then (p_force ->> 'weight')::double precision * p_heat else 0 end
+           when 'cold' then (p_force ->> 'weight')::double precision * p_cold
+           else case when (p_heat > 0 and (p_force ->> 'direction')::integer > 0)
+                       or (p_cold > 0 and (p_force ->> 'direction')::integer < 0) then 0
+                     else (p_force ->> 'weight')::double precision end
+         end;
+$$;
+
+-- pickForce: the force for a uniform draw p_u in [0, 1), in config order; null when none has weight
+create or replace function public.market_force_pick(p_heat double precision, p_cold double precision, p_u double precision,
+                                                    p_cfg jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_forces jsonb := coalesce(p_cfg -> 'forces', '[]'::jsonb);
+  v_total  double precision := 0;
+  v_x      double precision;
+  v_w      double precision;
+  v_last   jsonb;
+  f        jsonb;
+begin
+  for f in select value from jsonb_array_elements(v_forces) loop
+    v_total := v_total + public.market_force_weight(f, p_heat, p_cold);
+  end loop;
+  if v_total <= 0 then
+    return null;
+  end if;
+  v_x := p_u * v_total;
+  for f in select value from jsonb_array_elements(v_forces) loop
+    v_w := public.market_force_weight(f, p_heat, p_cold);
+    if v_w > 0 then
+      v_x := v_x - v_w;
+      v_last := f;
+      if v_x < 0 then
+        return f;
+      end if;
+    end if;
+  end loop;
+  return v_last;
+end;
+$$;
+
+-- forceMoveBps: uniform(min, max) × (1 + severityPerHeat × heat or cold), at most maxMoveBps (positive)
+create or replace function public.market_force_move_bps(p_force jsonb, p_heat double precision, p_cold double precision,
+                                                        p_u double precision, p_cfg jsonb)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select greatest(1, least(public.cfg_num(p_cfg, '{maxMoveBps}', 4500),
+           round(((p_force ->> 'minMoveBps')::double precision
+                  + p_u * ((p_force ->> 'maxMoveBps')::double precision - (p_force ->> 'minMoveBps')::double precision))
+                 * (1 + public.cfg_num(p_cfg, '{severityPerHeat}', 0.45)
+                        * case when (p_force ->> 'direction')::integer < 0 then p_heat else p_cold end))))::integer;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- The shock: price and mood move, the fair value and the EMAs stay (the value funds pull back to the anchor)
+-- -----------------------------------------------------------------------------
+create or replace function public.market_force_shock(p_security uuid, p_move_bps integer, p_sentiment double precision,
+                                                     p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  st    public.security_sim_state;
+  v_res jsonb;
+begin
+  select * into st from public.security_sim_state where security_id = p_security for update;
+  v_res := public.event_price_shock(p_security, p_move_bps, p_now);
+  if st.security_id is not null then
+    update public.security_sim_state
+       set fair_value_e4 = st.fair_value_e4,
+           event_value_factor = st.event_value_factor,
+           ema_fast = st.ema_fast,
+           ema_slow = st.ema_slow,
+           sentiment = greatest(-1, least(1, st.sentiment + coalesce(p_sentiment, 0))),
+           updated_at = now()
+     where security_id = p_security;
+  end if;
+  return v_res;
+end;
+$$;
+comment on function public.market_force_shock(uuid, integer, double precision, timestamptz) is
+  'Internal (ADR-214): a market force moves the price (as event_price_shock) and the mood, never the fair value.';
+
+-- -----------------------------------------------------------------------------
+-- Drawing forces once a minute
+-- -----------------------------------------------------------------------------
+create or replace function public.market_forces_run(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg      jsonb := public.config_jsonb('marketForces');
+  v_now      timestamptz := coalesce(p_now, public.game_now());
+  v_lead_min double precision;
+  v_lead_max double precision;
+  v_rel      integer;
+  v_sent     double precision;
+  v_words    jsonb;
+  v_new      integer := 0;
+  v_waves    integer := 0;
+  v_force    jsonb;
+  v_move     integer;
+  v_strength smallint;
+  v_head     text;
+  v_body     text;
+  v_news     bigint;
+  v_kind     text;
+  v_mean     double precision;
+  v_names    text;
+  v_sector   text;
+  v_sec_name text;
+  v_hit      uuid[];
+  r          record;
+begin
+  if v_cfg is null or jsonb_typeof(v_cfg) <> 'object' then
+    return jsonb_build_object('skipped', 'no_config');
+  end if;
+  v_lead_min := greatest(1, public.cfg_num(v_cfg, '{leadMinMinutes}', 3));
+  v_lead_max := greatest(v_lead_min, public.cfg_num(v_cfg, '{leadMaxMinutes}', 15));
+  v_rel      := least(10000, greatest(0, public.cfg_num(v_cfg, '{reliabilityBps}', 8500)))::integer;
+  v_sent     := public.cfg_num(v_cfg, '{sentimentPerMove}', 2);
+  v_words    := coalesce(v_cfg -> 'strengthWords', '["leicht", "spürbar", "deutlich"]'::jsonb);
+
+  if to_regclass('pg_temp.market_force_heat_tmp') is not null then
+    drop table pg_temp.market_force_heat_tmp;
+  end if;
+  create temporary table market_force_heat_tmp (
+    security_id uuid primary key, name text, sector_key text, heat double precision, cold double precision
+  ) on commit drop;
+  insert into pg_temp.market_force_heat_tmp (security_id, name, sector_key, heat, cold)
+  select sec.id, sec.name, sec.sector_key, h.heat, h.cold
+    from public.securities sec
+    join public.security_quotes q on q.security_id = sec.id
+    join public.security_sim_state st on st.security_id = sec.id
+    cross join lateral public.market_force_heat(
+      q.last_price_e4, st.fair_value_e4,
+      (select c.close_e4 from public.candles c
+        where c.security_id = sec.id and c.interval = '1h'
+          and c.bucket_start <= v_now - interval '24 hours' and c.bucket_start > v_now - interval '48 hours'
+        order by c.bucket_start desc limit 1),
+      (select c.close_e4 from public.candles c
+        where c.security_id = sec.id and c.interval = '1h'
+          and c.bucket_start <= v_now - interval '7 days' and c.bucket_start > v_now - interval '8 days'
+        order by c.bucket_start desc limit 1),
+      v_cfg) h
+   where sec.kind = 'stock' and sec.status = 'listed'
+     and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null);
+
+  -- 1. single forces
+  for r in select * from pg_temp.market_force_heat_tmp loop
+    if random() < 1 - exp(-greatest(0, public.market_force_chance_per_hour(r.heat, r.cold, v_cfg)) / 60.0) then
+      v_force := public.market_force_pick(r.heat, r.cold, random(), v_cfg);
+      continue when v_force is null;
+      v_move := public.market_force_move_bps(v_force, r.heat, r.cold, random(), v_cfg);
+      v_strength := case when v_move < 800 then 1 when v_move < 1600 then 2 else 3 end;
+      v_head := replace(v_force ->> 'headline', '{name}', r.name);
+      v_body := replace(replace(v_force ->> 'body', '{name}', r.name), '{w}', v_words ->> (v_strength - 1));
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values ('market', v_head, v_body, v_strength, r.security_id, v_now) returning id into v_news;
+      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                     published_at, due_at, source, force_key, sentiment_delta)
+      values (r.security_id, v_news, (v_force ->> 'direction')::smallint, v_move, v_strength, random() * 10000 < v_rel,
+              v_head, v_body, v_now, v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))),
+              'market', v_force ->> 'key',
+              greatest(-1, least(1, (v_force ->> 'direction')::integer * v_move / 10000.0 * v_sent)));
+      v_new := v_new + 1;
+      delete from pg_temp.market_force_heat_tmp where security_id = r.security_id;
+    end if;
+  end loop;
+
+  -- 2. a wave over the hot stocks, or a relief rally for the cold ones
+  select avg(t.heat) into v_mean from pg_temp.market_force_heat_tmp t
+   where t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2);
+  v_kind := null;
+  if v_mean is not null and random() < 1 - exp(-least(public.cfg_num(v_cfg, '{waves,maxPerHour}', 1),
+                                                       public.cfg_num(v_cfg, '{waves,basePerHour}', 0.02)
+                                                       + public.cfg_num(v_cfg, '{waves,perHeatPerHour}', 0.25) * v_mean) / 60.0) then
+    v_kind := (array['market', 'sector', 'rates'])[1 + floor(random() * 3)::integer];
+  elsif exists (select 1 from pg_temp.market_force_heat_tmp t where t.cold > 0)
+        and random() < 1 - exp(-public.cfg_num(v_cfg, '{waves,reliefPerHour}', 0.02) / 60.0) then
+    v_kind := 'relief';
+  end if;
+  if v_kind = 'sector' then
+    select t.sector_key, s.name into v_sector, v_sec_name
+      from pg_temp.market_force_heat_tmp t join public.sectors s on s.key = t.sector_key
+     where t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2)
+     group by t.sector_key, s.name order by avg(t.heat) desc, count(*) desc limit 1;
+    if v_sector is null then v_kind := 'market'; end if;
+  end if;
+  if v_kind is not null then
+    select array_agg(x.security_id order by x.lvl desc), string_agg(x.name, ', ' order by x.lvl desc) into v_hit, v_names
+      from (select t.security_id, t.name, case when v_kind = 'relief' then t.cold else t.heat end as lvl
+              from pg_temp.market_force_heat_tmp t
+             where case when v_kind = 'relief' then t.cold > 0
+                        else t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2)
+                             and (v_kind <> 'sector' or t.sector_key = v_sector) end
+             order by 3 desc
+             limit greatest(1, public.cfg_num(v_cfg, '{waves,maxStocks}', 6))::integer) x;
+  end if;
+  if v_hit is not null and cardinality(v_hit) > 0 then
+    v_head := replace(v_cfg #>> array['waveTexts', v_kind, 'headline'], '{sector}', coalesce(v_sec_name, ''));
+    v_body := replace(v_cfg #>> array['waveTexts', v_kind, 'body'], '{names}', v_names);
+    insert into public.news_items (category, headline, body, importance, published_at)
+    values ('market', v_head, v_body, 2, v_now) returning id into v_news;
+    for r in select t.* from pg_temp.market_force_heat_tmp t where t.security_id = any (v_hit) loop
+      v_move := public.market_force_move_bps(
+        jsonb_build_object('direction', case when v_kind = 'relief' then 1 else -1 end, 'minMoveBps', 300, 'maxMoveBps', 1000),
+        r.heat, r.cold, random(), v_cfg);
+      v_strength := case when v_move < 800 then 1 when v_move < 1600 then 2 else 3 end;
+      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                     published_at, due_at, source, force_key, sentiment_delta)
+      values (r.security_id, v_news, case when v_kind = 'relief' then 1 else -1 end, v_move, v_strength,
+              random() * 10000 < v_rel, v_head, v_body, v_now,
+              v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))),
+              'market', 'wave:' || v_kind,
+              greatest(-1, least(1, case when v_kind = 'relief' then 1 else -1 end * v_move / 10000.0 * v_sent)));
+    end loop;
+    v_waves := 1;
+  end if;
+  return jsonb_build_object('forces', v_new, 'waves', v_waves, 'wave', v_kind);
+end;
+$$;
+comment on function public.market_forces_run(timestamptz) is
+  'Internal, every minute from stock_news_run_due (ADR-214): draws market forces against overheated or fallen stocks.';
+
+-- -----------------------------------------------------------------------------
+-- stock_news_run_due: the 1200 definition, market hints settle through market_force_shock and do not hold back the
+-- ordinary news; draws the market forces at the end
+-- -----------------------------------------------------------------------------
+create or replace function public.stock_news_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg      jsonb := public.config_jsonb('stockNews');
+  v_now      timestamptz := coalesce(p_now, public.game_now());
+  v_every    double precision;
+  v_lead_min double precision;
+  v_lead_max double precision;
+  v_min      integer;
+  v_max      integer;
+  v_rel      integer;
+  v_settled  integer := 0;
+  v_new      integer := 0;
+  v_forces   jsonb;
+  t          public.stock_tips;
+  s          record;
+  v_dir      smallint;
+  v_move     integer;
+  v_strength smallint;
+  v_head     text;
+  v_body     text;
+  v_news     bigint;
+  v_good     jsonb := jsonb_build_array(
+      jsonb_build_array('Rekordauftrag für {name}', '{name} gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz {w} anheben.'),
+      jsonb_build_array('{name} hebt die Prognose an', 'Die Geschäfte laufen besser als geplant. Analysten erwarten einen {w} steigenden Kurs.'),
+      jsonb_build_array('Neuer Chef-Entwickler wechselt zu {name}', 'Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das {w} honorieren.'),
+      jsonb_build_array('{name} gewinnt Branchenpreis', 'Das Unternehmen wird für sein neues Produkt ausgezeichnet. Rückenwind für die Aktie erwartet.'),
+      jsonb_build_array('Übernahmegerüchte um {name}', 'Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs {w} treiben.'),
+      jsonb_build_array('{name} startet Aktienrückkauf', 'Das Unternehmen kauft eigene Aktien zurück. Das stützt den Kurs {w}.'),
+      jsonb_build_array('Staatlicher Großauftrag für {name}', 'Ein mehrjähriger Vertrag mit der öffentlichen Hand ist unterschrieben.'),
+      jsonb_build_array('{name}: Neues Produkt ausverkauft', 'Die Nachfrage übertrifft alle Erwartungen. Händler rechnen mit einem {w} steigenden Kurs.'),
+      jsonb_build_array('Patent für {name} erteilt', 'Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen.'),
+      jsonb_build_array('{name} senkt die Kosten deutlich', 'Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt.'),
+      jsonb_build_array('Star-Investor steigt bei {name} ein', 'Ein bekannter Anleger hat ein großes Paket gekauft. Andere könnten folgen.'),
+      jsonb_build_array('{name} erschließt neuen Markt', 'Der Start im Ausland läuft besser als geplant.'),
+      jsonb_build_array('Kooperation: {name} und ein Branchenriese', 'Die Partnerschaft soll beiden Seiten neue Kunden bringen.'),
+      jsonb_build_array('Analysten-Upgrade: {name} jetzt Kaufempfehlung', 'Mehrere Häuser heben ihr Kursziel {w} an.'),
+      jsonb_build_array('Sonderdividende bei {name} erwartet', 'Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen.'));
+  v_bad      jsonb := jsonb_build_array(
+      jsonb_build_array('Affäre erschüttert {name}', 'Die Chefetage von {name} steht wegen einer Affäre in der Kritik. Anleger werden nervös.'),
+      jsonb_build_array('{name} plant Kapitalerhöhung', 'Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte {w} nachgeben.'),
+      jsonb_build_array('Rassismus-Vorwürfe gegen {name}', 'Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge.'),
+      jsonb_build_array('Rückruf bei {name}', 'Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer.'),
+      jsonb_build_array('Datenleck bei {name}', 'Kundendaten sind im Netz aufgetaucht. Die Aufsicht prüft.'),
+      jsonb_build_array('{name}-Chef tritt überraschend zurück', 'Die Gründe sind unklar. Der Markt mag keine Unsicherheit.'),
+      jsonb_build_array('Razzia bei {name}', 'Ermittler durchsuchen die Zentrale wegen des Verdachts auf Bilanztricks.'),
+      jsonb_build_array('{name} senkt die Prognose', 'Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem {w} fallenden Kurs.'),
+      jsonb_build_array('Streik legt {name} lahm', 'Die Belegschaft legt die Arbeit nieder. Lieferungen verzögern sich.'),
+      jsonb_build_array('Großkunde springt bei {name} ab', 'Ein wichtiger Vertrag wird nicht verlängert.'),
+      jsonb_build_array('Analysten-Downgrade für {name}', 'Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel.'),
+      jsonb_build_array('{name} verliert Patentstreit', 'Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen.'),
+      jsonb_build_array('Umweltskandal bei {name}', 'Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich.'),
+      jsonb_build_array('Lieferkette reißt bei {name}', 'Ein wichtiger Zulieferer fällt aus. Die Produktion stockt.'),
+      jsonb_build_array('Leerverkäufer wetten gegen {name}', 'Ein bekannter Fonds hält die Aktie für überbewertet.'));
+  v_pick     jsonb;
+  v_words    text[] := array['leicht', 'spürbar', 'deutlich'];
+begin
+  if v_cfg is null or jsonb_typeof(v_cfg) <> 'object' then
+    return jsonb_build_object('skipped', 'no_config');
+  end if;
+  -- same lock as the minute job: never beside a running tick
+  perform pg_advisory_xact_lock(7311001);
+  v_every    := greatest(1, public.cfg_num(v_cfg, '{everyMinutes}', 12));
+  v_lead_min := greatest(1, public.cfg_num(v_cfg, '{leadMinMinutes}', 10));
+  v_lead_max := greatest(v_lead_min, public.cfg_num(v_cfg, '{leadMaxMinutes}', 40));
+  v_min      := greatest(1, public.cfg_num(v_cfg, '{minMoveBps}', 300))::integer;
+  v_max      := greatest(v_min, public.cfg_num(v_cfg, '{maxMoveBps}', 1200)::integer);
+  v_rel      := least(10000, greatest(0, public.cfg_num(v_cfg, '{reliabilityBps}', 7500)))::integer;
+
+  -- 1. hints whose time has come
+  for t in select * from public.stock_tips x where x.applied_at is null and x.due_at <= v_now order by x.due_at for update loop
+    select sec.name, sec.status into s from public.securities sec where sec.id = t.security_id;
+    if t.comes_true and s.status = 'listed' then
+      if t.source = 'market' then
+        -- ADR-214: a market force moves the price and the mood, not the fair value
+        perform public.market_force_shock(t.security_id, t.direction * t.move_bps, t.sentiment_delta, v_now);
+      else
+        perform public.event_price_shock(t.security_id, t.direction * t.move_bps, v_now);
+      end if;
+      v_head := case when t.direction > 0 then s.name || ' legt zu: Die Erwartungen haben sich bestätigt'
+                     else s.name || ' gibt nach: Die Warnungen haben sich bestätigt' end;
+    else
+      v_head := 'Entwarnung bei ' || s.name || ': Die Meldung hat sich nicht bestätigt';
+    end if;
+    insert into public.news_items (category, headline, body, importance, security_id, published_at)
+    values ('company', v_head, null, 1, t.security_id, v_now) returning id into v_news;
+    update public.stock_tips set applied_at = v_now, result_news_id = v_news where id = t.id;
+    v_settled := v_settled + 1;
+  end loop;
+
+  -- 2. a new hint when the last ordinary one is old enough (market forces do not count, ADR-214)
+  if not exists (select 1 from public.stock_tips x
+                  where x.published_at > v_now - make_interval(secs => v_every * 60 - 5) and x.source = 'news') then
+    select sec.id, sec.name into s
+      from public.securities sec
+     where sec.kind = 'stock' and sec.status = 'listed'
+       and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null)
+     order by random() limit 1;
+    if s.id is not null then
+      v_dir := case when random() < 0.5 then 1 else -1 end;
+      v_move := v_min + floor(random() * (v_max - v_min + 1))::integer;
+      v_strength := least(3, 1 + floor(3.0 * (v_move - v_min) / greatest(1, v_max - v_min + 1)))::smallint;
+      v_pick := case when v_dir > 0 then v_good -> floor(random() * jsonb_array_length(v_good))::integer
+                     else v_bad -> floor(random() * jsonb_array_length(v_bad))::integer end;
+      v_head := replace(v_pick ->> 0, '{name}', s.name);
+      v_body := replace(replace(v_pick ->> 1, '{name}', s.name), '{w}', v_words[v_strength]) || ' Sicher ist das nicht.';
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values ('company', v_head, v_body, v_strength, s.id, v_now) returning id into v_news;
+      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                     published_at, due_at)
+      values (s.id, v_news, v_dir, v_move, v_strength, random() * 10000 < v_rel, v_head, v_body, v_now,
+              v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))));
+      v_new := 1;
+    end if;
+  end if;
+
+  -- 3. market forces from outside (ADR-214)
+  v_forces := public.market_forces_run(v_now);
+
+  delete from public.stock_tips x
+   where x.applied_at is not null
+     and x.published_at < v_now - make_interval(hours => greatest(1, public.cfg_num(v_cfg, '{keepHours}', 24))::integer);
+  return jsonb_build_object('settled', v_settled, 'published', v_new, 'market_forces', v_forces);
+end;
+$$;
+comment on function public.stock_news_run_due(timestamptz) is
+  'Internal, cron every minute (ADR-119, ADR-214): settles due stock hints, publishes a new one when it is time, draws market forces.';
+
+revoke all on function public.market_force_heat(bigint, bigint, bigint, bigint, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_chance_per_hour(double precision, double precision, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_weight(jsonb, double precision, double precision) from public, anon, authenticated;
+revoke all on function public.market_force_pick(double precision, double precision, double precision, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_move_bps(jsonb, double precision, double precision, double precision, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_shock(uuid, integer, double precision, timestamptz) from public, anon, authenticated;
+revoke all on function public.market_forces_run(timestamptz) from public, anon, authenticated;
+revoke all on function public.stock_news_run_due(timestamptz) from public, anon, authenticated;
+grant execute on function public.market_forces_run(timestamptz) to service_role;
+grant execute on function public.stock_news_run_due(timestamptz) to service_role;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -91669,7 +92147,7 @@ insert into public.game_config (key, value, description) values
   ('time', '{"quarterHours":6,"quartersPerGameYear":4,"timezone":"Europe/Berlin","quarterBoundaryHours":[8,14,20,2],"marketOpenHour":0,"marketCloseHour":24,"tickSeconds":10,"ticksPerRunnerInvocation":12,"afterHours":{"spreadMultiplier":3,"liquidityMultiplier":0.25,"volatilityMultiplier":0.5},"candleIntervalsSeconds":[60,300,3600],"openingBonusMinutes":60,"openingBonusXpMultiplier":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "time"'),
   ('economy', '{"startingCapitalCents":1000000,"bankruptcyRestartCents":250000,"basicIncomeCentsPerHour":10000,"vaultCapHours":8,"vaultInitialHours":2,"vaultMinClaimCents":100,"bankruptcyStatusGameDays":3,"bankruptcyReputationPenalty":10}'::jsonb, 'Defaults from src/config/balance.ts, section "economy"'),
   ('vault', '{"levelBonusBps":800,"levelBonusMaxLevel":40,"deposits":{"minLevel":5,"minCents":100000,"capCentsPerLevel":2500000,"maxOpen":3,"terms":[{"days":1,"rateBps":150},{"days":3,"rateBps":500},{"days":7,"rateBps":1400}]}}'::jsonb, 'Defaults from src/config/balance.ts, section "vault"'),
-  ('trading', '{"limitOrders":false,"orderFeeCents":100,"maxOrderQuantity":1000000000,"quantityScale":1000000,"minOrderValueCents":100,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"midcap":15,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"midcap":300,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":1000,"highImpactWarnBps":500,"playerImpact":{"depthCentsPer100Bps":{"bluechip":2000000,"midcap":500000,"penny":100000},"bondDepthCentsPer100Bps":1000000,"maxHoldingsPremium":0.15,"premiumScaleDepths":20},"playerStocks":{"insiderCooldownHours":24,"dailyBandBps":10000}}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
+  ('trading', '{"limitOrders":false,"orderFeeCents":100,"maxOrderQuantity":1000000000,"quantityScale":1000000,"minOrderValueCents":100,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"midcap":15,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"midcap":300,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":1000,"highImpactWarnBps":500,"playerImpact":{"depthCentsPer100Bps":{"bluechip":2000000,"midcap":500000,"penny":100000},"bondDepthCentsPer100Bps":1000000,"maxHoldingsPremium":0.15,"premiumScaleDepths":20},"playerStocks":{"insiderCooldownHours":24,"dailyBandBps":0}}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
   ('centralBank', '{"startRateBps":300,"neutralRateBps":300,"minRateBps":50,"maxRateBps":1000,"stepBps":25,"maxStepsPerDecision":2,"targetMoneyGrowthBps":800,"toleranceBandBps":400,"decisionEveryQuarters":2,"warmupQuarters":56,"announceLeadQuarters":1,"measurementWindowQuarters":4,"activePlayerWindowDays":7}'::jsonb, 'Defaults from src/config/balance.ts, section "centralBank"'),
   ('bonds', '{"volatilityMultiplier":3,"faceValueCents":10000,"couponsPerGameYear":4,"maturities":[{"years":1,"spreadBps":-75},{"years":2,"spreadBps":-50},{"years":5,"spreadBps":-10},{"years":10,"spreadBps":25}],"minYieldBps":200,"maxYieldBps":400,"minLevel":5}'::jsonb, 'Defaults from src/config/balance.ts, section "bonds"'),
   ('sectors', '{"tech":{"baseDemandCentsPerQuarter":3000000000,"demandGrowthBpsPerGameYear":800,"demandNoise":0.08,"peRatio":28,"volatilityMultiplier":1.2,"priceExponent":1.2,"costStructure":{"referencePriceCents":5000,"unitCostCents":1180,"capacityUnitsPerSkillPoint":16.5,"fixedCostMultiplier":0.7,"qualityAdjustmentRate":0.1,"developmentIntensity":2},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.03,"cycle":0.8,"valuationRate":1.5}},"retail":{"baseDemandCentsPerQuarter":5000000000,"demandGrowthBpsPerGameYear":200,"demandNoise":0.04,"peRatio":14,"volatilityMultiplier":0.8,"priceExponent":2.5,"costStructure":{"referencePriceCents":2000,"unitCostCents":892,"capacityUnitsPerSkillPoint":47.6,"fixedCostMultiplier":1,"qualityAdjustmentRate":0.03,"developmentIntensity":0.5},"sensitivity":{"oilDemand":-0.05,"oilCost":0.1,"ratePer100Bps":-0.01,"cycle":0.5,"valuationRate":0.8}},"energy":{"baseDemandCentsPerQuarter":3600000000,"demandGrowthBpsPerGameYear":150,"demandNoise":0.06,"peRatio":11,"volatilityMultiplier":1,"priceExponent":1.5,"costStructure":{"referencePriceCents":8000,"unitCostCents":1995,"capacityUnitsPerSkillPoint":9.1,"fixedCostMultiplier":1.4,"qualityAdjustmentRate":0.03,"developmentIntensity":0.6},"sensitivity":{"oilDemand":0.8,"oilCost":0.3,"ratePer100Bps":-0.01,"cycle":0.6,"valuationRate":1}},"pharma":{"baseDemandCentsPerQuarter":2800000000,"demandGrowthBpsPerGameYear":500,"demandNoise":0.06,"peRatio":22,"volatilityMultiplier":1.4,"priceExponent":1,"costStructure":{"referencePriceCents":12000,"unitCostCents":2685,"capacityUnitsPerSkillPoint":7.7,"fixedCostMultiplier":1.2,"qualityAdjustmentRate":0.06,"developmentIntensity":1.5},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.01,"cycle":0.1,"valuationRate":1.2}},"logistics":{"baseDemandCentsPerQuarter":4200000000,"demandGrowthBpsPerGameYear":300,"demandNoise":0.06,"peRatio":15,"volatilityMultiplier":0.9,"priceExponent":2,"costStructure":{"referencePriceCents":3000,"unitCostCents":1048,"capacityUnitsPerSkillPoint":26.8,"fixedCostMultiplier":1.1,"qualityAdjustmentRate":0.04,"developmentIntensity":0.7},"sensitivity":{"oilDemand":0,"oilCost":0.5,"ratePer100Bps":-0.02,"cycle":1.2,"valuationRate":1}}}'::jsonb, 'Defaults from src/config/balance.ts, section "sectors"'),
@@ -91718,6 +92196,7 @@ insert into public.game_config (key, value, description) values
   ('listed', '{"refRevenue":{"windowHours":24,"minCents":20000},"satisfaction":{"start":60,"base":50,"adjustPerHour":0.15,"green":60,"red":35,"benefitsMax":40,"wages":{"unpaidMaxLoss":25,"moodMaxLoss":10},"workload":{"overFrom":0.95,"overFull":1.5,"overMaxLoss":12,"underBelow":0.35,"underLoss":4},"crisis":{"perSeverity":4,"scandal":6,"scandals":["quality_scandal","data_breach","tax_audit"]},"layoffs":{"perHead":3,"max":15,"decayPerHour":0.08},"greedMaxLoss":10,"success":{"profitHour":3,"lossHour":-3},"effect":{"lowCapacityMaxLoss":0.3,"lowQualityMaxLoss":0.15,"highCapacityMaxGain":0.06,"highFull":90},"quits":{"everyRedHours":3,"notifyEveryHours":24,"massQuitFrom":3}},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"windowHours":24,"minProfitShareOfRevenue":0.05,"greed":{"freeRatioBps":3000,"fullRatioBps":10000,"maxLoss":35,"feedBelow":35},"reinvest":{"fullRatioBps":5000,"maxGain":12},"dividend":{"fullRatioBps":2000,"maxGain":12,"streakPerDay":1,"streakMax":6},"penalty":{"lateFee":3,"estimate":6,"enforcement":8},"scandalLoss":5,"demandMaxEffect":0.2,"priceMaxEffect":0.25},"dividends":{"perDay":1,"maxShareOfFreeCashBps":5000,"minTotalCents":10000,"historyLimit":20},"board":{"minShareBps":2000,"voteHours":12,"quorumBps":3000,"maxOpen":2,"cooldownHours":6,"maxDays":7,"earmarkMaxShareOfCashBps":8000,"payoutCapStepBps":500,"aiVote":{"reputationBelow":40,"kinds":["payout_cap","withdraw_ban","dividend"]},"kinds":["earmark","release","dividend","payout_cap","withdraw_ban","price_level","debt"],"purposes":["research","products","expansion","benefits","marketing"],"historyLimit":20},"taxes":{"rateBps":1500,"minRateBps":800,"reminderAfterHours":30,"lateFeeAfterHours":42,"estimateAfterHours":60,"lateFee":{"minCents":5000,"revenueBps":50},"estimate":{"marginBps":2500,"surchargeBps":2500},"payWithinHours":24,"latePaymentBps":500,"enforceAfterHours":48,"enforcementBps":1000,"check":{"receipts":3,"discountBps":500},"brackets":[{"fromCentsPerDay":10000000,"extraBps":200},{"fromCentsPerDay":100000000,"extraBps":500},{"fromCentsPerDay":1000000000,"extraBps":800}],"advisor":{"minWageCentsPerHour":6000,"revenueBps":150,"discountBps":800,"pivotCentsPerHour":100000,"growthPerDecade":2.4,"maxRevenueBps":3000},"auditArchetype":"tax_audit","receipts":[{"key":"customer_invoice","category":"revenue"},{"key":"online_shop_payout","category":"revenue"},{"key":"raw_material","category":"goods"},{"key":"packaging","category":"goods"},{"key":"payslip","category":"wages"},{"key":"overtime","category":"wages"},{"key":"office_rent","category":"fixed"},{"key":"electricity","category":"fixed"},{"key":"lab_equipment","category":"research"},{"key":"prototype","category":"research"},{"key":"fruit_basket","category":"benefit"},{"key":"team_dinner","category":"benefit"}],"receiptCategories":["revenue","goods","wages","fixed","research","benefit"],"historyLimit":30},"historyHours":72,"accountingPageSize":50,"items":[{"key":"r_quality_1","kind":"research","branch":"quality","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"qualityBps":300}},{"key":"r_quality_2","kind":"research","branch":"quality","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_quality_1"],"effects":{"qualityBps":500}},{"key":"r_quality_3","kind":"research","branch":"quality","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_quality_2"],"effects":{"qualityBps":800}},{"key":"r_quality_4","kind":"research","branch":"quality","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_quality_3","r_efficiency_2"],"effects":{"qualityBps":1200,"demandBps":400}},{"key":"r_efficiency_1","kind":"research","branch":"efficiency","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"marginBps":200}},{"key":"r_efficiency_2","kind":"research","branch":"efficiency","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_efficiency_1"],"effects":{"marginBps":300}},{"key":"r_efficiency_3","kind":"research","branch":"efficiency","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_efficiency_2"],"effects":{"marginBps":500}},{"key":"r_efficiency_4","kind":"research","branch":"efficiency","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_efficiency_3","r_automation_2"],"effects":{"marginBps":800,"capacityBps":500}},{"key":"r_brand_1","kind":"research","branch":"brand","tier":1,"purpose":"marketing","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"awarenessBps":200}},{"key":"r_brand_2","kind":"research","branch":"brand","tier":2,"purpose":"marketing","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_brand_1"],"effects":{"awarenessBps":300}},{"key":"r_brand_3","kind":"research","branch":"brand","tier":3,"purpose":"marketing","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_brand_2"],"effects":{"awarenessBps":500}},{"key":"r_brand_4","kind":"research","branch":"brand","tier":4,"purpose":"marketing","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_brand_3","r_quality_2"],"effects":{"awarenessBps":500,"demandBps":800}},{"key":"r_automation_1","kind":"research","branch":"automation","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":500}},{"key":"r_automation_2","kind":"research","branch":"automation","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_automation_1"],"effects":{"capacityBps":800}},{"key":"r_automation_3","kind":"research","branch":"automation","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_automation_2"],"effects":{"capacityBps":1200}},{"key":"r_automation_4","kind":"research","branch":"automation","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_automation_3","r_efficiency_2"],"effects":{"capacityBps":2000,"marginBps":300}},{"key":"r_logistics_1","kind":"research","branch":"logistics","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":300,"marginBps":100}},{"key":"r_logistics_2","kind":"research","branch":"logistics","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_logistics_1"],"effects":{"marketBps":500}},{"key":"r_logistics_3","kind":"research","branch":"logistics","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_logistics_2"],"effects":{"fixedCostBps":-500}},{"key":"r_logistics_4","kind":"research","branch":"logistics","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_logistics_3","r_automation_2"],"effects":{"marketBps":1000,"marginBps":200}},{"key":"r_sustainability_1","kind":"research","branch":"sustainability","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"reputation":2}},{"key":"r_sustainability_2","kind":"research","branch":"sustainability","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_sustainability_1"],"effects":{"reputation":3,"marginBps":100}},{"key":"r_sustainability_3","kind":"research","branch":"sustainability","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_sustainability_2"],"effects":{"reputation":3,"satisfaction":3}},{"key":"r_sustainability_4","kind":"research","branch":"sustainability","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_sustainability_3","r_brand_2"],"effects":{"reputation":5,"demandBps":500}},{"key":"r_finance_1","kind":"research","branch":"finance","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"taxRateBps":-100}},{"key":"r_finance_2","kind":"research","branch":"finance","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_finance_1"],"effects":{"fixedCostBps":-300}},{"key":"r_finance_3","kind":"research","branch":"finance","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_finance_2"],"effects":{"taxRateBps":-150}},{"key":"r_finance_4","kind":"research","branch":"finance","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_finance_3","r_logistics_2"],"effects":{"taxRateBps":-150,"marginBps":300}},{"key":"p_second","kind":"product","purpose":"products","costHours":12,"minCostCents":300000,"hours":2,"upkeepBps":150,"effects":{"demandBps":800}},{"key":"p_budget","kind":"product","purpose":"products","costHours":16,"minCostCents":400000,"hours":3,"requires":["r_efficiency_1"],"upkeepBps":200,"effects":{"demandBps":1200,"qualityBps":-200}},{"key":"p_premium","kind":"product","purpose":"products","costHours":30,"minCostCents":1000000,"hours":6,"requires":["r_quality_2"],"upkeepBps":300,"effects":{"demandBps":1000,"qualityBps":400}},{"key":"p_subscription","kind":"product","purpose":"products","costHours":36,"minCostCents":1500000,"hours":8,"requires":["r_brand_1","p_second"],"upkeepBps":350,"effects":{"demandBps":1800}},{"key":"p_merch","kind":"product","purpose":"products","costHours":8,"minCostCents":200000,"hours":2,"requires":["r_brand_2"],"upkeepBps":100,"effects":{"demandBps":400,"awarenessBps":200}},{"key":"p_enterprise","kind":"product","purpose":"products","costHours":80,"minCostCents":6000000,"hours":16,"requires":["r_quality_3","p_premium"],"upkeepBps":500,"effects":{"demandBps":3000}},{"key":"g_south","kind":"region","purpose":"expansion","costHours":20,"minCostCents":600000,"hours":4,"upkeepBps":200,"effects":{"marketBps":1000}},{"key":"g_dach","kind":"region","purpose":"expansion","costHours":40,"minCostCents":2000000,"hours":8,"requires":["g_south"],"upkeepBps":300,"effects":{"marketBps":1500}},{"key":"g_europe","kind":"region","purpose":"expansion","costHours":80,"minCostCents":6000000,"hours":12,"requires":["g_dach","l_export"],"upkeepBps":400,"effects":{"marketBps":2500}},{"key":"g_america","kind":"region","purpose":"expansion","costHours":140,"minCostCents":15000000,"hours":24,"requires":["g_europe","r_logistics_2"],"upkeepBps":500,"effects":{"marketBps":3500}},{"key":"g_asia","kind":"region","purpose":"expansion","costHours":200,"minCostCents":30000000,"hours":36,"requires":["g_america","r_logistics_4"],"upkeepBps":600,"effects":{"marketBps":5000}},{"key":"m_machines","kind":"machine","purpose":"expansion","costHours":10,"minCostCents":300000,"hours":2,"maxLevel":5,"costGrowth":1.6,"upkeepBps":50,"effects":{"capacityBps":400}},{"key":"m_datacenter","kind":"machine","purpose":"expansion","costHours":14,"minCostCents":500000,"hours":3,"maxLevel":3,"costGrowth":1.8,"upkeepBps":60,"effects":{"marginBps":150,"capacityBps":200}},{"key":"m_showroom","kind":"machine","purpose":"marketing","costHours":12,"minCostCents":400000,"hours":3,"maxLevel":3,"costGrowth":1.7,"upkeepBps":60,"effects":{"awarenessBps":200,"demandBps":150}},{"key":"a_kleinhirn","kind":"acquisition","purpose":"expansion","costHours":90,"minCostCents":8000000,"hours":6,"requires":["r_automation_2"],"upkeepBps":200,"effects":{"capacityBps":1000,"qualityBps":300}},{"key":"a_datenkrake","kind":"acquisition","purpose":"expansion","costHours":110,"minCostCents":10000000,"hours":6,"requires":["r_brand_2"],"upkeepBps":250,"effects":{"demandBps":1500}},{"key":"a_robobutze","kind":"acquisition","purpose":"expansion","costHours":130,"minCostCents":12000000,"hours":8,"requires":["r_efficiency_3"],"upkeepBps":200,"effects":{"marginBps":600,"capacityBps":500}},{"key":"l_patent","kind":"licence","purpose":"research","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":100,"effects":{"qualityBps":500}},{"key":"l_brand","kind":"licence","purpose":"marketing","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":120,"effects":{"demandBps":600}},{"key":"l_export","kind":"licence","purpose":"expansion","costHours":15,"minCostCents":500000,"hours":2,"upkeepBps":50,"effects":{}},{"key":"b_obstkorb","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":5000,"hours":0,"upkeepPerHeadCents":40,"effects":{"satisfaction":3}},{"key":"b_kaffee","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":8000,"hours":0,"upkeepPerHeadCents":50,"effects":{"satisfaction":3}},{"key":"b_tischkicker","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":60000,"hours":0,"upkeepPerHeadCents":10,"effects":{"satisfaction":2}},{"key":"b_hundebuero","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":10000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_massagesessel","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":150000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_jobrad","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":20000,"hours":0,"upkeepPerHeadCents":120,"effects":{"satisfaction":3}},{"key":"b_fitness","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":30000,"hours":0,"upkeepPerHeadCents":150,"effects":{"satisfaction":4}},{"key":"b_homeoffice","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":50000,"hours":0,"upkeepPerHeadCents":100,"effects":{"satisfaction":5}},{"key":"b_weiterbildung","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":40000,"hours":0,"upkeepPerHeadCents":250,"effects":{"satisfaction":4,"qualityBps":200}},{"key":"b_feelgood","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":100000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":5}},{"key":"b_betriebsrente","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":80000,"hours":0,"upkeepPerHeadCents":400,"effects":{"satisfaction":6}},{"key":"b_kita","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":500000,"hours":0,"upkeepPerHeadCents":500,"effects":{"satisfaction":7}},{"key":"b_bonus","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":0,"hours":0,"upkeepPerHeadCents":900,"effects":{"satisfaction":8,"capacityBps":300}},{"key":"b_viertagewoche","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":200000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":10,"capacityBps":-600}},{"key":"x_pizza","kind":"action","purpose":"benefits","costHours":0,"minCostCents":5000,"costPerHeadCents":1500,"hours":0,"cooldownHours":6,"boost":3,"effects":{}},{"key":"x_teamevent","kind":"action","purpose":"benefits","costHours":0,"minCostCents":30000,"costPerHeadCents":6000,"hours":0,"cooldownHours":24,"boost":8,"effects":{}},{"key":"x_firmenfeier","kind":"action","purpose":"benefits","costHours":0,"minCostCents":100000,"costPerHeadCents":12000,"hours":0,"cooldownHours":72,"boost":12,"effects":{}},{"key":"x_sonderbonus","kind":"action","purpose":"benefits","costHours":0,"minCostCents":0,"costPerHeadCents":50000,"hours":0,"cooldownHours":48,"boost":15,"effects":{}}]}'::jsonb, 'Defaults from src/config/balance.ts, section "listed"'),
   ('world', '{"unlockWorthCents":1000000000,"aiOnMap":12,"hqTiers":[{"tier":1,"key":"office","costCents":100000000,"seats":5,"demandBps":0,"reputationPoints":1,"awarenessAdd":0.01,"satisfactionPoints":1,"prestige":1},{"tier":2,"key":"complex","costCents":400000000,"seats":15,"demandBps":100,"reputationPoints":2,"awarenessAdd":0.02,"satisfactionPoints":2,"prestige":3},{"tier":3,"key":"campus","costCents":1500000000,"seats":40,"demandBps":200,"reputationPoints":3,"awarenessAdd":0.03,"satisfactionPoints":3,"prestige":7},{"tier":4,"key":"tower","costCents":6000000000,"seats":100,"demandBps":300,"reputationPoints":4,"awarenessAdd":0.04,"satisfactionPoints":4,"prestige":15},{"tier":5,"key":"mega","costCents":25000000000,"seats":250,"demandBps":400,"reputationPoints":5,"awarenessAdd":0.05,"satisfactionPoints":5,"prestige":30}],"relocation":{"costBpsOfInvested":2000,"minCostCents":50000000,"cooldownHours":168},"effects":{"imageDemandWeightBps":5000,"minFactorBps":6000,"maxFactorBps":16000},"subsidiaries":{"unlockWorthCents":5000000000,"unlockHqTier":2,"max":4,"setupCostCents":300000000,"setupGrowthBps":16000,"hourlyCostCents":60000,"rampUpHours":336,"rampUpCostMultiplier":3,"revenueShareBps":1500,"demandBonusBps":500,"diminishingBps":6000},"imageCampaign":{"costBpsOfWorth":50,"minCostCents":20000000,"gainBps":500,"maxBonusBps":3000,"decayPerDayBps":100,"cooldownHours":12},"lobby":{"maxFeeBps":300,"feeChangeCooldownHours":24,"taxDiscountBps":1000,"politicalImpactReductionBps":3000,"minWorthCents":1000000000},"balance":{"production":0.5,"labour":0.3,"demand":1,"image":0.5,"taxBaselineBps":2500,"tax":0.2,"political":4,"tariff":3,"war":6,"disaster":120,"tolerance":400},"countries":[{"key":"de","name":"Deutschland","map":{"x":52.8,"y":20.7},"productionCostBps":11000,"labourCostBps":12500,"demandPotentialBps":10500,"imageBps":12500,"taxRateBps":3000,"politicalRisk":10,"tariffExposure":30,"disasterRisk":["flood"],"warRisk":5,"flag":["#1a1a1a","#dd0000","#ffce00"]},{"key":"us","name":"USA","map":{"x":22.8,"y":29.3},"productionCostBps":11000,"labourCostBps":12000,"demandPotentialBps":12000,"imageBps":10500,"taxRateBps":3400,"politicalRisk":35,"tariffExposure":40,"disasterRisk":["storm","wildfire"],"warRisk":10,"flag":["#b22234","#ffffff","#3c3b6e"]},{"key":"cn","name":"China","map":{"x":78.9,"y":32.1},"productionCostBps":8400,"labourCostBps":8800,"demandPotentialBps":11300,"imageBps":7600,"taxRateBps":2500,"politicalRisk":60,"tariffExposure":70,"disasterRisk":["flood","earthquake"],"warRisk":25,"flag":["#de2910","#ffde00"]},{"key":"jp","name":"Japan","map":{"x":88.3,"y":31.4},"productionCostBps":10800,"labourCostBps":11000,"demandPotentialBps":10500,"imageBps":12000,"taxRateBps":3000,"politicalRisk":10,"tariffExposure":30,"disasterRisk":["earthquake","storm"],"warRisk":10,"flag":["#ffffff","#bc002d"]},{"key":"in","name":"Indien","map":{"x":71.9,"y":41.4},"productionCostBps":8800,"labourCostBps":8000,"demandPotentialBps":10500,"imageBps":8800,"taxRateBps":2700,"politicalRisk":40,"tariffExposure":40,"disasterRisk":["flood","drought"],"warRisk":25,"flag":["#ff9933","#ffffff","#138808"]},{"key":"br","name":"Brasilien","map":{"x":35.6,"y":65.7},"productionCostBps":8800,"labourCostBps":8500,"demandPotentialBps":10200,"imageBps":9500,"taxRateBps":3400,"politicalRisk":45,"tariffExposure":40,"disasterRisk":["flood"],"warRisk":5,"flag":["#009c3b","#ffdf00","#002776"]},{"key":"gb","name":"Vereinigtes Königreich","map":{"x":49.4,"y":18.6},"productionCostBps":10600,"labourCostBps":11500,"demandPotentialBps":10200,"imageBps":11500,"taxRateBps":2500,"politicalRisk":20,"tariffExposure":45,"disasterRisk":["flood"],"warRisk":5,"flag":["#012169","#ffffff","#c8102e"]},{"key":"fr","name":"Frankreich","map":{"x":50.6,"y":23.6},"productionCostBps":10700,"labourCostBps":12000,"demandPotentialBps":10500,"imageBps":12000,"taxRateBps":2800,"politicalRisk":25,"tariffExposure":30,"disasterRisk":["flood"],"warRisk":5,"flag":["#0055a4","#ffffff","#ef4135"],"flagVertical":true},{"key":"ca","name":"Kanada","map":{"x":20.6,"y":17.1},"productionCostBps":10300,"labourCostBps":11000,"demandPotentialBps":9900,"imageBps":11500,"taxRateBps":2600,"politicalRisk":10,"tariffExposure":45,"disasterRisk":["wildfire"],"warRisk":5,"flag":["#ff0000","#ffffff","#ff0000"],"flagVertical":true},{"key":"mx","name":"Mexiko","map":{"x":21.7,"y":40.7},"productionCostBps":8500,"labourCostBps":7800,"demandPotentialBps":10000,"imageBps":9000,"taxRateBps":3000,"politicalRisk":45,"tariffExposure":45,"disasterRisk":["earthquake","storm"],"warRisk":10,"flag":["#006847","#ffffff","#ce1126"],"flagVertical":true},{"key":"kr","name":"Südkorea","map":{"x":85.6,"y":31.4},"productionCostBps":9800,"labourCostBps":10000,"demandPotentialBps":10300,"imageBps":11000,"taxRateBps":2400,"politicalRisk":15,"tariffExposure":35,"disasterRisk":["storm"],"warRisk":35,"flag":["#ffffff","#cd2e3a","#0047a0"]},{"key":"au","name":"Australien","map":{"x":87.2,"y":75},"productionCostBps":10500,"labourCostBps":10800,"demandPotentialBps":10000,"imageBps":11400,"taxRateBps":2500,"politicalRisk":10,"tariffExposure":25,"disasterRisk":["wildfire","drought"],"warRisk":5,"flag":["#00008b","#ffffff","#ff0000"]},{"key":"sg","name":"Singapur","map":{"x":78.9,"y":56.4},"productionCostBps":10600,"labourCostBps":11200,"demandPotentialBps":9800,"imageBps":11500,"taxRateBps":1700,"politicalRisk":10,"tariffExposure":35,"disasterRisk":[],"warRisk":10,"flag":["#ef3340","#ffffff"]},{"key":"ch","name":"Schweiz","map":{"x":52.2,"y":23.6},"productionCostBps":11000,"labourCostBps":12500,"demandPotentialBps":9500,"imageBps":13000,"taxRateBps":1500,"politicalRisk":5,"tariffExposure":15,"disasterRisk":[],"warRisk":5,"flag":["#ff0000","#ffffff"]},{"key":"ae","name":"Vereinigte Arabische Emirate","map":{"x":65,"y":40},"productionCostBps":9800,"labourCostBps":9800,"demandPotentialBps":9800,"imageBps":10500,"taxRateBps":900,"politicalRisk":35,"tariffExposure":40,"disasterRisk":["drought"],"warRisk":30,"flag":["#00732f","#ffffff","#000000"]},{"key":"za","name":"Südafrika","map":{"x":56.9,"y":77.9},"productionCostBps":8800,"labourCostBps":8300,"demandPotentialBps":9600,"imageBps":9500,"taxRateBps":2700,"politicalRisk":45,"tariffExposure":35,"disasterRisk":["drought"],"warRisk":10,"flag":["#007a4d","#ffb612","#de3831"]},{"key":"ng","name":"Nigeria","map":{"x":52.2,"y":50.7},"productionCostBps":7800,"labourCostBps":7000,"demandPotentialBps":10000,"imageBps":8500,"taxRateBps":3000,"politicalRisk":70,"tariffExposure":50,"disasterRisk":["flood"],"warRisk":30,"flag":["#008751","#ffffff","#008751"],"flagVertical":true},{"key":"pl","name":"Polen","map":{"x":55.3,"y":20},"productionCostBps":9000,"labourCostBps":8800,"demandPotentialBps":9500,"imageBps":10000,"taxRateBps":1900,"politicalRisk":25,"tariffExposure":30,"disasterRisk":["flood"],"warRisk":30,"flag":["#ffffff","#dc143c"]},{"key":"vn","name":"Vietnam","map":{"x":79.4,"y":45.7},"productionCostBps":7800,"labourCostBps":7200,"demandPotentialBps":9500,"imageBps":9000,"taxRateBps":2000,"politicalRisk":45,"tariffExposure":60,"disasterRisk":["storm","flood"],"warRisk":15,"flag":["#da251d","#ffff00"]},{"key":"se","name":"Schweden","map":{"x":54.4,"y":12.9},"productionCostBps":10600,"labourCostBps":12000,"demandPotentialBps":9700,"imageBps":12500,"taxRateBps":2100,"politicalRisk":5,"tariffExposure":30,"disasterRisk":[],"warRisk":10,"flag":["#006aa7","#fecc00"]},{"key":"ie","name":"Irland","map":{"x":47.8,"y":19.3},"productionCostBps":10800,"labourCostBps":11000,"demandPotentialBps":9500,"imageBps":12000,"taxRateBps":1250,"politicalRisk":10,"tariffExposure":40,"disasterRisk":[],"warRisk":5,"flag":["#169b62","#ffffff","#ff883e"],"flagVertical":true},{"key":"tr","name":"Türkei","map":{"x":59.7,"y":29.3},"productionCostBps":8600,"labourCostBps":8400,"demandPotentialBps":10000,"imageBps":9000,"taxRateBps":2500,"politicalRisk":55,"tariffExposure":45,"disasterRisk":["earthquake"],"warRisk":30,"flag":["#e30a17","#ffffff"]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "world"'),
   ('macro', '{"friction":{"worthPivotCents":3000000000,"saturationExponent":0.75,"overheadPerDecadeBps":2000,"overheadMaxBps":4500},"events":{"worthPivotCents":2000000000,"maxDecades":3,"chancePerDayPerDecade":0.2,"maxChancePerDay":0.95,"chanceShareCutPerDecade":0.08,"minChanceShare":0.15,"severityPowerPerDecade":0.6,"externalBoostPerDecade":1,"unitRevenueHours":0.25},"country":{"politicalBoost":2,"tariffBoost":2,"warBoost":3,"imageBoost":1,"disasterListed":2.5,"disasterOther":0.4,"disasterMap":{"earthquake":["earthquake","tsunami"],"flood":["flood"],"storm":["flood","tsunami"],"wildfire":["wildfire"],"drought":["wildfire"]}},"insurance":{"levels":[{"key":"none","coverage":0,"premiumBps":0},{"key":"basic","coverage":0.5,"premiumBps":40},{"key":"full","coverage":0.8,"premiumBps":110}],"changeWaitHours":12},"lobby":{"maxLevel":5,"successBpsPerLevel":350,"politicalCutPerLevel":0.12},"maxExtraCostShare":0.6}'::jsonb, 'Defaults from src/config/balance.ts, section "macro"'),
+  ('marketForces', '{"heat":{"premiumFree":0.25,"premiumScale":0.5,"gain24hFree":0.2,"gain24hScale":0.4,"gain7dFree":0.5,"gain7dScale":0.8,"gainGate":0.1,"discountFree":0.3,"discountScale":0.6,"loss24hFree":0.3,"loss24hScale":0.5,"maxHeat":4},"chance":{"basePerHour":0.012,"perHeatPerHour":0.9,"perColdPerHour":0.35,"maxPerHour":3},"leadMinMinutes":3,"leadMaxMinutes":15,"reliabilityBps":8500,"severityPerHeat":0.45,"maxMoveBps":4500,"sentimentPerMove":2,"waves":{"basePerHour":0.02,"perHeatPerHour":0.25,"maxPerHour":1,"reliefPerHour":0.02,"minHeat":0.2,"maxStocks":6},"forces":[{"key":"profit_taking","direction":-1,"when":"hot","minHeat":0,"weight":4,"minMoveBps":400,"maxMoveBps":1200,"headline":"Gewinnmitnahmen bei {name}","body":"Nach dem steilen Anstieg wollen viele Anleger ihre Gewinne sichern. Der Kurs dürfte {w} nachgeben."},{"key":"analyst_downgrade","direction":-1,"when":"hot","minHeat":0,"weight":3,"minMoveBps":300,"maxMoveBps":1000,"headline":"Analysten stufen {name} ab","body":"Nach dem Lauf halten mehrere Häuser die Aktie für ausgereizt und raten zum Verkauf."},{"key":"dilution_rumor","direction":-1,"when":"hot","minHeat":0.5,"weight":2,"minMoveBps":400,"maxMoveBps":1200,"headline":"Gerüchte über eine Kapitalerhöhung bei {name}","body":"Der hohe Kurs lädt zu neuen Aktien ein. Anleger fürchten, dass ihre Anteile {w} verwässert werden."},{"key":"short_report","direction":-1,"when":"hot","minHeat":1,"weight":3,"minMoveBps":800,"maxMoveBps":2000,"headline":"Leerverkäufer-Report: {name} sei massiv überbewertet","body":"Ein bekannter Fonds veröffentlicht eine Studie gegen {name} und wettet auf fallende Kurse."},{"key":"insider_probe","direction":-1,"when":"hot","minHeat":1,"weight":2,"minMoveBps":500,"maxMoveBps":1500,"headline":"Insider-Verdacht: Aufsicht prüft Käufe bei {name}","body":"Die Börsenaufsicht schaut sich die auffälligen Käufe der letzten Tage genauer an."},{"key":"margin_calls","direction":-1,"when":"hot","minHeat":1.5,"weight":2,"minMoveBps":600,"maxMoveBps":1800,"headline":"Margin Calls bei {name}","body":"Spekulanten auf Kredit müssen nachschießen oder verkaufen. Der Kurs dürfte {w} fallen."},{"key":"special_audit","direction":-1,"when":"hot","minHeat":1.5,"weight":2,"minMoveBps":800,"maxMoveBps":2500,"headline":"Sonderprüfung bei {name} angekündigt","body":"Wirtschaftsprüfer sollen die Bücher von {name} durchleuchten. Bis dahin halten sich Anleger zurück."},{"key":"bubble_warning","direction":-1,"when":"hot","minHeat":2,"weight":3,"minMoveBps":1000,"maxMoveBps":3000,"headline":"Blasenwarnung: {name} weit über jedem Wert","body":"Ökonomen warnen in den Nachrichten vor einer Blase bei {name}. Der Kurs dürfte {w} einbrechen."},{"key":"rotation","direction":-1,"when":"any","minHeat":0,"weight":1,"minMoveBps":200,"maxMoveBps":600,"headline":"Anleger schichten aus {name} um","body":"Große Fonds verkaufen Teile ihrer Position. Der Kurs dürfte {w} nachgeben."},{"key":"fund_entry","direction":1,"when":"any","minHeat":0,"weight":1,"minMoveBps":200,"maxMoveBps":600,"headline":"Fonds steigt bei {name} ein","body":"Ein großer Fonds baut eine Position auf. Der Kurs dürfte {w} anziehen."},{"key":"bargain_hunters","direction":1,"when":"cold","minHeat":0,"weight":3,"minMoveBps":400,"maxMoveBps":1200,"headline":"Schnäppchenjäger greifen bei {name} zu","body":"Nach dem Absturz gilt die Aktie als günstig. Käufer dürften den Kurs {w} anheben."},{"key":"buyback_rumor","direction":1,"when":"cold","minHeat":0,"weight":2,"minMoveBps":300,"maxMoveBps":900,"headline":"Gerücht: {name} kauft eigene Aktien zurück","body":"Bei diesem Kurs soll die Firma selbst zugreifen wollen. Das stützt den Kurs {w}."},{"key":"analyst_upgrade","direction":1,"when":"cold","minHeat":0,"weight":2,"minMoveBps":300,"maxMoveBps":1000,"headline":"Analysten sehen Nachholbedarf bei {name}","body":"Der Kurs liege weit unter dem Wert der Firma. Mehrere Häuser raten zum Kauf."}],"waveTexts":{"market":{"headline":"Marktkorrektur: Anleger nehmen heiße Werte vom Tisch","body":"Nach den starken Wochen sichern große Anleger Gewinne. Betroffen sind vor allem: {names}."},"sector":{"headline":"Korrektur in der Branche {sector}","body":"Die Branche gilt als heiß gelaufen. Anleger verkaufen {names}."},"rates":{"headline":"Zinssorgen belasten heiße Aktien","body":"Anleger fürchten höhere Zinsen und trennen sich von teuren Werten wie {names}."},"relief":{"headline":"Erholung: Anleger kaufen gefallene Werte","body":"Nach dem Ausverkauf greifen Anleger wieder zu, vor allem bei {names}."}},"strengthWords":["leicht","spürbar","deutlich"]}'::jsonb, 'Defaults from src/config/balance.ts, section "marketForces"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8,"advice":{"briefings":2,"nextSteps":3,"minImpactCents":500,"aiIdleBelowBps":5000,"freeCapacityBps":2000,"reputationLow":45,"reputationDriverPoints":2,"runwayHours":6,"strengthsNearPoints":5}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100,"strengths":{"gainPerHour":0.02,"decayPerHour":0.05,"marginFull":0.25,"cashHoursFull":24,"awarenessFollowPerHour":0.25,"rewards":[{"at":50,"bps":200},{"at":75,"bps":500},{"at":90,"bps":1000},{"at":98,"bps":1500}]},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"demandMaxEffect":0.2,"qualityMax":10,"qualityMaxLoss":5,"qualityNeutral":0.4,"deliveryMaxLoss":8,"premiumLowQualityLoss":6,"budgetGain":2,"wagesMaxLoss":10,"billsLoss":6,"crisisPerSeverity":3,"campaignGain":3}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),

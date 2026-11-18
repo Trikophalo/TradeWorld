@@ -68,7 +68,7 @@ describe("playerStockBandE4 (ADR-170)", () => {
     expect(playerStockBandE4(20_000, 10_000, { ...cfg, dailyBandBps: 0 })).toBe(20_000);
     expect(playerStockBandE4(20_000, 0, cfg)).toBe(20_000);
   });
-  it("uses the game's band", () => {
-    expect(BALANCE.trading.playerStocks.dailyBandBps).toBe(10_000);
+  it("is off in the game (ADR-214)", () => {
+    expect(BALANCE.trading.playerStocks.dailyBandBps).toBe(0); // ADR-214: no daily limit
   });
 });

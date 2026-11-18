@@ -11,6 +11,8 @@ update public.sim_runtime set is_paused = false;
 
 begin;
 delete from public.stock_tips;
+-- ADR-214: the market forces have their own test (f2_stock_unbounded.sql); here only the ordinary news
+delete from public.game_config where key = 'marketForces';
 -- always true, a fixed move of 5 %, a lead of exactly 10 minutes
 update public.game_config
    set value = '{"everyMinutes": 12, "leadMinMinutes": 10, "leadMaxMinutes": 10, "minMoveBps": 500, "maxMoveBps": 500,
@@ -22,7 +24,7 @@ select public.stock_news_run_due(:'t0'::timestamptz + interval '5 minutes') as r
 select t.security_id as sec, t.direction as dir, t.news_item_id as nid from public.stock_tips t limit 1 \gset
 select q.last_price_e4 as p0 from public.security_quotes q where q.security_id = :'sec' \gset
 select tests.assert(
-  :'r1'::jsonb = '{"settled": 0, "published": 1}'::jsonb and :'r2'::jsonb = '{"settled": 0, "published": 0}'::jsonb
+  (:'r1'::jsonb - 'market_forces') = '{"settled": 0, "published": 1}'::jsonb and (:'r2'::jsonb - 'market_forces') = '{"settled": 0, "published": 0}'::jsonb
   and (select count(*) from public.stock_tips) = 1
   and (select t.move_bps = 500 and t.strength = 1 and t.comes_true and t.applied_at is null
               and t.due_at = :'t0'::timestamptz + interval '10 minutes' from public.stock_tips t)

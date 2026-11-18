@@ -1461,7 +1461,7 @@ höchstens 9 000, stündlich 1/24 davon; Sperre 20 h, Ablauf 6 h. Je Punkt 60 bp
 | Abstand zweier Kapitalerhöhungen    | `startups.ipo.capitalIncreaseCooldownHours`  | 24 h                                                        |
 | Sperre für Ausgabeerlöse            | `startups.ipo.issueProceedsLockHours`        | 72 h nicht entnehmbar                                       |
 | Insiderregel                        | `trading.playerStocks.insiderCooldownHours`  | 24 h kein Kauf der eigenen Aktie nach Geld aus der Firma    |
-| Tagesband Spieleraktien             | `trading.playerStocks.dailyBandBps`          | +100 % / −50 % zum Vortagesschluss (vorher +30 % / −23 %)   |
+| Tagesband Spieleraktien             | `trading.playerStocks.dailyBandBps`          | 0 = keine Tagesgrenze (ADR-214; vorher +100 % / −50 %)      |
 | Sammler-Angebote gelten             | `nfts.ai.offerHours`                         | 2 h (vorher 24 h wie Spielerangebote)                       |
 | Käufe von Spielern                  | `nfts.ai.maxBuysPerHour`, `maxBuysPerDay`    | 6 je Stunde, 100 je Tag (vorher 60 je Tag)                  |
 | Handel unter Sammlern               | `nfts.ai.trade.perHour`, `trade.perDay`      | 24 je Stunde, 480 je Tag (vorher 300 je Tag)                |
@@ -1838,3 +1838,33 @@ mindestens das 2,2-Fache fest).
 
 Der Berater spart 8 % der Steuer, der eigene Belegcheck 5 %. Für die mittlere Firma kostet der Berater am Tag
 8.640 €, er spart gegenüber dem Belegcheck 2.490 €; ab dort machen kluge Gründer die Bücher selbst.
+
+## Nachtrag: Aktien ohne Tagesgrenze, Marktkräfte (ADR-214)
+
+| Wert                        | Schlüssel                                            | Stand                                                           |
+| --------------------------- | ---------------------------------------------------- | --------------------------------------------------------------- |
+| Tagesband                   | `trading.playerStocks.dailyBandBps`                  | 0 (aus; vorher +100 % / −50 %)                                  |
+| Hitze frei / Skala (ln)     | `marketForces.heat`                                  | Kurs/fair 0,25/0,5 · 24 h 0,2/0,4 · 7 Tage 0,5/0,8              |
+| Gewinne zählen nur, solange | `marketForces.heat.gainGate`                         | ln(Kurs/fair) ≥ −0,1                                            |
+| Chance je Aktie und Stunde  | `marketForces.chance`                                | 1,2 % + 90 % × heat + 35 % × cold, höchstens 3                  |
+| Vorlauf, Trefferquote       | `leadMinMinutes`, `leadMaxMinutes`, `reliabilityBps` | 3 bis 15 Minuten, 85 %                                          |
+| Stärke                      | `severityPerHeat`, `maxMoveBps`                      | × (1 + 0,45 × heat), höchstens 45 %                             |
+| Stimmung je Bewegung        | `sentimentPerMove`                                   | 2 (−20 % Kurs → −0,4 Stimmung)                                  |
+| Wellen                      | `marketForces.waves`                                 | 2 % + 25 % × Ø heat je Stunde, höchstens 6 Aktien; Erholung 2 % |
+
+**Kurswege einer heißen Spieleraktie** (`pnpm exec tsx scripts/stock-heat-harness.ts 14 8`, 8 Läufe über 14 Tage;
+vorher = Band +100 %/−50 % ohne Kräfte, nachher = ohne Band mit Kräften):
+
+| Szenario                                         | Modell  | 24 h Median | 24 h p90 | 24 h max | 7 Tage Median | 7 Tage p90 | Kurs/fair am Ende | Kräfte/Tag |
+| ------------------------------------------------ | ------- | ----------- | -------- | -------- | ------------- | ---------- | ----------------- | ---------- |
+| Hype: Firma +3 %/Quartal, 20.000 €/h + Trendjagd | vorher  | +16 %       | +97 %    | +100 %   | +252 %        | +499 %     | 2,07              | 0          |
+| Hype: Firma +3 %/Quartal, 20.000 €/h + Trendjagd | nachher | +13 %       | +82 %    | +262 %   | +140 %        | +319 %     | 1,09              | 13,2       |
+| Reiner Hype: Firma +0 %, 20.000 €/h + Trendjagd  | vorher  | +2 %        | +51 %    | +100 %   | +32 %         | +166 %     | 2,62              | 0          |
+| Reiner Hype: Firma +0 %, 20.000 €/h + Trendjagd  | nachher | +2 %        | +72 %    | +271 %   | +6 %          | +81 %      | 1,13              | 11,2       |
+| Wachstum: Firma +10 %/Quartal, 5.000 €/h + Jagd  | vorher  | +47 %       | +82 %    | +96 %    | +1.337 %      | +1.703 %   | 0,99              | 0          |
+| Wachstum: Firma +10 %/Quartal, 5.000 €/h + Jagd  | nachher | +42 %       | +92 %    | +297 %   | +1.200 %      | +1.561 %   | 0,83              | 13,5       |
+| Ruhig: Firma +2 %/Quartal, keine Spieler         | vorher  | +9 %        | +19 %    | +33 %    | +69 %         | +94 %      | 0,93              | 0          |
+| Ruhig: Firma +2 %/Quartal, keine Spieler         | nachher | +8 %        | +20 %    | +33 %    | +69 %         | +87 %      | 0,93              | 1,0        |
+
+Große Tage bleiben möglich (bis rund +270 % in den Läufen); anhaltende Übertreibung wird deutlich langsamer und kehrt
+zum fairen Wert zurück; wächst die Firma selbst, folgt die Aktie ihr weiter.
