@@ -9,6 +9,14 @@ import type {
   CompanyEventStep,
   EventSector,
 } from "../../config/company-events.ts";
+import {
+  sizeDecades,
+  sizedChancePerDay,
+  sizedChanceShare,
+  sizedSeverityUniform,
+  sizedWeight,
+  type SizeContext,
+} from "./macro.ts";
 
 export type Severity = 1 | 2 | 3;
 
@@ -26,21 +34,28 @@ export function rollSeverity(u: number, cfg: CompanyEventsConfig = COMPANY_EVENT
   return 3;
 }
 
-/** Weighted pick of an archetype of the given polarity that fits the sector. */
+/**
+ * Weighted pick of an archetype of the given polarity that fits the sector. External archetypes (ADR-209) only with
+ * a size context and from their minimum company value, weighted by size, country and lobby (sizedWeight).
+ */
 export function pickArchetype(
   u: number,
   sector: EventSector,
   polarity: "crisis" | "chance",
   cfg: CompanyEventsConfig = COMPANY_EVENTS,
+  size?: SizeContext,
 ): CompanyEventArchetype {
-  const pool = cfg.archetypes.filter((a) => a.polarity === polarity && (!a.sectors || a.sectors.includes(sector)));
-  const total = pool.reduce((s, a) => s + a.weight, 0);
+  const pool = cfg.archetypes
+    .filter((a) => a.polarity === polarity && (!a.sectors || a.sectors.includes(sector)))
+    .map((a) => ({ a, w: Math.max(0, sizedWeight(a, size)) }))
+    .filter((x) => x.w > 0);
+  const total = pool.reduce((s, x) => s + x.w, 0);
   let x = clamp(u, 0, 0.999_999) * total;
-  for (const a of pool) {
-    x -= a.weight;
-    if (x < 0) return a;
+  for (const p of pool) {
+    x -= p.w;
+    if (x < 0) return p.a;
   }
-  return pool.at(-1)!;
+  return pool.at(-1)!.a;
 }
 
 export interface EventRollContext {
@@ -51,6 +66,8 @@ export interface EventRollContext {
   readonly hoursSinceLast: number | null;
   /** An event is still open or in force. */
   readonly hasActive: boolean;
+  /** ADR-209: company value, country risk and lobby level; without it the roll is the one of a small company. */
+  readonly size?: SizeContext;
 }
 
 /**
@@ -64,9 +81,13 @@ export function rollCompanyEvent(
 ): { archetype: CompanyEventArchetype; severity: Severity } | null {
   if (ctx.hasActive || ctx.ageHours < cfg.minAgeHours) return null;
   if (ctx.hoursSinceLast !== null && ctx.hoursSinceLast < cfg.minGapHours) return null;
-  if (u[0] >= cfg.chancePerDay) return null;
-  const polarity = u[1] < cfg.chanceShare ? "chance" : "crisis";
-  return { archetype: pickArchetype(u[2], ctx.sector, polarity, cfg), severity: rollSeverity(u[3], cfg) };
+  const decades = ctx.size ? sizeDecades(ctx.size.worthCents) : 0;
+  if (u[0] >= sizedChancePerDay(cfg.chancePerDay, decades)) return null;
+  const polarity = u[1] < sizedChanceShare(cfg.chanceShare, decades) ? "chance" : "crisis";
+  return {
+    archetype: pickArchetype(u[2], ctx.sector, polarity, cfg, ctx.size),
+    severity: rollSeverity(sizedSeverityUniform(u[3], decades), cfg),
+  };
 }
 
 /** One cost unit for this company: bigger companies pay more for the same lobbying. */
@@ -184,7 +205,10 @@ export function eventModifiers(
     share = mitigation;
   }
   const e = archetype.effect;
-  const s = share * scale;
+  // ADR-209: insurance takes its share of an insurable crisis (fixed when the event started)
+  const insured = archetype.polarity === "crisis" ? clamp(archetype.insuredShare ?? 0, 0, 1) : 0;
+  const leader = archetype.polarity === "crisis" ? clamp(archetype.leaderShare ?? 0, 0, 1) : 0;
+  const s = share * scale * (1 - insured) * (1 - leader);
   return {
     demandFactor: Math.max(0.05, 1 + (e.demand ?? 0) * s),
     capacityFactor: Math.max(0.05, (1 + (e.capacity ?? 0) * s) * (1 - clamp(runningCapacityHit, 0, 0.9))),
