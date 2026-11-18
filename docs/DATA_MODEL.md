@@ -4898,6 +4898,9 @@ Pro Stunde = letzte abgerechnete Stunde; heute = Berliner Kalendertag; Quartal =
 
 ### RPC `get_company_ranking(p_scope default 'players', p_limit default 100)`
 
+> Seit ADR-203 mit `p_sector`, `basis`, Veränderung gegenüber gestern und `mine` als vollständigem Eintrag; siehe
+> Abschnitt „Ranglisten: ein Wert, ein Vermögen“ am Ende.
+
 `{ server_time, total, entries: [{ rank, company_id, kind, name, color, logo, ticker, sector, tier, founder,
 value_cents, revenue_cents, team_size, is_mine }], mine: { rank, value_cents } | null }`
 
@@ -8329,3 +8332,37 @@ und oben `has_clone`; `get_my_job().job` zusätzlich `is_clone`, `holder_name`, 
 - **Aktien-Wurf**: `job_stock_grant_bps(Rang, Extra)` (bei KI-Lohnzahlungen × min(m, 60) / 60) > `job_reward_roll(key)`
   (Hash 0 … 9 999), nur bei voller Anwesenheit und Gewinn. Paket = `stockGrantValueHours` × Vertragslohn; Stückzahl
   = ganze Aktien, höchstens der freie Bestand (`security_free_float_e6`).
+
+## Ranglisten: ein Wert, ein Vermögen (ADR-203, Migration `20261204009500_toplists.sql`)
+
+- `company_worth_cents(firma)` (intern): an der Börse (`phase = 'listed'` mit Kurs) `shares_outstanding ×
+last_price_e4 / 100` („half even“), sonst bei Spielerfirmen `company_value_cents`, bei nicht notierten KI-Firmen
+  `null`. `company_worth_json(firma)` → `{ cents, basis: 'market_cap' | 'company_value', company_value_cents, price_e4,
+shares }`.
+- `player_wealth_parts(p_player | null)` (intern) → je Spieler (null = alle aktiven) `cash_cents` (alle Konten mit
+  `owner_player_id`), `depot_cents` (offene Positionen × `coalesce(bid, last)`, ohne die eigene Börsenfirma),
+  `company_cents` (privat `company_worth_cents`, an der Börse eigene Aktien × letzter Kurs), `cards_cents`,
+  `slabs_cents` (`nexamon_copy_value_cents(wert, zustand, note, karte)` ohne bzw. mit Note), `nfts_cents`
+  (`player_art_value_cents`), `property_cents` (`player_property_value_cents`), `vault_cents`
+  (`vault_status().accrued_cents`), `escrow_cents` (Zeichnungen offener Angebote mit Treuhand), `deals_cents`
+  (`player_deal_balance_cents`), `debt_cents` (− `player_debt_cents`), `total_cents` = Summe.
+- `player_net_worth_cents(p)` = `total_cents`. `rich_list_rows()` = Rangliste mit `source` (größter Teil: `cash` mit
+  Tresor und Treuhand, `depot`, `company`, `cards` mit Slabs, `nfts`, `property`; Tycoons `depot`);
+  `rich_list_entries()` liest daraus (Signatur unverändert).
+- `company_ranking_rows()` (intern): aktive Spielerfirmen und notierte KI-Firmen mit `company_worth_cents`,
+  `rank_all`, `rank_players`. `company_rank_snapshots (taken_at, company_id, value_cents, rank_all, rank_players)`,
+  RLS an, nur `service_role`; `company_ranking_snapshot(p_force)` höchstens alle `richList.companySnapshotMinutes`,
+  löscht nach `richList.snapshotKeepDays` (pg_cron `nexa-company-ranking`, alle 10 Minuten aufgerufen).
+- `company_state` trägt `worth` (= `company_worth_json`), damit auch `get_my_company`. `get_company_profile.facts`:
+  `value_cents` = `company_worth_cents`, neu `value_basis`.
+- `league_refresh`: Vermögen ohne Tresor (`total_cents − vault_cents`); die laufende Saison wurde einmal umgestellt
+  (`job_runs` `toplists_rebase`).
+
+| RPC                                               | Antwort                                                                                                                                                                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_rich_list(p_limit, p_offset, p_scope)`       | wie bisher, je Eintrag zusätzlich `source`; `me` zusätzlich `change_24h_bps`, `rank_change_24h`, `source`                                                                                                                                  |
+| `get_company_ranking(p_scope, p_limit, p_sector)` | `{ server_time, total, entries: [{ rank, company_id, kind, name, color, logo, ticker, sector, tier, founder, value_cents, basis, price_e4, revenue_cents, team_size, is_mine, change_24h_bps, rank_change_24h }], mine: Eintrag \| null }` |
+| `get_my_net_worth()`                              | `{ server_time, total_cents, parts: { cash_cents, depot_cents, company_cents, cards_cents, slabs_cents, nfts_cents, property_cents, vault_cents, escrow_cents, deals_cents, debt_cents }, company: { name, cents, basis, … } \| null }`    |
+
+`p_sector` filtert (`invalid_argument` bei unbekannter Branche); `rank` bleibt der Platz im ganzen Scope. Veränderung
+gegenüber dem letzten Schnappschuss, der mindestens 24 Stunden alt ist; `null`, solange es keinen gibt.

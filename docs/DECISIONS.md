@@ -4966,3 +4966,56 @@ dazu. Spielerfirmen zahlen Beteiligungen aus ihrem Gewinn; die Quartalsberichte 
 nicht als Kosten. Die Funktionen `job_state`, `sign_contract`, `apply_for_job`, `get_job_board`, `quit_job`,
 `cancel_quit`, `request_raise`, `request_promotion`, `get_employer`, `company_full_time_check`,
 `player_company_team`, `get_player_card` und einige Leser sind in Migration 9810 neu geschrieben (Stand 9800).
+
+## ADR-203: Ranglisten – ein Wert je Firma, ein Vermögen aus allen Teilen — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Top-Unternehmen sagt, meine Firma ist 3 Mio. wert, die Firmenseite sagt 49,4 Mio.“
+Die Suche nach allen Stellen, an denen Firmenwert und Vermögen berechnet wurden, fand vier Formeln:
+
+| Stelle                                             | vorher                                                                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Firmenseite (`company_state.value_cents`)          | `company_value_cents`: Kasse − offene Löhne + 4 × Quartalsgewinn × KGV × 0,5, auch an der Börse                       |
+| Top-Unternehmen (`get_company_ranking`)            | an der Börse Aktien × letzter Kurs, privat `company_value_cents`                                                      |
+| Firmenprofil (`get_company_profile`)               | an der Börse `security_quotes.market_cap_cents` (zu anderen Zeiten, teils aus dem fairen Wert geschrieben)            |
+| Forbes 100, Alle, Liga (`rich_list_entries`)       | eigene Firma mit `company_value_cents`, **auch an der Börse**, plus die Aktien des Gründers im Depot: doppelt gezählt |
+| Visitenkarte, Missionen (`player_net_worth_cents`) | ohne Börsenfirma (nur die Aktien), also anders als Forbes 100                                                         |
+| Startseite (Client)                                | Konto + Depot + Firma − Schulden, ohne NFTs, Zuhause, Deals                                                           |
+
+Nexamon-Karten, der Tresor und Geld für gezeichnete Aktien (Treuhand, ADR-151) zählten nirgends. Die 3 Mio. gegen
+49,4 Mio. sind der Börsenwert einer börsennotierten Firma gegen ihren Ertragswert.
+
+**Entscheidung.**
+
+- **Ein Wert je Firma, überall:** `company_worth_cents(firma)`. An der Börse (Phase `listed` mit Kurs) der
+  Börsenwert = alle Aktien × letzter Kurs, privat der Firmenwert `company_value_cents`. Ihn zeigen Top-Unternehmen,
+  die Firmenseite (Kachel „Börsenwert“ bzw. „Wert“, darunter bei Börsenfirmen der Ertragswert), das Firmenprofil und
+  das Vermögen des Gründers. `company_worth_json` liefert Wert, Grundlage (`market_cap` | `company_value`),
+  Ertragswert, Kurs und Aktienzahl.
+- **Ein Vermögen aus allen Teilen:** `player_wealth_parts(spieler | null)` mit Bargeld (alle eigenen Konten), Depot
+  (offene Positionen zum Geldkurs, ohne die eigene Börsenfirma), eigene Firma (privat `company_worth_cents`, an der
+  Börse die eigenen Aktien zum letzten Kurs, also derselbe Kurs wie der Börsenwert), Nexamon-Karten (ohne Note) und
+  Slabs (mit Note, Black Labels mit Hype) zum Marktwert, NFTs zum letzten Verkaufspreis, Zuhause, Möbel, Autos, Böden
+  zum Wiederverkaufswert, Tresor (was Leeren auszahlen würde), Treuhand (Geld offener Zeichnungen), Deals (ADR-098) und
+  Schulden (negativ). Vermögen = Summe. `player_net_worth_cents`, `rich_list_entries` (Forbes 100, Alle,
+  Schnappschüsse, Rang-Missionen, Vermögensverlauf) und die Startseite lesen nur noch das. Nicht gezählt: Accessoires
+  (kein Wiederverkauf), ungeöffnete Booster und Einsätze laufender Spiele.
+- **Je Liste eine dokumentierte Regel**, in der App unter „Wie wird gerechnet?“: Forbes 100 = echte Spieler nach
+  Vermögen; Alle = dazu die KI-Tycoons (Bargeld + Aktien zum Geldkurs); Top-Unternehmen = `company_worth_cents`,
+  „Spielerfirmen“ oder „Mit KI-Firmen“, dazu ein Branchenfilter (der Platz bleibt der Platz in der ganzen Liste).
+- **Bewegung gegenüber gestern:** Rangliste wie bisher aus `rich_list_snapshots`; Top-Unternehmen neu aus
+  `company_rank_snapshots` (alle `richList.companySnapshotMinutes` = 30 Minuten, pg_cron `nexa-company-ranking`,
+  `richList.snapshotKeepDays` = 8 Tage). Pfeile für Plätze, Prozent für den Wert. Jede Zeile von Forbes 100 nennt die
+  Hauptquelle des Vermögens (größter Teil: Bargeld, Aktien, Firma, Nexamon, NFTs, Immobilien).
+- **Eigene Position:** hervorgehoben in der Liste, sonst unten angeheftet (Spieler und Firma), dazu die Karte
+  „So setzt sich dein Vermögen zusammen“ (`get_my_net_worth`).
+- **Wochenliga:** zählt alle Teile außer dem Tresor (Grundeinkommen ist geschenktes Geld, ADR-089). Die laufende
+  Saison wurde einmal umgestellt: Der Start verschiebt sich um das, was die neue Rechnung ändert, das Wachstum bleibt.
+- **Zwischenspeicher:** Forbes 100 und Alle rechnen bei jedem Abruf neu (alle 15 Sekunden), die Schnappschüsse dienen
+  nur den Pfeilen; damit ist der eigene Wert in der Liste immer derselbe wie auf Firmenseite, Karte und Startseite.
+
+**Folgen.** Gründer börsennotierter Firmen verlieren in Forbes 100 den doppelt gezählten Ertragswert; Sammler mit
+wertvollen Karten steigen. Die Pfeile und die 24-h-Prozente zeigen einen Tag lang auch diesen Sprung; die
+„Größter Gewinner“-Meldung des Tages kann davon betroffen sein. Der Tresor wächst sekündlich, darum friert
+`tests.vault_quiet` ihn in SQL-Tests ein, die Vermögen über mehrere Anweisungen vergleichen. Liegt der Börsenkurs weit
+unter dem Ertragswert (wie beim Eigentümer: 3 Mio. gegen 49,4 Mio.), zeigt die Firmenseite das jetzt offen; ob der
+Kurs einer Spieler-AG zu langsam zum fairen Wert findet, ist eine eigene Frage. SQL-Test `d9_toplists.sql`.

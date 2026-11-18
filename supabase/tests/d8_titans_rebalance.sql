@@ -6,7 +6,7 @@
 \set QUIET 1
 set client_min_messages = notice;
 
-\set p '''0d5d5d5d-0000-4000-8000-0000000000a1'''
+\set p '''0d8d8d8d-0000-4000-8000-0000000000a1'''
 update public.invite_codes set max_uses = max_uses + 1 where code = 'M1-TESTS';
 select tests.signup(:p, 'Tr_Paula') is not null as ok \gset
 select tests.set_level(:p, 10);

@@ -3,31 +3,32 @@
   "facts": {
     "staff": 1,
     "stage": 0,
-    "period": "quarter",
-    "product": "courier",
+    "period": null,
+    "product": "solar",
     "max_staff": 2,
     "ai_workers": 0,
-    "quality_bps": 2325,
-    "value_cents": 295009,
-    "profit_cents": -14991,
-    "awareness_bps": 355,
-    "revenue_cents": 219104
+    "quality_bps": null,
+    "value_basis": "company_value",
+    "value_cents": 200000,
+    "profit_cents": null,
+    "awareness_bps": null,
+    "revenue_cents": null
   },
   "company": {
-    "id": "91071a04-ae79-46d5-86d2-381f61a55458",
-    "idea": "Fahrräder reparieren",
+    "id": "2c301d3f-4548-4f01-9400-d2f179913a7f",
+    "idea": "Strom vom Dach",
     "logo": null,
-    "name": "Gero Werkstatt",
+    "name": "Fixture Krisenstab",
     "tier": "garage",
     "is_ai": false,
     "listed": false,
-    "sector": "logistics",
+    "sector": "energy",
     "ticker": null,
     "price_e4": null,
     "change_bps": null,
-    "founded_at": "2026-11-16T23:54:17.684567+00:00",
-    "brand_color": "#aa5500"
+    "founded_at": "2026-11-18T00:26:18.473353+00:00",
+    "brand_color": "#aa5533"
   },
-  "founder": { "tag": "HE6D", "nickname": "Gero_Garage", "avatar_key": "rookie" },
+  "founder": { "tag": "QARJ", "nickname": "Fixture_Krise", "avatar_key": "rookie" },
   "members": []
 }

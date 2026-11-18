@@ -290,13 +290,58 @@ export interface RichListEntry {
   rankChange24h: number | null;
   isMe: boolean;
   avatarKey: string | null;
+  /** Largest part of the fortune (ADR-203); null on older servers or without any positive part. */
+  source: WealthSource | null;
 }
 
 export interface RichList {
   serverTime: string;
   total: number;
   entries: RichListEntry[];
-  me: { rank: number; netWorthCents: number; next: { rank: number; name: string; gapCents: number } | null } | null;
+  me: {
+    rank: number;
+    netWorthCents: number;
+    change24hBps: number | null;
+    rankChange24h: number | null;
+    next: { rank: number; name: string; gapCents: number } | null;
+  } | null;
+}
+
+/** Where a fortune mainly comes from (ADR-203): cash includes the vault and subscription money. */
+export type WealthSource = "cash" | "depot" | "company" | "cards" | "nfts" | "property";
+
+/** The parts of the net worth, exactly as the rich list counts them (ADR-203, player_wealth_parts). */
+export const WEALTH_PARTS = [
+  "cash",
+  "depot",
+  "company",
+  "cards",
+  "slabs",
+  "nfts",
+  "property",
+  "vault",
+  "escrow",
+  "deals",
+  "debt",
+] as const;
+export type WealthPart = (typeof WEALTH_PARTS)[number];
+
+/** THE value of a company (ADR-203): listed at market cap, private at the company value. */
+export interface CompanyWorth {
+  cents: number;
+  basis: "market_cap" | "company_value";
+  /** Earnings value (cash - unpaid + earnings); for a listed company the number its page showed before. */
+  companyValueCents: number | null;
+  priceE4: number | null;
+  shares: number | null;
+}
+
+export interface NetWorthBreakdown {
+  serverTime: string;
+  totalCents: number;
+  /** Debt is negative, deals can be. The parts sum to totalCents. */
+  parts: Record<WealthPart, number>;
+  company: (CompanyWorth & { name: string }) | null;
 }
 
 export interface RichNews {
@@ -634,17 +679,25 @@ export interface CompanyRankingEntry {
   /** Player companies only. */
   tier: CompanyTier | null;
   founder: string | null;
+  /** company_worth_cents (ADR-203): the same value as the company page and the net worth. */
   valueCents: number;
+  basis: CompanyWorth["basis"];
+  /** Last price of a listed company. */
+  priceE4: number | null;
   revenueCents: number | null;
   teamSize: number | null;
   isMine: boolean;
+  /** Against the snapshot 24 h ago; null while there is none. */
+  change24hBps: number | null;
+  rankChange24h: number | null;
 }
 
 export interface CompanyRanking {
   serverTime: string;
   total: number;
   entries: CompanyRankingEntry[];
-  mine: { rank: number; valueCents: number } | null;
+  /** The own company in full (also when it is not among the entries). */
+  mine: CompanyRankingEntry | null;
 }
 
 export type MissionKind = "quick" | "daily" | "weekly" | "milestone";
@@ -1715,7 +1768,9 @@ export interface CompanyProfile {
   };
   founder: { nickname: string; tag: string | null; avatarKey: string } | null;
   facts: {
+    /** company_worth_cents (ADR-203). */
     valueCents: number | null;
+    valueBasis: CompanyWorth["basis"] | null;
     revenueCents: number | null;
     profitCents: number | null;
     period: "quarter" | "ttm" | null;
@@ -1894,6 +1949,8 @@ export interface MyCompany {
   reputation: CompanyReputation | null;
   /** Extra steps of the hourly close that failed in the last day (ADR-183); the hour itself was recorded. */
   closeWarnings: { step: string; at: string; error: string; failures: number }[];
+  /** The value Top-Unternehmen and the net worth count (ADR-203); null on older servers. */
+  worth: CompanyWorth | null;
   /** Share of every profitable hour paid to the founder automatically (ADR-086). */
   founderPayoutBps: number;
   /**
@@ -2661,7 +2718,9 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   richList(scope: RichListScope, limit: number, offset: number): Promise<RichList>;
   richNews(limit: number): Promise<RichNews[]>;
   /** The most valuable companies (ADR-074). */
-  companyRanking(scope: RichListScope, limit: number): Promise<CompanyRanking>;
+  companyRanking(scope: RichListScope, limit: number, sector?: SectorKey | null): Promise<CompanyRanking>;
+  /** The own net worth in parts (ADR-203). */
+  myNetWorth(): Promise<NetWorthBreakdown>;
   // Artworks (ADR-080)
   artworks(sort: ArtSort, origin: ArtOrigin, onAuction: boolean, limit: number, offset: number): Promise<ArtworkList>;
   artwork(id: string): Promise<ArtworkDetail>;

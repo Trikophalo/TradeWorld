@@ -8,6 +8,7 @@ set client_min_messages = notice;
 \set b '''08208208-0000-4000-8000-0000000000b1'''
 update public.invite_codes set max_uses = max_uses + 5 where code = 'M1-TESTS';
 select tests.signup(:a, 'Lea_Leiht') is not null and tests.signup(:b, 'Ben_Borgt') is not null as ok \gset
+select tests.vault_quiet(array[:a, :b]::uuid[]);
 update public.sim_runtime set is_paused = false;
 select tests.set_level(x, 6) from unnest(array[:a, :b]::uuid[]) x;
 select tests.fund(:a, 5000000, 'test:m4jnw:a');

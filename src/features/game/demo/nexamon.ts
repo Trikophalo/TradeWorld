@@ -279,6 +279,8 @@ export interface DemoBattlePacks {
     seats: number,
     decide: (pulls: NexamonPull[][]) => number,
   ): { pulls: NexamonPull[][]; winner: number };
+  /** ADR-203: the own copies at market value for the net worth, raw cards and slabs apart. */
+  demoCollectionCents(): { cards: number; slabs: number };
 }
 
 export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBattlePacks {
@@ -850,6 +852,16 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
     });
 
   return {
+    demoCollectionCents() {
+      const s = st();
+      let cards = 0;
+      let slabs = 0;
+      for (const c of s.copies) {
+        if (c.grade === null) cards += copyValue(s, c);
+        else slabs += copyValue(s, c);
+      }
+      return { cards, slabs };
+    },
     async nexamon() {
       const s = tick();
       const sets = NEXAMON_SETS.map((key) => {

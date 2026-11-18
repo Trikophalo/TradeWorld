@@ -91,6 +91,7 @@ import { useSettings } from "@/stores/settings";
 import { cn } from "@/lib/utils";
 import { CriticBadge } from "@/features/artworks/components/artwork-card";
 import type { Artwork } from "@/features/game/types";
+import { ToplistShowcase } from "@/features/rich-list/components/toplist-showcase";
 
 const COLOR_GROUPS = [
   { title: "Flächen", tokens: ["bg-0", "bg-1", "bg-2", "bg-3"] },
@@ -1370,6 +1371,10 @@ export function Showcase() {
 
       <Section id="battle-modes" title="Pack-Battle-Modi: Twist und Umgekehrt (ADR-205)">
         <BattleModesShowcase />
+      </Section>
+
+      <Section id="toplists" title="Ranglisten: Bewertung, Pfeile, Vermögensteile (ADR-203)">
+        <ToplistShowcase />
       </Section>
 
       <Section id="critic" title="Kritiker-Urteil für NFTs (ADR-181)">

@@ -118,6 +118,17 @@ test("rankings: Forbes 100 of real players, everyone with the AI tycoons, top co
   await expect(page.getByText("Noch hat niemand eine Firma gegründet.")).toBeVisible();
   await page.getByRole("radio", { name: "Mit KI-Firmen" }).click();
   await expect(page.getByTestId("company-ranking").getByText("KlarSoft AG")).toBeVisible();
+  // ADR-203: one documented valuation, a sector filter, the own net worth in parts
+  await expect(page.getByTestId("company-ranking").getByText("Börsenwert").first()).toBeVisible();
+  await page.getByRole("button", { name: "Wie wird gerechnet?" }).click();
+  await expect(page.getByText("Börsenwert: alle Aktien × letzter Kurs")).toBeVisible();
+  await page.getByTestId("sector-filter").getByRole("button", { name: "Energie" }).click();
+  await expect(page.getByTestId("company-ranking").getByText("KlarSoft AG")).toHaveCount(0);
+  await page.getByTestId("sector-filter").getByRole("button", { name: "Tech" }).click();
+  await expect(page.getByTestId("company-ranking").getByText("KlarSoft AG")).toBeVisible();
+  const breakdown = page.getByTestId("net-worth-breakdown");
+  await expect(breakdown.getByText("So setzt sich dein Vermögen zusammen")).toBeVisible();
+  await expect(breakdown.getByText("Bargeld")).toBeVisible();
 });
 
 test("the player name is shown and can be changed, forbidden names are refused", async ({ page }) => {

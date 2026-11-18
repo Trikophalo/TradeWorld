@@ -18,6 +18,7 @@ import { PITCH_RPC_SCHEMAS, livePitchEngine } from "./api-pitches";
 import { PROTEST_RPC_SCHEMAS, liveProtestEngine } from "./api-protests";
 import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { NEWS_PROMO_RPC_SCHEMAS, liveNewsPromoEngine } from "./api-news-promos";
+import { TOPLIST_RPC_SCHEMAS, liveToplistEngine } from "./api-toplists";
 import { COMPANY_SKILLS_RPC_SCHEMAS, liveCompanySkillsEngine } from "./api-company-skills";
 import { INTERVIEW_RPC_SCHEMAS, liveInterviewEngine } from "./api-interviews";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
@@ -247,59 +248,6 @@ const orderQuoteSchema = z.object({
 
 const progressSchema = z.object({ xp_awarded: num, level: num, xp_total: num });
 
-const companyRankingSchema = z.object({
-  server_time: iso,
-  total: num,
-  entries: z.array(
-    z.object({
-      rank: num,
-      company_id: z.string(),
-      kind: z.enum(["ai", "player"]),
-      name: z.string(),
-      color: z.string(),
-      logo: z
-        .object({ palette: z.array(z.string()), grid: z.array(z.string()) })
-        .nullable()
-        .default(null),
-      ticker: z.string().nullable(),
-      sector: z.enum(["tech", "retail", "energy", "pharma", "logistics"]).nullable(),
-      tier: z.enum(["garage", "small_business", "gmbh", "ag"]).nullable(),
-      founder: z.string().nullable(),
-      value_cents: num,
-      revenue_cents: nnum,
-      team_size: nnum,
-      is_mine: z.boolean(),
-    }),
-  ),
-  mine: z.object({ rank: num, value_cents: num }).nullable(),
-});
-
-const richListSchema = z.object({
-  server_time: iso,
-  total: num,
-  entries: z.array(
-    z.object({
-      rank: num,
-      kind: z.enum(["player", "tycoon"]),
-      id: z.string(),
-      name: z.string(),
-      description: z.string().nullable(),
-      net_worth_cents: num,
-      change_24h_bps: nnum,
-      rank_change_24h: nnum,
-      is_me: z.boolean(),
-      avatar_key: z.string().nullable().default(null),
-    }),
-  ),
-  me: z
-    .object({
-      rank: num,
-      net_worth_cents: num,
-      next: z.object({ rank: num, name: z.string(), gap_cents: num }).nullable(),
-    })
-    .nullable(),
-});
-
 const richNewsSchema = z.array(
   z.object({ published_at: iso, headline: z.string(), body: z.string().nullable(), kind: z.string() }),
 );
@@ -467,6 +415,7 @@ const companyProfileSchema = z.object({
   founder: z.object({ nickname: z.string(), tag: z.string().nullable(), avatar_key: z.string() }).nullable(),
   facts: z.object({
     value_cents: z.number().nullable(),
+    value_basis: z.enum(["market_cap", "company_value"]).nullable().default(null),
     revenue_cents: z.number().nullable(),
     profit_cents: z.number().nullable(),
     period: z.enum(["quarter", "ttm"]).nullable(),
@@ -551,9 +500,7 @@ export const RPC_SCHEMAS = {
   cancel_order: z.object({ order_id: z.string(), status: z.literal("cancelled") }),
   claim_vault: z.object({ claimed_cents: num, cash_cents: num }),
   complete_tutorial: progressSchema,
-  get_rich_list: richListSchema,
   get_rich_list_news: richNewsSchema,
-  get_company_ranking: companyRankingSchema,
   check_nickname: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),
   change_nickname: z.object({ nickname: z.string(), changed_at: iso, next_change_at: iso }),
   reset_account: z.object({ ok: z.literal(true), reset_at: iso }),
@@ -567,6 +514,7 @@ export const RPC_SCHEMAS = {
   record_security_view: z.object({ counted: z.boolean() }),
   ...CAREER_RPC_SCHEMAS,
   ...NEWS_PROMO_RPC_SCHEMAS,
+  ...TOPLIST_RPC_SCHEMAS,
   ...COMPANY_SKILLS_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
@@ -609,6 +557,7 @@ export const liveEngine: GameEngine = {
   ...liveTourEngine,
   ...liveNewsShowEngine,
   ...liveNewsPromoEngine,
+  ...liveToplistEngine,
   ...liveCompanySkillsEngine,
   ...liveInterviewEngine,
   ...liveBattleEngine,
@@ -655,6 +604,7 @@ export const liveEngine: GameEngine = {
       founder: r.founder ? { nickname: r.founder.nickname, tag: r.founder.tag, avatarKey: r.founder.avatar_key } : null,
       facts: {
         valueCents: f.value_cents,
+        valueBasis: f.value_basis,
         revenueCents: f.revenue_cents,
         profitCents: f.profit_cents,
         period: f.period,
@@ -993,61 +943,9 @@ export const liveEngine: GameEngine = {
     return { xpAwarded: r.xp_awarded, level: r.level, xpTotal: r.xp_total };
   },
 
-  async richList(scope, limit, offset) {
-    const r = await rpc("get_rich_list", { p_scope: scope, p_limit: limit, p_offset: offset }, richListSchema);
-    return {
-      serverTime: r.server_time,
-      total: r.total,
-      entries: r.entries.map((e) => ({
-        rank: e.rank,
-        kind: e.kind,
-        id: e.id,
-        name: e.name,
-        description: e.description,
-        netWorthCents: e.net_worth_cents,
-        change24hBps: e.change_24h_bps,
-        rankChange24h: e.rank_change_24h,
-        isMe: e.is_me,
-        avatarKey: e.avatar_key,
-      })),
-      me: r.me
-        ? {
-            rank: r.me.rank,
-            netWorthCents: r.me.net_worth_cents,
-            next: r.me.next ? { rank: r.me.next.rank, name: r.me.next.name, gapCents: r.me.next.gap_cents } : null,
-          }
-        : null,
-    };
-  },
-
   async richNews(limit) {
     const rows = await rpc("get_rich_list_news", { p_limit: limit }, richNewsSchema);
     return rows.map((n) => ({ publishedAt: n.published_at, headline: n.headline, body: n.body, kind: n.kind }));
-  },
-
-  async companyRanking(scope, limit) {
-    const r = await rpc("get_company_ranking", { p_scope: scope, p_limit: limit }, companyRankingSchema);
-    return {
-      serverTime: r.server_time,
-      total: r.total,
-      entries: r.entries.map((e) => ({
-        rank: e.rank,
-        companyId: e.company_id,
-        kind: e.kind,
-        name: e.name,
-        color: e.color,
-        logo: e.logo,
-        ticker: e.ticker,
-        sector: e.sector,
-        tier: e.tier,
-        founder: e.founder,
-        valueCents: e.value_cents,
-        revenueCents: e.revenue_cents,
-        teamSize: e.team_size,
-        isMine: e.is_mine,
-      })),
-      mine: r.mine ? { rank: r.mine.rank, valueCents: r.mine.value_cents } : null,
-    };
   },
 
   async checkNickname(nickname) {
