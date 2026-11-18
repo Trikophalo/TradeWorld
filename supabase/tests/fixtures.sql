@@ -823,6 +823,10 @@ reset role;
 select tests.login_as('authenticated', :fx_da);
 select public.found_company(gen_random_uuid(), 'Fixture Lieferwerk', 'Teile auf Abruf', 'tech', '#3355aa', 'garage') is not null as ok \gset
 select company_id as fx_dco from public.player_companies where founder_id = :fx_da and status = 'active' \gset
+-- pin the hidden niche (a Pareto draw): the flyer price follows its demand, a heavy-tail draw made it unaffordable
+reset role;
+update public.player_companies set potential_annual_cents = 3000000 where company_id = :'fx_dco';
+select tests.login_as('authenticated', :fx_da);
 \o :fixture_dir/start_campaign.json
 select public.start_campaign(gen_random_uuid(), :'fx_dco', 'flyer');
 \o :fixture_dir/get_my_company_campaign.json
@@ -1603,6 +1607,7 @@ select public.upgrade_company(gen_random_uuid()) is not null as ok \gset
 select public.company_deposit(gen_random_uuid(), 30000000) is not null as ok \gset
 reset role;
 select company_id as fx_uco from public.player_companies where founder_id = :fx_u \gset
+update public.player_companies set potential_annual_cents = 3000000 where company_id = :'fx_uco';  -- pinned niche (see M4j)
 update public.player_companies set last_hour_at = date_trunc('hour', public.game_now()) - interval '3 hours' where company_id = :'fx_uco';
 select public.player_companies_run_due() is not null as ok \gset
 select tests.login_as('authenticated', :fx_u) is null as ok \gset

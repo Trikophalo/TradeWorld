@@ -38,6 +38,9 @@ select tests.assert((:'fa'::jsonb ->> 'awareness_bps')::int = 300 and (:'fb'::js
 
 select tests.company_of(:a) as aco \gset
 select tests.company_of(:b) as bco \gset
+-- the same niche for both: the founding draws it from a Pareto tail, and a heavy-tail draw raises the marketing
+-- half-saturation (potential share) and leaves the garage sold out, so in some runs marketing barely moved awareness
+update public.player_companies set potential_annual_cents = 3000000 where company_id in (:'aco', :'bco');
 update public.player_companies set last_hour_at = date_trunc('hour', public.game_now()) - interval '30 hours'
  where company_id in (:'aco', :'bco');
 update public.companies set founded_at = date_trunc('hour', public.game_now()) - interval '30 hours'
