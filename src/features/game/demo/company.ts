@@ -2,7 +2,7 @@ import type { DemoCompanyEventsState } from "./company-events";
 import type { DemoListedState, ListedHourFacts } from "./listed";
 import type { EventModifiers } from "@/lib/sim/company-events";
 import {
-  campaignCostCents,
+  companyCampaignCostCents,
   campaignDemandFactor,
   campaignFactor,
   campaignLuck,
@@ -269,16 +269,13 @@ export interface CompanyHost {
 }
 
 /** Campaign prices from the last hour's demand (ADR-097). */
-function campaignCosts(company: DemoCompanyState): Record<CampaignKind, number> {
+function campaignCosts(company: DemoCompanyState, companyValueCents: number): Record<CampaignKind, number> {
   const last = company.hours?.at(-1);
   const demand = last
     ? last.demandCents
     : (company.potentialAnnualCents / 4 / BALANCE.time.quarterHours) * company.awareness;
-  return {
-    flyer: campaignCostCents("flyer", demand),
-    online: campaignCostCents("online", demand),
-    tv: campaignCostCents("tv", demand),
-  };
+  const cost = (kind: CampaignKind) => companyCampaignCostCents(kind, demand, company.tier, companyValueCents);
+  return { flyer: cost("flyer"), online: cost("online"), tv: cost("tv") };
 }
 
 function campaignView(company: DemoCompanyState): MyCompany["campaign"] {
@@ -921,7 +918,7 @@ export function createCompanyEngine(host: CompanyHost) {
       founderPayoutBps: company.founderPayoutBps ?? 0,
       strengths: demoStrengths(company),
       campaign: campaignView(company),
-      campaignCosts: campaignCosts(company),
+      campaignCosts: campaignCosts(company, valueCents(company)),
       priceLevel: company.priceLevel ?? "normal",
       contractWork: company.contractWork ?? true,
       expansionLevel: level,
@@ -1237,7 +1234,7 @@ export function createCompanyEngine(host: CompanyHost) {
         if (!(kind in startups.campaigns.kinds)) throw new GameError("invalid_argument");
         const now = Date.now();
         if (company.campaign && now < company.campaign.endsAt) throw new GameError("campaign_running");
-        const cost = campaignCosts(company)[kind];
+        const cost = campaignCosts(company, valueCents(company))[kind];
         if (company.cashCents - company.unpaidCents < cost) throw new GameError("insufficient_funds");
         company.cashCents -= cost;
         const luck = campaignLuck(Math.random());

@@ -5444,3 +5444,25 @@ eigene Meldung bekommen, mit Firma, Land, Lage und Gegenmaßnahme, und einen Nac
 Aufruf der neuen Kandidaten, der Ereignis-Meldungen und der Überleitung). Tests: `src/lib/sim/news-chat.test.ts`,
 `src/features/news/show/variants.test.ts`, `news-topics.test.ts`, SQL `e8_news_show_content.sql`; `a4` und `9k`
 angepasst (Zahl der Themen, Umfrage-Konto). Der Running Gag bleibt unverändert und steht weiter nicht in den Patchnotes.
+
+## ADR-212: Flyer für kleine Firmen gedeckelt — `Entscheidung (Eigentümer: „mach, was am besten ist“)`
+
+**Kontext.** Eine Kampagne kostet `costHours` × die Nachfrage der letzten Stunde (ADR-097). Die Nachfrage folgt aus
+der Marktgröße, die bei der Gründung zufällig und mit schwerem Rand gezogen wird (`potential_annual_cents`). Etwa
+5,6 % der neuen Garagen konnten sich deshalb nicht einmal den billigsten Flyer aus ihren 2.500 € Startkasse leisten,
+ausgerechnet die mit dem besten Markt.
+
+**Entscheidung.** Der Flyer einer kleinen Firma kostet höchstens `startups.campaigns.flyerCapCents` (2.000 €).
+Klein heißt: Rechtsform in `flyerCapTiers` (Garage) oder Firmenwert (`company_value_cents`) unter
+`flyerCapBelowValueCents` (1 Mio. €). Der Deckel gilt vor dem Rabatt der Werbeagentur (`ad_agency`), die also weiter
+wirkt. Online, TV und größere Firmen zahlen den normalen Preis; ein billigerer Flyer wird nie teurer.
+
+- Server: neue interne Hilfe `campaign_cap_cents()`, `company_campaign_cost_cents()` (Migration 20261204010500) nimmt
+  das Minimum. Diese eine Funktion rechnen `start_campaign()` und `company_campaign_costs()` (Preis auf der
+  Kampagnenkarte), Karte und Abbuchung zeigen also denselben Preis. Keine neuen RPCs, keine neuen Fehler.
+- Client: `campaignCapCents()` und `companyCampaignCostCents()` in `src/lib/sim/campaigns.ts` für den Demo-Modus.
+
+**Folgen.** Jede neue Garage kann ihre erste Kampagne starten und behält 500 € für Rechnungen. Der Flyer einer Garage
+mit großem Markt wird ein gutes Geschäft, das ist gewollt: Er hebt Nachfrage und Bekanntheit nur 24 Stunden lang, und
+mit dem Wachstum (Kleinunternehmen und 1 Mio. € Wert) fällt der Deckel weg. Tests: `src/lib/sim/campaigns.test.ts`,
+SQL `e9_flyer_cap.sql`.

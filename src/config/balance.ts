@@ -1704,6 +1704,14 @@ export interface StartupsConfig {
       >
     >;
     readonly minCostCents: number;
+    /**
+     * ADR-212: the flyer of a small company costs at most this much, so a fresh garage can always afford its first
+     * campaign however big its market was drawn. Small = legal form in `flyerCapTiers` or company value below
+     * `flyerCapBelowValueCents`. Bigger campaigns and bigger companies pay the normal price.
+     */
+    readonly flyerCapCents: number;
+    readonly flyerCapTiers: readonly ("garage" | "small_business" | "gmbh" | "ag")[];
+    readonly flyerCapBelowValueCents: number;
     readonly luckMin: number;
     readonly luckMax: number;
     readonly qualityWeight: number;
@@ -2864,6 +2872,9 @@ export const BALANCE = {
         tv: { hours: 72, costHours: 18, demandBps: 7_000, awareness: 0.12 },
       },
       minCostCents: 20_000,
+      flyerCapCents: 200_000,
+      flyerCapTiers: ["garage"],
+      flyerCapBelowValueCents: 100_000_000,
       luckMin: 0.4,
       luckMax: 1.6,
       qualityWeight: 0.5,
