@@ -638,6 +638,26 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Größe hat ihren Preis",
         text: "Bis etwa 30 Mio. € Firmenwert wächst deine Firma wie bisher.",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-5a68dc15",
+        title: "Talente und 15 Stellen",
+        text: "Deine Firma hat jetzt 15 Stellen von Vertrieb bis Betriebsarzt.",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-5be3075d",
+        title: "Der Tresor wächst mit dir",
+        text: "Das Grundeinkommen im Tresor steigt mit jedem Level um 8 % (bis Level 40, dann das 4,12-Fache), ab Level 5 gibt es Festgeld: Geld für 1, 3 oder 7…",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-e3f3e70c",
+        title: "Schneller aufsteigen, abwechslungsreichere Missionen",
+        text: "Jedes Level ab Level 2 braucht 20 % weniger XP, Missionen bringen mit dem Level mehr XP: Ein aktiver Spieler steigt etwa 1,3- bis 1,4-mal so schnell…",
+      },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-7357c84e",
+        title: "Mehr Nervenkitzel bei Packs und ASP",
+        text: "Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti…",
+      },
     ],
   },
   {
@@ -966,6 +986,16 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         id: "m0-fundament-d06be564",
         title: null,
         text: "Firmenaufgaben laufen wieder zuverlässig: Ein Fehler bei einer einzelnen Aufgabe hält nicht mehr alle Firmen auf, Aufgaben von Leuten, die gegangen…",
+      },
+      {
+        id: "m0-fundament-5549c50c",
+        title: null,
+        text: "Weltkarte: Ab 10 Mio. € Firmenwert setzt du deine Firma im neuen Tab „Standort“ in eines von 22 Ländern, baust die Zentrale bis zum Mega-Campus aus…",
+      },
+      {
+        id: "m0-fundament-0f4829aa",
+        title: null,
+        text: "Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der Firmenkasse neu, höchstens einmal…",
       },
     ],
   },
