@@ -84,6 +84,7 @@ import {
   type DemoListedStock,
 } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
+import { wealthSource, wealthTotal } from "@/features/rich-list/wealth";
 import {
   GameError,
   type Candle,
@@ -104,6 +105,7 @@ import {
   type Position,
   type RichList,
   type RichListEntry,
+  type WealthPart,
   type Security,
   type StockFigures,
   type Session,
@@ -1015,10 +1017,28 @@ function portfolioNow(): Portfolio {
   };
 }
 
-function netWorth(): number {
+/** The net worth in parts, as player_wealth_parts on the server (ADR-203). */
+function wealthParts(): Record<WealthPart, number> {
   const portfolio = portfolioNow();
-  // Loans, stakes and prepayments between players count too (ADR-098).
-  return portfolio.totalCents + portfolio.companyValueCents - portfolio.debtCents + deals.balanceCents();
+  const collection = nexamon.demoCollectionCents();
+  return {
+    cash: portfolio.cashCents + portfolio.reservedCents,
+    depot: portfolio.positionsValueCents,
+    company: Math.round(company.stakeCents()),
+    cards: collection.cards,
+    slabs: collection.slabs,
+    nfts: art.myArtValueCents(),
+    property: home.valueCents(),
+    vault: portfolio.vault.accruedCents,
+    escrow: 0,
+    // Loans, stakes and prepayments between players count too (ADR-098).
+    deals: deals.balanceCents(),
+    debt: -portfolio.debtCents,
+  };
+}
+
+function netWorth(): number {
+  return wealthTotal(wealthParts());
 }
 
 function sectorsHeld(): number {
@@ -1059,10 +1079,12 @@ function richListNow(scope: "all" | "players"): RichList {
         rankChange24h: null,
         isMe: false,
         avatarKey: tycoonAvatar(t.id),
+        source: "depot",
       });
     }
   }
-  const mine = netWorth();
+  const parts = wealthParts();
+  const mine = wealthTotal(parts);
   entries.push({
     kind: "player",
     id: "demo-player",
@@ -1073,6 +1095,7 @@ function richListNow(scope: "all" | "players"): RichList {
     rankChange24h: null,
     isMe: true,
     avatarKey: career.avatarKey(),
+    source: wealthSource(parts),
   });
   const ranked = entries.sort((a, b) => b.netWorthCents - a.netWorthCents).map((e, i) => ({ ...e, rank: i + 1 }));
   const me = ranked.find((e) => e.isMe)!;
@@ -1084,6 +1107,8 @@ function richListNow(scope: "all" | "players"): RichList {
     me: {
       rank: me.rank,
       netWorthCents: me.netWorthCents,
+      change24hBps: me.change24hBps,
+      rankChange24h: null,
       next: above ? { rank: above.rank, name: above.name, gapCents: above.netWorthCents - me.netWorthCents } : null,
     },
   };
@@ -2056,6 +2081,7 @@ export const demoEngine: GameEngine = {
       founder: null,
       facts: {
         valueCents: Math.round((shares * lastE4) / 100),
+        valueBasis: "market_cap",
         revenueCents: Math.round(c.marketCapCents / 6),
         profitCents: Math.round(c.marketCapCents / 40),
         period: "ttm",
@@ -2504,16 +2530,24 @@ export const demoEngine: GameEngine = {
       }),
     ),
 
-  // AI companies by market value plus the own company (ADR-074); other players do not exist in the demo.
-  companyRanking: async (scope, limit) => {
+  // AI companies by market value plus the own company (ADR-074, ADR-203); other players do not exist in the demo.
+  companyRanking: async (scope, limit, sector = null) => {
     const snap = snapshotNow();
     const own = (await company.engine.myCompany()).company;
+    const worth = company.worth();
     const colors = new Map(DEMO_COMPANIES.map((c) => [c.ticker, c.color]));
+    const ownTicker = own?.listing?.ticker ?? null;
     const rows: Omit<CompanyRankingEntry, "rank">[] = [
       ...(scope === "players"
         ? []
         : snap.securities
-            .filter((sec) => sec.kind === "stock" && sec.marketCapCents !== null && sec.companyKind === "ai")
+            .filter(
+              (sec) =>
+                sec.kind === "stock" &&
+                sec.marketCapCents !== null &&
+                sec.companyKind === "ai" &&
+                sec.ticker !== ownTicker,
+            )
             .map((sec) => ({
               companyId: sec.id,
               kind: "ai" as const,
@@ -2525,11 +2559,15 @@ export const demoEngine: GameEngine = {
               tier: null,
               founder: null,
               valueCents: sec.marketCapCents ?? 0,
+              basis: "market_cap" as const,
+              priceE4: sec.lastE4,
               revenueCents: null,
               teamSize: null,
               isMine: false,
+              change24hBps: sec.changeBps,
+              rankChange24h: null,
             }))),
-      ...(own
+      ...(own && worth
         ? [
             {
               companyId: own.id,
@@ -2541,21 +2579,37 @@ export const demoEngine: GameEngine = {
               sector: own.sector,
               tier: own.tier,
               founder: p().nickname,
-              valueCents: own.valueCents,
+              valueCents: worth.cents,
+              basis: worth.basis,
+              priceE4: worth.priceE4,
               revenueCents: own.lastQuarter?.revenueCents ?? null,
               teamSize: own.employees + own.aiWorkers + 1,
               isMine: true,
+              change24hBps: null,
+              rankChange24h: null,
             },
           ]
         : []),
     ];
-    const entries = rows.sort((a, b) => b.valueCents - a.valueCents).map((row, i) => ({ ...row, rank: i + 1 }));
-    const mine = entries.find((e) => e.isMine);
+    const ranked = rows.sort((a, b) => b.valueCents - a.valueCents).map((row, i) => ({ ...row, rank: i + 1 }));
+    const entries = sector ? ranked.filter((e) => e.sector === sector) : ranked;
     return {
       serverTime: snap.serverTime,
       total: entries.length,
       entries: entries.slice(0, limit),
-      mine: mine ? { rank: mine.rank, valueCents: mine.valueCents } : null,
+      mine: entries.find((e) => e.isMine) ?? null,
+    };
+  },
+
+  myNetWorth: async () => {
+    const parts = wealthParts();
+    const own = company.worth();
+    const name = (await company.engine.myCompany()).company?.name ?? "";
+    return {
+      serverTime: new Date().toISOString(),
+      totalCents: wealthTotal(parts),
+      parts,
+      company: own ? { ...own, name } : null,
     };
   },
 

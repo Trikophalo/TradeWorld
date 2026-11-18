@@ -39,6 +39,7 @@ select tests.assert(
 
 -- get_rich_list ---------------------------------------------------------------------
 select tests.signup(:r1, 'Rita_Reich') is not null and tests.signup(:r2, 'Rolf_Reich') is not null as ok \gset
+select tests.vault_quiet(array[:r1, :r2]::uuid[]);
 select tests.login_as('authenticated', :r1);
 select public.get_rich_list() as rl \gset
 select public.get_rich_list(10, 0, 'players') as rlp \gset

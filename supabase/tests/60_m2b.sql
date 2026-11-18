@@ -348,10 +348,10 @@ select tests.assert(
                          'offer_expires_at', 'message', 'created_at', 'updated_at']
   and (:'ap1'::jsonb -> 'posting') ?& array['id', 'company', 'tier', 'title_key', 'title', 'required']
   and :'ap1'::jsonb ->> 'status' = 'offered'
-  and (:'ap1'::jsonb ->> 'offer_salary_cents_per_hour')::bigint = public.ai_salary_ceiling(30000, 3)
-  and public.ai_salary_ceiling(30000, 3) = 32700
+  and (:'ap1'::jsonb ->> 'offer_salary_cents_per_hour')::bigint = public.job_pay_ceiling(:w, 30000, '[{"branch": "it", "min_score": 2}]')
+  and public.job_pay_ceiling(:w, 30000, '[{"branch": "it", "min_score": 2}]') = 33000
   and (:'ap1'::jsonb ->> 'offer_expires_at')::timestamptz between now() + interval '47 hours' and now() + interval '49 hours',
-  'apply_for_job() at an AI company: offered at once, offer = min(wish, base x (1 + 3% x match 3)) = 327 EUR, valid 48 h');
+  'apply_for_job() at an AI company: offered at once, offer = base x (1 + 3% x IT score 3 + 0.5% x 2 skills) = 330 EUR (ADR-206), valid 48 h');
 select tests.assert(
   (:'ap2'::jsonb ->> 'offer_salary_cents_per_hour')::bigint = :pj2max and :'ap2'::jsonb ->> 'status' = 'offered'
   and :'wd2'::jsonb ->> 'status' = 'declined'
@@ -413,7 +413,7 @@ select tests.assert(
                                       'pay_factor_bps', 'effective_salary_cents_per_hour', 'productivity_bps', 'started_at',
                                       'paid_hours_today', 'paid_hours_cap', 'earned_total_cents', 'raise_available_at',
                                       'raise_max_bps', 'pending_raise', 'quit_cost_cents', 'signature']
-  and (:'mj'::jsonb -> 'job' ->> 'salary_cents_per_hour')::bigint = 32700
+  and (:'mj'::jsonb -> 'job' ->> 'salary_cents_per_hour')::bigint = 33000
   and (:'mj'::jsonb -> 'job' ->> 'pay_factor_bps')::int = 10000
   and (:'mj'::jsonb -> 'job' ->> 'productivity_bps')::int = 15000 + 800 * 3
   and (:'mj'::jsonb -> 'job' ->> 'raise_max_bps')::int = 0
@@ -445,7 +445,7 @@ update public.player_jobs set last_paid_at = (:'bday'::date + time '01:00') at t
        paid_day = :'bday'::date, paid_minutes_today = 0 where id = :'wjob';
 select public.accrue_job_salary(:'wjob', (:'bday'::date + time '08:00') at time zone 'Europe/Berlin') as paid7 \gset
 select tests.assert(
-  :paid7::bigint = 32700 * 7 and tests.cash(:w) = :wc1 + 32700 * 7 and tests.company_cash(:'wco') = :cc0 - 32700 * 7
+  :paid7::bigint = 33000 * 7 and tests.cash(:w) = :wc1 + 33000 * 7 and tests.company_cash(:'wco') = :cc0 - 33000 * 7
   and (select sum(amount) from public.xp_events where player_id = :w and source = 'work_hour') - :wxp0
       = round(7 * public.config_double('progression', '{xpSources,workHour,xp}', 40) * public.config_double('progression', '{xpMultiplier}', 2))
   and (select (branch_points ->> 'it')::int from public.player_skill_points where player_id = :w) = 1
@@ -453,7 +453,7 @@ select tests.assert(
   'accrual: 7 h x contract wage from the AI company''s cash (ledger), work XP per hour, 6 work hours = 1 IT branch point');
 select public.config_double('careers', '{paidHoursPerDayCap}', 8)::int as wcap \gset
 select public.accrue_job_salary(:'wjob', (:'bday'::date + time '22:00') at time zone 'Europe/Berlin') as paid20 \gset
-select tests.assert(:paid20::bigint = 32700 * (:wcap - 7)
+select tests.assert(:paid20::bigint = 33000 * (:wcap - 7)
   and (select paid_minutes_today from public.player_jobs where id = :'wjob') = :wcap * 60,
   format('accrual: at most careers.paidHoursPerDayCap (%s) paid hours per day', :wcap));
 select tests.login_as('authenticated', :w);
@@ -461,7 +461,7 @@ select public.get_my_job() -> 'job' as mj2 \gset
 select public.get_my_skills() as wsk \gset
 reset role;
 select tests.assert(
-  (:'mj2'::jsonb ->> 'earned_total_cents')::bigint = 32700 * :wcap
+  (:'mj2'::jsonb ->> 'earned_total_cents')::bigint = 33000 * :wcap
   and (:'wsk'::jsonb -> 'branch_progress' ->> 'it')::numeric between 0 and 1,
   'get_my_job(): earned_total_cents; get_my_skills(): branch_progress fraction to the next point');
 
@@ -481,10 +481,10 @@ select tests.throws_key($$select public.request_raise(gen_random_uuid(), 1)$$, '
 select public.get_my_job() -> 'job' as mj3 \gset
 reset role;
 select tests.assert(
-  :rmax = least(300, floor((public.ai_salary_ceiling(30000, 4)::numeric / 32700 - 1) * 10000)::int)
+  :rmax = least(300, floor((public.job_pay_ceiling(:w, 30000, '[{"branch": "it", "min_score": 2}]')::numeric / 33000 - 1) * 10000)::int)
   and :'rr'::jsonb ->> 'status' = 'accepted'
-  and (:'rr'::jsonb ->> 'salary_cents_per_hour')::bigint <= public.ai_salary_ceiling(30000, 4)
-  and (:'rr'::jsonb ->> 'salary_cents_per_hour')::bigint > 32700
+  and (:'rr'::jsonb ->> 'salary_cents_per_hour')::bigint <= public.job_pay_ceiling(:w, 30000, '[{"branch": "it", "min_score": 2}]')
+  and (:'rr'::jsonb ->> 'salary_cents_per_hour')::bigint > 33000
   and (:'mj3'::jsonb ->> 'raise_available_at')::timestamptz > now() + interval '6 days'
   and (:'mj3'::jsonb ->> 'raise_max_bps')::int = 0,
   'request_raise() at an AI company: accepted at once up to the personal ceiling, then 7 days cooldown');

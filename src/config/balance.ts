@@ -1757,6 +1757,39 @@ export interface JobsConfig {
     /** Allowed raise per branch score gained since the last raise or hiring. */
     readonly maxRaiseBpsPerScore: number;
   };
+  /**
+   * Pay follows the skills (ADR-206): factor = 1 + perRelevantScoreBps × relevant score + perLearnedSkillBps ×
+   * learned skills, at most capMultiplier. Relevant score = the player's score in each required branch, each counted up
+   * to relevantScoreCapPerBranch. The most an AI employer pays and the market value shown on player postings.
+   */
+  readonly skillPay: {
+    readonly perRelevantScoreBps: number;
+    readonly relevantScoreCapPerBranch: number;
+    readonly perLearnedSkillBps: number;
+    readonly capMultiplier: number;
+  };
+  /** Profit share and employee shares (ADR-206). */
+  readonly rewards: {
+    /** Share of the employer's profit by career tier (0 below Senior); plus a posting's extra, at most maxProfitShareBps. */
+    readonly profitShareBpsByTier: Readonly<Record<string, number>>;
+    readonly maxProfitShareBps: number;
+    /** The most a founder may offer on top in a posting. */
+    readonly maxPostingProfitShareBps: number;
+    /** All profit shares of one company hour together at most this share of the hour's profit. */
+    readonly maxTotalProfitShareBps: number;
+    /** AI companies: an employee shares the profit of a department of this many people. */
+    readonly aiDepartmentSize: number;
+    /** AI companies: the profit share at most this share of the wage of the paid minutes. */
+    readonly aiMaxShareOfWageBps: number;
+    /** Chance per paid hour of good work (present, company in profit) for employee shares, by tier. */
+    readonly stockGrantChanceBpsByTier: Readonly<Record<string, number>>;
+    /** The most a founder may add to that chance in a posting. */
+    readonly maxPostingStockGrantBps: number;
+    /** One grant is worth this many hours of the contract wage. */
+    readonly stockGrantValueHours: number;
+  };
+  /** The clone (ADR-206): from this level, once, for this fee (to the treasury). */
+  readonly clone: { readonly minLevel: number; readonly feeCents: number };
 }
 
 export interface DailyRewardsConfig {
@@ -1805,6 +1838,10 @@ export interface RichListConfig {
   readonly tycoonMaxWealthCents: number;
   /** How often ranks are snapshotted and rank news are written. */
   readonly snapshotMinutes: number;
+  /** How often Top-Unternehmen is snapshotted for the change against yesterday (ADR-203). */
+  readonly companySnapshotMinutes: number;
+  /** How long company snapshots are kept. */
+  readonly snapshotKeepDays: number;
   /** Entering one of these top ranks makes the news. */
   readonly newsRanks: readonly number[];
 }
@@ -2606,6 +2643,8 @@ export const BALANCE = {
     tycoonMinWealthCents: 1_500_000, // 15.000 €
     tycoonMaxWealthCents: 40_000_000_000, // 400 Mio. €
     snapshotMinutes: 5,
+    companySnapshotMinutes: 30,
+    snapshotKeepDays: 8,
     newsRanks: [1, 3, 10, 25, 50, 100],
   },
 
@@ -2647,6 +2686,22 @@ export const BALANCE = {
     },
     profitLinkedPay: { minFactor: 0.5, bonusShareOfProfit: 0.2, maxBonusFactor: 1 },
     raiseRequest: { cooldownDays: 7, maxRaiseBpsPerScore: 300 },
+    // Owner: jobs pay much better with many skills (ADR-206).
+    skillPay: { perRelevantScoreBps: 300, relevantScoreCapPerBranch: 40, perLearnedSkillBps: 50, capMultiplier: 3 },
+    // Owner: from Senior a small profit share, rising with the rank to at most 5 %; shares now and then (ADR-206).
+    rewards: {
+      profitShareBpsByTier: { intern: 0, junior: 0, senior: 50, team_lead: 200, c_level: 500 },
+      maxProfitShareBps: 500,
+      maxPostingProfitShareBps: 300,
+      maxTotalProfitShareBps: 2_500,
+      aiDepartmentSize: 50,
+      aiMaxShareOfWageBps: 5_000,
+      stockGrantChanceBpsByTier: { intern: 0, junior: 100, senior: 300, team_lead: 500, c_level: 800 },
+      maxPostingStockGrantBps: 500,
+      stockGrantValueHours: 4,
+    },
+    // Owner: from level 20 a clone can take a job elsewhere (ADR-206).
+    clone: { minLevel: 20, feeCents: 2_500_000 },
   },
 
   // ------------------------------------------------- daily rewards (ADR-052)

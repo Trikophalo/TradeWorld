@@ -222,12 +222,12 @@ export const NEXAMON_SET_PRICE_FACTOR: Record<NexamonSetKey, number> = {
 export const NEXAMON_SET_PRICE_RANGE: Partial<
   Record<NexamonSetKey, Partial<Record<NexamonRarity, readonly [number, number]>>>
 > = {
-  // TITAN_PRICE_RANGE x 1.125 (TITAN_VALUE_FACTOR)
+  // TITAN_PRICE_RANGE x 1.125 (TITAN_VALUE_FACTOR) x TITAN_REBALANCE_FACTOR (ADR-207: diamond 1.3, uranium 0.918828)
   titans_revenge: {
     iron: [281_250, 675_000],
     titanium: [3_375_000, 8_437_500],
-    diamond: [33_750_000, 95_625_000],
-    uranium: [956_250_000, 3_937_500_000],
+    diamond: [43_875_000, 124_312_500],
+    uranium: [878_629_275, 3_617_885_250],
   },
   yin_yang: {
     common: [1_000, 10_000],

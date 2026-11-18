@@ -149,6 +149,13 @@ export function formatBps(bps: number): string {
   return percent.format(bps / 10_000);
 }
 
+const rate = new Intl.NumberFormat(LOCALE, { style: "percent", maximumFractionDigits: 2 });
+
+/** A rate without sign (ADR-206): 50 bps -> "0,5 %", 500 -> "5 %". */
+export function formatPercentBps(bps: number): string {
+  return rate.format(bps / 10_000);
+}
+
 const shares = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 6 });
 const sharesShort = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 4 });
 

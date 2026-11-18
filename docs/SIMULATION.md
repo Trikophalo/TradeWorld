@@ -1157,3 +1157,17 @@ nach dem Stundenbeginn liegt, sonst eine darunter.
 
 Die Faktoren werden in `listed_hour_effect` mit den Termen der Börsenfirma bzw. dem Ruf-Faktor privater Firmen
 multipliziert; die Abschlussstunde nutzt sie unverändert.
+
+## Nachtrag: Pack-Battle-Modi (ADR-205)
+
+Formeln in `src/lib/sim/nexamon-battle.ts`, gleich in PL/pgSQL (Migration 9700).
+
+- **Umgekehrt:** `decideMultiBattle(seats, seed, reverse = true)`: kleinste Summe gewinnt; Gleichstand: kleinster
+  Rang der jeweils seltensten Karte, dann `seed % Anzahl` unter den noch Gleichen.
+- **Twist:** `twistPermutation(seed, k, n)`: `x = (seed mod M + 7919 k) mod M` mit `M = 2³¹ − 1`, dreimal
+  `x ← 48271 x mod M`, `r = x mod n!`, als Lehmer-Code dekodiert (Ziffer i: `r div (i−1)!` aus den verbleibenden
+  Plätzen). `twistPiles`: für Pack p = 1…P erst die eigenen Karten von Pack p auf den Haufen, dann
+  `pile'[i] = pile[perm_p[i]]`. Entschieden wird über die Haufen (`decideMultiBattle`), auch zusammen mit Umgekehrt.
+- **Uhr:** `multiRevealAt(start, i, cfg, twistMs)`: `start + (p + 1) · tear + i · slot + p · twistMs` mit
+  `p = ⌊i / 5⌋`; `multiTwistAt(start, k)`: `start + k · (tear + 5 · slot) + (k − 1) · twistMs`; Entscheidung bei
+  `start + P · (tear + 5 · slot + twistMs)`. Ohne Twist ist `twistMs = 0` (die Uhr von ADR-192).

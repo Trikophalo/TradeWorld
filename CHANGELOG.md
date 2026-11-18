@@ -4,6 +4,9 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines
+  Packs bleibt gleich.
+- Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.
 - Projekt: Next.js 16, TypeScript strict, Tailwind 4, Supabase-Anbindung, Vitest, Playwright, Prettier, Husky.
 - Design: Tokens für Farben, Schrift, Radien, Motion und Ebenen in dunklem und hellem Theme mit fünf
   Akzentfarben; Komponentenbibliothek mit Showcase unter `/dev/ui`; erstes Pixel-Art-Set.
@@ -114,6 +117,12 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 ## Startseite, Währung zur Wahl, Freundescode
 
 - **Der Tresor wächst mit dir (ADR-201):** Das Grundeinkommen im Tresor steigt mit jedem Level um 8 % (bis Level 40, dann das 4,12-Fache), ab Level 5 gibt es Festgeld: Geld für 1, 3 oder 7 Tage anlegen, bis 25.000 € je Level, mit 1,5 %, 5 % oder 14 % Zinsen aus der Staatskasse. Der geöffnete Tresor zeigt Schritt für Schritt, was er bringt und womit er mehr bringt. Die Gruppen der Verbesserungen lassen sich auf- und zuklappen und zeigen zugeklappt, wie viel gekauft ist und was die nächste Stufe kostet.
+
+- **Pack Battles mit Modi (ADR-205):** Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder „Umgekehrt“ (wer am wenigsten zieht, gewinnt alle Karten). Lobby, Einladung, Live-Ansicht und Feed zeigen den Modus. Die letzten zwei Karten jedes Packs leuchten, blitzen und wackeln je nach Seltenheit, mit Wertzähler.
+
+- **Dein Klon und bessere Jobs (ADR-206):** Ab Level 20 erschaffst du im Job-Tab einmalig einen Klon (25 000 €). Er bewirbt sich bei anderen Firmen und arbeitet dort zusätzlich, auch wenn du eine eigene Firma führst; der Lohn geht auf dein Konto. Viele Skills zahlen sich jetzt richtig aus: bis zum Dreifachen des Stufenlohns statt höchstens das 1,5-Fache. Ab Senior bekommst du einen Teil vom Gewinn deines Arbeitgebers (0,5 % bis 5 %) und für gute Arbeit ab und zu Mitarbeiteraktien. Das Jobportal zeigt das alles je Stelle, Gründer können ihren Anzeigen Extras mitgeben.
+
+- **Ranglisten mit klaren Regeln (ADR-203):** Jede Firma hat jetzt überall denselben Wert: an der Börse den Börsenwert (Aktien × letzter Kurs), privat den Firmenwert. Die Firmenseite zeigt genau den Wert aus „Top-Unternehmen“ und daneben den Ertragswert. Forbes 100 zählt dein ganzes Vermögen: auch Nexamon-Karten und Slabs, den Tresor und gezeichnete Aktien; eine Börsenfirma zählt nicht mehr doppelt. Neu: „Wie wird gerechnet?“, Branchenfilter, Pfeile gegenüber gestern, dein Platz unten angeheftet und eine Aufstellung deines Vermögens.
 
 - **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro Stunde); die Preise steigen von 3.000 € bis rund 259.500 €.
 

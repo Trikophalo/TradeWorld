@@ -26,8 +26,8 @@ import { usePlayerCard } from "@/features/career/hooks";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame } from "@/features/game/store";
 import type { CareerTier, CompanyApplication, JobRequirementInfo, MyCompany, TeamMember } from "@/features/game/types";
-import { formatBps, formatMoney } from "@/lib/format";
-import { fitPercent } from "@/lib/sim/skills";
+import { formatBps, formatMoney, formatPercentBps } from "@/lib/format";
+import { fitPercent, profitShareBps, stockGrantChanceBps } from "@/lib/sim/skills";
 import { trainingFor } from "@/lib/sim/startup";
 import { OrgChart } from "./org-chart";
 import { isDemoMode } from "@/lib/supabase/env";
@@ -153,6 +153,9 @@ export function HireSheet({
   const [kind, setKind] = useState<"player" | "ai">(request?.kind ?? "player");
   const [aiCount, setAiCount] = useState(1);
   const [aiSkill, setAiSkill] = useState<string | null>(null);
+  // ADR-206: extras on top of the rank's profit share and share chance
+  const [profitShare, setProfitShare] = useState(0);
+  const [stockGrant, setStockGrant] = useState(0);
   const [state, setState] = useState<ButtonState>("idle");
   const freeSlots = Math.max(0, company.maxEmployees - company.employees - company.aiWorkers);
   const hireCount = Math.max(1, Math.min(aiCount, freeSlots));
@@ -190,6 +193,8 @@ export function HireSheet({
         salaryCentsPerHour: wage,
         slots,
         requiredSkills: skills,
+        profitShareBps: profitShare,
+        stockGrantBps: stockGrant,
       });
       setState("success");
       void playSound("success");
@@ -336,6 +341,13 @@ export function HireSheet({
               />
             </div>
             <SkillPicker value={skills} onChange={setSkills} />
+            <PostingPerksFields
+              tier={tier}
+              profitShare={profitShare}
+              stockGrant={stockGrant}
+              onProfitShare={setProfitShare}
+              onStockGrant={setStockGrant}
+            />
             <div className="flex items-center justify-between">
               <span className="label-pixel text-fg-2">{t("postingSlots")}</span>
               <Segmented<string>
@@ -358,6 +370,66 @@ export function HireSheet({
 
 function PlayerPostingFields({ children }: { children: ReactNode }) {
   return <div className="space-y-5">{children}</div>;
+}
+
+/**
+ * Tailor a posting (ADR-206): extra profit share (from Senior on, at most jobs.rewards.maxPostingProfitShareBps and
+ * 5 % in total) and a better chance for employee shares.
+ */
+export function PostingPerksFields({
+  tier,
+  profitShare,
+  stockGrant,
+  onProfitShare,
+  onStockGrant,
+}: {
+  tier: CareerTier;
+  profitShare: number;
+  stockGrant: number;
+  onProfitShare: (bps: number) => void;
+  onStockGrant: (bps: number) => void;
+}) {
+  const t = useTranslations("firm.perks");
+  const r = BALANCE.jobs.rewards;
+  const total = profitShareBps(tier, profitShare);
+  const chance = stockGrantChanceBps(tier, stockGrant);
+  const step = 50;
+  return (
+    <div className="space-y-4 rounded-md border border-line-1 p-3" data-testid="posting-perks-fields">
+      <div>
+        <p className="label-pixel text-fg-2">{t("title")}</p>
+        <p className="mt-0.5 text-xs text-pretty text-fg-3">{t("hint")}</p>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm text-fg-2">{t("profitShare")}</span>
+          <span className="nums text-sm font-semibold text-fg-1">+{formatPercentBps(profitShare)}</span>
+        </div>
+        <Slider
+          value={profitShare / r.maxPostingProfitShareBps}
+          onValueChange={(v) => onProfitShare(Math.round((v * r.maxPostingProfitShareBps) / step) * step)}
+          label={t("profitShare")}
+          valueText={formatPercentBps(profitShare)}
+        />
+        <p className="nums text-xs text-fg-3">
+          {total > 0 ? t("profitShareTotal", { percent: formatPercentBps(total) }) : t("profitShareFromSenior")}
+        </p>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm text-fg-2">{t("stock")}</span>
+          <span className="nums text-sm font-semibold text-fg-1">+{formatPercentBps(stockGrant)}</span>
+        </div>
+        <Slider
+          value={stockGrant / r.maxPostingStockGrantBps}
+          onValueChange={(v) => onStockGrant(Math.round((v * r.maxPostingStockGrantBps) / step) * step)}
+          label={t("stock")}
+          valueText={formatPercentBps(stockGrant)}
+        />
+        <p className="nums text-xs text-fg-3">{t("stockTotal", { percent: formatPercentBps(chance) })}</p>
+      </div>
+    </div>
+  );
 }
 
 /** Hiring AI workers from the posting form (ADR-069): wage, count and what they cannot do. */
@@ -959,7 +1031,7 @@ function MemberRow({ member, companyId, onFire }: { member: TeamMember; companyI
             className="block truncate font-semibold text-fg-1 focus-ring hover:underline"
             data-testid="member-profile"
           >
-            {member.nickname}
+            {member.isClone ? t("cloneOf", { name: member.nickname }) : member.nickname}
           </Link>
           <p className="truncate text-sm text-fg-3">
             {member.title} · {t("since", { date: date.format(new Date(member.startedAt)) })}

@@ -390,7 +390,7 @@ export const NEXAMON_RULES = {
    */
   instantSell: {
     windowSeconds: 900,
-    payoutBps: 9_000,
+    payoutBps: 8_500,
     maxPerCall: 200,
     callsPerMinute: 20,
     vaultOwner: "NEXA-Tresor",
@@ -443,6 +443,11 @@ export const NEXAMON_RULES = {
     minPlayers: 2,
     maxPlayers: 4,
     lobbySeconds: 120,
+    /**
+     * ADR-205: in a Twist battle the piles of all seats are permuted after every pack; the view plays the twist for
+     * this long (one slot after the pack's last card) before the next pack tears. Adds packs × twistMs to the battle.
+     */
+    twistMs: 3_200,
   },
   /**
    * Live openings (ADR-172): every opened pack can be watched while it is revealed. The opener's page reports each

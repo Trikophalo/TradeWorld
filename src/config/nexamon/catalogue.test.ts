@@ -16,7 +16,14 @@ import {
 } from "./index";
 import { BALANCE } from "../balance";
 import { nexamonExpectedPackValue } from "../../lib/sim/nexamon";
-import { TITAN_ART_SIZE, TITAN_PRICE_RANGE, TITAN_VALUE_FACTOR } from "./titans-draft";
+import {
+  TITAN_ART_SIZE,
+  TITAN_PRICE_RANGE,
+  TITAN_REBALANCE_FACTOR,
+  TITAN_VALUE_FACTOR,
+  type TitanRarity,
+} from "./titans-draft";
+import { TITANS_REVENGE_CARDS as TITAN_DRAFTS } from "./cards-titans-revenge-data";
 import { YINYANG_ART_SIZE, YINYANG_PRICE_RANGE } from "./yinyang-draft";
 
 describe("Nexamon catalogue (ADR-165, ADR-174)", () => {
@@ -107,7 +114,7 @@ describe("Nexamon catalogue (ADR-165, ADR-174)", () => {
   it("takes the ranges of Titans Revenge and Yin Yang from their drafts", () => {
     for (const rarity of ["iron", "titanium", "diamond", "uranium"] as const)
       expect(nexamonPriceRange("titans_revenge", rarity)).toEqual(
-        TITAN_PRICE_RANGE[rarity].map((p) => p * TITAN_VALUE_FACTOR),
+        TITAN_PRICE_RANGE[rarity].map((p) => Math.round(p * TITAN_VALUE_FACTOR * TITAN_REBALANCE_FACTOR[rarity])),
       );
     for (const rarity of ["common", "rare", "ultra", "prisma", "legendary"] as const)
       expect(nexamonPriceRange("yin_yang", rarity)).toEqual(YINYANG_PRICE_RANGE[rarity]);
@@ -131,6 +138,39 @@ describe("Nexamon catalogue (ADR-165, ADR-174)", () => {
       "yin_yang",
     );
     expect(yy.cents / BALANCE.nexamon.sets.yin_yang.packPriceCents).toBeGreaterThan(1.5);
+  });
+
+  it("rebalances Titans Revenge: diamond x 1.3, uranium lower, the pack's expected value unchanged (ADR-207)", () => {
+    const titans = NEXAMON_CARDS.filter((c) => c.set === "titans_revenge");
+    // the catalogue before ADR-207: drafts x 1.125, rounded to whole euros
+    const before = TITAN_DRAFTS.map((d) => ({
+      rarity: d.rarity,
+      startPriceCents: Math.round((d.startPriceCents * TITAN_VALUE_FACTOR) / 100) * 100,
+    }));
+    const evBefore = nexamonExpectedPackValue(before, "titans_revenge").cents;
+    const evAfter = nexamonExpectedPackValue(titans, "titans_revenge").cents;
+    expect(Math.abs(evAfter - evBefore)).toBeLessThan(100); // under 1 EUR per pack (whole-euro rounding)
+    expect(evBefore).toBeCloseTo(8_990_125, 0); // 89.901,25 EUR = 89,9 % of 100.000 EUR
+    const mean = (cards: readonly { rarity: string; startPriceCents: number }[], r: string) => {
+      const pool = cards.filter((c) => c.rarity === r);
+      return pool.reduce((a, c) => a + c.startPriceCents, 0) / pool.length;
+    };
+    expect(mean(titans, "diamond") / mean(before, "diamond")).toBeCloseTo(1.3, 4);
+    expect(mean(titans, "uranium") / mean(before, "uranium")).toBeCloseTo(0.918828, 4);
+    // the factor follows from the numbers: 0.3 x mean(diamond) / 50 = (1 - u) x mean(uranium) / 500
+    expect(1 - (0.3 * mean(before, "diamond") * 10) / mean(before, "uranium")).toBeCloseTo(
+      TITAN_REBALANCE_FACTOR.uranium,
+      6,
+    );
+    // per-card ratios within a rarity stay, iron and titanium do not change
+    for (const c of titans) {
+      const b = before.find((_, i) => TITAN_DRAFTS[i]!.key === c.key)!;
+      if (c.rarity === "iron" || c.rarity === "titanium") expect(c.startPriceCents).toBe(b.startPriceCents);
+      else
+        expect(
+          Math.abs(c.startPriceCents / b.startPriceCents - TITAN_REBALANCE_FACTOR[c.rarity as TitanRarity]),
+        ).toBeLessThan(1e-5);
+    }
   });
 
   it("keeps every start price inside the range of its rarity and set", () => {

@@ -50,6 +50,8 @@ export const DISCLOSURE = {
   companySkills: 3,
   /** News-Aktionen of the live show (ADR-193): the news tab section and the toast, after the tutorial. */
   newsPromo: 2,
+  /** The clone on the job tab (ADR-206): shown locked a few levels ahead, usable from jobs.clone.minLevel (20). */
+  jobClone: 15,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;

@@ -65,6 +65,8 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
     .slice(0, 3);
   const maxScore = Math.max(10, ...strongest.map((b) => b.score));
   const jobTitle = card.job ? (card.job.titleKey ? tj(card.job.titleKey as JobTitleKey) : card.job.title) : null;
+  const cloneJob = card.cloneJob ?? null;
+  const cloneTitle = cloneJob ? (cloneJob.titleKey ? tj(cloneJob.titleKey as JobTitleKey) : cloneJob.title) : null;
 
   return (
     <div className={cn("[perspective:900px]", className)}>
@@ -138,6 +140,12 @@ export function BusinessCard({ card, className }: { card: PlayerCard; className?
                     : t("noJob")}
               </dd>
               {card.job && <dd className="text-xs text-fg-3">{tc(card.job.tier)}</dd>}
+              {/* ADR-206: the clone's job */}
+              {cloneJob && cloneTitle && (
+                <dd className="mt-1 text-xs text-pretty break-words text-fg-2" data-testid="card-clone-job">
+                  {t("cloneJobAt", { name: card.nickname, title: cloneTitle, company: cloneJob.companyName })}
+                </dd>
+              )}
             </div>
             <div>
               <dt className="label-pixel text-fg-3">{t("skills")}</dt>

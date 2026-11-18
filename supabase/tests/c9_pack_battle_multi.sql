@@ -50,6 +50,13 @@ create or replace function tests.mb_age(p_id uuid, p_ms integer) returns void la
          decide_at = decide_at - make_interval(secs => p_ms / 1000.0), ends_at = ends_at - make_interval(secs => p_ms / 1000.0)
    where id = p_id;
   update public.nexamon_live set ends_at = ends_at - make_interval(secs => p_ms / 1000.0) where battle_id = p_id $$;
+-- The cards the shared clock has reached for a battle answer, from the answer's own server_time and starts_at
+-- (multiRevealAt with tear 2400, slot 1800, lead 800, five cards a pack): deterministic however long the machine
+-- takes between aging the battle and reading it.
+create or replace function tests.mb_expected(p jsonb) returns integer language sql as $$
+  select count(*)::integer from generate_series(1, jsonb_array_length(p #> '{battle,packs}') * 5) g
+   where ((g - 1) / 5 + 1) * 2400 + (g - 1) * 1800 + ((g - 1) / 5) * coalesce((p #>> '{battle,twist_ms}')::numeric, 0)
+         <= extract(epoch from ((p #>> '{battle,server_time}')::timestamptz - (p #>> '{battle,starts_at}')::timestamptz)) * 1000 + 800 $$;
 grant execute on all functions in schema tests to public;
 
 select tests.mb_escrow() as esc0 \gset
@@ -236,9 +243,10 @@ select tests.mb_age(:'m3', 4600);
 select tests.login_as('authenticated', :b);
 select public.get_nexamon_battle(:'m3') as r1 \gset
 reset role;
--- (a loaded machine can take a moment between mb_age and the read: one or two cards, but the same on every seat)
-select tests.assert((select count(distinct jsonb_array_length(x -> 'cards')) = 1 and min(jsonb_array_length(x -> 'cards')) between 1 and 2
-                       from jsonb_array_elements(:'r1'::jsonb #> '{battle,seats}') x)
+-- (a loaded machine can take a moment between mb_age and the read: the expected count comes from the answer's clock)
+select tests.assert(tests.mb_expected(:'r1'::jsonb) >= 1
+  and (select bool_and(jsonb_array_length(x -> 'cards') = tests.mb_expected(:'r1'::jsonb))
+         from jsonb_array_elements(:'r1'::jsonb #> '{battle,seats}') x)
   and :'r1'::jsonb #> '{battle,winner_seat}' = 'null'::jsonb and (:'r1'::jsonb #>> '{battle,my_seat}')::integer = 1,
   'lockstep: the first card on all four seats, the winner not yet');
 -- pack 2 tears after card 5: 3000 + 2*2400 + 5*1800 - 800 = 16 000 ms in -> 6 cards
@@ -246,8 +254,10 @@ select tests.mb_age(:'m3', 11400);
 select tests.login_as('authenticated', :b);
 select public.get_nexamon_battle(:'m3') as r2 \gset
 reset role;
-select tests.assert((select bool_and(jsonb_array_length(x -> 'cards') = 6 and (x #>> '{cards,5,pack}')::integer = 2)
-                       from jsonb_array_elements(:'r2'::jsonb #> '{battle,seats}') x),
+select tests.assert(tests.mb_expected(:'r2'::jsonb) >= 6
+  and (select bool_and(jsonb_array_length(x -> 'cards') = tests.mb_expected(:'r2'::jsonb)
+                       and (x #>> '{cards,4,pack}')::integer = 1 and (x #>> '{cards,5,pack}')::integer = 2)
+         from jsonb_array_elements(:'r2'::jsonb #> '{battle,seats}') x),
   'the next pack tears after the last card of the one before');
 select tests.mb_age(:'m3', 60000);
 select tests.login_as('authenticated', :c);

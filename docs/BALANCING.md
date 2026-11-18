@@ -1317,6 +1317,10 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es wieder heraus.
 - **Sofortverkauf:** rohe Commons und Rares zu 50 % des Werts, bis zu 50 Kopien je Aufruf.
 - **Markt:** 5 % Gebühr für verkaufende Spieler, Preis 0,10 € bis 1 Mrd. €, höchstens 30 offene Angebote.
+- **Pack-Battle-Modi (ADR-205):** `packBattle.twistMs` 3,2 s je Twist (ein Twist-Battle mit zehn Packs dauert damit
+  32 s länger). Der Twist ändert nicht, wer was zieht, nur wer welchen Wert hält: Der Erwartungswert je Spieler bleibt
+  bei n Spielern 1/n des Topfs, die Streuung steigt (nach dem letzten Twist gewinnt praktisch ein zufälliger Haufen).
+  „Umgekehrt“ belohnt schwache Pulls, ändert aber ebenso keinen Betrag.
 - **Stellschrauben, falls Booster zu lohnend oder zu teuer sind:** `ai.dailyBudgetPacks`, `ai.buysPerCardWindow`,
   `ai.premiumBps`, `ai.gradePremiumBps`, `ai.maxPremiumBps`, `ai.buyChanceBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
   Platzhalter-Preisen (gleichmäßig über die Spannen) liegt der Inhalt eines Boosters rechnerisch über seinem Preis;
@@ -1460,7 +1464,7 @@ vervielfachen. Ein Master-Set von Mystic Energy bringt einmalig 15.000 € (75 �
 | Rares/Ultras/Prismas/Legendaries | gleiche Raten je Pack wie die anderen Sets                          | `odds`                                       |
 | Bonusart Typ „cosmic“            | XP; Set-Faktor 1,5; One of One 5 % × 1,5                            | `bonuses`                                    |
 | Bulk an das Spiel                | Wert − 20 % (ADR-196; vorher 35 %, 50 %), bis 500 Kopien, 10/min    | `quickSell`                                  |
-| Sofort an das Spiel (ADR-196)    | 90 % des Werts frischer Züge, 15 min, bis 200 Kopien, 20/min        | `instantSell`                                |
+| Sofort an das Spiel (ADR-196)    | 85 % des Werts frischer Züge, 15 min, bis 200 Kopien, 20/min        | `instantSell`                                |
 | KI-Angebote                      | alle 6 h neu; Bestand je Karte höchstens 12/8/4/2/1/0               | `ai.listingResetHours`, `ai.stockCap`        |
 
 Erwartung je Cosmic-Winds-Pack ohne One of One wie bei den anderen Sets (½ Rare, 1/12 Ultra, 1/80 Prisma, 1/900
@@ -1532,7 +1536,7 @@ nachts damit rund 450–1.260 € je Stunde, höchstens 24 Aufgaben am Tag.
 | Wert                | Zahl                                                                                                         | Wo                                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
 | Pack Titans Revenge | 100.000 €, 30 Karten 15/7/4/4                                                                                | `nexamon.sets.titans_revenge`, `NEXAMON_SET_LAYOUT`          |
-| Titans-Spannen      | Iron 2.812,50–6.750 €, Titanium 33.750–84.375 €, Diamond 0,34–0,96 Mio. €, Uranium 9,6–39,4 Mio. €           | `NEXAMON_SET_PRICE_RANGE` (Entwurf × 1,125)                  |
+| Titans-Spannen      | Iron 2.812,50–6.750 €, Titanium 33.750–84.375 €, Diamond 0,44–1,24 Mio. €, Uranium 8,8–36,2 Mio. €           | `NEXAMON_SET_PRICE_RANGE` (Entwurf × 1,125, ADR-207)         |
 | Titans-Pack         | Iron als Basis; Uranium 1/500 (1), Diamond 1/50 (1), Titanium 1/5 (1–2)                                      | `packRules.titans_revenge`                                   |
 | Pack Yin Yang       | 2.000 €, 110 Karten 54/30/16/8/2                                                                             | `nexamon.sets.yin_yang`                                      |
 | Yin-Yang-Spannen    | 10× erste Spannen, ab Ultra × 1,12 (Legendary 1,0–2,0 Mio. €)                                                | `NEXAMON_SET_PRICE_RANGE`                                    |
@@ -1556,6 +1560,9 @@ um 16:00 UTC).
 
 Zum Vergleich mit derselben Rechnung: Mystic Energy 241,7 %, Super Apex 236,0 %, Cosmic Winds 187,0 % (ohne One of
 One), Prismatic Peak 166,9 %. Ohne den Faktor 1,125 läge Titans bei 79,9 %.
+
+Seit ADR-207 gilt zusätzlich `TITAN_REBALANCE_FACTOR` je Seltenheit (Diamond × 1,3, Uranium × 0,918828); der
+Erwartungswert bleibt bei 89.901 € (siehe Nachtrag ADR-207 unten).
 
 ## Nachtrag: Ruf für jede Firma (ADR-183)
 
@@ -1634,3 +1641,53 @@ ohne Verbesserungen bleibt er ein Sicherheitsnetz. Für die Staatskasse: vier Sp
 höchstens rund 330.000 € am Tag (0,13 % des Ziels von 250 Mio. €), der Faktor dämpft, wenn sie sich leert.
 Beobachten: Anteil der Tresor-Auszahlungen an den Quellen je Level, Füllstand der Staatskasse, Anteil des Festgelds am
 Bargeld später Spieler.
+
+## Nachtrag: Titans Revenge – Diamond rauf, Uranium runter (ADR-207)
+
+`TITAN_REBALANCE_FACTOR` in `src/config/nexamon/titans-draft.ts`, auf die Startpreise nach `TITAN_VALUE_FACTOR` 1,125
+(auf ganze Euro gerundet). Iron und Titanium bleiben, die Verhältnisse der Karten innerhalb einer Seltenheit auch.
+
+| Seltenheit | Je Pack |  Mittel vorher | Faktor   |  Mittel nachher | Beitrag je Pack vorher → nachher |
+| ---------- | ------: | -------------: | -------- | --------------: | -------------------------------: |
+| Diamond    |    1/50 |    597.375,– € | 1,3      |    776.587,75 € |          11.947,50 → 15.531,76 € |
+| Uranium    |   1/500 | 22.078.125,– € | 0,918828 | 20.285.999,50 € |          44.156,25 → 40.572,00 € |
+
+Rechnung: Der Diamond-Beitrag steigt um 0,3 × 597.375 € / 50 = 3.584,25 €. Damit der Erwartungswert gleich bleibt,
+muss der Uranium-Beitrag um genau so viel sinken: (1 − u) × 22.078.125 € / 500 = 3.584,25 €, also u = 1 − 3 × 597.375
+/ 22.078.125 = 0,918828025… ≈ 0,918828. Erwartungswert je Pack 89.901,25 € vorher, 89.901,26 € nachher (89,9 % von
+100.000 €, mit Zustand 87.743,62 → 87.743,63 €); die Rundung auf ganze Euro verschiebt ihn um 0,4 Cent.
+
+Einzelwerte: Diamond 606.938 / 772.200 / 539.663 / 1.187.550 € (vorher 466.875 / 594.000 / 415.125 / 913.500 €),
+Uranium 15.298.486 / 11.577.233 / 19.743.317 / 34.524.962 € (vorher 16.650.000 / 12.600.000 / 21.487.500 / 37.575.000
+€).
+
+Live: Migration `20261204009900` multipliziert einmal (Marke in `data_migrations`) Startpreis, Marktwert,
+Tagesreferenz und Wertgeschichte jeder Diamond-Karte mit 13/10 und jeder Uranium-Karte mit 918 828/1 000 000. Die
+Marktbewegung jeder Karte bleibt damit erhalten (relativ). Zu Marktwerten bleibt der Erwartungswert genau gleich,
+solange Diamond und Uranium sich im Mittel gleich bewegt haben; sonst ändert er sich um 3.584,25 € × (d − v), mit d
+und v der mittleren Bewegung seit dem Start (z. B. Diamond + 10 %, Uranium ± 0: + 358 € je Pack). KI-Angebote folgen
+dem neuen Wert, Angebote von Spielern behalten ihren Preis (der Besitzer hat ihn gewählt; ein Diamond-Angebot ist
+danach eher günstig, ein Uranium-Angebot eher teuer, beides kann der Besitzer jederzeit ändern).
+
+## Klon, Lohn nach Skills, Beteiligungen (ADR-206)
+
+`jobs.clone`: ab Level 20, 25 000 € einmalig. `jobs.skillPay`: 3 % je relevantem Score-Punkt (bis 40 je Bereich),
+0,5 % je gelerntem Skill, höchstens ×3. Vorher: 3 % je Treffer-Punkt (bis zum Doppelten der Anforderung), höchstens
+×1,5. Senior IT mit IT 30 und 40 Skills: 952 → 1 470 €/Std.; Teamleitung mit IT 40, Management 20 und 60 Skills:
+1 950 → 3 900 €/Std. `jobs.rewards`: Gewinnbeteiligung Senior 0,5 %, Teamleitung 2 %, C-Level 5 % (höchstens 5 %,
+Anzeigen bis +3 %, je Stunde zusammen höchstens 25 % des Gewinns); KI-Firmen auf den Gewinn einer Abteilung von 50
+Leuten, höchstens der halbe Lohn. Aktien-Chance je Stunde Junior 1 %, Senior 3 %, Teamleitung 5 %, C-Level 8 %
+(Anzeigen bis +5 %), Paket 4 Stunden Lohn: Erwartung Senior + 12 % Lohn, C-Level + 32 %.
+
+> > > > > > > worktree-agent-ac7e74a95ed153787
+
+## Nachtrag: Ranglisten (ADR-203)
+
+| Wert                              | Wert | Wirkung                                                                   |
+| --------------------------------- | ---- | ------------------------------------------------------------------------- |
+| `richList.companySnapshotMinutes` | 30   | Abstand der Schnappschüsse von Top-Unternehmen (Pfeile gegenüber gestern) |
+| `richList.snapshotKeepDays`       | 8    | so lange bleiben die Firmen-Schnappschüsse                                |
+
+Bewertet wird ohne eigene Spielwerte: Börsenwert = Aktien × letzter Kurs, Firmenwert wie bisher
+(`startups.valuationPeDiscount`, `sectors.*.peRatio`), Vermögensteile mit den Werten ihrer Bereiche (Geldkurs,
+Nexamon-Marktwert, `property.*`, Tresor).

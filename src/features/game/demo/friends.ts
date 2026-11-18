@@ -54,6 +54,7 @@ const DAY = 24 * 60 * MINUTE;
 export function demoFriendCard(friend: DemoFriend): PlayerCard {
   return {
     nickname: friend.nickname,
+    cloneJob: null,
     tag: friend.tag,
     trophies: { gold: 0, silver: 0, bronze: 0 },
     avatarKey: friend.avatarKey,

@@ -23,6 +23,7 @@ select tests.set_cfg('startups', '{gmbh,fixedCostCentsPerQuarter}', '600000') is
 select tests.signup(:f, 'Fiona_Fabrik') is not null and tests.signup(:w, 'Willi_Wert') is not null
    and tests.signup(:h, 'Hanno_Haftung') is not null and tests.signup(:v, 'Vera_Verlust') is not null
    and tests.signup(:x, 'Xena_Aussen') is not null as ok \gset
+select tests.vault_quiet(array[:f, :w, :h, :v, :x]::uuid[]);
 update public.sim_runtime set is_paused = false;
 select tests.set_level(:f, 10);
 select tests.set_level(:w, 3);

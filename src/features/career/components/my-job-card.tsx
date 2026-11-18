@@ -21,7 +21,7 @@ import type { MyJob } from "@/features/game/types";
 import { CompanyLogo } from "@/features/market/components/company-logo";
 import { brandColor } from "@/features/market/brand";
 import { unlockLevel } from "@/lib/sim/progression";
-import { formatBps, formatMoney } from "@/lib/format";
+import { formatBps, formatMoney, formatPercentBps } from "@/lib/format";
 import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
@@ -99,11 +99,11 @@ export function ActiveJob({ job }: { job: MyJob }) {
   const productivity = job.productivityBps / 10_000;
 
   return (
-    <Card padding="lg" data-tour="job-card">
+    <Card padding="lg" data-tour={job.isClone ? undefined : "job-card"} data-clone-job={job.isClone || undefined}>
       <div className="flex items-start gap-4">
         <EmployerLogo job={job} scale={3} />
         <div className="min-w-0 flex-1">
-          <p className="label-pixel text-fg-3">{t("jobCardTitle")}</p>
+          <p className="label-pixel text-fg-3">{job.isClone ? job.holderName : t("jobCardTitle")}</p>
           <h2 className="mt-0.5 truncate text-lg font-semibold text-fg-1">{title}</h2>
           <p className="truncate text-sm text-fg-2">
             {job.company.name} · {tc(job.tier)} · {t("since", { date: date.format(new Date(job.startedAt)) })}
@@ -150,11 +150,13 @@ export function ActiveJob({ job }: { job: MyJob }) {
         )}
       </div>
 
+      <RewardsBox job={job} />
+
       {job.presence && <PresenceBox presence={job.presence} />}
 
       <RaiseBox job={job} />
 
-      {job.noticeEndsAt && <NoticeBox noticeEndsAt={job.noticeEndsAt} />}
+      {job.noticeEndsAt && <NoticeBox noticeEndsAt={job.noticeEndsAt} forClone={job.isClone} />}
       <div className="mt-4 flex justify-end">
         <Button variant="danger" size="sm" onClick={() => setQuitting(true)}>
           {job.noticeEndsAt ? t("quitNowTitle") : t("quit")}
@@ -176,7 +178,7 @@ function RaiseBox({ job }: { job: MyJob }) {
   const ask = async () => {
     setState("loading");
     try {
-      const result = await engine.requestRaise(crypto.randomUUID(), job.raiseMaxBps);
+      const result = await engine.requestRaise(crypto.randomUUID(), job.raiseMaxBps, job.isClone);
       setState("success");
       void playSound("win");
       if (result.status === "accepted") {
@@ -215,6 +217,56 @@ function RaiseBox({ job }: { job: MyJob }) {
   );
 }
 
+/**
+ * What the job pays besides the wage (ADR-206): the skill factor, the profit share from Senior on and the chance for
+ * employee shares, with what came in so far.
+ */
+export function RewardsBox({
+  job,
+}: {
+  job: Pick<MyJob, "skillPayBps" | "profitShareBps" | "stockGrantChanceBps" | "rewards">;
+}) {
+  const t = useTranslations("career.rewards");
+  const skill = job.skillPayBps / 10_000;
+  return (
+    <div className="mt-4 rounded-md border border-line-1 px-3 py-3" data-testid="job-rewards">
+      <p className="text-sm font-medium text-fg-1">{t("title")}</p>
+      <dl className="mt-2 grid gap-y-1.5 text-sm">
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-3">{t("skillPay")}</dt>
+          <dd className="nums text-fg-1">{t("factor", { value: factor.format(skill) })}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-3">{t("profitShare")}</dt>
+          <dd className={cn("nums", job.profitShareBps > 0 ? "text-gain" : "text-fg-3")}>
+            {job.profitShareBps > 0 ? formatPercentBps(job.profitShareBps) : t("fromSenior")}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-3">{t("stockChance")}</dt>
+          <dd className="nums text-fg-1">
+            {job.stockGrantChanceBps > 0 ? t("perHour", { percent: formatPercentBps(job.stockGrantChanceBps) }) : "–"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-fg-3">{t("paid")}</dt>
+          <dd className="nums text-fg-1">{formatMoney(job.rewards.profitShareCents + job.rewards.stockGrantCents)}</dd>
+        </div>
+      </dl>
+      {job.rewards.stockGrants > 0 && (
+        <p className="mt-1.5 nums text-xs text-gain">
+          {t("grants", {
+            count: job.rewards.stockGrants,
+            shares: Math.floor(job.rewards.sharesE6 / 1_000_000),
+            amount: formatMoney(job.rewards.stockGrantCents),
+          })}
+        </p>
+      )}
+      <p className="mt-1.5 text-xs text-pretty text-fg-3">{t("rules")}</p>
+    </div>
+  );
+}
+
 /** Presence (ADR-103): full pay while the player comes by, less when away, the job ends after five days. */
 function PresenceBox({ presence }: { presence: NonNullable<MyJob["presence"]> }) {
   const t = useTranslations("career.presence");
@@ -235,7 +287,7 @@ function PresenceBox({ presence }: { presence: NonNullable<MyJob["presence"]> })
 }
 
 /** Running notice (ADR-063): countdown to the last day, can be taken back. */
-function NoticeBox({ noticeEndsAt }: { noticeEndsAt: string }) {
+function NoticeBox({ noticeEndsAt, forClone = false }: { noticeEndsAt: string; forClone?: boolean }) {
   const t = useTranslations("jobTab");
   const errorText = useGameErrorText();
   const refresh = useCareerRefresh();
@@ -243,7 +295,7 @@ function NoticeBox({ noticeEndsAt }: { noticeEndsAt: string }) {
   const cancel = async () => {
     setState("loading");
     try {
-      await engine.cancelQuit(crypto.randomUUID());
+      await engine.cancelQuit(crypto.randomUUID(), forClone);
       toast.success(t("noticeCancelled"), undefined, { silent: true });
       await refresh();
     } catch (error) {
@@ -274,7 +326,7 @@ function QuitSheet({ job, open, onOpenChange }: { job: MyJob; open: boolean; onO
   const quit = async (immediate: boolean) => {
     setBusy(true);
     try {
-      const result = await engine.quitJob(crypto.randomUUID(), immediate);
+      const result = await engine.quitJob(crypto.randomUUID(), immediate, job.isClone);
       if (result.ended) {
         toast.success(t("quitDone"), t("quitNowDoneText", { amount: formatMoney(result.paidCents) }));
       } else if (result.noticeEndsAt) {

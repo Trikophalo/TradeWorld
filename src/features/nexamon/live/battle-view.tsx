@@ -14,7 +14,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { NexamonBattle, NexamonBattleSeat, NexamonShownPull } from "@/features/game/pack-battle-types";
 import { formatMoney } from "@/lib/format";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
-import { multiShownCards, rarityRank } from "@/lib/sim/nexamon-battle";
+import {
+  multiShownCards,
+  multiTwistAt,
+  multiTwistsShown,
+  rarityRank,
+  twistCycles,
+  twistScores,
+} from "@/lib/sim/nexamon-battle";
 import { playSound, type SoundName } from "@/lib/sound";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
@@ -24,7 +31,9 @@ import { useNexamonCollection } from "../hooks";
 import { CardThumb, NexamonCardBack, NexamonCardFace } from "../components/card-face";
 import { NexamonPack } from "../components/pack";
 import { useNexamonBattle, useServerClock } from "./hooks";
-import { BattleLobby } from "./battle-lobby";
+import { BattleLobby, BattleModeBadges } from "./battle-lobby";
+import { battleRevealTier } from "./battle-reveal";
+import { BattleRevealFx } from "./battle-reveal-fx";
 import { Reactions } from "./reactions";
 
 const cfg = BALANCE.nexamon;
@@ -41,26 +50,37 @@ const REVEAL_SOUND: Record<NexamonRarity, SoundName> = {
   uranium: "pullUranium",
 };
 
-export type BattlePhase = "waiting" | "countdown" | "tearing" | "revealing" | "decided";
+export type BattlePhase = "waiting" | "countdown" | "tearing" | "revealing" | "twisting" | "decided";
 
 /**
  * Where the shared clock stands (ADR-172/192): before the start, a pack tearing, revealing card n of the lineup,
- * decided. `pack` is the pack of the lineup on screen (1 = the first).
+ * (ADR-205, Twist) the twist after a pack, decided. `pack` is the pack of the lineup on screen (1 = the first);
+ * `twists` how many twists apply to the scores (the clock reached them and the server sent them).
  */
 export function battlePhase(b: NexamonBattle, now: number | null) {
   const total = b.packs.length * cfg.packSize;
-  if (!b.startsAt || now === null) return { phase: "waiting" as BattlePhase, shown: 0, countdown: 0, pack: 1 };
+  const at = (phase: BattlePhase, shown: number, pack: number, twists = 0, countdown = 0) => ({
+    phase,
+    shown,
+    countdown,
+    pack,
+    twists,
+  });
+  if (!b.startsAt || now === null) return at("waiting", 0, 1);
   const startsAt = Date.parse(b.startsAt);
-  if (now < startsAt)
-    return { phase: "countdown" as BattlePhase, shown: 0, countdown: Math.ceil((startsAt - now) / 1000), pack: 1 };
+  if (now < startsAt) return at("countdown", 0, 1, 0, Math.ceil((startsAt - now) / 1000));
   const known = Math.min(...b.seats.map((s) => s.cards.length));
-  const shown = Math.min(multiShownCards(startsAt, now, b.packs.length), known);
+  const shown = Math.min(multiShownCards(startsAt, now, b.packs.length, cfg, b.twistMs), known);
+  const clockTwists = b.twist ? multiTwistsShown(startsAt, now, b.packs.length, cfg, b.twistMs) : 0;
+  const twists = Math.min(clockTwists, b.twists.length);
   const decided = b.winnerSeat !== null && b.decideAt !== null && now >= Date.parse(b.decideAt) && shown >= total;
-  if (decided) return { phase: "decided" as BattlePhase, shown, countdown: 0, pack: b.packs.length };
+  if (decided) return at("decided", shown, b.packs.length, twists);
+  // ADR-205: the twist after a pack plays for twistMs before the next pack tears
+  if (clockTwists > 0 && now < multiTwistAt(startsAt, clockTwists, cfg, b.twistMs) + b.twistMs)
+    return at("twisting", shown, clockTwists, twists);
   // between two packs (and before the first card) the next pack tears
-  if (shown % cfg.packSize === 0 && shown < total)
-    return { phase: "tearing" as BattlePhase, shown, countdown: 0, pack: shown / cfg.packSize + 1 };
-  return { phase: "revealing" as BattlePhase, shown, countdown: 0, pack: Math.floor((shown - 1) / cfg.packSize) + 1 };
+  if (shown % cfg.packSize === 0 && shown < total) return at("tearing", shown, shown / cfg.packSize + 1, twists);
+  return at("revealing", shown, Math.floor((shown - 1) / cfg.packSize) + 1, twists);
 }
 
 export interface BattleViewProps {
@@ -109,6 +129,7 @@ export function BattleView({ battleId, onClose }: BattleViewProps) {
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {b && <BattleModeBadges reverse={b.reverse} twist={b.twist} />}
               {b && state && b.packs.length > 1 && (b.status === "running" || b.status === "done") && (
                 <Badge tone="neutral" data-testid="battle-pack-no">
                   {t("battle.packNo", { n: state.pack, count: b.packs.length })}
@@ -177,10 +198,20 @@ function Arena({
   const reduced = useReducedMotionConfig();
   const desktop = useMediaQuery("(min-width: 1024px)");
   const winnerRef = useRef<HTMLDivElement | null>(null);
-  const { phase, shown, countdown, pack } = state;
+  const { phase, shown, countdown, pack, twists } = state;
   const decided = phase === "decided";
   const winner = decided ? b.winnerSeat : null;
   const many = b.seats.length > 2;
+  // ADR-205: what every seat holds so far (its pile after the twists shown); without Twist its own pulls
+  const applied = b.twists.slice(0, twists);
+  const scores = twistScores(
+    b.seats.map((s) => s.cards.slice(0, shown)),
+    applied,
+    b.packs.length,
+  );
+  const lastTwist = applied[applied.length - 1];
+  // right after a twist (while it plays and the next pack tears) a seat shows whose pile it took
+  const fresh = lastTwist !== undefined && shown === twists * cfg.packSize && !decided;
 
   // sounds, once per step of the shared clock
   const played = useRef<string>("");
@@ -190,6 +221,10 @@ function Arena({
     played.current = key;
     if (phase === "countdown" && countdown > 0) void playSound("battleCountdown");
     if (phase === "tearing") void playSound("packTear");
+    if (phase === "twisting") {
+      void playSound("battleWhoosh");
+      void playSound("battleZap");
+    }
     if (phase === "revealing" && shown > 0) {
       const best = b.seats
         .map((s) => s.cards[shown - 1])
@@ -199,6 +234,9 @@ function Arena({
       // the last card of the lineup is louder: the decision is near
       void playSound(REVEAL_SOUND[best], last ? 1.2 : 1);
       if (last) void playSound("battleFuse");
+      // ADR-205: the last two cards of a pack hit harder
+      const slot = ((shown - 1) % cfg.packSize) + 1;
+      if (battleRevealTier(best, slot, cfg.packSize) >= 3) void playSound("battleImpact");
     }
     if (phase === "decided") {
       void playSound(b.mySeat === null ? "battleGong" : b.mySeat === b.winnerSeat ? "battleFanfare" : "battleBust");
@@ -209,7 +247,11 @@ function Arena({
   const total = b.seats.reduce((s, x) => s + x.cents, 0);
   const cards = b.seats.reduce((s, x) => s + x.cards.length, 0);
   const winnerSeat = b.seats.find((s) => s.seat === b.winnerSeat);
-  const ranking = [...b.seats].sort((x, y) => y.cents - x.cents || x.seat - y.seat);
+  const scoreOf = (seat: number) => scores[b.seats.findIndex((s) => s.seat === seat)] ?? 0;
+  // ADR-205 "Umgekehrt": the lowest score ranks first
+  const ranking = [...b.seats].sort(
+    (x, y) => (b.reverse ? scoreOf(x.seat) - scoreOf(y.seat) : scoreOf(y.seat) - scoreOf(x.seat)) || x.seat - y.seat,
+  );
   return (
     <div className="flex min-h-full flex-col">
       <div
@@ -221,11 +263,13 @@ function Arena({
         )}
         data-testid="battle-arena"
       >
-        {b.seats.map((seat) => (
+        {b.seats.map((seat, i) => (
           <SeatPanel
             key={seat.seat}
             seat={seat}
             battle={b}
+            score={scores[i] ?? 0}
+            from={fresh && lastTwist && lastTwist[i] !== i ? (b.seats[lastTwist[i]!]?.player.nickname ?? null) : null}
             shown={shown}
             pack={pack}
             phase={phase}
@@ -236,8 +280,19 @@ function Arena({
             innerRef={winner === seat.seat ? winnerRef : undefined}
           />
         ))}
+        <AnimatePresence>
+          {phase === "twisting" && (
+            <TwistOverlay
+              key={`twist-${pack}`}
+              names={b.seats.map((s) => s.player.nickname)}
+              round={pack}
+              perm={b.twists[pack - 1] ?? null}
+              reduced={Boolean(reduced)}
+            />
+          )}
+        </AnimatePresence>
         {/* With 3 or 4 seats the badge sits on the cards: only the countdown, no "VS" */}
-        {(!many || phase === "countdown") && (
+        {phase !== "twisting" && (!many || phase === "countdown") && (
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
             <motion.span
               className="rounded-pill border-2 border-line-2 bg-surface-1 px-3 py-1 font-pixel text-sm text-fg-1 shadow-2"
@@ -272,9 +327,16 @@ function Arena({
             <p className="mt-1 nums text-sm text-fg-2">
               {t("battle.takes", { count: cards, value: formatMoney(total) })}
             </p>
+            {b.reverse && (
+              <p className="mt-1 text-xs text-fg-2" data-testid="battle-reverse-hint">
+                {t("battle.reverseHint")}
+              </p>
+            )}
             {b.tieBreak && b.tieBreak !== "value" && (
               <p className="mt-1 text-xs text-fg-3" data-testid="battle-tiebreak">
-                {t(`battle.tieBreak.${b.tieBreak}`)}
+                {b.reverse && b.tieBreak === "rarest"
+                  ? t("battle.tieBreak.rarestReverse")
+                  : t(`battle.tieBreak.${b.tieBreak}`)}
               </p>
             )}
             {many && (
@@ -286,7 +348,7 @@ function Arena({
                       {s.player.nickname}
                       {s.isMe && <span className="ml-1 text-xs text-fg-3">{t("you")}</span>}
                     </span>
-                    <span className="nums text-fg-2">{formatMoney(s.cents)}</span>
+                    <span className="nums text-fg-2">{formatMoney(scoreOf(s.seat))}</span>
                   </li>
                 ))}
               </ol>
@@ -310,6 +372,8 @@ function Arena({
 function SeatPanel({
   seat,
   battle: b,
+  score,
+  from,
   shown,
   pack,
   phase,
@@ -321,6 +385,10 @@ function SeatPanel({
 }: {
   seat: NexamonBattleSeat;
   battle: NexamonBattle;
+  /** ADR-205: what the seat holds for the decision (its pile); its own pulls without Twist. */
+  score: number;
+  /** ADR-205: right after a twist, whose pile the seat took (null: kept its own). */
+  from: string | null;
   shown: number;
   pack: number;
   phase: BattlePhase;
@@ -345,6 +413,8 @@ function SeatPanel({
   // the cards of the losers fade towards the middle
   const fly = reduced ? {} : { scale: 0.5, y: seat.seat < 2 && b.seats.length > 2 ? 60 : 0 };
   const legacy = b.seats.length === 2 ? (seat.seat === 0 ? "challenger" : "opponent") : null;
+  const twisting = phase === "twisting";
+  const tier = last ? battleRevealTier(last.rarity, last.slot, cfg.packSize) : 0;
 
   return (
     <motion.div
@@ -354,12 +424,17 @@ function SeatPanel({
         !compact && "p-3",
         won ? "border-gold" : seat.isMe ? "border-accent" : "border-line-1",
       )}
-      animate={{ opacity: lost ? 0.4 : 1, scale: won && !reduced ? 1.02 : 1 }}
-      transition={{ duration: DURATION.slower, ease: EASE.out }}
+      animate={{
+        opacity: lost ? 0.4 : 1,
+        scale: won && !reduced ? 1.02 : 1,
+        x: twisting && !reduced ? [0, -7, 7, -5, 5, -2, 0] : 0,
+      }}
+      transition={{ duration: DURATION.slower, ease: EASE.out, x: { duration: 0.7, ease: EASE.out } }}
       data-testid={legacy ? `battle-side-${legacy}` : "battle-seat"}
       data-seat={seat.seat}
       data-shown={visible.length}
       data-total={sum}
+      data-score={score}
     >
       <div className={cn("flex w-full items-center gap-2", compact && "flex-col gap-1")}>
         <PlayerFigure
@@ -377,15 +452,33 @@ function SeatPanel({
         </div>
         <div className={cn("text-right", compact && "text-center")}>
           <motion.p
-            key={sum}
-            className={cn("nums font-semibold text-fg-1", compact ? "text-sm" : "text-lg")}
-            initial={reduced ? false : { scale: 1.25, opacity: 0.6 }}
-            animate={{ scale: 1, opacity: 1 }}
+            key={score}
+            className={cn("nums font-semibold", compact ? "text-sm" : "text-lg", from ? "text-accent" : "text-fg-1")}
+            initial={
+              reduced ? false : twisting ? { rotateX: 90, scale: 1.4, opacity: 0 } : { scale: 1.25, opacity: 0.6 }
+            }
+            animate={{ rotateX: 0, scale: 1, opacity: 1 }}
             transition={SPRING.bouncy}
             data-testid={legacy ? `battle-total-${legacy}` : "battle-seat-total"}
           >
-            {formatMoney(sum)}
+            {formatMoney(score)}
           </motion.p>
+          {from && (
+            <motion.p
+              className="truncate text-2xs text-accent"
+              initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: DURATION.slow, ease: EASE.out }}
+              data-testid="battle-seat-from"
+            >
+              {t("battle.twist.from", { name: from })}
+            </motion.p>
+          )}
+          {b.twist && !from && !compact && (
+            <p className="nums text-2xs text-fg-3" data-testid="battle-seat-pulled">
+              {t("battle.twist.pulled", { value: formatMoney(sum) })}
+            </p>
+          )}
           {won && (
             <Badge tone="warn" data-testid="battle-winner-badge">
               {t("battle.winner")}
@@ -426,8 +519,11 @@ function SeatPanel({
               className="relative"
               data-testid={legacy ? `battle-spotlight-${legacy}` : "battle-seat-spotlight"}
             >
-              <NexamonCardFace card={lastCard} scale={scale} foil={reduced ? "still" : "live"} />
-              <span className="absolute -top-2 left-1/2 -translate-x-1/2">
+              {/* ADR-205: the last two cards of a pack reveal louder, by rarity */}
+              <BattleRevealFx tier={tier} rarity={last!.rarity} valueCents={last!.valueCents} reduced={reduced}>
+                <NexamonCardFace card={lastCard} scale={scale} foil={reduced ? "still" : "live"} />
+              </BattleRevealFx>
+              <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2">
                 <RarityBadge rarity={last!.rarity} />
               </span>
             </motion.div>
@@ -476,6 +572,80 @@ function SeatPanel({
           );
         })}
       </ol>
+    </motion.div>
+  );
+}
+
+/**
+ * ADR-205: the twist after a pack, over the arena: "TWIST!" and who takes whose pile ("Lena ↔ Max",
+ * "Lena → Max → Ida → Lena"); nothing moved: "Kein Tausch". Before the server's twist arrives only the title shows.
+ */
+export function TwistOverlay({
+  names,
+  round,
+  perm,
+  reduced,
+}: {
+  /** Nicknames in seat order. */
+  names: string[];
+  round: number;
+  perm: number[] | null;
+  reduced: boolean;
+}) {
+  const t = useTranslations("nexamonLive");
+  const name = (i: number) => names[i] ?? "";
+  const cycles = perm ? twistCycles(perm) : [];
+  return (
+    <motion.div
+      className="pointer-events-none absolute inset-0 z-20 grid place-items-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: DURATION.slow } }}
+      data-testid="battle-twist"
+      data-round={round}
+      data-moves={perm ? cycles.length : -1}
+      aria-live="polite"
+    >
+      <motion.div
+        className="max-w-full rounded-lg border-2 border-accent bg-surface-1 px-5 py-4 text-center shadow-3"
+        initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.3, rotate: -14 }}
+        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+        exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 1.3, rotate: 6 }}
+        transition={reduced ? { duration: DURATION.fast } : SPRING.bouncy}
+      >
+        <motion.p
+          className="font-pixel text-2xl text-accent uppercase"
+          animate={reduced ? undefined : { scale: [1, 1.12, 1], rotate: [0, -3, 3, 0] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {t("battle.twist.title")}
+        </motion.p>
+        <p className="mt-0.5 text-2xs text-fg-3">{t("battle.twist.label", { n: round })}</p>
+        {perm && (
+          <ul className="mt-2 space-y-1">
+            {cycles.length === 0 ? (
+              <li className="text-sm text-fg-2" data-testid="battle-twist-none">
+                {t("battle.twist.none")}
+              </li>
+            ) : (
+              cycles.map((cycle, k) => (
+                <motion.li
+                  key={cycle.join("-")}
+                  className="text-sm font-semibold break-words text-fg-1"
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, x: k % 2 === 0 ? -24 : 24 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: DURATION.slower, ease: EASE.out, delay: reduced ? 0 : 0.25 + k * 0.15 }}
+                  data-testid="battle-twist-move"
+                >
+                  {cycle.length === 2
+                    ? `${name(cycle[0]!)} ↔ ${name(cycle[1]!)}`
+                    : [...cycle, cycle[0]!].map(name).join(" → ")}
+                </motion.li>
+              ))
+            )}
+          </ul>
+        )}
+      </motion.div>
     </motion.div>
   );
 }

@@ -1,0 +1,25 @@
+{
+  "parts": {
+    "cash_cents": 2297807,
+    "debt_cents": 0,
+    "nfts_cents": 0,
+    "cards_cents": 0,
+    "deals_cents": 0,
+    "depot_cents": 72004,
+    "slabs_cents": 0,
+    "vault_cents": 17,
+    "escrow_cents": 0,
+    "company_cents": 83014,
+    "property_cents": 0
+  },
+  "company": {
+    "name": "Fixture Labor",
+    "basis": "company_value",
+    "cents": 83014,
+    "shares": null,
+    "price_e4": null,
+    "company_value_cents": 83014
+  },
+  "server_time": "2026-11-18T00:26:03.099665+00:00",
+  "total_cents": 2452842
+}

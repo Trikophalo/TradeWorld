@@ -6,6 +6,7 @@ import { toTrust, trustSchema } from "./api-deals";
 import { rpc } from "./rpc";
 import type {
   CareerTier,
+  CloneState,
   DailyRewardState,
   Employer,
   GameEngine,
@@ -89,6 +90,15 @@ const postingSchema = z.object({
   expires_at: iso.nullable(),
   my_application: z.object({ id: z.string(), status: z.string() }).nullable(),
   required_skills: z.array(z.string()).default([]),
+  // ADR-206 (0 / null on older servers)
+  skill_pay_bps: num.default(10_000),
+  market_salary_cents_per_hour: nnum.default(null),
+  profit_share_bps: num.default(0),
+  stock_grant_chance_bps: num.default(0),
+  posting_profit_share_bps: num.default(0),
+  posting_stock_grant_bps: num.default(0),
+  own_company: z.boolean().default(false),
+  my_clone_application: z.object({ id: z.string(), status: z.string() }).nullable().default(null),
 });
 
 export const applicationSchema = z.object({
@@ -109,6 +119,7 @@ export const applicationSchema = z.object({
   message: z.string().nullable(),
   created_at: iso,
   updated_at: iso,
+  for_clone: z.boolean().default(false),
 });
 
 const requirementSchema = z.object({
@@ -245,7 +256,27 @@ const jobSchema = z.object({
   rank_hours: num.default(0),
   promotion: promotionSchema.nullable().default(null),
   presence: z.object({ last_active_at: iso, pay_bps: num, fire_at: iso }).nullable().default(null),
+  // ADR-206
+  is_clone: z.boolean().default(false),
+  holder_name: z.string().default(""),
+  skill_pay_bps: num.default(10_000),
+  profit_share_bps: num.default(0),
+  stock_grant_chance_bps: num.default(0),
+  rewards: z
+    .object({ profit_share_cents: num, stock_grants: num, stock_grant_cents: num, shares_e6: num })
+    .passthrough()
+    .default({ profit_share_cents: 0, stock_grants: 0, stock_grant_cents: 0, shares_e6: 0 }),
 });
+
+const cardJobSchema = z
+  .object({
+    company_name: z.string(),
+    title_key: z.string().nullable(),
+    title: z.string().nullable(),
+    tier,
+    since: iso,
+  })
+  .nullable();
 
 const cardSchema = z.object({
   nickname: z.string(),
@@ -259,15 +290,8 @@ const cardSchema = z.object({
   skills_learned: num,
   branch_scores: branches,
   top_skills: z.array(z.object({ key: z.string(), tier: num })),
-  job: z
-    .object({
-      company_name: z.string(),
-      title_key: z.string().nullable(),
-      title: z.string().nullable(),
-      tier,
-      since: iso,
-    })
-    .nullable(),
+  job: cardJobSchema,
+  clone_job: cardJobSchema.default(null),
   company: z.object({ name: z.string(), ticker: z.string().nullable() }).nullable(),
   member_since: iso,
   trust: trustSchema.nullable().default(null),
@@ -280,7 +304,11 @@ export const CAREER_RPC_SCHEMAS = {
   claim_daily_reward: claimDailySchema,
   get_my_skills: skillsSchema,
   learn_skill: skillsSchema.extend({ learned_key: z.string() }),
-  get_job_board: z.object({ postings: z.array(postingSchema), next_refresh_at: iso.nullable() }),
+  get_job_board: z.object({
+    postings: z.array(postingSchema),
+    next_refresh_at: iso.nullable(),
+    has_clone: z.boolean().default(false),
+  }),
   apply_for_job: applicationSchema,
   get_my_applications: z.object({ applications: z.array(applicationSchema) }),
   counter_offer: applicationSchema,
@@ -320,6 +348,13 @@ export const CAREER_RPC_SCHEMAS = {
   get_upgrades: z.object({ levels: levelsSchema }),
   buy_upgrade: z.object({ key: upgradeKey, level: num, cost_cents: num, levels: levelsSchema }),
   get_player_card: cardSchema,
+  get_clone: z.object({
+    min_level: num,
+    fee_cents: num,
+    level: num,
+    clone: z.object({ name: z.string(), created_at: iso }).nullable(),
+    job: jobSchema.nullable(),
+  }),
 } as const;
 
 const S = CAREER_RPC_SCHEMAS;
@@ -365,6 +400,16 @@ const toPosting = (p: z.infer<typeof postingSchema>): JobPosting => ({
     ? { id: p.my_application.id, status: p.my_application.status as JobApplication["status"] }
     : null,
   requiredSkills: p.required_skills,
+  skillPayBps: p.skill_pay_bps,
+  marketSalaryCentsPerHour: p.market_salary_cents_per_hour ?? p.salary_cents_per_hour,
+  profitShareBps: p.profit_share_bps,
+  stockGrantChanceBps: p.stock_grant_chance_bps,
+  postingProfitShareBps: p.posting_profit_share_bps,
+  postingStockGrantBps: p.posting_stock_grant_bps,
+  ownCompany: p.own_company,
+  myCloneApplication: p.my_clone_application
+    ? { id: p.my_clone_application.id, status: p.my_clone_application.status as JobApplication["status"] }
+    : null,
 });
 
 export const toApplication = (a: z.infer<typeof applicationSchema>): JobApplication => ({
@@ -385,6 +430,7 @@ export const toApplication = (a: z.infer<typeof applicationSchema>): JobApplicat
   message: a.message,
   createdAt: a.created_at,
   updatedAt: a.updated_at,
+  forClone: a.for_clone,
 });
 
 const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
@@ -419,7 +465,23 @@ const toJob = (j: z.infer<typeof jobSchema>): MyJob => ({
   presence: j.presence
     ? { lastActiveAt: j.presence.last_active_at, payBps: j.presence.pay_bps, fireAt: j.presence.fire_at }
     : null,
+  isClone: j.is_clone,
+  holderName: j.holder_name,
+  skillPayBps: j.skill_pay_bps,
+  profitShareBps: j.profit_share_bps,
+  stockGrantChanceBps: j.stock_grant_chance_bps,
+  rewards: {
+    profitShareCents: j.rewards.profit_share_cents,
+    stockGrants: j.rewards.stock_grants,
+    stockGrantCents: j.rewards.stock_grant_cents,
+    sharesE6: j.rewards.shares_e6,
+  },
 });
+
+const toCardJob = (j: z.infer<typeof cardJobSchema>) =>
+  j
+    ? { companyName: j.company_name, titleKey: j.title_key, title: j.title, tier: j.tier as CareerTier, since: j.since }
+    : null;
 
 type CareerEngine = Pick<
   GameEngine,
@@ -443,7 +505,17 @@ type CareerEngine = Pick<
   | "upgrades"
   | "buyUpgrade"
   | "playerCard"
+  | "clone"
+  | "createClone"
 >;
+
+const toClone = (c: z.infer<typeof CAREER_RPC_SCHEMAS.get_clone>): CloneState => ({
+  minLevel: c.min_level,
+  feeCents: c.fee_cents,
+  level: c.level,
+  clone: c.clone ? { name: c.clone.name, createdAt: c.clone.created_at } : null,
+  job: c.job ? toJob(c.job) : null,
+});
 
 export const liveCareerEngine: CareerEngine = {
   async setAvatar(requestId, avatarKey) {
@@ -487,12 +559,12 @@ export const liveCareerEngine: CareerEngine = {
 
   async jobBoard() {
     const r = await rpc("get_job_board", {}, S.get_job_board);
-    return { postings: r.postings.map(toPosting), nextRefreshAt: r.next_refresh_at };
+    return { postings: r.postings.map(toPosting), nextRefreshAt: r.next_refresh_at, hasClone: r.has_clone };
   },
 
   async applyForJob(input) {
     const r = await rpc(
-      "apply_for_job",
+      input.forClone ? "clone_apply_for_job" : "apply_for_job",
       {
         p_request_id: input.requestId,
         p_posting_id: input.postingId,
@@ -527,9 +599,9 @@ export const liveCareerEngine: CareerEngine = {
     return toApplication(r);
   },
 
-  async signContract(requestId, applicationId, signature) {
+  async signContract(requestId, applicationId, signature, forClone = false) {
     const r = await rpc(
-      "sign_contract",
+      forClone ? "clone_sign_contract" : "sign_contract",
       { p_request_id: requestId, p_application_id: applicationId, p_signature: signature },
       S.sign_contract,
     );
@@ -542,14 +614,18 @@ export const liveCareerEngine: CareerEngine = {
     return r.job ? toJob(r.job) : null;
   },
 
-  async quitJob(requestId, immediate = false) {
-    const r = await rpc("quit_job", { p_request_id: requestId, p_immediate: immediate }, S.quit_job);
+  async quitJob(requestId, immediate = false, forClone = false) {
+    const r = await rpc(
+      forClone ? "clone_quit_job" : "quit_job",
+      { p_request_id: requestId, p_immediate: immediate },
+      S.quit_job,
+    );
     if ("notice_ends_at" in r) return { noticeEndsAt: r.notice_ends_at, ended: false, paidCents: 0 };
     return { noticeEndsAt: null, ended: true, paidCents: r.paid_cents };
   },
 
-  async cancelQuit(requestId) {
-    const r = await rpc("cancel_quit", { p_request_id: requestId }, S.cancel_quit);
+  async cancelQuit(requestId, forClone = false) {
+    const r = await rpc(forClone ? "clone_cancel_quit" : "cancel_quit", { p_request_id: requestId }, S.cancel_quit);
     if (!r.job) throw new Error("cancel_quit returned no job");
     return toJob(r.job);
   },
@@ -577,13 +653,21 @@ export const liveCareerEngine: CareerEngine = {
     };
   },
 
-  async requestRaise(requestId, raiseBps) {
-    const r = await rpc("request_raise", { p_request_id: requestId, p_raise_bps: raiseBps }, S.request_raise);
+  async requestRaise(requestId, raiseBps, forClone = false) {
+    const r = await rpc(
+      forClone ? "clone_request_raise" : "request_raise",
+      { p_request_id: requestId, p_raise_bps: raiseBps },
+      S.request_raise,
+    );
     return { status: r.status, salaryCentsPerHour: r.salary_cents_per_hour };
   },
 
-  async requestPromotion(requestId) {
-    const r = await rpc("request_promotion", { p_request_id: requestId }, S.request_promotion);
+  async requestPromotion(requestId, forClone = false) {
+    const r = await rpc(
+      forClone ? "clone_request_promotion" : "request_promotion",
+      { p_request_id: requestId },
+      S.request_promotion,
+    );
     return {
       status: r.status,
       tier: r.tier,
@@ -591,6 +675,14 @@ export const liveCareerEngine: CareerEngine = {
       retryAt: r.retry_at,
       chanceBps: r.chance_bps,
     };
+  },
+
+  async clone() {
+    return toClone(await rpc("get_clone", {}, S.get_clone));
+  },
+
+  async createClone(requestId) {
+    return toClone(await rpc("create_clone", { p_request_id: requestId }, S.get_clone));
   },
 
   async upgrades(): Promise<UpgradesState> {
@@ -615,15 +707,8 @@ export const liveCareerEngine: CareerEngine = {
       skillsLearned: c.skills_learned,
       branchScores: c.branch_scores as Branches,
       topSkills: c.top_skills,
-      job: c.job
-        ? {
-            companyName: c.job.company_name,
-            titleKey: c.job.title_key,
-            title: c.job.title,
-            tier: c.job.tier as CareerTier,
-            since: c.job.since,
-          }
-        : null,
+      job: toCardJob(c.job),
+      cloneJob: toCardJob(c.clone_job),
       company: c.company,
       memberSince: c.member_since,
       trust: c.trust ? toTrust(c.trust) : null,
