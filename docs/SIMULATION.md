@@ -900,6 +900,10 @@ Leitzins + 400 bp auf den geliehenen Betrag bei Hebel, Leihgebühr 1 % (Bluechip
 (Pennystock) auf den Wert der leerverkauften Stücke.
 
 **Tresor** (`vault.ts`): `accrued = min(vergangene Zeit, 8 h) × 100 €/h`, millisekundengenau, abgerundet.
+Seit ADR-201 ist die Rate `Grundeinkommen mit Verbesserungen × vaultLevelFactorBps(Level)` („half even“), danach der
+Staatskassen-Faktor (`vaultRateCentsPerHour`). Festgeld: `vaultDepositInterestCents = Betrag × Satz × Faktor`, einmal
+„half even“; `vaultDepositCheck` prüft Level, Laufzeit, Mindestbetrag, Anzahl, Deckel je Level und Bargeld in der
+Reihenfolge des Servers.
 Gehälter laufen genauso passiv auf, höchstens 12 bezahlte Stunden pro Tag (`salaryAccruedCents`).
 
 ## 22. Zocker gewinnen manchmal, Analytiker langfristig

@@ -85,6 +85,34 @@ export interface EconomyConfig {
   readonly bankruptcyReputationPenalty: number;
 }
 
+export interface VaultDepositTerm {
+  /** Lock time in days (game time). */
+  readonly days: number;
+  /** Interest on the deposited amount for the whole term, in bps (before the treasury factor). */
+  readonly rateBps: number;
+}
+
+/**
+ * The vault grows with the player (ADR-201): the basic income in the vault rises with the player level, and from
+ * `deposits.minLevel` money can be locked in the vault for a fixed term ("Festgeld") for interest from the treasury.
+ */
+export interface VaultConfig {
+  /** Extra vault income per player level above 1, in bps of the basic income (with the upgrades). */
+  readonly levelBonusBps: number;
+  /** Levels above this one add no more level bonus. */
+  readonly levelBonusMaxLevel: number;
+  readonly deposits: {
+    readonly minLevel: number;
+    /** Smallest deposit. */
+    readonly minCents: number;
+    /** All open deposits of a player together hold at most this times the player level. */
+    readonly capCentsPerLevel: number;
+    /** Open deposits at the same time. */
+    readonly maxOpen: number;
+    readonly terms: readonly VaultDepositTerm[];
+  };
+}
+
 export interface LeverageTier {
   readonly level: number;
   readonly maxLeverage: number;
@@ -871,6 +899,8 @@ export interface StockNewsConfig {
 export interface BalanceConfig {
   readonly time: TimeConfig;
   readonly economy: EconomyConfig;
+  /** Vault level bonus and fixed-term deposits (ADR-201), formulas in src/lib/sim/vault.ts. */
+  readonly vault: VaultConfig;
   readonly trading: TradingConfig;
   readonly centralBank: CentralBankConfig;
   readonly bonds: BondsConfig;
@@ -1866,6 +1896,27 @@ export const BALANCE = {
     vaultMinClaimCents: 100,
     bankruptcyStatusGameDays: 3,
     bankruptcyReputationPenalty: 10,
+  },
+
+  // ------------------------------------------------- vault grows with the player (ADR-201)
+  vault: {
+    // +8 % basic income in the vault per level above 1, up to level 40: level 5 x1.32, 15 x2.12, 30 x3.32, 40 x4.12
+    levelBonusBps: 800,
+    levelBonusMaxLevel: 40,
+    // Festgeld: lock cash for 1, 3 or 7 days; interest from the treasury (times the treasury factor), at most
+    // 25.000 € x level in all open deposits. 7 days pay 2 % a day, a day 1,5 %: a safe, capped yield well below
+    // the expected 7 % a day of a stock portfolio (BALANCING 2.1), but without risk.
+    deposits: {
+      minLevel: 5,
+      minCents: 100_000,
+      capCentsPerLevel: 2_500_000,
+      maxOpen: 3,
+      terms: [
+        { days: 1, rateBps: 150 },
+        { days: 3, rateBps: 500 },
+        { days: 7, rateBps: 1_400 },
+      ],
+    },
   },
 
   // --------------------------------------------------------------- trading (spec 10)

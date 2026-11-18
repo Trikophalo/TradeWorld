@@ -727,6 +727,14 @@ select public.get_upgrades();
 select public.buy_upgrade(gen_random_uuid(), 'vault');
 \o :fixture_dir/get_upgrades_bought.json
 select public.get_upgrades();
+-- ADR-201: Festgeld in the vault (level 5)
+\o :fixture_dir/open_vault_deposit.json
+select public.open_vault_deposit(gen_random_uuid(), 200000, 7);
+\o :fixture_dir/get_vault_deposits.json
+select public.get_vault_deposits();
+\o :fixture_dir/close_vault_deposit.json
+select public.close_vault_deposit(gen_random_uuid(),
+  (select (public.get_vault_deposits() -> 'deposits' -> 0 ->> 'id')::bigint));
 \o
 select x ->> 'id' as fx_ipost from jsonb_array_elements(public.get_job_board() -> 'postings') x
  where x ->> 'tier' = 'intern' and (x ->> 'eligible')::boolean and (x -> 'company' ->> 'is_ai')::boolean

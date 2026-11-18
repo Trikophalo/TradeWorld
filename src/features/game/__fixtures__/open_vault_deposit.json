@@ -1,0 +1,30 @@
+{
+  "level": 5,
+  "terms": [
+    { "days": 1, "rate_bps": 150 },
+    { "days": 3, "rate_bps": 500 },
+    { "days": 7, "rate_bps": 1400 }
+  ],
+  "deposits": [
+    {
+      "id": 4,
+      "matured": false,
+      "rate_bps": 1400,
+      "term_days": 7,
+      "created_at": "2026-11-18T00:13:55.861902+00:00",
+      "matures_at": "2026-11-25T00:13:55.861902+00:00",
+      "amount_cents": 200000,
+      "interest_cents": 28000
+    }
+  ],
+  "max_open": 3,
+  "cap_cents": 12500000,
+  "min_cents": 100000,
+  "min_level": 5,
+  "cash_cents": 5500000,
+  "deposit_id": 4,
+  "factor_bps": 10000,
+  "open_cents": 200000,
+  "server_time": "2026-11-18T00:13:55.861902+00:00",
+  "earned_cents": 0
+}

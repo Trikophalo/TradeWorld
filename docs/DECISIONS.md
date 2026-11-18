@@ -4827,6 +4827,78 @@ Level 16 mit Firma bekommt in 120 Ziehungen über 50 verschiedene Vorlagen. Mehr
 beschleunigen auch die Wirtschaft etwas (Missionen zahlen nur XP). Die Werte der Ziehung stehen in der
 Konfiguration; wird der Katalog kleiner als die Sperrliste, wiederholt sich die älteste Ziehung zuerst.
 
+## ADR-201: Der Tresor wächst mit dem Spieler, Festgeld, aufklappbare Verbesserungen — `Annahme`
+
+**Kontext.** Wunsch des Inhabers: Der Tresor sei „im späteren Spiel nutzlos, die Beträge lächerlich klein“, und die
+Seite „Verbesserungen“ sei zu lang; die Gruppen sollen sich auf- und zuklappen lassen.
+
+**Befund.** Das Grundeinkommen war bisher fest 100 € je Stunde, verbesserbar über `income` (ADR-197, bis 700 €),
+`vault`/`vault_xl` (bis 36 Stunden) und `vault_interest` (+20 %), gedämpft vom Staatskassen-Faktor (ADR-041). Selbst
+voll ausgebaut bringt der Tresor auf Level 30 rund 20.000 € am Tag; ein Spieler auf Level 25 verdient dann aber 84.000
+bis 182.000 € am Tag (BALANCING 2.2), überwiegend aus Lohn und Depot. Ohne Verbesserungen sind es 1.600 bis 2.400 €
+am Tag, also 1 bis 2 %.
+
+**Entscheidung.** Zwei Hebel, die mit dem Fortschritt wachsen, ohne das geschlossene Geldsystem zu verlassen:
+
+1. **Level-Bonus** (`vault.levelBonusBps` 800, `vault.levelBonusMaxLevel` 40): Das Grundeinkommen im Tresor (mit den
+   Verbesserungen) steigt je Level über 1 um 8 %, bis Level 40 (×4,12); danach ändert es sich nicht mehr. Gerundet wird
+   einmal „half even“, der Staatskassen-Faktor kommt danach. `vault_status` rechnet es ein, `claim_vault`, Portfolio,
+   „Tresor voll“ und alle anderen Leser übernehmen es unverändert. Wer ein Level aufsteigt, bekommt die neue Rate
+   für alles, was gerade im Tresor liegt (wie bei der Staatskasse; die Verbesserung `income` dagegen rechnet beim Kauf
+   ab, ADR-093).
+2. **Festgeld im Tresor** (`vault.deposits`), ab Level 5: Bargeld für 1, 3 oder 7 Tage fest anlegen, Zinsen 1,5 %,
+   5 % oder 14 % (also 1,5 %, 1,67 % und 2 % am Tag). Alle offenen Anlagen zusammen höchstens 25.000 € × Level, höchstens
+   drei gleichzeitig, mindestens 1.000 €. Das Geld bleibt dem Spieler: Es liegt auf seinem Konto `player_reserve`
+   (zählt zum Vermögen und zur Geldmenge wie reservierte Orders). Bei Fälligkeit kommt es mit den Zinsen zurück; die
+   Zinsen zahlt die Staatskasse (× Staatskassen-Faktor, so weit sie das Geld hat, `state_pay_partial`; ein offener
+   Zwangskredit behält seinen Anteil ein). Vorzeitig auflösen geht jederzeit, dann ohne Zinsen. Fällige Anlagen holt
+   der Spieler selbst ab, Zinsen laufen danach nicht weiter. Ein Zurücksetzen des Kontos verwirft offene Anlagen (das
+   Geld ist mit `account_wipe` schon an die Staatskasse gegangen).
+
+Die Zinsen liegen bewusst unter dem erwarteten Depotertrag (etwa 7 % am Tag, BALANCING 2.1), sind aber sicher und
+gedeckelt: ein Platz für Geld, das gerade nicht arbeiten soll, kein Ersatz für die Börse. Keine Steuer auf die Zinsen
+(wie beim Grundeinkommen); der Deckel je Level hält sie klein gegen das Vermögen später Spieler.
+
+Nicht gewählt: Zinsen auf den Tresorinhalt (er ist höchstens 36 Stunden Grundeinkommen, Zinsen darauf wären winzig),
+Serien-Bonus für regelmäßiges Leeren (belohnt Pflicht statt Fortschritt), Bänder nach Vermögen (Reiche bekämen mehr
+Staatsgeld).
+
+**Zahlen** (alle Verbesserungen gekauft, die das Level erlaubt; zwei Leerungen am Tag, also 24 Stunden gezählt, wenn
+der Tresor mindestens 12 Stunden fasst; Staatskasse voll; ohne Nexamon-Bonus):
+
+| Level | Grundeinkommen | Tresor | Tresorzinsen | vorher je Stunde / Tag | nachher je Stunde / Tag | Festgeld höchstens | Festgeld je Tag (7 Tage) |
+| ----- | -------------- | ------ | ------------ | ---------------------- | ----------------------- | ------------------ | ------------------------ |
+| 5     | 200 €          | 14 h   | +5 %         | 200 € / 5.040 €        | 264 € / 6.653 €         | 125.000 €          | bis 2.500 €              |
+| 15    | 450 €          | 28 h   | +20 %        | 450 € / 12.960 €       | 954 € / 27.475 €        | 375.000 €          | bis 7.500 €              |
+| 30    | 700 €          | 36 h   | +20 %        | 700 € / 20.160 €       | 2.324 € / 66.931 €      | 750.000 €          | bis 15.000 €             |
+
+Ohne jede Verbesserung (8 Stunden, zwei Leerungen = 16 Stunden): Level 5 1.600 → 2.112 €, Level 15 1.600 → 3.392 €,
+Level 30 1.600 → 5.312 € am Tag.
+
+**Geldsystem.** Bei vier Spielern auf Level 30 mit vollem Ausbau und vollem Festgeld zahlt die Staatskasse höchstens
+rund 330.000 € am Tag, 0,13 % ihres Ziels von 250 Mio. €. Leert sie sich, sinken Grundeinkommen und Festgeld-Zinsen
+mit dem Faktor (bis 0,25), Zinsen werden nur gezahlt, so weit Geld da ist. Das Festgeld selbst schafft kein Geld: Es
+wandert nur zwischen zwei Konten des Spielers.
+
+**Oberfläche.** Der geöffnete Tresor zeigt unter den Einnahmequellen „Das bringt dein Tresor“: Grundeinkommen,
+Level-Bonus, gegebenenfalls Staatskasse, Rate im Tresor, voller Tresor, Tresorzinsen und „am Tag, wenn du rechtzeitig
+leerst“. Darunter „So bringt er mehr“: nächstes Level, die nächste Stufe von Grundeinkommen, Tresor, Panzertresor und
+Tresorzinsen (mit Gewinn je Stunde und Preis oder „ab Level …“, Link auf die Verbesserungen) und Festgeld. Ab Level 5
+(`disclosure.vaultDeposits`) folgt das Festgeld mit Betrag, Laufzeit, Vorschau, laufenden Anlagen, „Abholen“ und
+„Auflösen“ (gedrückt halten). Die Untertitelzeile nennt Rate und vollen Tresor.
+
+Die Seite „Verbesserungen“ zeigt die fünf Gruppen als aufklappbare Abschnitte (`CollapsibleSection`, Radix
+Collapsible, `aria-expanded`): zugeklappt „3/30 gekauft · nächste ab 4.000 €“ (oder „nächste ab Level …“, „alles
+gekauft“) und eine Marke „2 jetzt kaufbar“. Beim ersten Besuch sind die Gruppen offen, in denen jetzt etwas kaufbar
+ist; das bleibt für den Besuch so, auch wenn man die letzte bezahlbare Stufe kauft. Die eigene Wahl merkt sich der
+Browser je Spieler (`nexa-folds:upgrades:<name>`, erst nach der Hydration gelesen).
+
+**Technik.** Migration `20261204009300_vault_level_deposits.sql` (Kopie in `updates/`): `vault_level_factor_bps`,
+`vault_status` neu (neue Felder `income_cents_per_hour`, `level`, `level_factor_bps`, `cap_hours`), Tabelle
+`vault_deposits`, RPCs `get_vault_deposits`, `open_vault_deposit`, `close_vault_deposit`, Trigger auf
+`player_private.account_reset_at`. Formeln in `src/lib/sim/vault.ts` mit Tests, Demo in `demo/vault-deposits.ts`.
+SQL-Test `e0_vault_level_deposits.sql`.
+
 ## ADR-205: Pack-Battle-Modi „Umgekehrt“ und „Twist“ — `Entscheidung (Eigentümer)`
 
 **Kontext.** Der Eigentümer wünscht mehr Optionen im Pack Battle (ADR-192): „Eine Einstellung, bei der der Spieler mit

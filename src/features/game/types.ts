@@ -184,6 +184,45 @@ export interface Vault {
   lastClaimedAt: string | null;
   fullAt: string;
   serverTime: string;
+  /** Basic income with the upgrades, before level bonus and treasury factor (ADR-201). */
+  incomeCentsPerHour: number;
+  /** Level bonus on the vault income, 10_000 = none (ADR-201). */
+  levelFactorBps: number;
+  /** Hours the vault holds (base, vault and vault_xl upgrades). */
+  capHours: number;
+}
+
+/** One open Festgeld deposit in the vault (ADR-201). */
+export interface VaultDeposit {
+  id: number;
+  amountCents: number;
+  termDays: number;
+  rateBps: number;
+  createdAt: string;
+  maturesAt: string;
+  matured: boolean;
+  /** Interest at maturity with the treasury factor of now. */
+  interestCents: number;
+}
+
+/** Festgeld in the vault (ADR-201): terms, limits and the open deposits. */
+export interface VaultDeposits {
+  level: number;
+  minLevel: number;
+  minCents: number;
+  capCents: number;
+  maxOpen: number;
+  factorBps: number;
+  serverTime: string;
+  terms: { days: number; rateBps: number }[];
+  openCents: number;
+  /** Interest collected so far. */
+  earnedCents: number;
+  deposits: VaultDeposit[];
+}
+
+export interface VaultDepositClosed extends VaultDeposits {
+  closed: { id: number; amountCents: number; interestCents: number; matured: boolean };
 }
 
 export interface Portfolio {
@@ -2505,6 +2544,10 @@ export const GAME_ERROR_KEYS = [
   "news_promo_inactive",
   "news_promo_claimed",
   "news_promo_no_company",
+  // ADR-201
+  "deposit_too_small",
+  "deposit_limit",
+  "deposit_not_found",
 ] as const;
 export type GameErrorKey = (typeof GAME_ERROR_KEYS)[number] | "unknown";
 
@@ -2714,6 +2757,10 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   quoteOrder(input: OrderQuoteInput): Promise<OrderQuote>;
   cancelOrder(requestId: string, orderId: string): Promise<void>;
   claimVault(requestId: string): Promise<{ claimedCents: number; cashCents: number }>;
+  /** Festgeld in the vault (ADR-201). */
+  vaultDeposits(): Promise<VaultDeposits>;
+  openVaultDeposit(requestId: string, amountCents: number, termDays: number): Promise<VaultDeposits>;
+  closeVaultDeposit(requestId: string, depositId: number): Promise<VaultDepositClosed>;
   completeTutorial(requestId: string): Promise<ProgressResult>;
   richList(scope: RichListScope, limit: number, offset: number): Promise<RichList>;
   richNews(limit: number): Promise<RichNews[]>;

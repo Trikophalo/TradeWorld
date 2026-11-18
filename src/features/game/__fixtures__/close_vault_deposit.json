@@ -1,0 +1,19 @@
+{
+  "level": 5,
+  "terms": [
+    { "days": 1, "rate_bps": 150 },
+    { "days": 3, "rate_bps": 500 },
+    { "days": 7, "rate_bps": 1400 }
+  ],
+  "closed": { "id": 4, "matured": false, "amount_cents": 200000, "interest_cents": 0 },
+  "deposits": [],
+  "max_open": 3,
+  "cap_cents": 12500000,
+  "min_cents": 100000,
+  "min_level": 5,
+  "cash_cents": 5700000,
+  "factor_bps": 10000,
+  "open_cents": 0,
+  "server_time": "2026-11-18T00:13:55.871301+00:00",
+  "earned_cents": 0
+}

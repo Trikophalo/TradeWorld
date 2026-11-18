@@ -634,9 +634,9 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder…",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-e3f3e70c",
-        title: "Schneller aufsteigen, abwechslungsreichere Missionen",
-        text: "Jedes Level ab Level 2 braucht 20 % weniger XP, Missionen bringen mit dem Level mehr XP: Ein aktiver Spieler steigt etwa 1,3- bis 1,4-mal so schnell…",
+        id: "startseite-waehrung-zur-wahl-freundescode-5be3075d",
+        title: "Der Tresor wächst mit dir",
+        text: "Das Grundeinkommen im Tresor steigt mit jedem Level um 8 % (bis Level 40, dann das 4,12-Fache), ab Level 5 gibt es Festgeld: Geld für 1, 3 oder 7…",
       },
     ],
   },

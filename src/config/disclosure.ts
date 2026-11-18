@@ -27,6 +27,8 @@ export const DISCLOSURE = {
   newsBattle: 2,
   /** Link from the vault to the upgrades (ADR-093): not during the tutorial. */
   homeUpgrades: 2,
+  /** Festgeld in the open vault (ADR-201): with the server unlock BALANCE.vault.deposits.minLevel. */
+  vaultDeposits: 5,
   /** Patch notes button in the top bar (ADR-137): not during the tutorial. */
   topbarPatchNotes: 2,
   /** Renting out places in the home and the rental market (ADR-158): with the property unlock (level 8). */
