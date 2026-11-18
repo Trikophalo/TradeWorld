@@ -28,7 +28,7 @@ import { useMountTime } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { NexamonPack } from "../components/pack";
 import { BattleView } from "./battle-view";
-import { LineupStrip, useBattleAction } from "./battle-lobby";
+import { BattleModeBadges, LineupStrip, useBattleAction } from "./battle-lobby";
 import { useNexamonLobby } from "./hooks";
 import { SpectatorView } from "./spectator-view";
 
@@ -280,6 +280,9 @@ function CreateBattleSheet({
   const [lineup, setLineup] = useState<NexamonSetKey[]>([NEXAMON_SETS[0]]);
   const [size, setSize] = useState<(typeof SIZES)[number]>("2");
   const [invited, setInvited] = useState<string[]>([]);
+  // ADR-205: the modes; both may be on
+  const [twist, setTwist] = useState(false);
+  const [reverse, setReverse] = useState(false);
   const { state, run } = useBattleAction();
   const opened = useRef<string | null>(null);
   // a fresh sheet per opening: one pack, two players, the friend it was opened for
@@ -290,6 +293,8 @@ function CreateBattleSheet({
       setLineup([NEXAMON_SETS[0]]);
       setSize("2");
       setInvited(invite ? [invite.nickname] : []);
+      setTwist(false);
+      setReverse(false);
     }
   }
   const players = Number(size);
@@ -322,7 +327,7 @@ function CreateBattleSheet({
           data-testid="challenge-send"
           onClick={async () => {
             const battle = await run(
-              (id) => engine.createNexamonPackBattle(id, lineup, players, invites),
+              (id) => engine.createNexamonPackBattle(id, lineup, players, invites, { reverse, twist }),
               t("challenge.error"),
             );
             if (battle) {
@@ -346,6 +351,58 @@ function CreateBattleSheet({
             label={t("create.players")}
             block
           />
+        </section>
+
+        <section className="space-y-2" aria-labelledby="battle-mode-label">
+          <h3 id="battle-mode-label" className="label-pixel text-fg-3">
+            {t("modes.label")}
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["twist", twist, setTwist],
+                ["reverse", reverse, setReverse],
+              ] as const
+            ).map(([key, on, set]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  set(!on);
+                  void playSound("battleClick");
+                }}
+                data-testid={`mode-${key}`}
+                className={cn(
+                  "flex min-w-0 flex-col items-start gap-0.5 rounded-md border-2 p-2 text-left focus-ring transition duration-fast ease-standard active:scale-[0.98]",
+                  on ? "border-accent bg-accent-soft" : "border-line-1 bg-surface-1 hover:bg-surface-2",
+                )}
+              >
+                <span className="flex w-full items-center justify-between gap-2">
+                  <span className="font-pixel text-xs text-fg-1 uppercase">{t(`modes.${key}`)}</span>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "grid size-4 place-items-center rounded-xs border-2 text-2xs leading-none",
+                      on ? "border-accent bg-accent text-on-accent" : "border-line-2",
+                    )}
+                  >
+                    {on ? "✓" : ""}
+                  </span>
+                </span>
+                <span className="text-2xs text-pretty text-fg-2">{t(`modes.${key}Short`)}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-pretty text-fg-3" data-testid="mode-rules">
+            {twist && reverse
+              ? t("modes.both")
+              : twist
+                ? t("modes.twistText")
+                : reverse
+                  ? t("modes.reverseText")
+                  : t("modes.classicText")}
+          </p>
         </section>
 
         <section className="space-y-2">
@@ -512,7 +569,10 @@ function LobbyBanner({
               })}{" "}
           <Countdown target={Date.parse(b.expiresAt)} className="text-xs text-fg-3" />
         </p>
-        <LineupStrip battle={b} className="mt-1" />
+        <div className="mt-1 flex flex-wrap items-end gap-2">
+          <LineupStrip battle={b} />
+          <BattleModeBadges reverse={b.reverse} twist={b.twist} />
+        </div>
       </div>
       {!mine && (
         <Button
@@ -631,7 +691,10 @@ function LiveSheet({
                         ? t("live.battle", { a: s.player.nickname, b: s.opponent.nickname })
                         : t("live.pack", { name: s.player.nickname })}
                   </span>
-                  <span className="block text-xs text-fg-3">{t(`sets.${s.set}`)}</span>
+                  <span className="flex flex-wrap items-center gap-1 text-xs text-fg-3">
+                    {t(`sets.${s.set}`)}
+                    {s.kind === "battle" && <BattleModeBadges reverse={s.reverse} twist={s.twist} />}
+                  </span>
                 </span>
                 <Badge tone="loss">{t("liveViewers", { count: s.viewers })}</Badge>
               </button>

@@ -1,0 +1,588 @@
+-- ===== idempotent copy of migrations/20261204009700_nexamon_pack_battle_modes.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 9700 · Pack Battle modes "Umgekehrt" and "Twist" (ADR-205)
+-- =============================================================================
+-- Rules: game_config.nexamon.packBattle.twistMs; src/lib/sim/nexamon-battle.ts (decideMultiBattle with reverse,
+-- twistPermutation, twistPiles, multiRevealAt/multiTwistAt with twistMs).
+-- * nexamon_battles.reverse ("Umgekehrt"): the lowest total wins; on a tie among the lowest the seat whose rarest card
+--   is the least rare, then the coin (coin_seed % count, seat order) as before.
+-- * nexamon_battles.twist ("Twist"): after every pack (the last one too) the piles of all seats are permuted at
+--   random. A pile is what a seat holds for the decision: pack by pack every seat adds its own pulls, then the twist
+--   hands seat i the pile seat perm[i] held (the cards travel with it for the rarity tie-break). The permutation of
+--   round k comes from twist_seed (nexamon_battle_twist_perm, identical to twistPermutation), uniform over all n!
+--   orders; all of them are stored in twists at the start. The winner still takes every card of every seat.
+-- * Both combine: the lowest pile after all twists wins.
+-- * Shared clock: a Twist battle plays packBattle.twistMs after every pack (one slot after its last card) before the
+--   next pack tears; nexamon_battle_json() reveals the cards and the twists on that clock (lead ms ahead, lockstep).
+-- * Money is unchanged: the same stakes, escrow, refunds and ledger keys as ADR-192.
+-- * Redefined in full (latest: 8000): create_nexamon_pack_battle (new p_reverse, p_twist; the 4-argument version is
+--   dropped, calls with four arguments still work through the defaults), nexamon_pack_battle_start,
+--   nexamon_battle_json, nexamon_live_row_json. New: nexamon_battle_twist_perm, nexamon_pack_battle_piles,
+--   nexamon_pack_battle_decide(jsonb, bigint, boolean), nexamon_battle_mode_label.
+-- Idempotent: runs unchanged as supabase/updates/20261204009700_nexamon_pack_battle_modes.sql.
+
+alter table public.nexamon_battles add column if not exists reverse boolean not null default false;
+alter table public.nexamon_battles add column if not exists twist boolean not null default false;
+alter table public.nexamon_battles add column if not exists twist_seed bigint;
+alter table public.nexamon_battles add column if not exists twists jsonb;
+alter table public.nexamon_battle_seats add column if not exists score_cents bigint;
+do $do$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'nexamon_battles_variant_check') then
+    alter table public.nexamon_battles add constraint nexamon_battles_variant_check
+      check (mode = 'multi' or (not reverse and not twist));
+  end if;
+end;
+$do$;
+comment on column public.nexamon_battles.reverse is 'ADR-205 "Umgekehrt": the lowest total wins (ties mirrored).';
+comment on column public.nexamon_battles.twist is
+  'ADR-205 "Twist": after every pack the piles (running totals) of all seats are permuted at random.';
+comment on column public.nexamon_battles.twist_seed is 'ADR-205: seed of the twists (nexamon_battle_twist_perm).';
+comment on column public.nexamon_battles.twists is
+  'ADR-205: one permutation per pack, [[perm of pack 1], ...]; seat i takes the pile of seat perm[i].';
+comment on column public.nexamon_battle_seats.score_cents is
+  'ADR-205: the total that decided (the pile after all twists); equals total_cents without Twist.';
+
+-- The twist after pack p_round (1-based) for p_n seats (twistPermutation): three MINSTD steps, modulo n!, Lehmer code
+create or replace function public.nexamon_battle_twist_perm(p_seed bigint, p_round integer, p_n integer)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  m      constant bigint := 2147483647;
+  x      bigint := (abs(coalesce(p_seed, 0)) % 2147483647 + p_round::bigint * 7919) % 2147483647;
+  v_fact bigint := 1;
+  v_f    bigint;
+  v_pool integer[];
+  v_out  integer[] := '{}';
+  v_k    integer;
+  i      integer;
+begin
+  for i in 1 .. 3 loop
+    x := (x * 48271) % m;
+  end loop;
+  for i in 2 .. p_n loop
+    v_fact := v_fact * i;
+  end loop;
+  x := x % v_fact;
+  v_pool := array(select g from generate_series(0, p_n - 1) g order by g);
+  for i in reverse p_n .. 1 loop
+    v_f := v_fact / i;
+    v_k := (x / v_f)::integer;
+    x := x % v_f;
+    v_out := v_out || v_pool[v_k + 1];
+    v_pool := v_pool[1:v_k] || v_pool[v_k + 2:];
+    v_fact := v_f;
+  end loop;
+  return to_jsonb(v_out);
+end;
+$$;
+
+-- The piles of every seat (twistPiles): pack by pack each seat adds its own pulls (only idx <= p_upto when given),
+-- then the twist of that pack (if p_twists has it) permutes the piles
+create or replace function public.nexamon_pack_battle_piles(p_seats jsonb, p_twists jsonb, p_packs integer,
+                                                            p_upto integer default null)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_n     integer := jsonb_array_length(p_seats);
+  v_piles jsonb[];
+  v_next  jsonb[];
+  v_perm  jsonb;
+  p       integer;
+  i       integer;
+begin
+  if v_n = 0 then
+    return '[]'::jsonb;
+  end if;
+  v_piles := array(select '[]'::jsonb from generate_series(1, v_n));
+  for p in 1 .. coalesce(p_packs, 0) loop
+    for i in 1 .. v_n loop
+      v_piles[i] := v_piles[i] || coalesce((select jsonb_agg(x order by (x ->> 'idx')::integer)
+                                              from jsonb_array_elements(coalesce(p_seats -> (i - 1), '[]'::jsonb)) x
+                                             where coalesce((x ->> 'pack')::integer, 1) = p
+                                               and (p_upto is null or (x ->> 'idx')::integer <= p_upto)), '[]'::jsonb);
+    end loop;
+    v_perm := p_twists -> (p - 1);
+    if v_perm is not null and jsonb_typeof(v_perm) = 'array' and jsonb_array_length(v_perm) = v_n then
+      v_next := v_piles;
+      for i in 1 .. v_n loop
+        v_next[i] := v_piles[(v_perm ->> (i - 1))::integer + 1];
+      end loop;
+      v_piles := v_next;
+    end if;
+  end loop;
+  return to_jsonb(v_piles);
+end;
+$$;
+
+-- Who wins (decideMultiBattle): p_seats = [pile of seat 0, ...]; p_reverse: the lowest total, ties mirrored
+create or replace function public.nexamon_pack_battle_decide(p_seats jsonb, p_seed bigint, p_reverse boolean)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_tot  bigint[] := '{}';
+  v_rank integer[] := '{}';
+  v_tied integer[] := '{}';
+  v_best bigint;
+  v_top  integer;
+  v_sum  bigint;
+  v_r    integer;
+  v_rev  boolean := coalesce(p_reverse, false);
+  i      integer;
+begin
+  for i in 0 .. jsonb_array_length(p_seats) - 1 loop
+    select coalesce(sum((x ->> 'value_cents')::bigint), 0), coalesce(max(public.nexamon_rarity_rank(x ->> 'rarity')), -1)
+      into v_sum, v_r from jsonb_array_elements(coalesce(p_seats -> i, '[]'::jsonb)) x;
+    v_tot := v_tot || v_sum;
+    v_rank := v_rank || v_r;
+  end loop;
+  if v_rev then
+    select min(t) into v_best from unnest(v_tot) t;
+  else
+    select max(t) into v_best from unnest(v_tot) t;
+  end if;
+  for i in 1 .. array_length(v_tot, 1) loop
+    if v_tot[i] = v_best then
+      v_tied := v_tied || (i - 1);
+    end if;
+  end loop;
+  if array_length(v_tied, 1) = 1 then
+    return jsonb_build_object('winner', v_tied[1], 'tie_break', 'value', 'totals', to_jsonb(v_tot));
+  end if;
+  if v_rev then
+    select min(v_rank[t + 1]) into v_top from unnest(v_tied) t;
+  else
+    select max(v_rank[t + 1]) into v_top from unnest(v_tied) t;
+  end if;
+  select array_agg(t order by t) into v_tied from unnest(v_tied) t where v_rank[t + 1] = v_top;
+  if array_length(v_tied, 1) = 1 then
+    return jsonb_build_object('winner', v_tied[1], 'tie_break', 'rarest', 'totals', to_jsonb(v_tot));
+  end if;
+  return jsonb_build_object('winner', v_tied[(abs(coalesce(p_seed, 0)) % array_length(v_tied, 1))::integer + 1],
+                            'tie_break', 'coin', 'totals', to_jsonb(v_tot));
+end;
+$$;
+
+-- " · Modus: Twist + Umgekehrt" for notifications ('' for the classic mode)
+create or replace function public.nexamon_battle_mode_label(p_reverse boolean, p_twist boolean)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_twist, false) or coalesce(p_reverse, false)
+              then ' · Modus: ' || concat_ws(' + ', case when p_twist then 'Twist' end, case when p_reverse then 'Umgekehrt' end)
+              else '' end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- The last seat is taken (latest: 8000): pay, open the lineup, twist, decide, the winner takes all
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_pack_battle_start(p_battle uuid, p_now timestamptz)
+returns public.nexamon_battles
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  b        public.nexamon_battles;
+  s        record;
+  v_pack   jsonb;
+  v_i      integer;
+  v_cards  jsonb;
+  v_all    jsonb := '[]'::jsonb;
+  v_ids    jsonb := '[]'::jsonb;
+  v_seed   bigint;
+  v_tseed  bigint;
+  v_twists jsonb;
+  v_piles  jsonb;
+  v_dec    jsonb;
+  v_ws     integer;
+  v_win    uuid;
+  v_total  bigint;
+  v_n      integer;
+  v_names  text;
+  v_losers text;
+  v_twist  numeric;
+  v_starts timestamptz;
+  v_decide timestamptz;
+begin
+  select * into b from public.nexamon_battles x where x.id = p_battle for update;
+  perform public.nexamon_sync(p_now);
+  v_n := jsonb_array_length(b.packs);
+  for s in select * from public.nexamon_battle_seats x where x.battle_id = b.id order by x.seat loop
+    if s.paid_cents > 0 then
+      perform public.ledger_transfer(public.ledger_system_account('nexamon_battle_escrow'), public.ledger_system_account('households'),
+                                     s.paid_cents, 'nexamon_pack', 'Pack Battle: ' || v_n || ' Packs', 'nexamon_battle', b.id,
+                                     'nexamon:battle:' || b.id::text || ':' || s.player_id::text, s.player_id,
+                                     jsonb_build_object('packs', b.packs, 'price_cents', s.paid_cents, 'battle_id', b.id));
+    end if;
+    v_cards := '[]'::jsonb;
+    for v_i in 0 .. v_n - 1 loop
+      v_pack := b.packs -> v_i;
+      v_cards := v_cards || public.nexamon_pack_battle_pull(b, s.player_id, v_pack ->> 'set', v_i + 1, p_now);
+    end loop;
+    update public.nexamon_battle_seats
+       set cards = v_cards, total_cents = (select coalesce(sum((x ->> 'value_cents')::bigint), 0) from jsonb_array_elements(v_cards) x)
+     where battle_id = b.id and seat = s.seat;
+    v_all := v_all || jsonb_build_array(v_cards);
+    v_ids := v_ids || (select coalesce(jsonb_agg(x -> 'copy_id'), '[]'::jsonb) from jsonb_array_elements(v_cards) x);
+  end loop;
+  for v_i in 0 .. v_n - 1 loop
+    update public.nexamon_set_state set player_packs_opened = player_packs_opened + b.size where set_key = b.packs -> v_i ->> 'set';
+  end loop;
+
+  v_seed := floor(random() * 2147483647)::bigint;
+  -- ADR-205: the twists of every pack from their own seed, stored; the piles after them decide
+  if b.twist then
+    v_tseed := floor(random() * 2147483647)::bigint;
+    select jsonb_agg(public.nexamon_battle_twist_perm(v_tseed, k, jsonb_array_length(v_all)) order by k)
+      into v_twists from generate_series(1, v_n) k;
+  end if;
+  v_piles := public.nexamon_pack_battle_piles(v_all, v_twists, v_n);
+  v_dec := public.nexamon_pack_battle_decide(v_piles, v_seed, b.reverse);
+  v_ws := (v_dec ->> 'winner')::integer;
+  update public.nexamon_battle_seats x set score_cents = (v_dec #>> array['totals', x.seat::text])::bigint
+   where x.battle_id = b.id;
+  select x.player_id into v_win from public.nexamon_battle_seats x where x.battle_id = b.id and x.seat = v_ws;
+  select coalesce(sum(t::bigint), 0) into v_total from jsonb_array_elements_text(v_dec -> 'totals') t;
+  -- the winner takes every copy of every seat; listings cannot exist yet
+  update public.nexamon_copies c set owner_id = v_win, acquired_at = p_now
+   where c.id in (select (x #>> '{}')::uuid from jsonb_array_elements(v_ids) x) and c.owner_id is distinct from v_win;
+  if to_regprocedure('public.nexamon_bonus_recompute(uuid)') is not null then
+    for s in select x.player_id from public.nexamon_battle_seats x where x.battle_id = b.id order by x.seat loop
+      execute 'select public.nexamon_bonus_recompute($1)' using s.player_id;
+    end loop;
+  end if;
+
+  v_twist := case when b.twist then coalesce((cfg #>> '{packBattle,twistMs}')::numeric, 3200) else 0 end;
+  v_starts := p_now + public.nexamon_ms(coalesce((cfg #>> '{battles,startDelayMs}')::numeric, 3000));
+  v_decide := v_starts + public.nexamon_ms(v_n * (coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400)
+                                                  + coalesce((cfg ->> 'packSize')::numeric, 5) * coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800)
+                                                  + v_twist));
+  update public.nexamon_battles
+     set status = 'accepted', responded_at = p_now, accepted_at = p_now, starts_at = v_starts, decide_at = v_decide,
+         ends_at = v_decide + public.nexamon_ms(coalesce((cfg #>> '{battles,outroMs}')::numeric, 8000)),
+         opponent_id = (select x.player_id from public.nexamon_battle_seats x where x.battle_id = b.id and x.seat = 1),
+         challenger_cards = v_all -> 0, opponent_cards = v_all -> 1,
+         challenger_cents = (v_dec #>> '{totals,0}')::bigint, opponent_cents = (v_dec #>> '{totals,1}')::bigint,
+         winner_id = v_win, winner_seat = v_ws, tie_break = v_dec ->> 'tie_break', coin_seed = v_seed,
+         twist_seed = v_tseed, twists = v_twists
+   where id = b.id returning * into b;
+  insert into public.nexamon_live (player_id, kind, battle_id, set_key, started_at, ends_at)
+  values (b.challenger_id, 'battle', b.id, b.set_key, p_now, b.ends_at)
+  on conflict (battle_id) do nothing;
+
+  select string_agg(p.nickname, ', ' order by x.seat) into v_names
+    from public.nexamon_battle_seats x join public.profiles p on p.id = x.player_id where x.battle_id = b.id;
+  select string_agg(p.nickname, ', ' order by x.seat) into v_losers
+    from public.nexamon_battle_seats x join public.profiles p on p.id = x.player_id where x.battle_id = b.id and x.seat <> v_ws;
+  perform public.feed_post(v_win, 'nexamon_battle_won',
+                           jsonb_build_object('set', b.set_key, 'other', v_losers, 'total_cents', v_total, 'packs', v_n,
+                                              'players', b.size, 'cards', jsonb_array_length(v_ids),
+                                              'reverse', b.reverse, 'twist', b.twist),
+                           'nexamon:battle:won:' || b.id::text);
+  if v_total >= coalesce((cfg #>> '{battles,gossipMinCents}')::bigint, 500000) then
+    perform public.feed_post(v_win, 'nexamon_battle_big',
+                             jsonb_build_object('set', b.set_key, 'other', v_losers, 'total_cents', v_total,
+                                                'reverse', b.reverse, 'twist', b.twist),
+                             'nexamon:battle:big:' || b.id::text);
+  end if;
+  for s in select x.player_id from public.nexamon_battle_seats x where x.battle_id = b.id order by x.seat loop
+    perform public.social_notify(s.player_id, 'nexamon_battle', 'Pack Battle läuft',
+      v_names || ': die Packs gehen auf!' || public.nexamon_battle_mode_label(b.reverse, b.twist),
+      jsonb_build_object('battle_id', b.id, 'reverse', b.reverse, 'twist', b.twist), '/nexamon?battle=' || b.id::text,
+      'nexamon:battle:accepted:' || b.id::text || ':' || s.player_id::text);
+  end loop;
+  return b;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- create_nexamon_pack_battle (latest: 8000) with the modes
+-- ---------------------------------------------------------------------------
+drop function if exists public.create_nexamon_pack_battle(uuid, text[], integer, text[]);
+create or replace function public.create_nexamon_pack_battle(p_request_id uuid, p_sets text[], p_size integer,
+                                                             p_invite text[] default '{}', p_reverse boolean default false,
+                                                             p_twist boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cfg      jsonb := public.nexamon_cfg();
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_packs  jsonb := '[]'::jsonb;
+  v_price  bigint := 0;
+  v_p      bigint;
+  v_set    text;
+  v_last   timestamptz;
+  v_other  uuid;
+  v_nick   text;
+  v_name   text;
+  b        public.nexamon_battles;
+begin
+  v_player := public.require_player();
+  perform public.nexamon_require_unlock(v_player);
+  if p_request_id is null or p_sets is null or p_size is null or p_reverse is null or p_twist is null
+     or coalesce(array_length(p_sets, 1), 0) < 1
+     or array_length(p_sets, 1) > coalesce((cfg #>> '{packBattle,maxPacks}')::integer, 10)
+     or p_size < coalesce((cfg #>> '{packBattle,minPlayers}')::integer, 2)
+     or p_size > least(4, coalesce((cfg #>> '{packBattle,maxPlayers}')::integer, 4))
+     or coalesce(array_length(p_invite, 1), 0) > p_size - 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'create_nexamon_pack_battle');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  foreach v_set in array p_sets loop
+    v_p := (cfg #>> array['sets', v_set, 'packPriceCents'])::bigint;
+    if v_set is null or v_p is null or v_p < 0
+       or not exists (select 1 from public.nexamon_cards k where k.set_key = v_set and k.in_catalogue) then
+      perform public.api_error('nexamon_unknown');
+    end if;
+    if not public.nexamon_set_released(v_set, v_now) then
+      perform public.api_error('nexamon_set_not_released');
+    end if;
+    v_packs := v_packs || jsonb_build_object('set', v_set, 'price_cents', v_p);
+    v_price := v_price + v_p;
+  end loop;
+  perform 1 from public.profiles p where p.id = v_player for update;
+  perform public.nexamon_pack_battle_expire(v_now);
+  if public.nexamon_battle_busy(v_player, v_now) then
+    perform public.api_error('nexamon_battle_busy');
+  end if;
+  select max(x.created_at) into v_last from public.nexamon_battles x where x.challenger_id = v_player;
+  if v_last is not null and v_last > v_now - make_interval(secs => coalesce((cfg #>> '{battles,cooldownSeconds}')::integer, 20)) then
+    perform public.api_error('nexamon_battle_cooldown');
+  end if;
+  if public.nexamon_battles_last_hour(v_player, v_now) >= coalesce((cfg #>> '{battles,perHour}')::integer, 6) then
+    perform public.api_error('nexamon_battle_limit');
+  end if;
+  if public.lock_player_accounts(v_player) < v_price then
+    perform public.api_error('insufficient_funds');
+  end if;
+  insert into public.nexamon_battles (challenger_id, opponent_id, set_key, price_cents, created_at, expires_at, mode, size, packs,
+                                      reverse, twist)
+  values (v_player, null, p_sets[1], v_price, v_now,
+          v_now + make_interval(secs => coalesce((cfg #>> '{packBattle,lobbySeconds}')::integer, 120)), 'multi', p_size, v_packs,
+          p_reverse, p_twist)
+  returning * into b;
+  insert into public.nexamon_battle_seats (battle_id, seat, player_id, joined_at, paid_cents)
+  values (b.id, 0, v_player, v_now, v_price);
+  if v_price > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('nexamon_battle_escrow'),
+                                   v_price, 'nexamon_pack', 'Pack Battle: Einsatz', 'nexamon_battle', b.id,
+                                   'nexamon:battle:stake:' || b.id::text || ':' || v_player::text, v_player,
+                                   jsonb_build_object('packs', v_packs, 'price_cents', v_price, 'battle_id', b.id));
+  end if;
+
+  select p.nickname into v_name from public.profiles p where p.id = v_player;
+  foreach v_nick in array coalesce(p_invite, '{}') loop
+    select p.id into v_other from public.profiles p where lower(p.nickname) = lower(v_nick) and not p.is_deactivated;
+    if v_other is null then
+      perform public.api_error('nexamon_battle_unknown');
+    end if;
+    if v_other = v_player then
+      perform public.api_error('nexamon_battle_self');
+    end if;
+    if not exists (select 1 from public.friendships f
+                    where f.status = 'accepted'
+                      and ((f.requester_id = v_player and f.addressee_id = v_other) or (f.requester_id = v_other and f.addressee_id = v_player))) then
+      perform public.api_error('nexamon_battle_not_friend');
+    end if;
+    if not public.nexamon_unlocked(v_other) then
+      perform public.api_error('nexamon_battle_opponent_locked');
+    end if;
+    insert into public.nexamon_battle_invites (battle_id, player_id) values (b.id, v_other) on conflict do nothing;
+    perform public.social_notify(v_other, 'nexamon_battle', 'Pack Battle!',
+      v_name || ' lädt dich zum Pack Battle ein: ' || jsonb_array_length(v_packs) || ' Pack'
+        || case when jsonb_array_length(v_packs) = 1 then '' else 's' end || ', ' || p_size || ' Spieler, Einsatz '
+        || public.format_eur(v_price) || public.nexamon_battle_mode_label(p_reverse, p_twist) || '.',
+      jsonb_build_object('battle_id', b.id, 'packs', v_packs, 'price_cents', v_price, 'size', p_size,
+                         'reverse', p_reverse, 'twist', p_twist),
+      '/nexamon?battle=' || b.id::text, 'nexamon:battle:invite:' || b.id::text || ':' || v_other::text);
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('battle', public.nexamon_battle_json(b, v_player, v_now)));
+end;
+$$;
+comment on function public.create_nexamon_pack_battle(uuid, text[], integer, text[], boolean, boolean) is
+  'RPC (ADR-192/205): opens a Pack Battle lobby with a lineup of packs (sets in order) for 2-4 players and the modes '
+  'p_reverse ("Umgekehrt": the lowest total wins) and p_twist ("Twist": the piles are permuted after every pack), '
+  'pays the stake (sum of the pack prices) into escrow, invites friends; returns {battle}. Errors nexamon_locked, '
+  'invalid_argument, nexamon_unknown, nexamon_set_not_released, nexamon_battle_busy, nexamon_battle_cooldown, '
+  'nexamon_battle_limit, insufficient_funds, nexamon_battle_unknown, nexamon_battle_self, nexamon_battle_not_friend, '
+  'nexamon_battle_opponent_locked.';
+
+-- ---------------------------------------------------------------------------
+-- The battle as players and spectators see it (latest: 8000), with modes, twists and running scores
+-- ---------------------------------------------------------------------------
+create or replace function public.nexamon_battle_json(b public.nexamon_battles, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  cfg     jsonb := public.nexamon_cfg();
+  v_size  integer := coalesce((cfg ->> 'packSize')::integer, 5);
+  v_lead  numeric := coalesce((cfg #>> '{battles,leadMs}')::numeric, 800);
+  v_tear  numeric := coalesce((cfg #>> '{battles,tearMs}')::numeric, 2400);
+  v_slot  numeric := coalesce((cfg #>> '{battles,slotMs}')::numeric, 1800);
+  v_twist numeric := case when b.twist then coalesce((cfg #>> '{packBattle,twistMs}')::numeric, 3200) else 0 end;
+  v_packs jsonb := coalesce(b.packs, jsonb_build_array(jsonb_build_object('set', b.set_key, 'price_cents', b.price_cents)));
+  v_n     integer;
+  v_known integer := 0;
+  v_tk    integer := 0;
+  v_done  boolean := false;
+  v_status text := b.status;
+  v_ms    numeric;
+  v_ca    jsonb := '[]'::jsonb;
+  v_oa    jsonb := '[]'::jsonb;
+  v_seats jsonb := '[]'::jsonb;
+  v_tw    jsonb := '[]'::jsonb;
+  v_score jsonb;
+  v_my    integer;
+  v_live  uuid;
+begin
+  v_n := jsonb_array_length(v_packs);
+  if b.status = 'pending' and b.expires_at <= p_now then
+    v_status := 'expired';
+  end if;
+  if b.status = 'accepted' then
+    v_status := case when p_now >= b.ends_at then 'done' else 'running' end;
+    if p_now >= b.starts_at then
+      -- card idx g (1-based over the lineup) of pack p shows at starts + p * tear + (g - 1) * slot + (p - 1) * twist
+      -- (multiRevealAt); the twist after pack k at starts + k * (tear + size * slot) + (k - 1) * twist (multiTwistAt)
+      v_ms := extract(epoch from (p_now - b.starts_at)) * 1000 + v_lead;
+      select count(*)::integer into v_known from generate_series(1, v_n * v_size) g
+       where ((g - 1) / v_size + 1) * v_tear + (g - 1) * v_slot + ((g - 1) / v_size) * v_twist <= v_ms;
+      if b.twist then
+        select count(*)::integer into v_tk from generate_series(1, v_n) k
+         where k * (v_tear + v_size * v_slot) + (k - 1) * v_twist <= v_ms;
+      end if;
+    end if;
+    v_done := p_now >= b.decide_at - public.nexamon_ms(v_lead);
+  end if;
+  if b.mode = 'multi' then
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'seat', s.seat, 'player', public.nexamon_figure_json(s.player_id), 'is_me', s.player_id = p_viewer,
+             'cards', (select coalesce(jsonb_agg(x - 'copy_id' - 'is_new' - 'population' order by (x ->> 'idx')::integer), '[]'::jsonb)
+                         from jsonb_array_elements(coalesce(s.cards, '[]'::jsonb)) x where (x ->> 'idx')::integer <= v_known))
+             order by s.seat), '[]'::jsonb)
+      into v_seats from public.nexamon_battle_seats s where s.battle_id = b.id;
+    select s.seat into v_my from public.nexamon_battle_seats s where s.battle_id = b.id and s.player_id = p_viewer;
+    if b.twist and v_tk > 0 then
+      select coalesce(jsonb_agg(x order by o), '[]'::jsonb) into v_tw
+        from jsonb_array_elements(coalesce(b.twists, '[]'::jsonb)) with ordinality t(x, o) where o <= v_tk;
+    end if;
+  else
+    v_seats := jsonb_build_array(
+      jsonb_build_object('seat', 0, 'player', public.nexamon_figure_json(b.challenger_id), 'is_me', b.challenger_id = p_viewer,
+                         'cards', (select coalesce(jsonb_agg((x - 'copy_id' - 'is_new' - 'population') || jsonb_build_object('pack', 1, 'idx', (x ->> 'slot')::integer)
+                                                             order by (x ->> 'slot')::integer), '[]'::jsonb)
+                                     from jsonb_array_elements(coalesce(b.challenger_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known)),
+      jsonb_build_object('seat', 1, 'player', public.nexamon_figure_json(b.opponent_id), 'is_me', b.opponent_id = p_viewer,
+                         'cards', (select coalesce(jsonb_agg((x - 'copy_id' - 'is_new' - 'population') || jsonb_build_object('pack', 1, 'idx', (x ->> 'slot')::integer)
+                                                             order by (x ->> 'slot')::integer), '[]'::jsonb)
+                                     from jsonb_array_elements(coalesce(b.opponent_cards, '[]'::jsonb)) x where (x ->> 'slot')::integer <= v_known)));
+    v_my := case when p_viewer = b.challenger_id then 0 when p_viewer = b.opponent_id then 1 end;
+  end if;
+  -- the running score per seat: the piles from the cards and twists known so far (equals cents without Twist)
+  v_score := public.nexamon_pack_battle_piles(
+    (select coalesce(jsonb_agg(x -> 'cards' order by (x ->> 'seat')::integer), '[]'::jsonb) from jsonb_array_elements(v_seats) x),
+    v_tw, v_n);
+  v_seats := (select coalesce(jsonb_agg(x || jsonb_build_object(
+                                 'cents', (select coalesce(sum((c ->> 'value_cents')::bigint), 0) from jsonb_array_elements(x -> 'cards') c),
+                                 'score_cents', (select coalesce(sum((c ->> 'value_cents')::bigint), 0)
+                                                   from jsonb_array_elements(coalesce(v_score -> (o::integer - 1), '[]'::jsonb)) c))
+                               order by (x ->> 'seat')::integer), '[]'::jsonb)
+                from jsonb_array_elements(v_seats) with ordinality t(x, o));
+  v_ca := coalesce((select x -> 'cards' from jsonb_array_elements(v_seats) x where (x ->> 'seat')::integer = 0), '[]'::jsonb);
+  v_oa := coalesce((select x -> 'cards' from jsonb_array_elements(v_seats) x where (x ->> 'seat')::integer = 1), '[]'::jsonb);
+  select l.id into v_live from public.nexamon_live l where l.battle_id = b.id;
+  return jsonb_build_object(
+    'id', b.id, 'set', b.set_key, 'status', v_status, 'price_cents', b.price_cents,
+    'mode', b.mode, 'size', b.size, 'packs', v_packs, 'seats', v_seats, 'my_seat', v_my,
+    'reverse', b.reverse, 'twist', b.twist, 'twists', v_tw, 'twist_ms', v_twist,
+    'twist_seed', case when v_done then b.twist_seed end,
+    'challenger', public.nexamon_figure_json(b.challenger_id), 'opponent', public.nexamon_figure_json(b.opponent_id),
+    'me', case when v_my = 0 then 'challenger' when v_my = 1 then 'opponent' end,
+    'created_at', b.created_at, 'expires_at', b.expires_at, 'accepted_at', b.accepted_at, 'starts_at', b.starts_at,
+    'decide_at', b.decide_at, 'ends_at', b.ends_at, 'tear_ms', v_tear, 'slot_ms', v_slot,
+    'challenger_cards', v_ca, 'opponent_cards', v_oa,
+    'challenger_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_ca) x), 0),
+    'opponent_cents', coalesce((select sum((x ->> 'value_cents')::bigint) from jsonb_array_elements(v_oa) x), 0),
+    'winner', case when v_done then case when b.winner_id = b.challenger_id then 'challenger'
+                                         when b.winner_id = b.opponent_id then 'opponent' end end,
+    'winner_seat', case when v_done then coalesce(b.winner_seat::integer,
+                                                  case when b.winner_id = b.challenger_id then 0 when b.winner_id = b.opponent_id then 1 end) end,
+    'tie_break', case when v_done then b.tie_break end,
+    'coin_seed', case when v_done then b.coin_seed end,
+    'abort_reason', b.abort_reason,
+    'live_id', v_live,
+    'viewers', case when v_live is null then 0 else public.nexamon_live_viewer_count(v_live, p_now) end,
+    'reactions', case when v_live is null then '[]'::jsonb else public.nexamon_live_reactions_json(v_live, p_now) end,
+    'server_time', p_now);
+end;
+$$;
+
+-- One live opening as the lobby lists it (latest: 8000), battles with their modes
+create or replace function public.nexamon_live_row_json(l public.nexamon_live, p_viewer uuid, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('id', l.id, 'kind', l.kind, 'set', l.set_key, 'battle_id', l.battle_id,
+                            'player', public.nexamon_figure_json(l.player_id),
+                            'opponent', case when l.kind = 'battle'
+                                          then public.nexamon_figure_json((select b.opponent_id from public.nexamon_battles b where b.id = l.battle_id)) end,
+                            'players', case when l.kind = 'battle'
+                                         then coalesce((select jsonb_agg(public.nexamon_figure_json(s.player_id) order by s.seat)
+                                                          from public.nexamon_battle_seats s where s.battle_id = l.battle_id),
+                                                       (select jsonb_build_array(public.nexamon_figure_json(b.challenger_id), public.nexamon_figure_json(b.opponent_id))
+                                                          from public.nexamon_battles b where b.id = l.battle_id)) end,
+                            'reverse', coalesce((select b.reverse from public.nexamon_battles b where b.id = l.battle_id), false),
+                            'twist', coalesce((select b.twist from public.nexamon_battles b where b.id = l.battle_id), false),
+                            'is_me', l.player_id = p_viewer or (l.kind = 'battle' and public.nexamon_battle_player(l.battle_id, p_viewer)),
+                            'started_at', l.started_at, 'ends_at', l.ends_at,
+                            'viewers', public.nexamon_live_viewer_count(l.id, p_now));
+$$;
+
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array['public.create_nexamon_pack_battle(uuid, text[], integer, text[], boolean, boolean)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+  foreach f in array array['public.nexamon_battle_twist_perm(bigint, integer, integer)',
+                           'public.nexamon_pack_battle_piles(jsonb, jsonb, integer, integer)',
+                           'public.nexamon_pack_battle_decide(jsonb, bigint, boolean)',
+                           'public.nexamon_battle_mode_label(boolean, boolean)',
+                           'public.nexamon_pack_battle_start(uuid, timestamptz)',
+                           'public.nexamon_battle_json(public.nexamon_battles, uuid, timestamptz)',
+                           'public.nexamon_live_row_json(public.nexamon_live, uuid, timestamptz)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+end;
+$do$;

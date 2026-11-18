@@ -40,6 +40,7 @@ const seatSchema = z.object({
   is_me: z.boolean(),
   cards: z.array(pullSchema),
   cents: num,
+  score_cents: num.optional(),
 });
 const packSchema = z.object({ set: z.enum(NEXAMON_SETS), price_cents: num });
 const reactionSchema = z.object({ id: num, emoji: z.string(), at: iso });
@@ -50,6 +51,11 @@ const battleSchema = z.object({
   price_cents: num,
   mode: z.enum(["duel", "multi"]).default("duel"),
   size: num.default(2),
+  reverse: z.boolean().default(false),
+  twist: z.boolean().default(false),
+  twists: z.array(z.array(num)).default([]),
+  twist_ms: num.default(0),
+  twist_seed: num.nullish(),
   packs: z.array(packSchema).nullish(),
   seats: z.array(seatSchema).nullish(),
   my_seat: num.nullish(),
@@ -86,6 +92,8 @@ const liveSchema = z.object({
   player: figureSchema,
   opponent: figureSchema.nullable(),
   players: z.array(figureSchema).nullish(),
+  reverse: z.boolean().default(false),
+  twist: z.boolean().default(false),
   is_me: z.boolean(),
   started_at: iso,
   ends_at: iso,
@@ -150,6 +158,8 @@ const toLive = (l: z.infer<typeof liveSchema>): NexamonLiveSession => ({
   player: toFigure(l.player),
   opponent: l.opponent ? toFigure(l.opponent) : null,
   players: l.players ? l.players.map(toFigure) : null,
+  reverse: l.reverse,
+  twist: l.twist,
   isMe: l.is_me,
   startedAt: l.started_at,
   endsAt: l.ends_at,
@@ -162,6 +172,11 @@ export const toNexamonBattle = (b: z.infer<typeof battleSchema>): NexamonBattle 
   priceCents: b.price_cents,
   mode: b.mode,
   size: b.size,
+  reverse: b.reverse,
+  twist: b.twist,
+  twists: b.twists,
+  twistMs: b.twist_ms,
+  twistSeed: b.twist_seed ?? null,
   packs: (b.packs ?? [{ set: b.set, price_cents: b.price_cents }]).map((p) => ({
     set: p.set,
     priceCents: p.price_cents,
@@ -193,6 +208,7 @@ export const toNexamonBattle = (b: z.infer<typeof battleSchema>): NexamonBattle 
     isMe: s.is_me,
     cards: s.cards.map(toPull),
     cents: s.cents,
+    scoreCents: ("score_cents" in s ? s.score_cents : undefined) ?? s.cents,
   })),
   mySeat: b.my_seat ?? (b.me === "challenger" ? 0 : b.me === "opponent" ? 1 : null),
   winnerSeat: b.winner_seat ?? (b.winner === "challenger" ? 0 : b.winner === "opponent" ? 1 : null),
@@ -247,10 +263,17 @@ export const livePackBattleEngine: PackBattleEngine = {
     );
     return toNexamonBattle(r.battle);
   },
-  async createNexamonPackBattle(requestId, sets, size, invite) {
+  async createNexamonPackBattle(requestId, sets, size, invite, modes) {
     const r = await rpc(
       "create_nexamon_pack_battle",
-      { p_request_id: requestId, p_sets: sets, p_size: size, p_invite: invite },
+      {
+        p_request_id: requestId,
+        p_sets: sets,
+        p_size: size,
+        p_invite: invite,
+        p_reverse: modes?.reverse ?? false,
+        p_twist: modes?.twist ?? false,
+      },
       battleResultSchema,
     );
     return toNexamonBattle(r.battle);

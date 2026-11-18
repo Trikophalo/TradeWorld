@@ -1315,6 +1315,10 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es wieder heraus.
 - **Sofortverkauf:** rohe Commons und Rares zu 50 % des Werts, bis zu 50 Kopien je Aufruf.
 - **Markt:** 5 % Gebühr für verkaufende Spieler, Preis 0,10 € bis 1 Mrd. €, höchstens 30 offene Angebote.
+- **Pack-Battle-Modi (ADR-205):** `packBattle.twistMs` 3,2 s je Twist (ein Twist-Battle mit zehn Packs dauert damit
+  32 s länger). Der Twist ändert nicht, wer was zieht, nur wer welchen Wert hält: Der Erwartungswert je Spieler bleibt
+  bei n Spielern 1/n des Topfs, die Streuung steigt (nach dem letzten Twist gewinnt praktisch ein zufälliger Haufen).
+  „Umgekehrt“ belohnt schwache Pulls, ändert aber ebenso keinen Betrag.
 - **Stellschrauben, falls Booster zu lohnend oder zu teuer sind:** `ai.dailyBudgetPacks`, `ai.buysPerCardWindow`,
   `ai.premiumBps`, `ai.gradePremiumBps`, `ai.maxPremiumBps`, `ai.buyChanceBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
   Platzhalter-Preisen (gleichmäßig über die Spannen) liegt der Inhalt eines Boosters rechnerisch über seinem Preis;

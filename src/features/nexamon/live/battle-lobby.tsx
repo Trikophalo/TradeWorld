@@ -45,6 +45,34 @@ export function useBattleAction() {
   return { state, run };
 }
 
+/** ADR-205: the modes of a battle as badges ("Twist", "Umgekehrt"); nothing for the classic mode. */
+export function BattleModeBadges({
+  reverse,
+  twist,
+  className,
+}: {
+  reverse?: boolean;
+  twist?: boolean;
+  className?: string;
+}) {
+  const t = useTranslations("nexamonLive.modes");
+  if (!reverse && !twist) return null;
+  return (
+    <span className={cn("inline-flex flex-wrap items-center gap-1", className)} data-testid="battle-modes">
+      {twist && (
+        <Badge tone="accent" data-testid="battle-mode-twist">
+          {t("twist")}
+        </Badge>
+      )}
+      {reverse && (
+        <Badge tone="warn" data-testid="battle-mode-reverse">
+          {t("reverse")}
+        </Badge>
+      )}
+    </span>
+  );
+}
+
 /** The lineup of a battle as small packs in order. */
 export function LineupStrip({ battle: b, className }: { battle: NexamonBattle; className?: string }) {
   const t = useTranslations("nexamonLive");
@@ -80,9 +108,12 @@ export function BattleLobby({ battle: b, onClose }: { battle: NexamonBattle; onC
           {t("lobbyView.waiting", { taken: b.seats.length, size: b.size })}{" "}
           <Countdown target={Date.parse(b.expiresAt)} className="text-xs text-fg-3" />
         </p>
-        <Badge tone="accent" className="nums">
-          {t("lobbyView.stake", { price: formatMoney(b.priceCents, { whole: true }) })}
-        </Badge>
+        <span className="flex flex-wrap items-center gap-1">
+          <BattleModeBadges reverse={b.reverse} twist={b.twist} />
+          <Badge tone="accent" className="nums">
+            {t("lobbyView.stake", { price: formatMoney(b.priceCents, { whole: true }) })}
+          </Badge>
+        </span>
       </div>
       <ul className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label={t("lobbyView.seats")}>
         {Array.from({ length: b.size }, (_, i) => {
@@ -124,6 +155,11 @@ export function BattleLobby({ battle: b, onClose }: { battle: NexamonBattle; onC
         <h3 className="label-pixel text-fg-3">{t("lobbyView.lineup")}</h3>
         <LineupStrip battle={b} />
         <p className="text-xs text-pretty text-fg-3">{t("lobbyView.rules")}</p>
+        {(b.twist || b.reverse) && (
+          <p className="text-xs text-pretty text-fg-2" data-testid="lobby-mode-rules">
+            {[b.twist && t("modes.twistText"), b.reverse && t("modes.reverseText")].filter(Boolean).join(" ")}
+          </p>
+        )}
       </section>
       <div className="mt-auto flex flex-col gap-2 sm:flex-row sm:justify-end">
         {!seated && (

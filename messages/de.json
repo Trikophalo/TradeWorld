@@ -3260,7 +3260,8 @@
         "board_revolt": "hat im Geschäftsrat von {company} einen Aufstand angezettelt.",
         "research_done": "feiert bei {company} einen Forschungsdurchbruch.",
         "nexamon_master_set": "hat das Master-Set von {name} komplett.",
-        "nexamon_hype": "freut sich: Die Black Labels von {name} sind im Preis gesprungen."
+        "nexamon_hype": "freut sich: Die Black Labels von {name} sind im Preis gesprungen.",
+        "nexamon_battle_mode": "{mode, select, twist {(Twist)} reverse {(Umgekehrt)} both {(Twist + Umgekehrt)} other {}}"
       }
     },
     "notifications": {
@@ -10745,7 +10746,8 @@
       "takes": "{count} Karten im Wert von {value} gehen an den Gewinner.",
       "tieBreak": {
         "rarest": "Gleicher Wert: die seltenste Karte hat entschieden.",
-        "coin": "Gleicher Wert, gleich selten: der Münzwurf hat entschieden."
+        "coin": "Gleicher Wert, gleich selten: der Münzwurf hat entschieden.",
+        "rarestReverse": "Gleicher Wert: Die am wenigsten seltene Top-Karte hat entschieden."
       },
       "done": "Fertig",
       "winner": "Gewinner",
@@ -10757,7 +10759,15 @@
         "expired": "Nicht voll geworden: alle haben ihren Einsatz zurück",
         "cancelled": "Abgesagt: alle haben ihren Einsatz zurück",
         "aborted": "Abgebrochen: alle haben ihren Einsatz zurück"
-      }
+      },
+      "twist": {
+        "title": "Twist!",
+        "label": "Nach Pack {n}",
+        "none": "Kein Tausch: alle behalten ihren Wert.",
+        "from": "von {name}",
+        "pulled": "gezogen {value}"
+      },
+      "reverseHint": "Umgekehrt: Der niedrigste Wert hat gewonnen."
     },
     "spectate": {
       "title": "{name} öffnet live",
@@ -10839,6 +10849,17 @@
       "join": "Beitreten · {price}",
       "joinError": "Beitreten ging nicht",
       "cancel": "Absagen und Einsatz zurück"
+    },
+    "modes": {
+      "label": "Modus",
+      "twist": "Twist",
+      "reverse": "Umgekehrt",
+      "twistShort": "Nach jedem Pack werden die Werte zufällig getauscht.",
+      "reverseShort": "Der niedrigste Wert gewinnt.",
+      "classicText": "Klassisch: Wer insgesamt am meisten Wert zieht, bekommt alle Karten.",
+      "twistText": "Twist: Nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht. Wer am Ende den höchsten Wert hält, bekommt alle Karten. Reines Chaos.",
+      "reverseText": "Umgekehrt: Wer insgesamt am wenigsten Wert zieht, bekommt alle Karten.",
+      "both": "Twist + Umgekehrt: Nach jedem Pack werden die Werte zufällig vertauscht, am Ende gewinnt der niedrigste Wert alle Karten."
     }
   },
   "companyInterview": {
