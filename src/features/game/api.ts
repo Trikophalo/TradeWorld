@@ -20,6 +20,7 @@ import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { NEWS_PROMO_RPC_SCHEMAS, liveNewsPromoEngine } from "./api-news-promos";
 import { TOPLIST_RPC_SCHEMAS, liveToplistEngine } from "./api-toplists";
 import { COMPANY_SKILLS_RPC_SCHEMAS, liveCompanySkillsEngine } from "./api-company-skills";
+import { liveWorldEngine, WORLD_RPC_SCHEMAS } from "./api-world";
 import { INTERVIEW_RPC_SCHEMAS, liveInterviewEngine } from "./api-interviews";
 import { TOUR_RPC_SCHEMAS, liveTourEngine } from "./api-tours";
 import { NFT_RPC_SCHEMAS, liveNftEngine } from "./api-nfts";
@@ -511,6 +512,7 @@ export const RPC_SCHEMAS = {
   ...NEWS_PROMO_RPC_SCHEMAS,
   ...TOPLIST_RPC_SCHEMAS,
   ...COMPANY_SKILLS_RPC_SCHEMAS,
+  ...WORLD_RPC_SCHEMAS,
   ...COMPANY_RPC_SCHEMAS,
   ...ARTWORK_RPC_SCHEMAS,
   ...PROPERTY_RPC_SCHEMAS,
@@ -554,6 +556,7 @@ export const liveEngine: GameEngine = {
   ...liveNewsPromoEngine,
   ...liveToplistEngine,
   ...liveCompanySkillsEngine,
+  ...liveWorldEngine,
   ...liveInterviewEngine,
   ...liveBattleEngine,
   ...liveNexamonEngine,

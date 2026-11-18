@@ -184,7 +184,10 @@ select tests.assert(
            'get_clone', 'create_clone', 'clone_apply_for_job', 'clone_sign_contract', 'clone_quit_job',
            'clone_cancel_quit', 'clone_request_raise', 'clone_request_promotion', 'set_job_posting_perks',
            -- the own net worth in parts (ADR-203)
-           'get_my_net_worth']
+           'get_my_net_worth',
+           -- Weltkarte (ADR-208)
+           'get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
+           'world_open_subsidiary', 'world_close_subsidiary', 'world_image_campaign', 'world_set_location_fee']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

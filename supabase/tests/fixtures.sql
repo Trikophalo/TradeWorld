@@ -1704,6 +1704,39 @@ select public.learn_company_skill(gen_random_uuid(), 'data_analysis');
 \o
 reset role;
 
+-- Weltkarte (ADR-208) ------------------------------------------------------------------------------------------------
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/get_world_unplaced.json
+select public.get_world();
+\o
+reset role;
+select tests.set_company_cash(:'fx_npco', 20000000000);
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/world_place_hq.json
+select public.world_place_hq(gen_random_uuid(), 'de');
+\o :fixture_dir/world_upgrade_hq.json
+select public.world_upgrade_hq(gen_random_uuid());
+\o :fixture_dir/world_open_subsidiary.json
+select public.world_open_subsidiary(gen_random_uuid(), 'vn');
+\o :fixture_dir/world_image_campaign.json
+select public.world_image_campaign(gen_random_uuid(), 'vn');
+\o :fixture_dir/world_save_hq_style.json
+select public.world_save_hq_style(gen_random_uuid(), '{"wall": 2, "roof": 4, "sign": 1, "roofKind": "antenna", "deco": "trees", "flag": true}');
+\o :fixture_dir/world_set_location_fee.json
+select public.world_set_location_fee(gen_random_uuid(), 100);
+\o
+reset role;
+update public.company_locations set placed_at = public.game_now() - interval '8 days' where company_id = :'fx_npco';
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/world_relocate_hq.json
+select public.world_relocate_hq(gen_random_uuid(), 'fr');
+\o :fixture_dir/world_close_subsidiary.json
+select public.world_close_subsidiary(gen_random_uuid(), 'vn');
+\o :fixture_dir/get_world.json
+select public.get_world();
+\o
+reset role;
+
 -- Clone and job perks (ADR-206) --------------------------------------------------------------------------------------
 \set fx_cl '''f1f1f1f1-0000-4000-8000-0000000002a1'''
 update public.invite_codes set max_uses = max_uses + 1 where code = 'M1-TESTS';

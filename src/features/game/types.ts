@@ -13,6 +13,7 @@ import type { NexamonEngine } from "./nexamon-types";
 import type { NexamonSealedEngine } from "./nexamon-sealed-types";
 import type { PackBattleEngine } from "./pack-battle-types";
 import type { ListedEngine } from "./listed-types";
+import type { WorldEngine } from "./world-types";
 import type { SectorKey } from "@/components/pixel/art";
 import type { FloorMaterial, PropertyTier } from "@/config/balance";
 import type { SkillBranch } from "@/config/skills";
@@ -2323,6 +2324,14 @@ export const GAME_ERROR_KEYS = [
   "skill_unknown",
   "skill_learned",
   "skill_locked",
+  "world_locked",
+  "world_placed",
+  "world_not_placed",
+  "world_max_tier",
+  "world_subsidiary_locked",
+  "world_subsidiary_cap",
+  "world_same_country",
+  "world_not_leader",
   "skill_points_insufficient",
   "job_not_found",
   "job_level_too_low",
@@ -2652,7 +2661,8 @@ export interface InterviewAnswer {
   quick?: number;
 }
 
-export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEngine, PackBattleEngine, ListedEngine {
+export interface GameEngine
+  extends BattleEngine, NexamonEngine, NexamonSealedEngine, PackBattleEngine, ListedEngine, WorldEngine {
   /** The own CEO interview: an open request or the latest result (ADR-173). */
   companyInterview(): Promise<CompanyInterviewState>;
   answerCompanyInterview(requestId: string, id: number, answers: InterviewAnswer[]): Promise<CompanyInterviewState>;

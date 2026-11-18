@@ -1,9 +1,10 @@
 /*
- * The tabs of the own company page (ADR-167, UI): Dashboard, Controlling, Mitarbeiter, Buchhaltung, Geschäftsrat.
+ * The tabs of the own company page (ADR-167, UI): Dashboard, Controlling, Mitarbeiter, Standort (ADR-208),
+ * Buchhaltung, Geschäftsrat.
  * Pure: maps the old tabs and sections (Mira, overview, tasks, team, chat; ADR-071/138; the ids before ADR-187) and
  * Mira's "open" actions to the new places, and builds the links notifications and the dashboard use.
  */
-export const COMPANY_TABS = ["dashboard", "controlling", "staff", "books", "board"] as const;
+export const COMPANY_TABS = ["dashboard", "controlling", "staff", "location", "books", "board"] as const;
 export type CompanyTab = (typeof COMPANY_TABS)[number];
 
 /** Tabs that only exist while the company has a stock at the exchange. */
@@ -40,6 +41,8 @@ export const COMPANY_GROUPS = {
   "staff-tasks": { tab: "staff", panes: [] },
   situation: { tab: "staff", panes: [] },
   "group-team": { tab: "staff", panes: ["staff-team", "staff-mood", "staff-value"] },
+  // Standort (ADR-208)
+  location: { tab: "location", panes: [] },
 } as const satisfies Record<string, { tab: CompanyTab; panes: readonly string[] }>;
 export type CompanyGroup = keyof typeof COMPANY_GROUPS;
 
@@ -62,6 +65,8 @@ const TAB_ALIASES: Record<string, CompanyTarget> = {
   chat: { tab: "staff", target: "chat" },
   accounting: { tab: "books" },
   taxes: { tab: "books", target: "taxes" },
+  world: { tab: "location" },
+  standort: { tab: "location" },
 };
 
 /**
@@ -146,6 +151,19 @@ const SECTIONS = {
   accounting: { tab: "books", target: "accounting" },
   "books-ledger": { tab: "books", target: "accounting" },
   advisor: { tab: "books", target: "advisor" },
+  // Standort (ADR-208): world map, headquarters, subsidiaries, lobby
+  location: { tab: "location", section: "location" },
+  world: { tab: "location", section: "location" },
+  "world-map": { tab: "location", target: "world-map" },
+  map: { tab: "location", target: "world-map" },
+  "world-hq": { tab: "location", target: "world-hq" },
+  headquarters: { tab: "location", target: "world-hq" },
+  "world-effect": { tab: "location", target: "world-effect" },
+  "world-subsidiaries": { tab: "location", target: "world-subsidiaries" },
+  subsidiaries: { tab: "location", target: "world-subsidiaries" },
+  "world-lobby": { tab: "location", target: "world-lobby" },
+  lobby: { tab: "location", target: "world-lobby" },
+  "location-fee": { tab: "location", target: "world-lobby" },
   // Geschäftsrat
   board: { tab: "board" },
   // ADR-185: more of Mira's places
@@ -239,6 +257,7 @@ const NOTIFICATION_SECTIONS: Record<string, string> = {
   company_project: "research",
   company_dividend: "dividends",
   board: "board",
+  world_location: "world-lobby",
 };
 
 /**

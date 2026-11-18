@@ -1094,6 +1094,24 @@ export const UI_ICONS = {
       "............",
     ],
   },
+  /** A globe with continents (Weltkarte und Standort, ADR-208). */
+  globe: {
+    palette: duo,
+    grid: [
+      "....xxxx....",
+      "..xxooxxxx..",
+      ".xoooxxxoox.",
+      ".xooxxxooox.",
+      "xxoxxxxoooxx",
+      "xooxxxooooox",
+      "xoooxxooxxox",
+      "xooooxoxxxox",
+      ".xooooxxxox.",
+      ".xoooooxxox.",
+      "..xxoooxxx..",
+      "....xxxx....",
+    ],
+  },
   /** A contract being signed: the page, two lines of text, the pen setting the signature (deals, ADR-098). */
   deal: {
     palette: duo,

@@ -46,6 +46,11 @@ export const DISCLOSURE = {
   companyInterview: 3,
   /** Fertigkeiten of the own company (ADR-194): with the company, after the tutorial. */
   companySkills: 3,
+  /**
+   * The tab "Standort" with the world map (ADR-208): shown with the company once the IPO is in reach, locked with the
+   * progress toward world.unlockWorthCents until the company is worth that much.
+   */
+  companyWorld: 9,
   /** News-Aktionen of the live show (ADR-193): the news tab section and the toast, after the tutorial. */
   newsPromo: 2,
   /** The clone on the job tab (ADR-206): shown locked a few levels ahead, usable from jobs.clone.minLevel (20). */
