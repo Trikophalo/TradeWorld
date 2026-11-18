@@ -235,6 +235,17 @@ begin
 end;
 $$;
 
+-- pickArchetype without size (m4h signature): the pick of a small company, never an external event
+create or replace function public.company_event_pick(p_u double precision, p_sector text, p_polarity text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.company_event_pick_sized(p_u, p_sector, p_polarity, 0, null, 0);
+$$;
+
 -- effectiveCoverage of a company right now (insurance coverage 0..1)
 create or replace function public.macro_coverage(p_company uuid, p_at timestamptz default null)
 returns double precision

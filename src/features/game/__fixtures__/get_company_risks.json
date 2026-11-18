@@ -1,0 +1,44 @@
+{
+  "lobby": { "max": 5, "level": 0, "leader": false, "bonus_bps": 0, "political_cut_bps": 0 },
+  "country": null,
+  "decades": 0,
+  "exposure": [],
+  "upcoming": [
+    { "archetype": "commodity_crunch", "from_cents": 2000000000 },
+    { "archetype": "cyber_attack", "from_cents": 2000000000 },
+    { "archetype": "earthquake", "from_cents": 2000000000 },
+    { "archetype": "energy_shock", "from_cents": 2000000000 },
+    { "archetype": "flood", "from_cents": 2000000000 },
+    { "archetype": "pandemic", "from_cents": 2000000000 },
+    { "archetype": "political_decision", "from_cents": 2000000000 },
+    { "archetype": "shitstorm", "from_cents": 2000000000 },
+    { "archetype": "tariffs", "from_cents": 2000000000 },
+    { "archetype": "tsunami", "from_cents": 2000000000 },
+    { "archetype": "union_strike", "from_cents": 2000000000 },
+    { "archetype": "wildfire", "from_cents": 2000000000 },
+    { "archetype": "currency_crisis", "from_cents": 5000000000 },
+    { "archetype": "war_conflict", "from_cents": 5000000000 },
+    { "archetype": "antitrust", "from_cents": 50000000000 }
+  ],
+  "insurance": {
+    "level": 0,
+    "levels": [
+      { "key": "none", "level": 0, "premium_bps": 0, "coverage_bps": 0, "premium_cents_per_hour": 0 },
+      { "key": "basic", "level": 1, "premium_bps": 40, "coverage_bps": 5000, "premium_cents_per_hour": 277 },
+      { "key": "full", "level": 2, "premium_bps": 110, "coverage_bps": 8000, "premium_cents_per_hour": 763 }
+    ],
+    "full_from": null,
+    "changed_at": null,
+    "coverage_bps": 0
+  },
+  "company_id": "a00cbb77-0500-4bf4-8894-7f8e6d249b94",
+  "unit_cents": 20000,
+  "worth_cents": 113222,
+  "overhead_bps": 0,
+  "saturation_bps": 10000,
+  "crisis_share_bps": 6000,
+  "event_pivot_cents": 2000000000,
+  "ref_revenue_cents": 69426,
+  "chance_per_day_bps": 6000,
+  "friction_pivot_cents": 3000000000
+}
