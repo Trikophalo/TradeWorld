@@ -42,9 +42,14 @@ import { FriendsPlaza } from "@/features/friends/components/plaza";
 import { ChatIconButton, ChatsView, ChatUnreadBadge, MessageFriendButton } from "@/features/friends/components/chats";
 import { RentalShowcase } from "@/features/property/components/rental-showcase";
 import { NexamonShowcase } from "@/features/nexamon/components/showcase";
+import { BattleModesShowcase } from "@/features/nexamon/live/battle-showcase";
 import { PokeButton } from "@/features/friends/components/poke";
 import { FigureCard } from "@/features/wardrobe/components/figure-card";
 import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
+import { CloneCard } from "@/features/career/components/clone-card";
+import { PostingPerks } from "@/features/career/components/job-portal";
+import { RewardsBox } from "@/features/career/components/my-job-card";
+import { PostingPerksFields } from "@/features/company/components/employer";
 import { UpgradeCard } from "@/features/upgrades/components/upgrade-shop";
 import { CRYPTO } from "@/config/crypto";
 import { StatBars } from "@/features/crypto/components/coin-detail";
@@ -97,6 +102,7 @@ const COLOR_GROUPS = [
 
 const SAMPLE_CARD: PlayerCard = {
   nickname: "Boersenfuchs_7",
+  cloneJob: null,
   tag: "K7Q2",
   trophies: { gold: 2, silver: 1, bronze: 0 },
   avatarKey: "analyst",
@@ -609,6 +615,66 @@ function SampleGame({ sample }: { sample: (typeof SAMPLE_GAMES)[number] }) {
   );
 }
 
+/** Clone, rewards and posting perks (ADR-206) in their states. */
+function CloneShowcase() {
+  const [profit, setProfit] = useState(100);
+  const [stock, setStock] = useState(200);
+  const base = { minLevel: 20, feeCents: 2_500_000, job: null };
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <CloneCard state={{ ...base, level: 16, clone: null }} />
+      <CloneCard state={{ ...base, level: 22, clone: null }} />
+      <CloneCard
+        state={{ ...base, level: 22, clone: { name: "Klon von Boersenfuchs_7", createdAt: "2026-11-10T08:00:00Z" } }}
+      />
+      <CloneCard
+        state={{
+          ...base,
+          level: 22,
+          clone: { name: "Klon von Boersenfuchs_7", createdAt: "2026-11-10T08:00:00Z" },
+          job: {
+            ...SAMPLE_JOB,
+            isClone: true,
+            holderName: "Klon von Boersenfuchs_7",
+            tier: "senior",
+            profitShareBps: 50,
+          },
+        }}
+      />
+      <Card padding="lg">
+        <RewardsBox
+          job={{
+            skillPayBps: 21_000,
+            profitShareBps: 200,
+            stockGrantChanceBps: 500,
+            rewards: { profitShareCents: 412_000, stockGrants: 2, stockGrantCents: 1_040_000, sharesE6: 34_000_000 },
+          }}
+        />
+      </Card>
+      <Card padding="lg" className="space-y-3">
+        <PostingPerks
+          posting={{
+            skillPayBps: 14_350,
+            marketSalaryCentsPerHour: 100_450,
+            profitShareBps: 350,
+            stockGrantChanceBps: 800,
+            postingProfitShareBps: 300,
+            postingStockGrantBps: 500,
+            company: { id: "c", name: "Klon Werk", ticker: null, sector: "tech", color: null, isAi: false, logo: null },
+          }}
+        />
+        <PostingPerksFields
+          tier="senior"
+          profitShare={profit}
+          stockGrant={stock}
+          onProfitShare={setProfit}
+          onStockGrant={setStock}
+        />
+      </Card>
+    </div>
+  );
+}
+
 const SAMPLE_JOB: MyJob = {
   id: "job-sample",
   company: {
@@ -644,6 +710,12 @@ const SAMPLE_JOB: MyJob = {
   quitNowCostCents: 360_000,
   rankHours: 20,
   presence: { lastActiveAt: "2026-11-13T08:00:00Z", payBps: 10_000, fireAt: "2026-11-18T08:00:00Z" },
+  isClone: false,
+  holderName: "Boersenfuchs_7",
+  skillPayBps: 13_200,
+  profitShareBps: 0,
+  stockGrantChanceBps: 100,
+  rewards: { profitShareCents: 0, stockGrants: 0, stockGrantCents: 0, sharesE6: 0 },
   promotion: {
     nextTier: "senior",
     mainBranch: "it",
@@ -1253,6 +1325,7 @@ export function Showcase() {
         </Card>
         <CareerLadder job={SAMPLE_JOB} />
         <PayRoutes job={SAMPLE_JOB} />
+        <CloneShowcase />
         <HealthShowcase />
         <FirmLayoutShowcase />
         <CompanyMovesCard preview={SAMPLE_MOVES} />
@@ -1293,6 +1366,10 @@ export function Showcase() {
 
       <Section id="nexamon" title="Nexamon-Sammelkarten (ADR-165)">
         <NexamonShowcase />
+      </Section>
+
+      <Section id="battle-modes" title="Pack-Battle-Modi: Twist und Umgekehrt (ADR-205)">
+        <BattleModesShowcase />
       </Section>
 
       <Section id="critic" title="Kritiker-Urteil für NFTs (ADR-181)">

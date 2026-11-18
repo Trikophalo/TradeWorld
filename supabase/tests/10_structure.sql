@@ -181,7 +181,10 @@ select tests.assert(
            -- News-Aktionen (ADR-193)
            'get_news_promo', 'file_news_tax_return',
            -- Fertigkeiten of player companies (ADR-194)
-           'get_company_skills', 'learn_company_skill']
+           'get_company_skills', 'learn_company_skill',
+           -- clone, job perks (ADR-206)
+           'get_clone', 'create_clone', 'clone_apply_for_job', 'clone_sign_contract', 'clone_quit_job',
+           'clone_cancel_quit', 'clone_request_raise', 'clone_request_promotion', 'set_job_posting_perks']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

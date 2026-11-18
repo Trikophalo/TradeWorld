@@ -5,13 +5,18 @@ import {
   decideMultiBattle,
   multiBattleTimeline,
   multiKnownCards,
+  multiTwistsShown,
   packBattleCostCents,
   packBattleLineupOk,
+  twistPermutations,
+  twistPiles,
+  twistScores,
 } from "@/lib/sim/nexamon-battle";
 import { createRng } from "@/lib/sim/rng";
 import type { NexamonPull } from "../nexamon-types";
 import type {
   NexamonBattle,
+  NexamonBattleModes,
   NexamonFigure,
   NexamonLiveReaction,
   NexamonLiveSession,
@@ -74,6 +79,11 @@ const JOIN_MS = ACCEPT_MS;
 interface DemoBattle {
   id: string;
   mode: "duel" | "multi";
+  /** ADR-205 */
+  reverse: boolean;
+  twist: boolean;
+  twistSeed: number;
+  twists: number[][];
   packs: NexamonSetKey[];
   size: number;
   /** Seat 1.. in order: who will join (invited friends first). */
@@ -182,8 +192,9 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
   const taken = (b: DemoBattle, now: number) =>
     Math.min(b.size, 1 + Math.max(0, Math.floor((now - b.createdAt) / JOIN_MS)));
   const fullAt = (b: DemoBattle) => b.createdAt + (b.size - 1) * JOIN_MS;
+  const twistMs = (b: DemoBattle) => (b.twist ? cfg.packBattle.twistMs : 0);
   const timeline = (b: DemoBattle) =>
-    b.acceptedAt !== null ? multiBattleTimeline(b.acceptedAt, b.packs.length) : null;
+    b.acceptedAt !== null ? multiBattleTimeline(b.acceptedAt, b.packs.length, cfg, twistMs(b)) : null;
 
   function refund(b: DemoBattle) {
     if (b.refunded) return;
@@ -201,8 +212,18 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
 
   function accept(b: DemoBattle, at: number) {
     b.seed = Math.floor(host.random() * 2_147_483_647);
+    // ADR-205: the twists from their own seed; the piles after them decide (reverse: the lowest)
+    if (b.twist) {
+      b.twistSeed = Math.floor(host.random() * 2_147_483_647);
+      b.twists = twistPermutations(b.twistSeed, b.packs.length, b.size);
+    }
     const rolled = host.rollPacks(b.packs, b.size, (pulls) => {
-      const d = decideMultiBattle(pulls, b.seed);
+      const piles = twistPiles(
+        pulls.map((seat) => seat.map(shown)),
+        b.twists,
+        b.packs.length,
+      );
+      const d = decideMultiBattle(piles, b.seed, b.reverse);
       b.tieBreak = d.tieBreak;
       return d.winner;
     });
@@ -218,6 +239,8 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
         cards: b.cards.flat().length,
         packs: b.packs.length,
         players: b.size,
+        reverse: b.reverse,
+        twist: b.twist,
       });
     }
   }
@@ -225,13 +248,25 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
   function battleJson(b: DemoBattle, now: number): NexamonBattle {
     settle(b, now);
     const t = timeline(b);
-    const known = t ? multiKnownCards(t.startsAt, now, b.packs.length) : 0;
+    const known = t ? multiKnownCards(t.startsAt, now, b.packs.length, cfg, twistMs(b)) : 0;
+    const twists = t
+      ? b.twists.slice(0, multiTwistsShown(t.startsAt, now, b.packs.length, cfg, twistMs(b), cfg.battles.leadMs))
+      : [];
     const decided = t !== null && now >= t.decideAt - cfg.battles.leadMs;
     const seatCount = b.status === "accepted" ? b.size : b.status === "pending" ? taken(b, now) : 1;
     const figures = [host.me(), ...b.joiners].slice(0, seatCount);
+    const seatCards = figures.map((_, seat) => (b.cards[seat] ?? []).filter((p) => p.idx <= known));
+    const scores = twistScores(seatCards, twists, b.packs.length);
     const seats = figures.map((player, seat) => {
-      const cards = (b.cards[seat] ?? []).filter((p) => p.idx <= known);
-      return { seat, player, isMe: seat === 0, cards, cents: cards.reduce((s, p) => s + p.valueCents, 0) };
+      const cards = seatCards[seat]!;
+      return {
+        seat,
+        player,
+        isMe: seat === 0,
+        cards,
+        cents: cards.reduce((s, p) => s + p.valueCents, 0),
+        scoreCents: scores[seat]!,
+      };
     });
     const status = b.status === "accepted" ? (t && now >= t.endsAt ? "done" : "running") : b.status;
     const winnerSeat = decided ? b.winnerSeat : null;
@@ -242,6 +277,11 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
       priceCents: b.priceCents,
       mode: b.mode,
       size: b.size,
+      reverse: b.reverse,
+      twist: b.twist,
+      twists,
+      twistMs: twistMs(b),
+      twistSeed: decided && b.twist ? b.twistSeed : null,
       packs: b.packs.map((set) => ({ set, priceCents: cfg.sets[set].packPriceCents })),
       seats,
       mySeat: 0,
@@ -286,6 +326,7 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
     size: number,
     invite: string[],
     mode: "duel" | "multi",
+    modes: NexamonBattleModes = { reverse: false, twist: false },
   ): NexamonBattle {
     requireUnlock();
     if (!requestId || !packBattleLineupOk(sets, size) || invite.length > size - 1)
@@ -318,6 +359,10 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
       const b: DemoBattle = {
         id: `battle-${nextId++}`,
         mode,
+        reverse: mode === "multi" && modes.reverse,
+        twist: mode === "multi" && modes.twist,
+        twistSeed: 0,
+        twists: [],
         packs: [...sets],
         size: Math.min(size, joiners.length + 1),
         joiners,
@@ -394,6 +439,8 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
           player: host.me(),
           opponent: b.joiners[0] ?? null,
           players: [host.me(), ...b.joiners],
+          reverse: b.reverse,
+          twist: b.twist,
           isMe: true,
           startedAt: iso(b.acceptedAt!),
           endsAt: iso(timeline(b)!.endsAt),
@@ -444,8 +491,8 @@ export function createPackBattleEngine(host: PackBattleHost): PackBattleEngine &
       return create(requestId, [set], 2, [nickname], "duel");
     },
 
-    async createNexamonPackBattle(requestId, sets, size, invite) {
-      return create(requestId, sets, size, invite, "multi");
+    async createNexamonPackBattle(requestId, sets, size, invite, modes) {
+      return create(requestId, sets, size, invite, "multi", modes);
     },
 
     async joinNexamonPackBattle() {

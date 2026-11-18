@@ -1705,3 +1705,37 @@ select public.get_company_skills();
 select public.learn_company_skill(gen_random_uuid(), 'data_analysis');
 \o
 reset role;
+
+-- Clone and job perks (ADR-206) --------------------------------------------------------------------------------------
+\set fx_cl '''f1f1f1f1-0000-4000-8000-0000000002a1'''
+update public.invite_codes set max_uses = max_uses + 1 where code = 'M1-TESTS';
+select tests.signup(:fx_cl, 'Fixture_Klon') is not null as ok \gset
+select tests.set_level(:fx_cl, 20);
+select tests.fund(:fx_cl, 9000000, 'fixture:clone');
+select tests.login_as('authenticated', :fx_cl) is null as ok \gset
+\o :fixture_dir/get_clone_none.json
+select public.get_clone();
+\o :fixture_dir/get_clone_created.json
+select public.create_clone(gen_random_uuid());
+\o
+select x ->> 'id' as fx_clpost from jsonb_array_elements(public.get_job_board() -> 'postings') x
+ where x ->> 'tier' = 'intern' and (x ->> 'eligible')::boolean and (x -> 'company' ->> 'is_ai')::boolean
+ order by x ->> 'id' limit 1 \gset
+\o :fixture_dir/apply_for_job_clone.json
+select public.clone_apply_for_job(gen_random_uuid(), :'fx_clpost', 1, null);
+\o
+select public.clone_sign_contract(gen_random_uuid(), (select id from public.job_applications where player_id = :fx_cl and for_clone
+                                                       order by created_at desc limit 1), 'M1 1') is not null as ok \gset
+\o :fixture_dir/get_clone.json
+select public.get_clone();
+\o :fixture_dir/get_job_board_clone.json
+select public.get_job_board();
+\o
+reset role;
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+\o :fixture_dir/set_job_posting_perks.json
+select public.set_job_posting_perks(gen_random_uuid(),
+  (public.create_job_posting(gen_random_uuid(), :'fx_npco', 'senior', 'Werkstudium Klone', '[{"branch": "it", "min_score": 0}]',
+                             50000, 1) ->> 'id')::uuid, 200, 300);
+\o
+reset role;

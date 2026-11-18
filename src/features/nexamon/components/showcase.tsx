@@ -345,7 +345,7 @@ export function NexamonShowcase() {
         </Block>
       </div>
 
-      <Block label="Sofort an das Spiel (ADR-196): frisch gezogene Karten für 90 % verkaufen" testId="nexamon-instant">
+      <Block label="Sofort an das Spiel (ADR-196): frisch gezogene Karten für 85 % verkaufen" testId="nexamon-instant">
         <InstantSell
           className="max-w-sm"
           items={[

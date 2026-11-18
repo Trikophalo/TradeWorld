@@ -28,7 +28,7 @@ export interface InstantSellItem {
 const cfg = BALANCE.nexamon.instantSell;
 
 /**
- * ADR-196: right after a pack opening or a won Pack Battle, the fresh pulls can go to the game for 90 % of their
+ * ADR-196: right after a pack opening or a won Pack Battle, the fresh pulls can go to the game for 85 % of their
  * value: all at once (hold to confirm) or card by card. A One of One asks once more. The server checks the window
  * (instantSell.windowSeconds) and pays; the shown sums use the values at pull time.
  */

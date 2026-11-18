@@ -38,6 +38,21 @@ export const TITAN_PRICE_RANGE: Record<TitanRarity, readonly [number, number]> =
  */
 export const TITAN_VALUE_FACTOR = 1.125;
 
+/**
+ * Rebalance per rarity (ADR-207, on top of TITAN_VALUE_FACTOR): diamond cards are worth 30 % more, uranium cards less by
+ * exactly the amount that keeps a pack's expected value. Per pack a diamond shows up 1/50, a uranium 1/500, so
+ * 0.3 x mean(diamond) / 50 = (1 - u) x mean(uranium) / 500, with the means of the catalogue before (diamond
+ * 597.375 EUR, uranium 22.078.125 EUR): u = 1 - 3 x 597.375 / 22.078.125 = 0.918828 (to 6 digits; the rest moves the
+ * pack's value by less than a cent). Iron and titanium stay. The ratios between the cards of a rarity stay; the
+ * migration 20261204009900 scales the live market values by the same factors.
+ */
+export const TITAN_REBALANCE_FACTOR: Record<TitanRarity, number> = {
+  iron: 1,
+  titanium: 1,
+  diamond: 1.3,
+  uranium: 0.918828,
+};
+
 /** Art sizes: iron 60 x 40 (framed), titanium 68 x 48 (breaks out), diamond and uranium 72 x 100 full art. */
 export const TITAN_ART_SIZE: Record<TitanRarity, { width: number; height: number }> = {
   iron: { width: 60, height: 40 },

@@ -129,14 +129,21 @@ export interface MultiBattleDecision {
 /**
  * The highest total value over all packs wins; on a tie among the leaders their rarest single card; then the coin
  * picks among the seats still tied, in seat order: `seed % count`. For two seats this is `decideBattle`.
+ * ADR-205 `reverse` ("Umgekehrt"): the lowest total wins; on a tie the seat whose rarest card is the least rare;
+ * then the same coin.
  */
-export function decideMultiBattle(seats: readonly (readonly BattlePull[])[], seed: number): MultiBattleDecision {
+export function decideMultiBattle(
+  seats: readonly (readonly BattlePull[])[],
+  seed: number,
+  reverse = false,
+): MultiBattleDecision {
+  const pick = reverse ? Math.min : Math.max;
   const totals = seats.map(battleTotalCents);
-  const best = Math.max(...totals);
+  const best = pick(...totals);
   let tied = totals.flatMap((t, i) => (t === best ? [i] : []));
   if (tied.length === 1) return { winner: tied[0]!, tieBreak: "value", totals };
   const ranks = tied.map((i) => rarest(seats[i]!));
-  const top = Math.max(...ranks);
+  const top = pick(...ranks);
   tied = tied.filter((_, k) => ranks[k] === top);
   if (tied.length === 1) return { winner: tied[0]!, tieBreak: "rarest", totals };
   return { winner: tied[Math.abs(Math.trunc(seed)) % tied.length]!, tieBreak: "coin", totals };
@@ -164,11 +171,35 @@ export function packBattleLineupOk(sets: readonly string[], size: number, cfg: C
 
 /**
  * When card `index` (0-based over the whole lineup) shows: every pack tears for `tearMs`, then its cards follow one
- * per `slotMs`; the next pack tears after the last card of the one before.
+ * per `slotMs`; the next pack tears after the last card of the one before. ADR-205: in a Twist battle `twistMs`
+ * (`packBattle.twistMs`) for the twist follow every pack; 0 otherwise.
  */
-export function multiRevealAt(startsAt: number, index: number, cfg: Config = BALANCE.nexamon): number {
+export function multiRevealAt(startsAt: number, index: number, cfg: Config = BALANCE.nexamon, twistMs = 0): number {
   const pack = Math.floor(index / cfg.packSize);
-  return startsAt + (pack + 1) * cfg.battles.tearMs + index * cfg.battles.slotMs;
+  return startsAt + (pack + 1) * cfg.battles.tearMs + index * cfg.battles.slotMs + pack * twistMs;
+}
+
+/**
+ * ADR-205: when the twist after pack `round` (1-based) shows: one slot after the pack's last card, for `twistMs`;
+ * then the next pack tears.
+ */
+export function multiTwistAt(startsAt: number, round: number, cfg: Config = BALANCE.nexamon, twistMs = 0): number {
+  const b = cfg.battles;
+  return startsAt + round * (b.tearMs + cfg.packSize * b.slotMs) + (round - 1) * twistMs;
+}
+
+/** ADR-205: twists (after packs 1..n) that show at `now` (`lead` earlier: that the clients may know). */
+export function multiTwistsShown(
+  startsAt: number,
+  now: number,
+  packs: number,
+  cfg: Config = BALANCE.nexamon,
+  twistMs = 0,
+  lead = 0,
+): number {
+  let n = 0;
+  while (n < packs && multiTwistAt(startsAt, n + 1, cfg, twistMs) - lead <= now) n++;
+  return n;
 }
 
 export interface MultiBattleTimeline {
@@ -177,29 +208,129 @@ export interface MultiBattleTimeline {
   endsAt: number;
 }
 
-/** The shared clock of a battle with `packs` packs that filled at `filledAt`. One pack is `battleTimeline`. */
+/**
+ * The shared clock of a battle with `packs` packs that filled at `filledAt`. One pack is `battleTimeline`.
+ * ADR-205: a Twist battle adds `twistMs` after every pack.
+ */
 export function multiBattleTimeline(
   filledAt: number,
   packs: number,
   cfg: Config = BALANCE.nexamon,
+  twistMs = 0,
 ): MultiBattleTimeline {
   const b = cfg.battles;
   const startsAt = filledAt + b.startDelayMs;
-  const decideAt = startsAt + packs * (b.tearMs + cfg.packSize * b.slotMs);
+  const decideAt = startsAt + packs * (b.tearMs + cfg.packSize * b.slotMs + twistMs);
   return { startsAt, decideAt, endsAt: decideAt + b.outroMs };
 }
 
 /** Cards (over the whole lineup) a client may know at `now`: each arrives `leadMs` before it shows. */
-export function multiKnownCards(startsAt: number, now: number, packs: number, cfg: Config = BALANCE.nexamon): number {
+export function multiKnownCards(
+  startsAt: number,
+  now: number,
+  packs: number,
+  cfg: Config = BALANCE.nexamon,
+  twistMs = 0,
+): number {
   if (now < startsAt) return 0;
   let n = 0;
-  while (n < packs * cfg.packSize && multiRevealAt(startsAt, n, cfg) - cfg.battles.leadMs <= now) n++;
+  while (n < packs * cfg.packSize && multiRevealAt(startsAt, n, cfg, twistMs) - cfg.battles.leadMs <= now) n++;
   return n;
 }
 
 /** Cards (over the whole lineup) that show at `now` on the shared clock. */
-export function multiShownCards(startsAt: number, now: number, packs: number, cfg: Config = BALANCE.nexamon): number {
+export function multiShownCards(
+  startsAt: number,
+  now: number,
+  packs: number,
+  cfg: Config = BALANCE.nexamon,
+  twistMs = 0,
+): number {
   let n = 0;
-  while (n < packs * cfg.packSize && multiRevealAt(startsAt, n, cfg) <= now) n++;
+  while (n < packs * cfg.packSize && multiRevealAt(startsAt, n, cfg, twistMs) <= now) n++;
   return n;
+}
+
+/*
+ * Battle modes (ADR-205). "Umgekehrt" (reverse): see decideMultiBattle. "Twist": after every pack (the last one
+ * too) the piles of all seats are permuted at random. A pile is what a seat holds for the decision: its own pulls
+ * of the next pack are added to it, then the twist hands seat i the pile seat perm[i] held. The pile's total (and,
+ * for a tie, its rarest card) decides; the winner still takes every card of every seat. The permutation of round k
+ * comes from the stored twist seed: uniform over all n! orders (also "nothing moves").
+ */
+
+const TWIST_MOD = 2_147_483_647;
+
+/**
+ * The twist after pack `round` (1-based) for `n` seats: `perm[i]` is the seat whose pile seat i takes. Three MINSTD
+ * steps from `(seed % (2^31 − 1) + round · 7919) % (2^31 − 1)`, modulo n!, decoded as a Lehmer code (PL/pgSQL:
+ * nexamon_battle_twist_perm, identical).
+ */
+export function twistPermutation(seed: number, round: number, n: number): number[] {
+  let x = ((Math.abs(Math.trunc(seed)) % TWIST_MOD) + round * 7919) % TWIST_MOD;
+  for (let i = 0; i < 3; i++) x = (x * 48_271) % TWIST_MOD;
+  let fact = 1;
+  for (let i = 2; i <= n; i++) fact *= i;
+  x %= fact;
+  const pool = Array.from({ length: n }, (_, i) => i);
+  const out: number[] = [];
+  for (let i = n; i >= 1; i--) {
+    const f = fact / i;
+    const k = Math.floor(x / f);
+    x %= f;
+    out.push(pool.splice(k, 1)[0]!);
+    fact = f;
+  }
+  return out;
+}
+
+/** The twists of a battle: one permutation per pack. */
+export const twistPermutations = (seed: number, packs: number, n: number): number[][] =>
+  Array.from({ length: packs }, (_, k) => twistPermutation(seed, k + 1, n));
+
+/**
+ * The piles of every seat (ADR-205): pack by pack each seat adds its own pulls of that pack, then the twist of that
+ * pack (if given) permutes the piles. Without twists every seat holds its own pulls.
+ */
+export function twistPiles<T extends { pack: number }>(
+  seats: readonly (readonly T[])[],
+  twists: readonly (readonly number[])[],
+  packs: number,
+): T[][] {
+  let piles: T[][] = seats.map(() => []);
+  for (let p = 1; p <= packs; p++) {
+    piles = piles.map((pile, i) => [...pile, ...seats[i]!.filter((c) => c.pack === p)]);
+    const perm = twists[p - 1];
+    if (perm) piles = piles.map((_, i) => piles[perm[i]!]!);
+  }
+  return piles;
+}
+
+/** The running score of every seat: the pile totals from the cards and twists given so far. */
+export const twistScores = (
+  seats: readonly (readonly (BattlePull & { pack: number })[])[],
+  twists: readonly (readonly number[])[],
+  packs: number,
+): number[] => twistPiles(seats, twists, packs).map(battleTotalCents);
+
+/**
+ * How a twist reads (ADR-205): its cycles, each in the direction the piles travel (seat a's pile goes to b, …);
+ * seats that keep their pile are left out. Empty: nothing moves.
+ */
+export function twistCycles(perm: readonly number[]): number[][] {
+  const seen = new Set<number>();
+  const out: number[][] = [];
+  for (let start = 0; start < perm.length; start++) {
+    if (seen.has(start) || perm[start] === start) continue;
+    const cycle: number[] = [];
+    let s = start;
+    while (!seen.has(s)) {
+      seen.add(s);
+      cycle.push(s);
+      // the pile of s goes to the seat that takes from s
+      s = perm.indexOf(s);
+    }
+    out.push(cycle);
+  }
+  return out;
 }

@@ -66,12 +66,12 @@ select tests.assert(
   not exists (select 1 from public.nexamon_cards where set_key = 'titans_revenge' and rarity = 'iron'
                and (start_e4 < 281250::bigint * 100 or start_e4 > 675000::bigint * 100))
   and not exists (select 1 from public.nexamon_cards where set_key = 'titans_revenge' and rarity = 'uranium'
-                   and (start_e4 < 956250000::bigint * 100 or start_e4 > 3937500000::bigint * 100))
+                   and (start_e4 < 878629275::bigint * 100 or start_e4 > 3617885250::bigint * 100))
   and not exists (select 1 from public.nexamon_cards where set_key = 'yin_yang' and rarity = 'legendary'
                    and (start_e4 < 100800000::bigint * 100 or start_e4 > 201600000::bigint * 100))
   and public.nexamon_rarity_rank('iron') = 0 and public.nexamon_rarity_rank('titanium') = 2
   and public.nexamon_rarity_rank('diamond') = 3 and public.nexamon_rarity_rank('uranium') = 5,
-  'start prices in their ranges (Titans x 1.125), the new rarities rank from game_config');
+  'start prices in their ranges (Titans x 1.125, diamond x 1.3 and uranium x 0.918828 since ADR-207), the new rarities rank from game_config');
 
 -- =============================================================================
 -- B. The shop: pack prices; the AI stock holds iron and titanium, no diamond, never uranium
