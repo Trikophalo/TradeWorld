@@ -4,6 +4,8 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Flyer für kleine Firmen: Solange deine Firma eine Garage ist oder weniger als 1 Mio. € wert, kostet die
+  Flyer-Kampagne höchstens 2.000 €. So kann sich jede neue Garage ihre erste Kampagne leisten, auch mit großem Markt.
 - Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der
   Firmenkasse neu, höchstens einmal am Tag. Das neue Logo erscheint sofort überall und in den Neuigkeiten.
 - Weltkarte: Ab 10 Mio. € Firmenwert setzt du deine Firma im neuen Tab „Standort“ in eines von 22 Ländern, baust die

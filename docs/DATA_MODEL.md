@@ -7302,15 +7302,16 @@ RPC, kein neuer Fehlerschlüssel.
 - `get_upgrades()` und `buy_upgrade()` liefern in `levels` alle 32 Schlüssel. `claim_vault()` liefert zusätzlich
   `interest_cents`; `claimed_cents` enthält die Tresorzinsen.
 
-| Hilfsfunktion (intern)                    | Formel                                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------------------------ |
-| `player_upgrade_bps(spieler, key)`        | Stufe × `perLevel`, begrenzt auf 0 bis 10 000                                        |
-| `company_upgrade_bps(firma, key)`         | dasselbe für den Gründer der Firma, 0 für KI-Firmen                                  |
-| `player_xp_bonus_bps(spieler, quelle)`    | Summe aller gekauften Verbesserungen, deren `xpSources` die Quelle oder `"*"` nennen |
-| `player_vault_cap_hours(spieler)`         | `economy.vaultCapHours` + `vault` × 2 h + `vault_xl` × 4 h                           |
-| `company_move_rest(zug, cfg, tempo)`      | Minuten × 60 s × (1 + `cooldownFactor` × (10 000 − `move_tempo`) / 10 000)           |
-| `pitch_chance_bps_for(fit, firma)`        | min(`maxChanceBps`, `pitch_chance_bps(fit)` + `strategist`)                          |
-| `company_campaign_cost_cents(firma, art)` | `campaign_cost_cents` − `ad_agency`-Anteil, auf ganze Euro gerundet                  |
+| Hilfsfunktion (intern)                    | Formel                                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `player_upgrade_bps(spieler, key)`        | Stufe × `perLevel`, begrenzt auf 0 bis 10 000                                                                |
+| `company_upgrade_bps(firma, key)`         | dasselbe für den Gründer der Firma, 0 für KI-Firmen                                                          |
+| `player_xp_bonus_bps(spieler, quelle)`    | Summe aller gekauften Verbesserungen, deren `xpSources` die Quelle oder `"*"` nennen                         |
+| `player_vault_cap_hours(spieler)`         | `economy.vaultCapHours` + `vault` × 2 h + `vault_xl` × 4 h                                                   |
+| `company_move_rest(zug, cfg, tempo)`      | Minuten × 60 s × (1 + `cooldownFactor` × (10 000 − `move_tempo`) / 10 000)                                   |
+| `pitch_chance_bps_for(fit, firma)`        | min(`maxChanceBps`, `pitch_chance_bps(fit)` + `strategist`)                                                  |
+| `company_campaign_cost_cents(firma, art)` | min(`campaign_cost_cents`, `campaign_cap_cents`) − `ad_agency`-Anteil (ADR-212), auf ganze Euro gerundet     |
+| `campaign_cap_cents(firma, art)`          | ADR-212: `flyerCapCents` für den Flyer einer Garage oder Firma unter `flyerCapBelowValueCents`, sonst `null` |
 
 Wo die Wirkungen greifen (alle Boni und Rabatte mit `apply_bps`, kaufmännisch „half even“):
 

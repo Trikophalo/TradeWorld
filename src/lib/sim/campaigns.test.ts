@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { BALANCE } from "../../config/balance.ts";
 import {
+  campaignCapCents,
   campaignCostCents,
+  companyCampaignCostCents,
   campaignDemandFactor,
   campaignFactor,
   campaignGainPerHourCents,
@@ -14,6 +17,33 @@ describe("campaign price", () => {
     expect(campaignCostCents("tv", 50_000)).toBe(900_000);
     expect(campaignCostCents("flyer", 1_000)).toBe(20_000);
     expect(campaignCostCents("online", 12_345)).toBe(74_100);
+  });
+});
+
+describe("flyer cap of small companies (ADR-212)", () => {
+  const cap = BALANCE.startups.campaigns.flyerCapCents;
+  const limit = BALANCE.startups.campaigns.flyerCapBelowValueCents;
+
+  it("caps the flyer of a garage with a huge market", () => {
+    expect(campaignCostCents("flyer", 5_000_000)).toBe(10_000_000);
+    expect(companyCampaignCostCents("flyer", 5_000_000, "garage", 10 * limit)).toBe(cap);
+    expect(cap).toBeLessThan(BALANCE.startups.garage.foundingCostCents);
+  });
+
+  it("caps the flyer of any company below the value threshold", () => {
+    expect(campaignCapCents("flyer", "gmbh", limit - 1)).toBe(cap);
+    expect(companyCampaignCostCents("flyer", 5_000_000, "small_business", limit - 1)).toBe(cap);
+  });
+
+  it("never raises a cheap flyer", () => {
+    expect(companyCampaignCostCents("flyer", 50_000, "garage", 0)).toBe(100_000);
+  });
+
+  it("leaves bigger campaigns and bigger companies unchanged", () => {
+    expect(campaignCapCents("online", "garage", 0)).toBeNull();
+    expect(companyCampaignCostCents("tv", 5_000_000, "garage", 0)).toBe(campaignCostCents("tv", 5_000_000));
+    expect(campaignCapCents("flyer", "small_business", limit)).toBeNull();
+    expect(companyCampaignCostCents("flyer", 5_000_000, "gmbh", limit)).toBe(10_000_000);
   });
 });
 

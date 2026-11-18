@@ -1231,6 +1231,10 @@ Alle Werte stehen in `src/config/upgrades.ts`, `src/config/deals.ts` und `src/co
   Stunden im Rang (12, 36, 72, 120) entsprechen bei 12 bezahlten Stunden am Tag 1, 3, 6 und 10 Tagen.
 - **Kampagnen:** Bei durchschnittlichem Glück lohnt eine Kampagne nur mit freier Kapazität und hoher Marge
   (Tech, Pharma). Handel und Logistik verdienen mit Kampagnen kaum etwas, eher mit Lieferverträgen.
+  ADR-212: Der Flyer einer kleinen Firma (Garage oder Firmenwert unter 1 Mio. €, `flyerCapTiers`,
+  `flyerCapBelowValueCents`) kostet höchstens 2.000 € (`flyerCapCents`), vor dem Rabatt der Werbeagentur. Vorher
+  konnten sich etwa 5,6 % der neuen Garagen mit großem Zufallsmarkt nicht einmal den Flyer aus den 2.500 € Startkasse
+  leisten; jetzt jede. Online, TV und größere Firmen zahlen den normalen Preis.
 - **Lieferverträge:** Gewinn je Stück für den Käufer = Preis − Gebühr, für den Lieferanten = Gebühr − (1 − Marge).
   Bei 60 % Gebühr gewinnen Tech-Lieferanten 35 %, Handels-Lieferanten verlieren 5 %: Handel liefert nur teurer.
 - **Vertrauen:** Start 50. Ein pünktlicher Kredit +4, ein gebrochener Vertrag −12: Drei Brüche machen aus

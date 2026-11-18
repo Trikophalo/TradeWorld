@@ -997,6 +997,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der Firmenkasse neu, höchstens einmal…",
       },
+      {
+        id: "m0-fundament-bfb5bf24",
+        title: null,
+        text: "Flyer für kleine Firmen: Solange deine Firma eine Garage ist oder weniger als 1 Mio. € wert, kostet die Flyer-Kampagne höchstens 2.000 €.",
+      },
     ],
   },
 ];

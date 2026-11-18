@@ -27,6 +27,35 @@ export function campaignCostCents(
   return Math.round(raw / 100) * 100;
 }
 
+/**
+ * ADR-212: the highest price of a campaign kind for a company, or null when it pays the normal price. Only the flyer
+ * is capped, and only while the company is small (legal form in flyerCapTiers or value below flyerCapBelowValueCents).
+ */
+export function campaignCapCents(
+  kind: CampaignKind,
+  tier: string,
+  companyValueCents: number,
+  cfg: BalanceConfig = BALANCE,
+): number | null {
+  const c = cfg.startups.campaigns;
+  if (kind !== "flyer") return null;
+  const small = (c.flyerCapTiers as readonly string[]).includes(tier) || companyValueCents < c.flyerCapBelowValueCents;
+  return small ? c.flyerCapCents : null;
+}
+
+/** Price of a campaign for a company: campaignCostCents, at most the cap of a small company (ADR-212). */
+export function companyCampaignCostCents(
+  kind: CampaignKind,
+  demandPerHourCents: number,
+  tier: string,
+  companyValueCents: number,
+  cfg: BalanceConfig = BALANCE,
+): number {
+  const price = campaignCostCents(kind, demandPerHourCents, cfg);
+  const cap = campaignCapCents(kind, tier, companyValueCents, cfg);
+  return cap === null ? price : Math.min(price, cap);
+}
+
 /** Luck of a campaign from a uniform draw u ∈ [0, 1). */
 export function campaignLuck(u: number, cfg: BalanceConfig = BALANCE): number {
   const c = cfg.startups.campaigns;
