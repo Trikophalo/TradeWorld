@@ -15,9 +15,9 @@ export const MACRO = {
    */
   friction: {
     worthPivotCents: 3_000_000_000,
-    saturationExponent: 0.4,
-    overheadPerDecadeBps: 1_500,
-    overheadMaxBps: 4_000,
+    saturationExponent: 0.75,
+    overheadPerDecadeBps: 2_000,
+    overheadMaxBps: 4_500,
   },
   /**
    * External events scale with the company value (company_worth_cents). decades = log10(value / pivot), 0 below
@@ -33,12 +33,11 @@ export const MACRO = {
     minChanceShare: 0.15,
     severityPowerPerDecade: 0.6,
     externalBoostPerDecade: 1,
-    /** One cost unit of a response step is at least this share of the company value (bps), so lobbying a billion-euro
-     * group is not paid from petty cash. Below ~10 Mio. € the old unit (fixed costs) is larger. */
-    unitWorthBps: 12,
-    /** News show (Mr. Doodle Dangle): external events of at least this severity and company value are a topic. */
-    newsMinSeverity: 2,
-    newsMinWorthCents: 5_000_000_000,
+    /**
+     * Above the pivot one cost unit of a response step is at least unitRevenueHours of the average hourly revenue (last
+     * 24 hours), so lobbying a group is not paid from petty cash. Below the pivot the old unit (fixed costs) stays.
+     */
+    unitRevenueHours: 0.25,
   },
   /**
    * Country risk (ADR-208, country_cfg of the company's headquarters). Without a headquarters every factor is 1.

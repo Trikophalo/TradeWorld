@@ -17,7 +17,7 @@ import {
   sizedChanceShare,
   sizedSeverityUniform,
   sizedWeight,
-  worthUnitCents,
+  sizeUnitCents,
 } from "./macro.ts";
 
 const MIO = 100_000_000;
@@ -97,8 +97,9 @@ describe("events scale with the company value", () => {
     expect(share(3_000 * MIO)).toBeGreaterThan(share(30 * MIO));
   });
 
-  it("the cost unit grows with the company value", () => {
-    expect(worthUnitCents(1_000 * MIO)).toBe((1_000 * MIO * MACRO.events.unitWorthBps) / 10_000);
+  it("big companies pay a share of their hourly revenue per cost unit, small ones the old unit", () => {
+    expect(sizeUnitCents(1_000 * MIO, 400_000)).toBe(400_000 * MACRO.events.unitRevenueHours);
+    expect(sizeUnitCents(5 * MIO, 400_000)).toBe(0);
   });
 });
 

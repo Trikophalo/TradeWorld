@@ -96,6 +96,7 @@ describe("BALANCE", () => {
       "battles",
       "nexamon",
       "listed",
+      "macro",
     ];
     expect(Object.keys(BALANCE).sort()).toEqual([...sections].sort());
   });

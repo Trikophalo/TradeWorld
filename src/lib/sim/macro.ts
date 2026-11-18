@@ -160,9 +160,13 @@ export function sizedWeight(archetype: CompanyEventArchetype, size: SizeContext 
 
 // ------------------------------------------------------------------ cost unit, insurance, lobby
 
-/** One cost unit of a response step: never below this share of the company value. */
-export function worthUnitCents(worthCents: number, cfg: MacroConfig = MACRO): number {
-  return Math.round((Math.max(0, worthCents) * cfg.events.unitWorthBps) / 10_000);
+/**
+ * Lower bound of a cost unit for a big company: unitRevenueHours of its average hourly revenue; 0 up to the event
+ * pivot (small companies keep the old unit).
+ */
+export function sizeUnitCents(worthCents: number, revenuePerHourCents: number, cfg: MacroConfig = MACRO): number {
+  if (sizeDecades(worthCents, cfg) <= 0) return 0;
+  return Math.round(Math.max(0, revenuePerHourCents) * cfg.events.unitRevenueHours);
 }
 
 /**

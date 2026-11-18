@@ -593,9 +593,9 @@ export const LISTED_RULES = {
      * the length of the bookkeeping period, so closing more often changes nothing) pays extraBps more.
      */
     brackets: [
-      { fromCentsPerDay: 10_000_000, extraBps: 300 },
-      { fromCentsPerDay: 100_000_000, extraBps: 700 },
-      { fromCentsPerDay: 1_000_000_000, extraBps: 1_200 },
+      { fromCentsPerDay: 10_000_000, extraBps: 200 },
+      { fromCentsPerDay: 100_000_000, extraBps: 500 },
+      { fromCentsPerDay: 1_000_000_000, extraBps: 800 },
     ],
     /**
      * Tax advisor: hourly wage max(minWage, rate × reference revenue); books and payment on time. ADR-209: the rate

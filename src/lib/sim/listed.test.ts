@@ -495,13 +495,13 @@ describe("listed companies: books and taxes", () => {
   it("taxes rise progressively with the profit per day, independent of the period length (ADR-209)", () => {
     // small: only the base rate
     expect(progressiveTaxCents(2_400_000, 1_500, 24)).toBe(360_000);
-    // 500 000 € a day: 15 % + 3 % on the part above 100 000 €
-    expect(progressiveTaxCents(50_000_000, 1_500, 24)).toBe(7_500_000 + 1_200_000);
+    // 500 000 € a day: 15 % + 2 % on the part above 100 000 €
+    expect(progressiveTaxCents(50_000_000, 1_500, 24)).toBe(7_500_000 + 800_000);
     // the same profit rate over half a day pays the same share
-    expect(progressiveTaxCents(25_000_000, 1_500, 12)).toBe((7_500_000 + 1_200_000) / 2);
+    expect(progressiveTaxCents(25_000_000, 1_500, 12)).toBe((7_500_000 + 800_000) / 2);
     expect(progressiveTaxCents(0, 1_500, 24)).toBe(0);
     // books close with the brackets when the period length is known
-    expect(booksTax(60_000_000, 10_000_000, 0, 1_500, 0, 24).taxCents).toBe(7_500_000 + 1_200_000);
+    expect(booksTax(60_000_000, 10_000_000, 0, 1_500, 0, 24).taxCents).toBe(7_500_000 + 800_000);
     expect(booksTax(60_000_000, 10_000_000, 0, 1_500, 0).taxCents).toBe(7_500_000);
   });
 });

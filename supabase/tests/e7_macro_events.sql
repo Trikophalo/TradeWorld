@@ -70,18 +70,18 @@ select tests.assert(
   and public.macro_size_decades(:worth_small) = 0
   and abs(public.macro_size_decades(200000000000) - 2) < 1e-9
   and public.macro_size_decades(1000000000000000) = 3
-  and abs((public.macro_friction(30000000000, 0) ->> 'demand_factor')::float8 - power(0.1, 0.6)) < 1e-9
-  and abs((public.macro_friction(30000000000, 0) ->> 'extra_cost_share')::float8 - 0.15) < 1e-9
-  and abs((public.macro_friction(30000000000000, 0) ->> 'extra_cost_share')::float8 - 0.4) < 1e-9
+  and abs((public.macro_friction(30000000000, 0) ->> 'demand_factor')::float8 - power(0.1, 0.25)) < 1e-9
+  and abs((public.macro_friction(30000000000, 0) ->> 'extra_cost_share')::float8 - 0.2) < 1e-9
+  and abs((public.macro_friction(30000000000000, 0) ->> 'extra_cost_share')::float8 - 0.45) < 1e-9
   and abs((public.macro_friction(1000, 2) ->> 'extra_cost_share')::float8 - 0.011) < 1e-9,
-  'e7: saturation (pivot/value)^0.6 and overhead 15 % per tenfold (max 40 %) above 30 Mio. EUR, premium of the insurance');
+  'e7: saturation (pivot/value)^0.25 and overhead 20 % per tenfold (max 45 %) above 30 Mio. EUR, premium of the insurance');
 select tests.assert(
   (public.company_event_hour_effect(:'small', date_trunc('hour', now()), date_trunc('hour', now()) + interval '1 hour') ->> 'demand_factor')::float8 = 1
   and (public.company_event_hour_effect(:'big', date_trunc('hour', now()), date_trunc('hour', now()) + interval '1 hour') ->> 'demand_factor')::float8 < 1
   and (public.company_event_hour_effect(:'big', date_trunc('hour', now()), date_trunc('hour', now()) + interval '1 hour') ->> 'extra_cost_share')::float8 > 0
   and public.company_event_unit_cents(:'small') = 20000
-  and public.company_event_unit_cents(:'big') >= :worth_big * 12 / 10000 - 1,
-  'e7: the hour of a big company carries the friction, a small one does not; the cost unit follows the value');
+  and public.company_event_unit_cents(:'big') = greatest(20000, round(public.macro_ref_revenue(:'big') * 0.25)::bigint),
+  'e7: the hour of a big company carries the friction, a small one does not; the cost unit follows the revenue');
 
 -- =============================================================================
 -- B. Frequency and severity scale with the size
@@ -183,11 +183,11 @@ select tests.assert(
 -- =============================================================================
 select tests.assert(
   public.company_tax_progressive_cents(2400000, 1500, 24) = 360000
-  and public.company_tax_progressive_cents(50000000, 1500, 24) = 8700000
-  and public.company_tax_progressive_cents(25000000, 1500, 12) = 4350000
-  and public.company_tax_progressive_cents(1000000000, 1500, 24) = 242700000
+  and public.company_tax_progressive_cents(50000000, 1500, 24) = 8300000
+  and public.company_tax_progressive_cents(25000000, 1500, 12) = 4150000
+  and public.company_tax_progressive_cents(1000000000, 1500, 24) = 214800000
   and public.company_tax_progressive_cents(0, 1500, 24) = 0,
-  'e7: 15 % up to 100 000 EUR a day, +3 / +7 / +12 % above 0.1 / 1 / 10 Mio.; the length of the period does not matter');
+  'e7: 15 % up to 100 000 EUR a day, +2 / +5 / +8 % above 0.1 / 1 / 10 Mio.; the length of the period does not matter');
 select tests.assert(
   public.listed_advisor_wage(20000) = 6000 and public.listed_advisor_wage(100000) = 6000
   and public.listed_advisor_wage(1000000) = 36000 and public.listed_advisor_wage(10000000) = 864000

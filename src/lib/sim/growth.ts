@@ -5,7 +5,7 @@
  *
  * The scripted founder: full time, quality 70 %, stage 2, the suggested marketing budget, contract work on, AI workers
  * matched to demand, next legal form as soon as the cash allows (AG = IPO from 5 Mio. € value), expansion whenever
- * the cash holds 1.3 × its price, every crisis answered with the strongest strategy (steps retried until they work),
+ * the cash holds 1.3 × its price and 30 days of profit pay it back, every crisis answered with the strongest strategy (steps retried until they work),
  * every chance taken, books done by hand every day (listed only). Insurance "Basis" in the friction run.
  */
 import { BALANCE } from "../../config/balance.ts";
@@ -21,7 +21,7 @@ import {
   type Severity,
 } from "./company-events.ts";
 import { progressiveTaxCents } from "./listed.ts";
-import { combineModifiers, eventSnapshot, frictionModifiers, worthUnitCents } from "./macro.ts";
+import { combineModifiers, eventSnapshot, frictionModifiers, sizeUnitCents } from "./macro.ts";
 import { createRng } from "./rng.ts";
 import {
   closeStartupHour,
@@ -50,6 +50,8 @@ export interface GrowthOptions {
   readonly seed: number;
   readonly milestonesCents?: readonly number[];
   readonly cfg?: BalanceConfig;
+  /** Called after every hour (to look inside the harness). */
+  readonly trace?: (hour: number, info: Readonly<Record<string, number | string>>) => void;
 }
 
 export interface GrowthResult {
@@ -63,7 +65,6 @@ export interface GrowthResult {
 
 export const GROWTH_SCENARIOS: readonly GrowthScenario[] = [
   { name: "Gute Nische (Tech, 200.000 €/Jahr)", sector: "tech", potentialAnnualCents: 20_000_000 },
-  { name: "Top-Nische (Tech, 1 Mio. €/Jahr)", sector: "tech", potentialAnnualCents: 100_000_000 },
   { name: "Spitzen-Nische (Pharma, 10 Mio. €/Jahr)", sector: "pharma", potentialAnnualCents: 1_000_000_000 },
 ];
 
@@ -162,7 +163,10 @@ export function runGrowth(scenario: GrowthScenario, options: GrowthOptions): Gro
       );
       if (rolled) {
         const fixed = fixedCostCents(tier, cfg, level);
-        const unit = Math.max(costUnitCents(fixed, cfg.companyEvents), options.friction ? worthUnitCents(value) : 0);
+        const unit = Math.max(
+          costUnitCents(fixed, cfg.companyEvents),
+          options.friction ? sizeUnitCents(value, lastQuarterRevenue / qh) : 0,
+        );
         const archetype = options.friction
           ? eventSnapshot(rolled.archetype, cfg.macro.insurance.levels[1]!.coverage, 0)
           : rolled.archetype;
@@ -232,6 +236,18 @@ export function runGrowth(scenario: GrowthScenario, options: GrowthOptions): Gro
       cfg,
     );
     state = { ...state, awareness: r.awareness.next, cashCents: state.cashCents + r.profitCents };
+    options.trace?.(h, {
+      tier,
+      level,
+      ai,
+      value,
+      demand: Number(r.demandCents),
+      capacity: Number(r.capacityCents),
+      revenue: Number(r.revenueCents),
+      profit: Number(r.profitCents),
+      demandFactor: mods.demandFactor,
+      extraCost: mods.extraCostShare,
+    });
     quarterProfit += r.profitCents;
     quarterRevenue += Number(r.revenueCents);
     dayProfit += Number(r.profitCents);
@@ -273,7 +289,8 @@ export function runGrowth(scenario: GrowthScenario, options: GrowthOptions): Gro
     }
     if (tier === "gmbh" || tier === "ag") {
       const price = BigInt(expansionCostCents(level, sc));
-      if (state.cashCents >= (price * 13n) / 10n + reserve) {
+      // a careful founder: only while the step pays back within 30 game years (days) of the current profit
+      if (state.cashCents >= (price * 13n) / 10n + reserve && price <= lastQuarterProfit * 4n * 30n) {
         state = { ...state, cashCents: state.cashCents - price };
         level += 1;
       }

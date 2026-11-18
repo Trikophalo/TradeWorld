@@ -4368,6 +4368,7 @@
     },
     "progress": "Abgewendet",
     "demoTrigger": "Demo: Lage auslösen",
+    "demoTriggerExternal": "Demo: Ereignis von außen",
     "demoFinish": "Demo: Schritt sofort beenden",
     "external": "Von außen",
     "insurable": "Versicherbar"

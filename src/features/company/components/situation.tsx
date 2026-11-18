@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { BALANCE } from "@/config/balance";
 import type { CompanyEventStep } from "@/config/company-events";
-import { demoFinishEventStep, demoTriggerCompanyEvent } from "@/features/game/demo-engine";
+import { demoFinishEventStep, demoTriggerCompanyEvent, demoTriggerExternalEvent } from "@/features/game/demo-engine";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine } from "@/features/game/store";
 import type { CompanyEvent, CompanyEventState } from "@/features/game/types";
@@ -86,17 +86,31 @@ function DemoTrigger() {
   const t = useTranslations("companyEvents");
   const client = useQueryClient();
   return (
-    <button
-      type="button"
-      className="text-xs text-accent underline-offset-2 focus-ring hover:underline"
-      onClick={() => {
-        demoTriggerCompanyEvent();
-        void client.invalidateQueries({ queryKey: ["company"] });
-      }}
-      data-testid="demo-trigger-event"
-    >
-      {t("demoTrigger")}
-    </button>
+    <span className="flex flex-wrap gap-x-4 gap-y-1">
+      <button
+        type="button"
+        className="text-xs text-accent underline-offset-2 focus-ring hover:underline"
+        onClick={() => {
+          demoTriggerCompanyEvent();
+          void client.invalidateQueries({ queryKey: ["company"] });
+        }}
+        data-testid="demo-trigger-event"
+      >
+        {t("demoTrigger")}
+      </button>
+      {/* ADR-209: an event from outside, which otherwise only hits companies worth tens of millions */}
+      <button
+        type="button"
+        className="text-xs text-accent underline-offset-2 focus-ring hover:underline"
+        onClick={() => {
+          demoTriggerExternalEvent();
+          void client.invalidateQueries({ queryKey: ["company"] });
+        }}
+        data-testid="demo-trigger-external"
+      >
+        {t("demoTriggerExternal")}
+      </button>
+    </span>
   );
 }
 

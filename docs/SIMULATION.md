@@ -1167,3 +1167,24 @@ Formeln in `src/lib/sim/nexamon-battle.ts`, gleich in PL/pgSQL (Migration 9700).
 - **Uhr:** `multiRevealAt(start, i, cfg, twistMs)`: `start + (p + 1) · tear + i · slot + p · twistMs` mit
   `p = ⌊i / 5⌋`; `multiTwistAt(start, k)`: `start + k · (tear + 5 · slot) + (k − 1) · twistMs`; Entscheidung bei
   `start + P · (tear + 5 · slot + twistMs)`. Ohne Twist ist `twistMs = 0` (die Uhr von ADR-192).
+
+## Nachtrag: Größe, Ereignisse von außen, Steuerstufen (ADR-209)
+
+Formeln in `src/lib/sim/macro.ts`, Werte in `BALANCE.macro`; Postgres spiegelt sie in
+`20261204010100_macro_events.sql`.
+
+- `decades = log10(Wert / 20 Mio. €)`, 0 darunter, höchstens 3 (Ereignisse). Reibung ab 30 Mio. €:
+  `saturationFactor = (30 Mio. / Wert)^(1 − 0,75)`, `overheadShare = min(45 %, 20 % × log10(Wert / 30 Mio.))`.
+- Stunde: `combineModifiers(Ereignis, Reibung)` multipliziert die Nachfrage, addiert Verwaltung und
+  Versicherungsprämie zu den Zusatzkosten (Anteil am eigenen Umsatz, mit dem Wareneinsatz gebucht) und deckelt die
+  Summe auf `maxExtraCostShare` (60 %).
+- Täglicher Wurf (`rollCompanyEvent` mit `size`): `sizedChancePerDay = min(95 %, 60 % + 20 % × decades)`,
+  `sizedChanceShare = max(15 %, 40 % − 8 % × decades)`, Schwere aus `1 − (1 − u)^(1 + 0,6 × decades)`, Gewicht externer
+  Archetypen `weight × (1 + decades) × countryFactor × lobbyPoliticalFactor`, nur ab `minWorthCents`.
+- `eventSnapshot` (Trigger beim Start): `insuredShare` (Deckung) für versicherbare Krisen, `leaderShare` für
+  politische Krisen des Marktführers, Lobby-Bonus auf `baseBps` der Lobby-Schritte. `eventModifiers` rechnet die
+  Wirkung × (1 − insuredShare) × (1 − leaderShare).
+- Kosteneinheit: `max(alt, sizeUnitCents)`, `sizeUnitCents = 0,25 × Ø Stundenumsatz` ab 20 Mio. €.
+- Steuer: `progressiveTaxCents(taxable, rate, Stunden)` = Satz auf alles + `extraBps` auf den Teil über
+  `fromCentsPerDay × Stunden / 24`. Steuerberater: `advisorRateBps = 150 × 2,4^log10(ref / 1.000 €)`, höchstens 3.000.
+- Wachstums-Werkzeug: `src/lib/sim/growth.ts` (`runGrowth`, `medianReach`), Ausgabe `scripts/growth-harness.ts`.

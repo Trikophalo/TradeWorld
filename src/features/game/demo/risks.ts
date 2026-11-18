@@ -8,7 +8,7 @@ import {
   sizedChancePerDay,
   sizedChanceShare,
   sizedWeight,
-  worthUnitCents,
+  sizeUnitCents,
 } from "@/lib/sim/macro";
 import type { CompanyRisks } from "../types";
 
@@ -54,7 +54,7 @@ export function demoRisks(
     overheadBps: Math.round(friction.extraCostShare * 10_000),
     chancePerDayBps: Math.round(chance * 10_000),
     crisisShareBps: Math.round((1 - share) * 10_000),
-    unitCents: Math.max(ce.costUnit.minUnitCents, worthUnitCents(worthCents)),
+    unitCents: Math.max(ce.costUnit.minUnitCents, sizeUnitCents(worthCents, refRevenueCents)),
     exposure: crises
       .filter((a) => a.external)
       .map((a) => ({

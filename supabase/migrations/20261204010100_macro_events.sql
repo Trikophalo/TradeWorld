@@ -2,7 +2,7 @@
 -- NEXA · 10100 · Size, risk and the world outside (ADR-209)
 -- =============================================================================
 -- Mirrors src/lib/sim/macro.ts (saturationFactor, overheadShare, frictionModifiers, combineModifiers, sizeDecades,
--- sizedChancePerDay, sizedChanceShare, sizedSeverityUniform, countryFactor, sizedWeight, worthUnitCents,
+-- sizedChancePerDay, sizedChanceShare, sizedSeverityUniform, countryFactor, sizedWeight, sizeUnitCents,
 -- effectiveCoverage, eventSnapshot), eventModifiers of src/lib/sim/company-events.ts (insurance and leader share) and
 -- advisorWageCents / progressiveTaxCents of src/lib/sim/listed.ts. Values: game_config "macro" (src/config/macro.ts),
 -- "companyEvents" (15 external archetypes) and "listed" (taxes.brackets, taxes.advisor).
@@ -16,7 +16,7 @@
 --   - player_company_events AFTER UPDATE: a won lobby strategy ("lobby…") raises the lobby level.
 --   - company_event_hour_effect (only caller: player_company_close_hour) returns the event modifiers times the size
 --     friction (saturation, overhead, insurance premium), extra costs capped. close_hour stays untouched.
--- * Redefined (latest versions copied): company_event_modifiers (m4h), company_event_unit_cents (0700: + value share),
+-- * Redefined (latest versions copied): company_event_modifiers (m4h), company_event_unit_cents (0700: + revenue share),
 --   company_event_roll (m4h: size, country and lobby), listed_advisor_wage (5400: exponential), listed_books_do and
 --   listed_books_preview (5410: progressive brackets, world tax rate when present).
 -- * RPCs: get_company_risks (the "Risiken" card), set_company_insurance.
@@ -413,7 +413,21 @@ begin
 end;
 $$;
 
--- costUnitCents (copied from 0700): also at least unitWorthBps of the company value; the crisis_manager discount stays
+-- Average revenue per operating hour of the last 24 hours
+create or replace function public.macro_ref_revenue(p_company uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(round(avg(h.revenue_cents))::bigint, 0)
+    from (select x.revenue_cents from public.player_company_hours x where x.company_id = p_company
+           order by x.hour_start desc limit 24) h;
+$$;
+
+-- costUnitCents (copied from 0700), sizeUnitCents: above the event pivot at least unitRevenueHours of the hourly
+-- revenue; the crisis_manager discount stays
 create or replace function public.company_event_unit_cents(p_company uuid)
 returns bigint
 language sql
@@ -425,8 +439,10 @@ as $$
     from (select greatest(public.cfg_num(c, '{costUnit,minUnitCents}', 20000)::bigint,
                           round(public.company_fixed_cost_cents(pc.tier, pc.expansion_level)::numeric
                                 * public.cfg_num(c, '{costUnit,unitShareOfFixed}', 0.5)::numeric)::bigint,
-                          round(greatest(0, coalesce(public.company_worth_cents(p_company), 0))::numeric
-                                * public.cfg_num(public.macro_cfg(), '{events,unitWorthBps}', 12)::numeric / 10000)::bigint) as u
+                          case when public.macro_size_decades(public.company_worth_cents(p_company)) > 0
+                               then round(public.macro_ref_revenue(p_company)::numeric
+                                          * public.cfg_num(public.macro_cfg(), '{events,unitRevenueHours}', 0.25)::numeric)::bigint
+                               else 0 end) as u
             from public.player_companies pc, (select public.company_events_cfg() as c) x
            where pc.company_id = p_company) y;
 $$;
@@ -868,7 +884,7 @@ revoke all on function public.macro_cfg(), public.macro_size_decades(bigint), pu
   public.macro_company_country(uuid), public.company_event_pick_sized(double precision, text, text, bigint, jsonb, integer),
   public.macro_coverage(uuid, timestamptz), public.macro_event_snapshot_trg(), public.macro_lobby_win_trg(),
   public.company_tax_progressive_cents(bigint, integer, double precision), public.macro_tax_rate_bps(uuid),
-  public.company_risks_json(uuid)
+  public.company_risks_json(uuid), public.macro_ref_revenue(uuid)
   from public, anon, authenticated;
 revoke all on function public.get_company_risks(), public.set_company_insurance(uuid, integer) from public, anon;
 grant execute on function public.get_company_risks(), public.set_company_insurance(uuid, integer) to authenticated;

@@ -633,6 +633,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Pack Battles mit Modi",
         text: "Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-768c3410",
+        title: "Größe hat ihren Preis",
+        text: "Bis etwa 30 Mio. € Firmenwert wächst deine Firma wie bisher.",
+      },
     ],
   },
   {

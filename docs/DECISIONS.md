@@ -4970,3 +4970,66 @@ wertvollen Karten steigen. Die Pfeile und die 24-h-Prozente zeigen einen Tag lan
 `tests.vault_quiet` ihn in SQL-Tests ein, die Vermögen über mehrere Anweisungen vergleichen. Liegt der Börsenkurs weit
 unter dem Ertragswert (wie beim Eigentümer: 3 Mio. gegen 49,4 Mio.), zeigt die Firmenseite das jetzt offen; ob der
 Kurs einer Spieler-AG zu langsam zum fairen Wert findet, ist eine eigene Frage. SQL-Test `d9_toplists.sql`.
+
+## ADR-209: Größe hat ihren Preis – Reibung, Ereignisse von außen, Versicherung, Lobby, Steuerstufen — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Gerade wird man mit einer Firma sehr leicht riesig. Am Anfang soll es so bleiben, in
+den hohen Millionen soll es schwerer werden. Milliarden sollen möglich sein, aber nicht so schnell.“ Dazu Ereignisse
+„von außen“ mit Gegenmaßnahmen, höhere und progressive Firmensteuern und ein deutlich teurerer Steuerberater.
+
+**Entscheidung.** Werte in `src/config/macro.ts` (`game_config.macro`), `companyEvents` (15 neue Archetypen) und
+`listed.taxes`; Formeln in `src/lib/sim/macro.ts`, gespiegelt in Migration `20261204010100_macro_events.sql`.
+
+- **Reibung nach Firmenwert** (`company_worth_cents`, ADR-203), erst ab 30 Mio. €: Marktsättigung (Nachfrage ×
+  (30 Mio. / Wert)^0,25) und Verwaltung (+20 % des Umsatzes je Verzehnfachung, höchstens 45 %). Darunter ändert sich
+  nichts. Die Wirkung läuft über den einzigen Haken `company_event_hour_effect` (Nachfrage-Faktor und Zusatzkosten),
+  `player_company_close_hour` bleibt unangetastet. Alle Zusatzkosten der Stunde (Ereignis, Verwaltung, Prämie) sind
+  auf 60 % des Umsatzes gedeckelt: Eine gut geführte Firma geht daran nicht pleite.
+- **Ereignisse nach Größe** ab 20 Mio. €: je Verzehnfachung +20 Prozentpunkte Tageschance (höchstens 95 %), 8 Punkte
+  weniger Chancen unter den Lagen, schwerere Stufen, externe Archetypen wiegen (1 + Zehnerstufen) mal mehr. Die
+  Kosteneinheit der Reaktion ist dann mindestens eine Viertelstunde Umsatz. Kleine Firmen ziehen nie ein externes
+  Ereignis; ihr Wurf ist derselbe wie vorher.
+- **15 Ereignisse von außen** im bestehenden Krisensystem (Strategien mit bezahlten, zeitlich gebundenen, scheiternden
+  Schritten; Mira, eigene Strategien, Kursreaktion, Firmen-News funktionieren ohne Sonderweg): politische Entscheidung
+  (große Lobby-Kampagne, vier Schritte mit Risiko), Zölle, Erdbeben, Tsunami, Überschwemmung, Waldbrand,
+  Krankheitswelle, Shitstorm, Konflikt in der Region, Rohstoffknappheit, Cyberangriff, Kartellverfahren (ab 500 Mio. €),
+  Streik der Gewerkschaft, Währungskrise, Energiepreisschock. Jede ist lösbar und lässt sich aussitzen; Frist und
+  Vorlaufzeit sind die Warnung, die Karte „Risiken“ zeigt vorher, was wie wahrscheinlich ist.
+- **Länderrisiko** über den Weltkarten-Vertrag (ADR-208): `company_country`, `country_cfg`, `company_is_market_leader`
+  werden als neutrale Stubs angelegt, falls die Weltkarte fehlt. Politisches Risiko, Zollabhängigkeit, Kriegsrisiko
+  (0..100) und ein schlechtes Image erhöhen die passenden Gewichte; genannte Katastrophen (earthquake → auch Tsunami,
+  storm → Überschwemmung und Tsunami, drought → Waldbrand) wiegen × 2,5, die übrigen × 0,4. Marktführer eines Landes
+  spüren politische Krisen um `world.lobby.politicalImpactReductionBps` weniger. Ist `world_tax_rate_bps` vorhanden,
+  ist sie der Grundsatz der Körperschaftsteuer.
+- **Versicherung** (`player_companies.insurance_level`, RPC `set_company_insurance`): Keine / Basis (50 %, 0,4 % vom
+  Umsatz) / Voll (80 %, 1,1 %). Die Prämie läuft mit den Zusatzkosten der Stunde; die Deckung wird beim Start eines
+  versicherbaren Ereignisses (Katastrophen, Cyberangriff) in die Definition geschrieben (Trigger), eine höhere Stufe
+  gilt erst nach 12 Stunden.
+- **Lobby** (`player_companies.lobby_level`, höchstens 5): jede gewonnene Lobby-Strategie (`lobby…`) hebt die Stufe
+  (Trigger, Firmen-News `lobby_level`). Je Stufe +3,5 Punkte Erfolgschance auf Lobby-Schritte (höchstens 95 %) und
+  12 % weniger politische Krisen.
+- **Steuern** (nur Börsenfirmen haben Bücher, wie bisher): Stufen auf den Tagesgewinn, auf die Länge der
+  Buchungsperiode umgerechnet (öfter abschließen ändert nichts): 15 % bis 100.000 €, darüber +2 %, ab 1 Mio. € +5 %,
+  ab 10 Mio. € +8 % (Grenzsatz 30 %). Der Steuerberater kostet 1,5 % des Referenzumsatzes bis 1.000 € je Stunde,
+  danach ×2,4 je Verzehnfachung (höchstens 30 %), mindestens 60 € je Stunde. `rate_bps` einer Periode ist der
+  effektive Satz.
+- **Oberfläche:** Ereigniskarte mit Abzeichen „Von außen“ und „Versicherbar“; Controlling → Wachstum → „Risiken“
+  (`RisksCard`, `Reveal companyRisks`): Firmenwert, Tageschance, Sättigung, Verwaltung, Versicherung mit Wartezeit,
+  Lobby-Stufe, die wahrscheinlichsten Ereignisse und was mit mehr Wert dazukommt. Demo: „Ereignis von außen“.
+
+**Gemessen** (`scripts/growth-harness.ts`, Median dreier Läufe, vorsichtiger Gründer ohne Börsenhebel):
+
+| Nische                 | Modell  | 10 Mio. € | 100 Mio. € | 1 Mrd. €     |
+| ---------------------- | ------- | --------- | ---------- | ------------ |
+| Tech, 200.000 €/Jahr   | vorher  | 2,0 Tage  | 22,8 Tage  | 248,9 Tage   |
+| Tech, 200.000 €/Jahr   | nachher | 2,0 Tage  | 47,3 Tage  | 603,8 Tage   |
+| Pharma, 10 Mio. €/Jahr | vorher  | 3,3 Tage  | 49,4 Tage  | 335,2 Tage   |
+| Pharma, 10 Mio. €/Jahr | nachher | 4,3 Tage  | 73,8 Tage  | 1.667,8 Tage |
+
+Von 100 Mio. auf 1 Mrd. € dauert es 2,5- bis 5,6-mal so lange, bis 10 Mio. € praktisch gleich.
+
+**Folgen.** Börsenfirmen mit Forschung, Regionen und Kapitalerhöhungen wachsen schneller als der Gründer des
+Werkzeugs; die Verhältnisse gelten, die absoluten Tage nicht. Der Steuerberater lohnt sich nur noch für kleine Firmen
+oder Bequeme; der Belegcheck spart ab mittlerer Größe ein Vielfaches. Tests: `src/lib/sim/macro.test.ts`,
+`growth.test.ts`, `listed.test.ts`, SQL `e7_macro_events.sql`, E2E „an event from outside“ in
+`e2e/company-growth.spec.ts`.

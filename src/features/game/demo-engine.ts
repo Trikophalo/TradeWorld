@@ -1426,6 +1426,13 @@ const companyEvents = createCompanyEventsEngine({
 export function demoTriggerCompanyEvent(archetype?: string): void {
   companyEvents.triggerNow(archetype);
 }
+/** Demo (ADR-209): an event from outside that a founder alone can answer, whatever the size. */
+export function demoTriggerExternalEvent(): void {
+  const pool = BALANCE.companyEvents.archetypes.filter(
+    (a) => a.external && (a.strategies.find((s) => s.steps.length > 0)?.steps ?? []).every((s) => (s.staff ?? 0) <= 1),
+  );
+  companyEvents.triggerNow(pool[Math.floor(Math.random() * pool.length)]?.key);
+}
 export function demoFinishEventStep(): void {
   companyEvents.finishStepNow();
 }

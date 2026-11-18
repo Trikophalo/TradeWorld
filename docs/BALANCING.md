@@ -1660,3 +1660,52 @@ Leuten, höchstens der halbe Lohn. Aktien-Chance je Stunde Junior 1 %, Senior 3 
 Bewertet wird ohne eigene Spielwerte: Börsenwert = Aktien × letzter Kurs, Firmenwert wie bisher
 (`startups.valuationPeDiscount`, `sectors.*.peRatio`), Vermögensteile mit den Werten ihrer Bereiche (Geldkurs,
 Nexamon-Marktwert, `property.*`, Tresor).
+
+## Nachtrag: Größe hat ihren Preis (ADR-209)
+
+Werte in `src/config/macro.ts` (`BALANCE.macro`), Steuern in `src/config/listed.ts` (`taxes.brackets`,
+`taxes.advisor`).
+
+| Wert                        | Schlüssel                                       | Stand                                                                                               |
+| --------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Reibung ab                  | `friction.worthPivotCents`                      | 30 Mio. € Firmenwert                                                                                |
+| Marktsättigung              | `friction.saturationExponent`                   | 0,75 (bei 300 Mio. € Nachfrage × 0,56)                                                              |
+| Verwaltung                  | `friction.overheadPerDecadeBps/overheadMaxBps`  | 20 % des Umsatzes je Verzehnfachung, höchstens 45 %                                                 |
+| Ereignisse ab               | `events.worthPivotCents`, `maxDecades`          | 20 Mio. €, höchstens drei Zehnerstufen                                                              |
+| Tageschance                 | `events.chancePerDayPerDecade/maxChancePerDay`  | +20 Punkte je Zehnerstufe, höchstens 95 %                                                           |
+| Chancen unter den Lagen     | `events.chanceShareCutPerDecade/minChanceShare` | −8 Punkte je Zehnerstufe, mindestens 15 %                                                           |
+| Schwere                     | `events.severityPowerPerDecade`                 | 0,6                                                                                                 |
+| Gewicht externer Ereignisse | `events.externalBoostPerDecade`                 | × (1 + Zehnerstufen)                                                                                |
+| Kosteneinheit großer Firmen | `events.unitRevenueHours`                       | eine Viertelstunde Umsatz                                                                           |
+| Länderrisiko                | `country.*`                                     | politisch/Zoll × (1 + 2 × Risiko), Krieg × (1 + 3 × Risiko), Katastrophe genannt × 2,5, sonst × 0,4 |
+| Versicherung                | `insurance.levels`, `changeWaitHours`           | Basis 50 % für 0,4 %, Voll 80 % für 1,1 % des Umsatzes; 12 h Wartezeit                              |
+| Lobby                       | `lobby.*`                                       | bis Stufe 5, je Stufe +3,5 Punkte, −12 % politische Krisen                                          |
+| Deckel Zusatzkosten         | `maxExtraCostShare`                             | 60 % des Umsatzes                                                                                   |
+| Steuerstufen                | `listed.taxes.brackets`                         | 15 % bis 100.000 € Gewinn am Tag, +2 / +5 / +8 % ab 0,1 / 1 / 10 Mio. €                             |
+| Steuerberater               | `listed.taxes.advisor`                          | 1,5 % des Stundenumsatzes bis 1.000 €, × 2,4 je Verzehnfachung, höchstens 30 %, mindestens 60 €     |
+
+**Zeit bis zum Firmenwert** (`pnpm exec tsx scripts/growth-harness.ts 2000 3`, Median aus drei Läufen; der Gründer
+des Werkzeugs reinvestiert vorsichtig und nutzt keine Börsenhebel, die absoluten Tage sind darum lang, die
+Verhältnisse zählen):
+
+| Nische                 | Modell  | 10 Mio. € | 100 Mio. € | 1 Mrd. €     |
+| ---------------------- | ------- | --------- | ---------- | ------------ |
+| Tech, 200.000 €/Jahr   | vorher  | 2,0 Tage  | 22,8 Tage  | 248,9 Tage   |
+| Tech, 200.000 €/Jahr   | nachher | 2,0 Tage  | 47,3 Tage  | 603,8 Tage   |
+| Pharma, 10 Mio. €/Jahr | vorher  | 3,3 Tage  | 49,4 Tage  | 335,2 Tage   |
+| Pharma, 10 Mio. €/Jahr | nachher | 4,3 Tage  | 73,8 Tage  | 1.667,8 Tage |
+
+Der Anfang bleibt gleich; von 100 Mio. € auf 1 Mrd. € dauert es 2,5- bis 5,6-mal so lange (`growth.test.ts` hält
+mindestens das 2,2-Fache fest).
+
+**Steuer vorher und nachher** (Gewinn eines Tages, Satz 15 %, ohne Rabatte):
+
+| Firma   | Gewinn am Tag | Steuer vorher       | Steuer nachher       | Umsatz je Stunde | Berater vorher | Berater nachher |
+| ------- | ------------- | ------------------- | -------------------- | ---------------- | -------------- | --------------- |
+| klein   | 24.000 €      | 3.600 € (15,0 %)    | 3.600 € (15,0 %)     | 500 €            | 40 €/h         | 60 €/h          |
+| mittel  | 500.000 €     | 75.000 € (15,0 %)   | 83.000 € (16,6 %)    | 10.000 €         | 100 €/h        | 360 €/h         |
+| groß    | 10 Mio. €     | 1,5 Mio. € (15,0 %) | 2,15 Mio. € (21,5 %) | 200.000 €        | 2.000 €/h      | 22.490 €/h      |
+| Konzern | 100 Mio. €    | 15 Mio. € (15,0 %)  | 29,1 Mio. € (29,1 %) | 2 Mio. €         | 20.000 €/h     | 539.772 €/h     |
+
+Der Berater spart 8 % der Steuer, der eigene Belegcheck 5 %. Für die mittlere Firma kostet der Berater am Tag
+8.640 €, er spart gegenüber dem Belegcheck 2.490 €; ab dort machen kluge Gründer die Bücher selbst.

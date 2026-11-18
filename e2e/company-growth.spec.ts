@@ -211,6 +211,42 @@ test("company situation: a crisis or chance, a strategy, a step, the news", asyn
   await expect(news.locator('[data-kind="event_step_done"], [data-kind="event_step_failed"]').first()).toBeVisible();
 });
 
+test("an event from outside: a response step, and the risks card with the insurance (ADR-209)", async ({ page }) => {
+  await preparePlayer(page, "Krisenkonzern", 7_000, 2_000_000);
+  await found(page, "garage", "Weltwerk", "Ersatzteile für Fahrräder aus aller Welt.");
+  await showStaff(page);
+  await page.getByTestId("demo-trigger-external").click();
+  const situation = page.getByTestId("situation");
+  await expect(situation).toBeVisible();
+  await expect(situation.getByTestId("situation-external")).toHaveText("Von außen");
+  await expect(situation.getByTestId("situation-headline")).not.toBeEmpty();
+
+  // Answer it: the first strategy with real work, its first step, finished at once in the demo.
+  const picker = situation.getByTestId("strategy-picker");
+  await picker
+    .locator("[data-strategy]")
+    .filter({ has: page.getByText(/Schritte?$/) })
+    .first()
+    .getByRole("button", { name: "Diese Strategie" })
+    .click();
+  const path = situation.getByTestId("step-path");
+  await path.getByTestId("start-step").click();
+  await expect(path.locator('[data-step-status="running"]')).toHaveCount(1);
+  await situation.getByTestId("demo-finish-step").click();
+  await expect(path.locator('[data-step-status="done"], [data-step-status="failed"]').first()).toBeVisible();
+
+  // Controlling → Wachstum → Risiken: a small company feels no size yet; the insurance can be chosen.
+  await showOverview(page);
+  await showPane(page, "group-growth", "Risiken");
+  const risks = page.getByTestId("company-risks");
+  await expect(risks.getByTestId("risks-size")).toContainText("Noch spürt deine Firma ihre Größe nicht");
+  const insurance = risks.getByTestId("risks-insurance");
+  await insurance.getByRole("radio", { name: "Basis" }).click();
+  await insurance.getByTestId("risks-insurance-save").click();
+  await expect(page.getByText("Versicherung geändert").first()).toBeVisible();
+  await expect(insurance.getByText("Volle Deckung in")).toBeVisible();
+});
+
 test("business moves fit the product, cost company cash and run for minutes (ADR-127)", async ({ page }) => {
   await preparePlayer(page, "Zugmeister", 21_000, 2_000_000);
   await found(page, "garage", "Zugwerk");
