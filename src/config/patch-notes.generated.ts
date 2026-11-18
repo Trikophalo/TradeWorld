@@ -1008,6 +1008,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Aktien ohne Tagesgrenze: Kurse steigen und fallen an einem Tag so weit, wie der Markt sie trägt.",
       },
       {
+        id: "m0-fundament-9298c771",
+        title: null,
+        text: "Entnahmen aus der Firma: Du kannst alle 6 Stunden Geld entnehmen.",
+      },
+      {
         id: "m0-fundament-f6048448",
         title: null,
         text: "Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen), das Mausrad und zwei Finger zoomen…",
