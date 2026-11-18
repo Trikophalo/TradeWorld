@@ -17,6 +17,7 @@ import { COUNTRIES, WORLD_RULES, type CountryConfig } from "./countries.ts";
 import { MACRO, type MacroConfig } from "./macro.ts";
 import { INVESTOR_CONFIDENCE, type InvestorConfidenceConfig } from "./investor-confidence.ts";
 import { MARKET_FORCES, type MarketForcesConfig } from "./market-forces.ts";
+import { PLAYER_VALUATION, type PlayerValuationConfig } from "./player-valuation.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -994,6 +995,8 @@ export interface BalanceConfig {
   readonly marketForces: MarketForcesConfig;
   /** Investor confidence and market mood (ADR-216), values in investor-confidence.ts. */
   readonly investorConfidence: InvestorConfidenceConfig;
+  /** Valuation of listed player companies (ADR-217). */
+  readonly playerValuation: PlayerValuationConfig;
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -2978,6 +2981,7 @@ export const BALANCE = {
   macro: MACRO,
   marketForces: MARKET_FORCES,
   investorConfidence: INVESTOR_CONFIDENCE,
+  playerValuation: PLAYER_VALUATION,
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,

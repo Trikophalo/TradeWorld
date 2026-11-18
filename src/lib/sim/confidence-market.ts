@@ -39,6 +39,7 @@ import {
   pickForce,
   stockHeat,
 } from "./market-forces.ts";
+import { legacyCompanyValue, nextAnchor, playerCompanyValue, playerFairValueE4 } from "./player-valuation.ts";
 import { createRng } from "./rng.ts";
 import { stepMarketTick } from "./tick.ts";
 import type { MarketState, PlayerFlow, SecurityState, TickShock } from "./types.ts";
@@ -55,6 +56,33 @@ export interface HarnessStock {
   /** Player buying (cents per hour) that ignores the price, and that chases the trend. */
   readonly steadyBuyCentsPerHour?: number;
   readonly chaseBuyCentsPerHour?: number;
+  /**
+   * A real player company behind the stock (ADR-217): its hourly profit, cash and spending decide the fair value
+   * (instead of fairGrowthPerQuarter). The start price is the fair value of the chosen valuation.
+   */
+  readonly company?: HarnessCompany;
+}
+
+/** Economics of a player company in the harness (ADR-217). */
+export interface HarnessCompany {
+  /** Operating profit per hour at the start (cents) and its growth per day, fading with growthTauDays. */
+  readonly profitCentsPerHour: number;
+  readonly growthPerDay: number;
+  readonly growthTauDays: number;
+  /** Hourly noise of the profit (log σ) and a slow random walk of the business per hour (log σ). */
+  readonly hourNoise: number;
+  readonly walkPerHour: number;
+  readonly cashCents: number;
+  /** Share of the profit the automatic CEO payout takes (ADR-086); the rest stays as cash. */
+  readonly payoutShare: number;
+  /** Once a day the founder invests this share of the cash; it pays back over paybackDays as more profit. */
+  readonly investShareDaily?: number;
+  readonly paybackDays?: number;
+}
+
+export interface MarketOptions {
+  /** Fair value of player companies: legacy = company value at the quarter close, earnings = ADR-217. */
+  readonly valuation?: "legacy" | "earnings";
 }
 
 export interface MarketRun {
@@ -70,6 +98,8 @@ export interface MarketRun {
   readonly phases: MoodPhase[];
   /** Stock incidents drawn per stock. */
   readonly incidents: number[];
+  /** Player companies with a business (ADR-217): hourly profit level per stock (empty for the others). */
+  readonly profits?: number[][];
 }
 
 /** An open stock incident in the harness: the founder works through `steps` (70 % success each, retried). */
@@ -141,15 +171,67 @@ export function simulateMarket(
   model: "before" | "after",
   days: number,
   seed: number,
-  stocks: readonly HarnessStock[] = HARNESS_STOCKS,
+  stocksIn: readonly HarnessStock[] = HARNESS_STOCKS,
+  options: MarketOptions = {},
 ): MarketRun {
   const cfg = INVESTOR_CONFIDENCE;
   const after = model === "after";
   const rng = createRng(seed);
   const ev = rng.derive("events");
   const flowRng = rng.derive("flows");
+  const bizRng = rng.derive("business");
   const ticksPerMinute = 60 / BALANCE.time.tickSeconds;
   const rate = BALANCE.centralBank.startRateBps;
+  const valuation = options.valuation ?? "legacy";
+  const peDiscount = BALANCE.startups.valuationPeDiscount;
+  // player companies (ADR-217): business state
+  const biz = stocksIn.map((s) =>
+    s.company
+      ? {
+          base: s.company.profitCentsPerHour,
+          cash: s.company.cashCents,
+          anchor: s.company.cashCents,
+          hours: [] as number[],
+        }
+      : null,
+  );
+  // hours since 1970 at the start (sector P/E cycles start at a different point per seed)
+  const hour0 = 490_000 + seed * 37;
+  const shareCount = stocksIn.map((s) => s.freeFloat * (s.kind === "player" ? 2 : 1));
+  const companyFair = (i: number, minute: number, moodNow: number): number => {
+    const b = biz[i]!;
+    const s = stocksIn[i]!;
+    const pe = BALANCE.sectors[s.sector].peRatio;
+    if (valuation === "legacy") {
+      const q = b.hours.slice(-BALANCE.time.quarterHours).reduce((a, x) => a + x, 0);
+      return playerFairValueE4(legacyCompanyValue(b.cash, q, pe, peDiscount), shareCount[i]!);
+    }
+    const n = b.hours.length;
+    const recent = b.hours.slice(-24).reduce((a, x) => a + x, 0);
+    const prior = n >= 48 ? b.hours.slice(-48, -24).reduce((a, x) => a + x, 0) : null;
+    const v = playerCompanyValue({
+      profitRecentCents: recent,
+      hoursRecent: Math.min(24, n),
+      profitPriorCents: prior,
+      hoursPrior: 24,
+      cashCents: b.cash,
+      anchorCents: b.anchor,
+      sector: s.sector,
+      peRatio: pe,
+      peDiscount,
+      mood: moodNow,
+      hours: hour0 + minute / 60,
+    });
+    return playerFairValueE4(v.valueCents, shareCount[i]!);
+  };
+  // a company starts with six hours of history at its start profit
+  biz.forEach((b) => {
+    if (b) for (let h = 0; h < 6; h++) b.hours.push(b.base);
+  });
+  const stocks = stocksIn.map((s, i) =>
+    biz[i] ? { ...s, priceE4: companyFair(i, 0, INVESTOR_CONFIDENCE.mood.start) } : s,
+  );
+  const held = stocks.map(() => 0);
   const fair = stocks.map((s) => s.priceE4);
   let state: MarketState = {
     tick: 0,
@@ -199,6 +281,7 @@ export function simulateMarket(
     mood: [mood.mood],
     phases: [mood.phase],
     incidents: stocks.map(() => 0),
+    profits: stocks.map((_, i) => (biz[i] ? [biz[i]!.base] : [])),
   };
   const incident: (OpenIncident | null)[] = stocks.map(() => null);
   const incidentFree = stocks.map(() => 0);
@@ -247,12 +330,51 @@ export function simulateMarket(
           if (after) factors[i] = addBump(factors[i]!, "earnings", earningsBump(surprise), cfg);
           profitPrev[i] = profitNow[i]!;
           profitNow[i] = profitNow[i]! * (1 + g / 4) * Math.exp(sec.demandNoise * z);
+        } else if (biz[i]) {
+          // quarter result of a player company: this quarter's profit against the one before
+          const hs = biz[i]!.hours;
+          const recent = hs.slice(-BALANCE.time.quarterHours).reduce((a, x) => a + x, 0);
+          const prior = hs.slice(-2 * BALANCE.time.quarterHours, -BALANCE.time.quarterHours).reduce((a, x) => a + x, 0);
+          if (after && hs.length >= 2 * BALANCE.time.quarterHours)
+            factors[i] = addBump(
+              factors[i]!,
+              "earnings",
+              cfg.events.earnings.perSurprise *
+                Math.max(-1, Math.min(1, (recent - prior) / Math.max(Math.abs(prior), 100))),
+              cfg,
+            );
+          profitPrev[i] = prior;
+          profitNow[i] = recent;
+          if (valuation === "legacy") fair[i] = companyFair(i, minute, mood.mood);
         } else {
           fair[i] = Math.max(1, Math.round(fair[i]! * (1 + (s.fairGrowthPerQuarter ?? 0))));
           profitPrev[i] = profitNow[i]!;
           profitNow[i] = profitNow[i]! * (1 + (s.fairGrowthPerQuarter ?? 0));
         }
       }
+    }
+
+    // player companies (ADR-217): the hour closes with its profit, the founder invests once a day
+    for (let i = 0; i < n; i++) {
+      const b = biz[i];
+      const c = stocks[i]!.company;
+      if (!b || !c) continue;
+      if (minute % 60 === 0) {
+        const t = minute / 1_440;
+        const profit = b.base * Math.exp(c.hourNoise * bizRng.normal());
+        b.hours.push(profit);
+        if (b.hours.length > 60) b.hours.shift();
+        const lastCash = b.cash;
+        b.cash += profit * (1 - c.payoutShare);
+        b.base *= Math.exp((c.growthPerDay * Math.exp(-t / c.growthTauDays)) / 24 + c.walkPerHour * bizRng.normal());
+        if (c.investShareDaily && minute % 1_440 === 0) {
+          const spend = b.cash * c.investShareDaily;
+          b.cash -= spend;
+          b.base += spend / (24 * (c.paybackDays ?? 8));
+        }
+        b.anchor = nextAnchor(b.anchor, b.cash, lastCash, false);
+      }
+      if (valuation === "earnings" && minute % 5 === 0) fair[i] = companyFair(i, minute, after ? mood.mood : 50);
     }
 
     // ordinary stock news every 12 minutes
@@ -410,6 +532,7 @@ export function simulateMarket(
         ...s,
         fairValueE4: BigInt(Math.max(1, Math.round(fair[i]! * (1 - 0.04 * (incident[i]?.severity ?? 0))))),
         ...(after ? { confidence: conf[i]! } : {}),
+        ...(biz[i] ? { playerHeldShares: held[i]! } : {}),
       })),
     };
     for (let t = 0; t < ticksPerMinute; t++) {
@@ -424,6 +547,7 @@ export function simulateMarket(
           (1 / (60 * ticksPerMinute)) *
           (0.5 + flowRng.next());
         const shares = Math.round((cents * 100) / Math.max(1, Number(s.priceE4)));
+        if (biz[i]) held[i] = Math.max(0, held[i]! + shares);
         if (shares !== 0)
           flows.push({ securityId: st.id, netShares: BigInt(shares), volumeShares: BigInt(Math.abs(shares)) });
       }
@@ -446,6 +570,7 @@ export function simulateMarket(
         run.prices[i]!.push(Number(state.securities[i]!.priceE4));
         run.fairs[i]!.push(fair[i]!);
         run.confidence[i]!.push(conf[i]!);
+        if (biz[i]) run.profits![i]!.push(biz[i]!.base);
         // keep 8 days of minute prices (heat needs 7 days)
         if (minutePrices[i]!.length > 11_600) minutePrices[i]!.splice(0, minutePrices[i]!.length - 11_600);
       }

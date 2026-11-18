@@ -8637,3 +8637,16 @@ Keine neue Tabelle.
 market: MOOD, updated_at}`; Fehler `unknown_security` für unbekannte Ticker und Nicht-Aktien.
 - `get_market_mood()` → `MOOD ∪ {avg_confidence, confident, stocks, leaders[{ticker, name, confidence}],
 laggards[…]}` mit `MOOD = {mood, phase, phase_started_at, trend, history[], sectors[{sector, points}]}`.
+
+## Bewertung der Spieleraktien (ADR-217, Migration `20261204011200_player_stock_valuation.sql`)
+
+- `player_stock_valuation` (intern, RLS ohne Policy): `security_id` (PK), `company_id`, `anchor_cents` (Kassen-Anker),
+  `last_cash_cents`, `shares`, `shock` (Faktor von außen, läuft aus), `written_e4` (zuletzt geschriebener fairer
+  Wert), `price_factor` (Ruf-Faktor dabei), `quarter_id` (letzter Quartalsabschluss), `parts` (`value_cents`,
+  `yearly_profit_cents`, `counted_cash_cents`, `cash_cents`, `growth`, `mood`, `cycle`, `multiple`, `shock`),
+  `run_at`, `updated_at`.
+- Interne Funktionen: `player_valuation_value` (= `playerCompanyValue`), `player_valuation_fade`,
+  `player_valuation_anchor`, `player_stock_valuation_run(p_now)` (Cron `nexa-player-valuation` jede Minute, nur
+  `service_role`). Schreibt `security_sim_state.fair_value_e4` aller börsennotierten Spielerfirmen; keine Funktion wird
+  umgeschrieben.
+- Diagnose für den Betrieb (nur lesend): `supabase/tools/player-stocks-check.sql`.

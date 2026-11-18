@@ -4,6 +4,11 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Spieleraktien steigen nicht mehr von allein: Ihr fairer Wert kommt jetzt aus dem Gewinn der Firma, nicht mehr aus
+  dem Geld, das sich in der Kasse stapelt. Die Anleger zahlen ein KGV, das mit der Wachstumserwartung, der
+  Marktstimmung und den Zyklen der Branche schwankt: Wächst der Gewinn, steigt die Aktie, lässt das Wachstum nach oder
+  kommt ein Bärenmarkt, fällt sie. Gehortete Kasse hebt den Kurs kaum noch.
+
 - Forschung bleibt bezahlbar: Ein Forschungsschritt kostet jetzt Stunden deines Gewinns (Schnitt der letzten 48
   Stunden), nie mehr als 40 Stunden Gewinn, egal wie groß oder wie viel wert die Firma ist. Jede Forschung macht die
   nächste etwas teurer. Neu ist die Sparforschung für den halben Preis bei dreifacher Dauer, und das Blatt zeigt, wie

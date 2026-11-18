@@ -100417,6 +100417,280 @@ $function$;
 revoke all on function public.simulate_ai_companies(bigint) from public, anon, authenticated;
 grant execute on function public.simulate_ai_companies(bigint) to service_role;
 
+-- ===== supabase/migrations/20261204011200_player_stock_valuation.sql =====
+-- =============================================================================
+-- NEXA · 011200 · Player stocks valued from expected profit, not from piled-up cash (ADR-217)
+-- =============================================================================
+-- The owner (after ADR-214 and ADR-216 were live): "Alle Spieler-Aktien steigen immer noch ununterbrochen."
+--
+-- Root cause: the fair value of a listed player company was its company value (company_value_cents, ADR-067/167):
+-- cash − open bills + 4 × last quarter's profit × sector P/E × 0,5, written at every quarter close
+-- (player_company_close_quarter) and scaled by the reputation factor. A player company keeps its profit as cash
+-- (no dividends; ADR-216 even punishes founder withdrawals), so every quarter (6 hours) the cash and with it the
+-- fair value rose by one quarter's profit, ≈ 3 % of the value: about +13 % a day and +60 to +140 % a week, also for
+-- a company whose profit did not grow at all. The value fund pulls the price to that line within the hour; confidence,
+-- herd and incidents only wobbled around a line that only went up.
+--
+-- Now (formulas = src/lib/sim/player-valuation.ts, values = game_config.playerValuation):
+--   value = counted cash + expected yearly profit × sector P/E × peDiscount × multiple
+--   * expected yearly profit = operating profit of the last 24 hours (one game year; scaled up from at least 6 hours)
+--   * multiple = growth × mood × sector cycle in [0,45; 2]: growth expectation priced in at once
+--     (e^clamp(0,8 × ln(profit per hour of the last 24 h / the 24 h before), ±0,4)), market mood
+--     (e^(0,01 × (mood − 50))), sector P/E cycles (e^(0,25 × sin(2π (h / period + phase))), 83 to 149 hours)
+--   * counted cash = min(cash, reserve) + 3 % of the cash above it, reserve = max(anchor, 0,5 × yearly profit);
+--     anchor = free cash when the stock is first valued this way (or listed) plus capital increases, never above the
+--     cash. At least 20 % of the free cash.
+--   fair value per share = value / shares × reputation factor (ADR-167) × shock.
+-- player_stock_valuation_run() (cron nexa-player-valuation, every minute) writes it. Changes from outside the model
+-- (crisis shocks ADR-091, market events, the old formula at the quarter close is ignored) are kept as a shock factor
+-- that fades with a 3-hour half-life; the first run starts with the old fair value as shock, so nothing jumps.
+-- Nothing else is rewritten: the quarter close keeps its line, the reputation step keeps scaling (both are accounted).
+-- Idempotent: runs unchanged as supabase/updates/20261204011200_player_stock_valuation.sql.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. Schema
+-- ---------------------------------------------------------------------------
+create table if not exists public.player_stock_valuation (
+  security_id     uuid primary key references public.securities (id) on delete cascade,
+  company_id      uuid not null references public.companies (id) on delete cascade,
+  anchor_cents    bigint not null default 0 check (anchor_cents >= 0),
+  last_cash_cents bigint not null default 0,
+  shares          bigint not null default 0,
+  shock           double precision not null default 1 check (shock > 0),
+  written_e4      bigint,
+  price_factor    double precision not null default 1 check (price_factor > 0),
+  quarter_id      bigint,
+  parts           jsonb not null default '{}'::jsonb check (jsonb_typeof(parts) = 'object'),
+  run_at          timestamptz,
+  updated_at      timestamptz not null default now()
+);
+create index if not exists player_stock_valuation_company_idx on public.player_stock_valuation (company_id);
+alter table public.player_stock_valuation enable row level security;
+drop trigger if exists set_updated_at on public.player_stock_valuation;
+create trigger set_updated_at before update on public.player_stock_valuation
+  for each row execute function public.set_updated_at();
+comment on table public.player_stock_valuation is
+  'Valuation of a listed player stock (ADR-217): cash anchor, shock factor from outside the model, the last written '
+  'fair value and its parts (profit, multiple, counted cash). Internal; written by player_stock_valuation_run().';
+
+-- ---------------------------------------------------------------------------
+-- B. Formulas (src/lib/sim/player-valuation.ts)
+-- ---------------------------------------------------------------------------
+
+-- playerCompanyValue: {value_cents, yearly_profit_cents, counted_cash_cents, growth, mood, cycle, multiple}
+create or replace function public.player_valuation_value(
+  p_recent double precision, p_hours double precision, p_prior double precision, p_prior_hours double precision,
+  p_cash double precision, p_anchor double precision, p_sector text, p_pe double precision, p_discount double precision,
+  p_mood double precision, p_epoch_hours double precision, p_cfg jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_ph      double precision := public.cfg_num(p_cfg, '{profitHours}', 24);
+  v_minh    double precision := public.cfg_num(p_cfg, '{minProfitHours}', 6);
+  v_yearly  double precision;
+  v_rec     double precision;
+  v_pri     double precision;
+  v_g       double precision;
+  v_max     double precision := public.cfg_num(p_cfg, '{growth,maxLog}', 0.4);
+  v_growth  double precision;
+  v_mood    double precision;
+  v_period  double precision;
+  v_phase   double precision;
+  v_cycle   double precision;
+  v_mult    double precision;
+  v_reserve double precision;
+  v_cash    double precision;
+  v_value   double precision;
+begin
+  v_yearly := case when coalesce(p_hours, 0) <= 0 then 0
+                   else greatest(0, p_recent * v_ph / greatest(p_hours, v_minh)) end;
+  -- growth expectation from the average hourly profit
+  if p_prior is null or coalesce(p_hours, 0) <= 0 then
+    v_g := 0;
+  else
+    v_rec := p_recent / greatest(1, p_hours);
+    v_pri := p_prior / greatest(1, p_prior_hours);
+    v_g := case when v_rec > 0 and v_pri > 0 then ln(v_rec / v_pri)
+                when v_rec > v_pri then 10 when v_rec < v_pri then -10 else 0 end;
+  end if;
+  v_growth := exp(greatest(-v_max, least(v_max, public.cfg_num(p_cfg, '{growth,perLogGrowth}', 0.8) * v_g)));
+  v_mood := exp(public.cfg_num(p_cfg, '{mood,perPoint}', 0.01) * (least(100, greatest(0, coalesce(p_mood, 50))) - 50));
+  v_period := public.cfg_num(p_cfg, array['sectorCycle', 'sectors', coalesce(p_sector, ''), 'periodHours'],
+                             public.cfg_num(p_cfg, '{sectorCycle,fallback,periodHours}', 113));
+  v_phase := public.cfg_num(p_cfg, array['sectorCycle', 'sectors', coalesce(p_sector, ''), 'phase'],
+                            public.cfg_num(p_cfg, '{sectorCycle,fallback,phase}', 0.45));
+  v_cycle := exp(public.cfg_num(p_cfg, '{sectorCycle,amplitude}', 0.25)
+                 * sin(2 * pi() * (p_epoch_hours / greatest(1, v_period) + v_phase)));
+  v_mult := greatest(public.cfg_num(p_cfg, '{minMultiple}', 0.45),
+                     least(public.cfg_num(p_cfg, '{maxMultiple}', 2), v_growth * v_mood * v_cycle));
+  -- counted cash: 1x up to the reserve, a little above it
+  if p_cash <= 0 then
+    v_cash := p_cash;
+  else
+    v_reserve := greatest(coalesce(p_anchor, 0), public.cfg_num(p_cfg, '{reserveYears}', 0.5) * v_yearly);
+    v_cash := least(p_cash, v_reserve) + public.cfg_num(p_cfg, '{excessCashWeight}', 0.03) * greatest(0, p_cash - v_reserve);
+  end if;
+  v_value := greatest(0, public.cfg_num(p_cfg, '{liquidationWeight}', 0.2) * p_cash,
+                      v_cash + v_yearly * p_pe * p_discount * v_mult);
+  return jsonb_build_object('value_cents', v_value, 'yearly_profit_cents', v_yearly, 'counted_cash_cents', v_cash,
+                            'growth', v_growth, 'mood', v_mood, 'cycle', v_cycle, 'multiple', v_mult);
+end;
+$$;
+
+-- fadeShock: ln(factor) halves every shockHalfLifeHours
+create or replace function public.player_valuation_fade(p_factor double precision, p_minutes double precision, p_cfg jsonb)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_factor, 0) <= 0 then 1::double precision
+              else exp(ln(p_factor) * power(0.5, greatest(0, p_minutes) / 60.0
+                                                 / greatest(0.01, public.cfg_num(p_cfg, '{shockHalfLifeHours}', 3)))) end;
+$$;
+
+-- nextAnchor: never above the free cash, plus what a capital increase brought in
+create or replace function public.player_valuation_anchor(p_anchor bigint, p_cash bigint, p_last_cash bigint, p_shares_grew boolean)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select greatest(0, least(coalesce(p_anchor, 0) + case when p_shares_grew then greatest(0, p_cash - coalesce(p_last_cash, p_cash)) else 0 end,
+                           greatest(0, p_cash)))::bigint;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- C. The minute job
+-- ---------------------------------------------------------------------------
+create or replace function public.player_stock_valuation_run(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg    jsonb := coalesce(public.config_jsonb('playerValuation'), '{}'::jsonb);
+  v_now    timestamptz := coalesce(p_now, public.game_now());
+  v_ph     double precision := public.cfg_num(coalesce(public.config_jsonb('playerValuation'), '{}'::jsonb), '{profitHours}', 24);
+  v_disc   double precision := public.config_double('startups', '{valuationPeDiscount}', 0.5);
+  v_mood   double precision;
+  v_epoch  double precision := extract(epoch from coalesce(p_now, public.game_now())) / 3600.0;
+  v_val    jsonb;
+  v_anchor bigint;
+  v_shock  double precision;
+  v_x      double precision;
+  v_min    double precision;
+  v_fair   bigint;
+  v_model  double precision;
+  v_n      integer := 0;
+  r        record;
+begin
+  -- never beside a running tick (same lock as the tick and the confidence job)
+  perform pg_advisory_xact_lock(7311001);
+  select m.mood into v_mood from public.market_mood m where m.id;
+  for r in
+    select s.id as security_id, c.id as company_id, s.sector_key, c.shares_outstanding,
+           pc.last_closed_quarter_id,
+           greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a
+                                  where a.owner_company_id = c.id and a.kind = 'company_cash'), 0)) - pc.unpaid_cents as cash,
+           st.fair_value_e4 as fair,
+           public.listed_price_factor(c.id) as pf,
+           (select sum(h.profit_cents) from public.player_company_hours h
+             where h.company_id = c.id and h.hour_start >= v_now - make_interval(secs => v_ph * 3600)) as recent,
+           (select count(*) from public.player_company_hours h
+             where h.company_id = c.id and h.hour_start >= v_now - make_interval(secs => v_ph * 3600)) as recent_n,
+           (select sum(h.profit_cents) from public.player_company_hours h
+             where h.company_id = c.id and h.hour_start >= v_now - make_interval(secs => 2 * v_ph * 3600)
+               and h.hour_start < v_now - make_interval(secs => v_ph * 3600)) as prior,
+           (select count(*) from public.player_company_hours h
+             where h.company_id = c.id and h.hour_start >= v_now - make_interval(secs => 2 * v_ph * 3600)
+               and h.hour_start < v_now - make_interval(secs => v_ph * 3600)) as prior_n,
+           v.security_id is not null as known, v.anchor_cents, v.last_cash_cents, v.shares, v.shock, v.written_e4,
+           v.price_factor as v_pf, v.quarter_id, v.run_at
+      from public.companies c
+      join public.player_companies pc on pc.company_id = c.id
+      join public.securities s on s.id = c.security_id and s.kind = 'stock' and s.status = 'listed'
+      join public.security_sim_state st on st.security_id = s.id
+      left join public.player_stock_valuation v on v.security_id = s.id
+     where not c.is_ai and c.phase = 'listed' and coalesce(c.shares_outstanding, 0) > 0
+  loop
+    v_val := public.player_valuation_value(
+      coalesce(r.recent, 0)::double precision, r.recent_n::double precision,
+      -- the prior game year counts once most of its hours exist
+      case when r.prior_n >= 0.75 * v_ph then r.prior::double precision end, r.prior_n::double precision,
+      r.cash::double precision,
+      (case when r.known then public.player_valuation_anchor(r.anchor_cents, r.cash, r.last_cash_cents,
+                                                              r.shares_outstanding > coalesce(r.shares, r.shares_outstanding))
+            else greatest(0, r.cash) end)::double precision,
+      r.sector_key, public.config_double('sectors', array[coalesce(r.sector_key, ''), 'peRatio'], 15), v_disc,
+      coalesce(v_mood, 50), v_epoch, v_cfg);
+    v_anchor := case when r.known then public.player_valuation_anchor(r.anchor_cents, r.cash, r.last_cash_cents,
+                                                                       r.shares_outstanding > coalesce(r.shares, r.shares_outstanding))
+                     else greatest(0, r.cash) end;
+    v_model := (v_val ->> 'value_cents')::double precision * 100 / r.shares_outstanding * coalesce(r.pf, 1);
+    if not r.known or r.written_e4 is null then
+      -- first run: start from the fair value as it is and let the difference fade
+      v_shock := greatest(0.2, least(5, coalesce(r.fair, 0)::double precision / greatest(1, v_model)));
+      v_min := 0;
+    else
+      v_min := least(60, greatest(0, extract(epoch from (v_now - coalesce(r.run_at, v_now))) / 60.0));
+      -- a change from outside since the last run (crisis shock, market event), not the reputation step and not the
+      -- old formula at a quarter close
+      if r.last_closed_quarter_id is distinct from r.quarter_id then
+        v_x := 1;
+      else
+        v_x := r.fair::double precision * r.v_pf / greatest(1, r.written_e4::double precision * coalesce(r.pf, 1));
+      end if;
+      v_shock := greatest(0.05, least(20, coalesce(r.shock, 1) * v_x));
+    end if;
+    v_shock := public.player_valuation_fade(v_shock, v_min, v_cfg);
+    v_fair := greatest(1, round(v_model * v_shock))::bigint;
+    update public.security_sim_state set fair_value_e4 = v_fair where security_id = r.security_id;
+    insert into public.player_stock_valuation as t (security_id, company_id, anchor_cents, last_cash_cents, shares, shock,
+                                                    written_e4, price_factor, quarter_id, parts, run_at)
+    values (r.security_id, r.company_id, v_anchor, r.cash, r.shares_outstanding, v_shock, v_fair, coalesce(r.pf, 1),
+            r.last_closed_quarter_id, v_val || jsonb_build_object('shock', v_shock, 'cash_cents', r.cash), v_now)
+    on conflict (security_id) do update
+       set company_id = excluded.company_id, anchor_cents = excluded.anchor_cents, last_cash_cents = excluded.last_cash_cents,
+           shares = excluded.shares, shock = excluded.shock, written_e4 = excluded.written_e4,
+           price_factor = excluded.price_factor, quarter_id = excluded.quarter_id, parts = excluded.parts,
+           run_at = excluded.run_at;
+    v_n := v_n + 1;
+  end loop;
+  return jsonb_build_object('stocks', v_n);
+end;
+$$;
+comment on function public.player_stock_valuation_run(timestamptz) is
+  'Internal, cron every minute (ADR-217): fair value of every listed player stock from expected profit × multiple '
+  '(growth, market mood, sector cycle), counted cash and a fading shock factor.';
+
+-- ---------------------------------------------------------------------------
+-- D. Grants and the cron job
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.player_valuation_value(double precision, double precision, double precision, double precision, double precision, double precision, text, double precision, double precision, double precision, double precision, jsonb)',
+    'public.player_valuation_fade(double precision, double precision, jsonb)',
+    'public.player_valuation_anchor(bigint, bigint, bigint, boolean)',
+    'public.player_stock_valuation_run(timestamptz)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+  grant execute on function public.player_stock_valuation_run(timestamptz) to service_role;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-player-valuation';
+    perform cron.schedule('nexa-player-valuation', '* * * * *', 'select public.player_stock_valuation_run()');
+  end if;
+end;
+$do$;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- NEXA · seed.sql · reference data
@@ -101097,6 +101371,7 @@ insert into public.game_config (key, value, description) values
   ('macro', '{"friction":{"worthPivotCents":3000000000,"saturationExponent":0.75,"overheadPerDecadeBps":2000,"overheadMaxBps":4500},"events":{"worthPivotCents":2000000000,"maxDecades":3,"chancePerDayPerDecade":0.2,"maxChancePerDay":0.95,"chanceShareCutPerDecade":0.08,"minChanceShare":0.15,"severityPowerPerDecade":0.6,"externalBoostPerDecade":1,"unitRevenueHours":0.25},"country":{"politicalBoost":2,"tariffBoost":2,"warBoost":3,"imageBoost":1,"disasterListed":2.5,"disasterOther":0.4,"disasterMap":{"earthquake":["earthquake","tsunami"],"flood":["flood"],"storm":["flood","tsunami"],"wildfire":["wildfire"],"drought":["wildfire"]}},"insurance":{"levels":[{"key":"none","coverage":0,"premiumBps":0},{"key":"basic","coverage":0.5,"premiumBps":40},{"key":"full","coverage":0.8,"premiumBps":110}],"changeWaitHours":12},"lobby":{"maxLevel":5,"successBpsPerLevel":350,"politicalCutPerLevel":0.12},"maxExtraCostShare":0.6}'::jsonb, 'Defaults from src/config/balance.ts, section "macro"'),
   ('marketForces', '{"heat":{"premiumFree":0.25,"premiumScale":0.5,"gain24hFree":0.2,"gain24hScale":0.4,"gain7dFree":0.5,"gain7dScale":0.8,"gainGate":0.1,"discountFree":0.3,"discountScale":0.6,"loss24hFree":0.3,"loss24hScale":0.5,"maxHeat":4},"chance":{"basePerHour":0.012,"perHeatPerHour":0.9,"perColdPerHour":0.35,"maxPerHour":3},"leadMinMinutes":3,"leadMaxMinutes":15,"reliabilityBps":8500,"severityPerHeat":0.45,"maxMoveBps":4500,"sentimentPerMove":2,"waves":{"basePerHour":0.02,"perHeatPerHour":0.25,"maxPerHour":1,"reliefPerHour":0.02,"minHeat":0.2,"maxStocks":6},"forces":[{"key":"profit_taking","direction":-1,"when":"hot","minHeat":0,"weight":4,"minMoveBps":400,"maxMoveBps":1200,"headline":"Gewinnmitnahmen bei {name}","body":"Nach dem steilen Anstieg wollen viele Anleger ihre Gewinne sichern. Der Kurs dürfte {w} nachgeben."},{"key":"analyst_downgrade","direction":-1,"when":"hot","minHeat":0,"weight":3,"minMoveBps":300,"maxMoveBps":1000,"headline":"Analysten stufen {name} ab","body":"Nach dem Lauf halten mehrere Häuser die Aktie für ausgereizt und raten zum Verkauf."},{"key":"dilution_rumor","direction":-1,"when":"hot","minHeat":0.5,"weight":2,"minMoveBps":400,"maxMoveBps":1200,"headline":"Gerüchte über eine Kapitalerhöhung bei {name}","body":"Der hohe Kurs lädt zu neuen Aktien ein. Anleger fürchten, dass ihre Anteile {w} verwässert werden."},{"key":"short_report","direction":-1,"when":"hot","minHeat":1,"weight":3,"minMoveBps":800,"maxMoveBps":2000,"headline":"Leerverkäufer-Report: {name} sei massiv überbewertet","body":"Ein bekannter Fonds veröffentlicht eine Studie gegen {name} und wettet auf fallende Kurse."},{"key":"insider_probe","direction":-1,"when":"hot","minHeat":1,"weight":2,"minMoveBps":500,"maxMoveBps":1500,"headline":"Insider-Verdacht: Aufsicht prüft Käufe bei {name}","body":"Die Börsenaufsicht schaut sich die auffälligen Käufe der letzten Tage genauer an."},{"key":"margin_calls","direction":-1,"when":"hot","minHeat":1.5,"weight":2,"minMoveBps":600,"maxMoveBps":1800,"headline":"Margin Calls bei {name}","body":"Spekulanten auf Kredit müssen nachschießen oder verkaufen. Der Kurs dürfte {w} fallen."},{"key":"special_audit","direction":-1,"when":"hot","minHeat":1.5,"weight":2,"minMoveBps":800,"maxMoveBps":2500,"headline":"Sonderprüfung bei {name} angekündigt","body":"Wirtschaftsprüfer sollen die Bücher von {name} durchleuchten. Bis dahin halten sich Anleger zurück."},{"key":"bubble_warning","direction":-1,"when":"hot","minHeat":2,"weight":3,"minMoveBps":1000,"maxMoveBps":3000,"headline":"Blasenwarnung: {name} weit über jedem Wert","body":"Ökonomen warnen in den Nachrichten vor einer Blase bei {name}. Der Kurs dürfte {w} einbrechen."},{"key":"rotation","direction":-1,"when":"any","minHeat":0,"weight":1,"minMoveBps":200,"maxMoveBps":600,"headline":"Anleger schichten aus {name} um","body":"Große Fonds verkaufen Teile ihrer Position. Der Kurs dürfte {w} nachgeben."},{"key":"fund_entry","direction":1,"when":"any","minHeat":0,"weight":1,"minMoveBps":200,"maxMoveBps":600,"headline":"Fonds steigt bei {name} ein","body":"Ein großer Fonds baut eine Position auf. Der Kurs dürfte {w} anziehen."},{"key":"bargain_hunters","direction":1,"when":"cold","minHeat":0,"weight":3,"minMoveBps":400,"maxMoveBps":1200,"headline":"Schnäppchenjäger greifen bei {name} zu","body":"Nach dem Absturz gilt die Aktie als günstig. Käufer dürften den Kurs {w} anheben."},{"key":"buyback_rumor","direction":1,"when":"cold","minHeat":0,"weight":2,"minMoveBps":300,"maxMoveBps":900,"headline":"Gerücht: {name} kauft eigene Aktien zurück","body":"Bei diesem Kurs soll die Firma selbst zugreifen wollen. Das stützt den Kurs {w}."},{"key":"analyst_upgrade","direction":1,"when":"cold","minHeat":0,"weight":2,"minMoveBps":300,"maxMoveBps":1000,"headline":"Analysten sehen Nachholbedarf bei {name}","body":"Der Kurs liege weit unter dem Wert der Firma. Mehrere Häuser raten zum Kauf."}],"waveTexts":{"market":{"headline":"Marktkorrektur: Anleger nehmen heiße Werte vom Tisch","body":"Nach den starken Wochen sichern große Anleger Gewinne. Betroffen sind vor allem: {names}."},"sector":{"headline":"Korrektur in der Branche {sector}","body":"Die Branche gilt als heiß gelaufen. Anleger verkaufen {names}."},"rates":{"headline":"Zinssorgen belasten heiße Aktien","body":"Anleger fürchten höhere Zinsen und trennen sich von teuren Werten wie {names}."},"relief":{"headline":"Erholung: Anleger kaufen gefallene Werte","body":"Nach dem Ausverkauf greifen Anleger wieder zu, vor allem bei {names}."}},"strengthWords":["leicht","spürbar","deutlich"]}'::jsonb, 'Defaults from src/config/balance.ts, section "marketForces"'),
   ('investorConfidence', '{"neutral":50,"smoothingPerMinute":0.075,"flow":{"capitalShare":0.25,"reactionSpeed":0.0005,"gain":1,"panicBelow":15,"panicGain":0.8},"events":{"earnings":{"halfLifeHours":12,"max":22,"perSurprise":30},"news":{"halfLifeHours":5,"max":14,"pointsPerTenPercent":6},"market":{"halfLifeHours":8,"max":18,"pointsPerTenPercent":5},"event":{"halfLifeHours":12,"max":20,"perSeverity":5,"solvedPerSeverity":3,"lostPerSeverity":4},"scandal":{"halfLifeHours":24,"max":22,"perSeverity":7},"payout":{"halfLifeHours":24,"max":10,"pointsPerPercentYield":4,"min":1},"withdraw":{"halfLifeHours":24,"max":30,"perCashShare":32,"min":2},"insider":{"halfLifeHours":24,"max":25,"base":3,"perStakeShare":25},"dilution":{"halfLifeHours":24,"max":18,"perNewShare":40},"incident":{"halfLifeHours":18,"max":30,"perSeverity":9,"stepSucceededPerSeverity":2.5,"stepFailedPerSeverity":1.5,"solvedPerSeverity":4,"lostPerSeverity":5,"badStrategyPerSeverity":6}},"incidents":{"basePerHour":0.001,"perHeatPerHour":0.07,"maxPerHour":0.5,"perWorthDecade":0.25,"cooldownHours":24,"minListedHours":6,"severity2Heat":0.6,"severity3Heat":1.6,"badStrategies":["cover_up","deny","ignore","price_war"],"founderNote":"Die Anleger verlieren das Vertrauen, der Kurs steht unter Druck. Nur Schritt für Schritt gelöst kommt es zurück. Wähle in der Firma eine Strategie, Mira hilft.","news":{"incident_accounting":["Bilanzskandal bei {name}","Ein Whistleblower erhebt schwere Vorwürfe gegen die Bücher. Eine Sonderprüfung droht, Anleger verkaufen."],"incident_recall":["Rückruf und Klagewelle bei {name}","Defekte Produkte, erste Klagen, eine Sammelklage droht. Die Aktie gerät unter Druck."],"incident_data_leak":["Datenleck bei {name}","Kundendaten sind im Netz, die Behörde ermittelt. Ein Bußgeld droht."],"incident_ceo_scandal":["Skandal um die Chefetage von {name}","Schwere Vorwürfe gegen die Führung. Große Anleger drohen mit dem Ausstieg."],"incident_supplier_bankrupt":["Lieferant von {name} ist pleite","Ohne Teile stockt die Produktion. Anleger fürchten einen Umsatzeinbruch."],"incident_patent_suit":["Patentklage gegen {name}","Ein Konkurrent will ein Verkaufsverbot erwirken. Bis zum Urteil bleibt die Aktie unter Druck."],"incident_rating_downgrade":["Ratingagentur stuft {name} herab","Kredite werden teurer, Fonds müssen verkaufen."],"incident_key_customer":["Großkunde springt bei {name} ab","Ein großer Teil des Umsatzes fällt weg. Analysten senken ihre Ziele."]}},"scandalArchetypes":["shitstorm","quality_scandal","data_breach","tax_audit","bad_review","protest","antitrust"],"externalArchetypes":["political_decision","tariffs","earthquake","tsunami","flood","wildfire","pandemic","war_conflict","commodity_crunch","cyber_attack","union_strike","currency_crisis","energy_shock"],"externalWeight":1.3,"state":{"profitMax":8,"lossPoints":-5,"reputationPerPoint":0.2,"crisisPerSeverity":-3,"incidentPerSeverity":-5,"countryPerRisk":0.12,"managementPerTier":0.6,"managementCoCeo":2,"managementMax":7,"volatilityFree":0.025,"volatilityPerSigma":120,"volatilityMax":10,"macroPerPoint":0.5,"momentumMax":10,"momentumScale":0.15,"valuationMax":12,"valuationScale":0.35,"chatterTauHours":6,"chatterSigma":0.45},"mood":{"start":50,"tauHours":5,"sigmaPerMinute":0.35,"phases":{"bull":{"target":68,"minHours":20,"maxHours":60,"weight":0.35},"calm":{"target":50,"minHours":10,"maxHours":40,"weight":0.35},"bear":{"target":28,"minHours":18,"maxHours":54,"weight":0.3}},"rotation":{"minHours":12,"maxHours":36,"tilt":7}},"aiFundamentals":{"trendShare":0.1,"cycleGrowthPerGameYear":0.08},"newsTexts":{"phases":{"bull":["Bullenmarkt: Anleger greifen wieder zu","Die Marktstimmung dreht ins Positive. KI-Fonds kaufen breit über alle Branchen."],"calm":["Die Börse beruhigt sich","Nach den letzten Tagen pendelt sich die Marktstimmung ein. Anleger warten ab."],"bear":["Bärenmarkt: Anleger flüchten aus Aktien","Die Marktstimmung kippt. KI-Fonds verkaufen breit, auch gute Werte geben nach."]},"rotation":["Branchenrotation: {up} gefragt, {down} gemieden","Große Anleger schichten um: Sie kaufen {up} und verkaufen {down}."],"swingDown":["Anleger verlieren das Vertrauen in {name}","Das Anlegervertrauen fiel in sechs Stunden von {from} auf {to}. KI-Anleger verkaufen."],"swingUp":["Anleger fassen Vertrauen in {name}","Das Anlegervertrauen stieg in sechs Stunden von {from} auf {to}. KI-Anleger kaufen."]},"news":{"swingPoints":15,"cooldownHours":12,"historyHours":24},"miraBelow":40,"reasons":{"minPoints":1.5,"maxReasons":4}}'::jsonb, 'Defaults from src/config/balance.ts, section "investorConfidence"'),
+  ('playerValuation', '{"profitHours":24,"minProfitHours":6,"growth":{"perLogGrowth":0.8,"maxLog":0.4},"mood":{"perPoint":0.01},"sectorCycle":{"amplitude":0.25,"sectors":{"tech":{"periodHours":83,"phase":0.1},"retail":{"periodHours":131,"phase":0.55},"energy":{"periodHours":107,"phase":0.3},"pharma":{"periodHours":149,"phase":0.8},"logistics":{"periodHours":97,"phase":0.65}},"fallback":{"periodHours":113,"phase":0.45}},"minMultiple":0.45,"maxMultiple":2,"reserveYears":0.5,"excessCashWeight":0.03,"liquidationWeight":0.2,"shockHalfLifeHours":3}'::jsonb, 'Defaults from src/config/balance.ts, section "playerValuation"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8,"advice":{"briefings":2,"nextSteps":3,"minImpactCents":500,"aiIdleBelowBps":5000,"freeCapacityBps":2000,"reputationLow":45,"reputationDriverPoints":2,"runwayHours":6,"strengthsNearPoints":5}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100,"strengths":{"gainPerHour":0.02,"decayPerHour":0.05,"marginFull":0.25,"cashHoursFull":24,"awarenessFollowPerHour":0.25,"rewards":[{"at":50,"bps":200},{"at":75,"bps":500},{"at":90,"bps":1000},{"at":98,"bps":1500}]},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"demandMaxEffect":0.2,"qualityMax":10,"qualityMaxLoss":5,"qualityNeutral":0.4,"deliveryMaxLoss":8,"premiumLowQualityLoss":6,"budgetGain":2,"wagesMaxLoss":10,"billsLoss":6,"crisisPerSeverity":3,"campaignGain":3}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),

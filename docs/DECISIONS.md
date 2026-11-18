@@ -5751,3 +5751,76 @@ Spieleraktien stürzen bei Übertreibung über Vorfälle ab und erholen sich nur
 KI-Firmen ist bewusst gedämpft; es betrifft nur ihr Geschäft, nicht die Märkte der Spielerfirmen. Tests:
 `src/lib/sim/investor-confidence.test.ts`, SQL `f4_investor_confidence.sql`, Vertragstest mit den Fixtures
 `get_stock_confidence` und `get_market_mood`.
+
+## ADR-217: Spieleraktien werden nach erwartetem Gewinn bewertet, nicht nach gehorteter Kasse — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer, nachdem ADR-214 und ADR-216 live waren: „Alle Spieler-Aktien steigen immer noch
+ununterbrochen.“
+
+**Ursache** (Weg einer Spieleraktie von Anfang bis Ende geprüft, nachgestellt mit
+`scripts/player-stock-drift-harness.ts` auf dem echten Takt mit Vertrauen, Stimmung und Vorfällen):
+
+- **Der faire Wert wuchs mit der Kasse.** Der faire Wert einer Spieleraktie war der Firmenwert (ADR-067/167): Kasse −
+  offene Rechnungen + 4 × letzter Quartalsgewinn × Branchen-KGV × 0,5, neu bei jedem Quartalsabschluss
+  (`player_company_close_quarter`), dazu der Ruf-Faktor. Eine Spielerfirma behält ihren Gewinn als Kasse: Dividenden
+  sind selten, Entnahmen kosten seit ADR-216 Vertrauen. So stieg die Kasse und mit ihr der faire Wert jedes Quartal (6
+  Stunden) um einen Quartalsgewinn, rund 3 % des Werts. Ein Spieljahr ist ein echter Tag: Das KGV von 15 × 0,5 sind
+  7,5 Tage Gewinn, also brachte allein die Kasse rund +13 % am Tag, +60 bis +140 % in der Woche, auch für eine
+  Firma, deren Gewinn gar nicht wuchs (gemessen: eine reife Firma mit −41 % Gewinn über 30 Tage stieg um +232 %).
+- **Der Takt folgt dem Anker.** Der Value-Fonds zieht den Kurs binnen einer Stunde zum fairen Wert (plus Halteprämie
+  bis 15 %). Vertrauen (Kurs × 0,6 bis × 1,6), Herde, Marktkräfte und Vorfälle wackelten nur um eine Linie, die nur
+  nach oben ging. ADR-216 hat die Spieleraktien „gegen den fairen Wert“ gemessen (Median −0 %) und damit genau diesen
+  Anstieg herausgerechnet.
+- **Nicht die Ursache:** Der Takt ist symmetrisch, der Vortagesschluss nur Anzeige, Spielerkäufe heben den Kurs nur,
+  solange gekauft wird, die Halteprämie ist gedeckelt, Rückkäufe und Ausgabepreis setzen nur Startpunkte. Die
+  Marktstimmung wirkt auf das Vertrauen aller Aktien, auch der Spieleraktien. Vorfälle feuern im Harness 3 bis 6 Mal
+  je Monat und Aktie (Hitze aus Kauf-Prämie, Vertrauen und 24-h-Sprüngen); sie bleiben unverändert.
+
+**Entscheidung.** Werte in `src/config/player-valuation.ts` (`game_config.playerValuation`), Formeln in
+`src/lib/sim/player-valuation.ts`, Server in `20261204011200_player_stock_valuation.sql` (neuer Minutenjob, keine
+Funktion umgeschrieben).
+
+- **Wert = gezählte Kasse + erwarteter Jahresgewinn × Branchen-KGV × 0,5 × Multiple.** Der erwartete Jahresgewinn ist
+  der Betriebsgewinn der letzten 24 Stunden (ein Spieljahr; jüngere Firmen ab 6 Stunden hochgerechnet).
+- **Das Multiple atmet** (0,45 bis 2): Wachstumserwartung e^clamp(0,8 × ln(Gewinn/h der letzten 24 h / der 24 h davor),
+  ±0,4), also wird erwartetes Wachstum sofort eingepreist und das Multiple schrumpft, wenn das Wachstum nachlässt;
+  Marktstimmung e^(0,01 × (Stimmung − 50)), im Bärenmarkt (28) × 0,80, im Bullenmarkt (68) × 1,2; Branchen-KGV im
+  Zyklus e^(0,25 × sin(…)) mit Perioden von 83 bis 149 Stunden (gut drei bis sechs Tage).
+- **Gehortete Kasse zählt kaum.** Kasse zählt 1 : 1 bis zur Reserve max(Anker, ½ Jahresgewinn), darüber zu 3 %. Der
+  Anker ist die freie Kasse beim ersten Lauf (beim Update: der heutige Stand, damit nichts abstürzt) plus Geld aus
+  Kapitalerhöhungen; er sinkt, wenn die Kasse sinkt (ausgegeben oder entnommen). Begründung für Spieler: Die Anleger
+  bezahlen den Gewinn schon im KGV; Geld, das nur liegt und das der Gründer jederzeit entnehmen kann, ist ihnen wenig
+  wert. Untergrenze: 20 % der Kasse (eine Firma voller Geld ist nie fast nichts wert).
+- **Fairer Wert je Aktie** = Wert / Aktien × Ruf-Faktor (ADR-167). `player_stock_valuation_run()` schreibt ihn jede
+  Minute (Cron `nexa-player-valuation`). Kursstürze aus Krisen und Vorfällen (ADR-091) und Marktereignisse bleiben als
+  Schock-Faktor erhalten und laufen mit 3 Stunden Halbwertszeit aus (vorher galten sie bis zum nächsten
+  Quartalsabschluss). Der Quartalsabschluss schreibt weiter seinen alten Wert, der Lauf ignoriert ihn; der Ruf-Schritt
+  wird herausgerechnet. Beim ersten Lauf startet der Schock bei alter fairer Wert / neues Modell, die Umstellung
+  verteilt sich so über einige Stunden.
+- **Diagnose** für den Eigentümer: `supabase/tools/player-stocks-check.sql` (nur lesend; Jobs, Kurs gegen fairen Wert,
+  wie viel des alten Firmenwerts Kasse ist, Vorfälle, Anteil der Wochen im Minus, die neue Bewertung).
+
+**Gemessen** (`pnpm exec tsx scripts/player-stock-drift-harness.ts 30 4`: der Markt von ADR-216 mit 10 KI-Aktien und
+vier Spielerfirmen mit eigenem Geschäft: Gewinn je Stunde mit Rauschen, Kasse ohne Dividende, CEO-Auszahlung,
+Investitionen, Spieler kaufen und jagen den Trend und verkaufen kaum; vorher = alter Firmenwert, nachher = ADR-217;
+volle Tabelle in docs/BALANCING.md):
+
+| Spielerfirma                          | Gewinn 30 Tage | 7 Tage Median vorher | nachher | Wochen im Minus vorher | nachher | 30 Tage vorher | nachher |
+| ------------------------------------- | -------------- | -------------------- | ------- | ---------------------- | ------- | -------------- | ------- |
+| Reif, hortet Kasse (Handel)           | −41 %          | +27 %                | −7 %    | 24 %                   | 59 %    | +232 %         | −39 %   |
+| Ruhig, CEO-Auszahlung 30 % (Logistik) | +21 %          | +32 %                | +5 %    | 8 %                    | 47 %    | +353 %         | +59 %   |
+| Wachstum (Tech)                       | +493 %         | +56 %                | +60 %   | 7 %                    | 17 %    | +435 %         | +450 %  |
+| Investiert viel (Pharma)              | +474 %         | +65 %                | +69 %   | 11 %                   | 14 %    | +568 %         | +308 %  |
+
+Eine Spieleraktie folgt jetzt dem Gewinn ihrer Firma: Ohne Gewinnwachstum läuft sie im Mittel seitwärts mit rund der
+Hälfte der Wochen im Minus (vorher +27 bis +32 % je Woche), eine Firma mit sinkendem Gewinn fällt. Wer den Gewinn
+wirklich vervielfacht, sieht die Aktie weiter steigen, mit Rückschlägen (Multiple, Stimmung, Branchenzyklus, Vorfälle).
+
+**Folgen.** Kursgewinne bei Spieleraktien kommen aus Gewinnwachstum, nicht aus dem Liegenlassen von Geld. Kasse zu
+horten hebt den Kurs nicht mehr; Investieren senkt kurzfristig die Kasse (und den Anker) und hebt später den Gewinn.
+Firmenwert und Ranglisten (ADR-203) bleiben unverändert (für börsennotierte Firmen zählt dort ohnehin der Börsenwert).
+Verworfen: die Kasse ganz weglassen (Börsenneulinge mit viel Emissionsgeld würden abstürzen), ein höheres KGV (der
+Wert hätte sich beim Update vervielfacht), ein Größenabschlag aufs KGV (die Reibung aus ADR-209 bremst den Gewinn
+großer Firmen schon). Tests: `src/lib/sim/player-valuation.test.ts`, SQL `f5_player_stock_drift.sql` (Formeln wie in
+TS, erster Lauf ohne Sprung, gehortete Kasse hebt den Wert kaum, Kapitalerhöhung zählt, Quartalsabschluss wird
+ignoriert, Krisen-Schock bleibt und läuft aus, Bärenmarkt senkt den Wert, Rechte, Geld-Invariante).

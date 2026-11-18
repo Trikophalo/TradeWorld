@@ -102,6 +102,7 @@ describe("BALANCE", () => {
       "listed",
       "macro",
       "marketForces",
+      "playerValuation",
     ];
     expect(Object.keys(BALANCE).sort()).toEqual([...sections].sort());
   });

@@ -1285,3 +1285,28 @@ Sparforschung `floor(Preis × slow.costBps / 10 000)` bei `item.hours × slow.ho
 - **Vorfälle:** `incidentChancePerHour(heat, Börsenwert)`, `incidentSeverity(heat)`, `incidentBump(kind, Stufe)`.
 - **Harness:** `src/lib/sim/confidence-market.ts` (`simulateMarket`) rechnet einen kleinen Markt mit dem echten
   `stepMarketTick` Minute für Minute; `scripts/investor-confidence-harness.ts` druckt die Verteilungen (docs/BALANCING.md).
+
+## Nachtrag: Bewertung der Spieleraktien (ADR-217)
+
+`src/lib/sim/player-valuation.ts`, Werte in `src/config/player-valuation.ts` (`game_config.playerValuation`),
+gespiegelt in `20261204011200_player_stock_valuation.sql` (`player_valuation_value`, Minutenjob
+`player_stock_valuation_run`).
+
+- **Fairer Wert je Aktie** = Wert / Aktien × Ruf-Faktor (ADR-167) × Schock. Vorher: Firmenwert (Kasse − offene
+  Rechnungen + 4 × Quartalsgewinn × KGV × 0,5) beim Quartalsabschluss; die Kasse wuchs jedes Quartal um den Gewinn.
+- **Wert** = `max(0,2 × Kasse, gezählte Kasse + E × KGV × 0,5 × Multiple)` mit
+  `E = Gewinn der letzten 24 h × 24 / max(Stunden, 6)` (ein Spieljahr) und
+  `Multiple = clamp(Wachstum × Stimmung × Zyklus, 0,45, 2)`:
+  `Wachstum = e^clamp(0,8 × ln(Gewinn/h der letzten 24 h / Gewinn/h der 24 h davor), ±0,4)` (unbekannt, solange weniger
+  als 18 Stunden davor existieren: 1), `Stimmung = e^(0,01 × (Marktstimmung − 50))`,
+  `Zyklus = e^(0,25 × sin(2π (Stunden seit 1970 / Periode + Phase)))` je Branche (Tech 83 h, Handel 131 h, Energie
+  107 h, Pharma 149 h, Logistik 97 h).
+- **Gezählte Kasse** = `min(Kasse, R) + 0,03 × max(0, Kasse − R)`, `R = max(Anker, 0,5 × E)`; negative Kasse zählt voll.
+  `Anker ← min(Anker + Kapitalerhöhung, Kasse)`, Start = freie Kasse beim ersten Lauf.
+- **Schock:** Änderungen des fairen Werts von außen (Krisen-Kurssturz ADR-091, Marktereignisse) werden als Faktor
+  übernommen, `ln(Schock)` halbiert sich alle 3 Stunden. Der alte Firmenwert, den der Quartalsabschluss schreibt, wird
+  ignoriert; der Ruf-Schritt (Faktor alt → neu) wird herausgerechnet. Der erste Lauf startet mit Schock = alter fairer
+  Wert / Modell, damit nichts springt.
+- **Harness:** `simulateMarket(…, { valuation: "legacy" | "earnings" })` mit `HarnessStock.company` (Gewinn je Stunde,
+  Wachstum, Kasse, CEO-Auszahlung, Investitionen); `scripts/player-stock-drift-harness.ts` druckt die Verteilungen
+  (docs/BALANCING.md).

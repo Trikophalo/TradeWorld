@@ -2048,3 +2048,56 @@ Server, 8 Läufe über 30 Tage, 7-Tage-Fenster je Tag versetzt):
 Die Spieleraktien S1 und S3 steigen nachher weiter, weil ihre Firmen im Szenario wirklich wachsen (S1 +12 % am Tag);
 gegen den fairen Wert liegen sie im Median leicht darunter (Vorfälle und ihre Nachwirkung). Der größte Rückgang des
 KI-Index über 30 Tage enthält meist mehr als eine Bärenphase; eine einzelne Phase drückt den Index um 20 bis 40 %.
+
+## Nachtrag: Bewertung der Spieleraktien (ADR-217)
+
+Werte in `src/config/player-valuation.ts` (`game_config.playerValuation`).
+
+| Hebel                   | Wert                                                                                                             |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Erwarteter Jahresgewinn | Betriebsgewinn der letzten 24 h (ein Spieljahr), ab 6 h hochgerechnet                                            |
+| KGV                     | Branchen-KGV × 0,5 (`startups.valuationPeDiscount`) × Multiple                                                   |
+| Multiple                | Wachstum × Stimmung × Branchenzyklus, 0,45 bis 2                                                                 |
+| Wachstum                | e^clamp(0,8 × ln(Gewinn/h 24 h / Gewinn/h der 24 h davor), ±0,4), also × 0,67 … × 1,49                           |
+| Marktstimmung           | e^(0,01 × (Stimmung − 50)): Bär (28) × 0,80, Bulle (68) × 1,20                                                   |
+| Branchenzyklus          | e^(0,25 × sin(…)): × 0,78 … × 1,28, Perioden Tech 83 h, Logistik 97 h, Energie 107 h, Handel 131 h, Pharma 149 h |
+| Gezählte Kasse          | 1 : 1 bis max(Anker, 0,5 × Jahresgewinn), darüber 3 %                                                            |
+| Untergrenze             | 20 % der freien Kasse                                                                                            |
+| Schock von außen        | Halbwertszeit 3 h (Krisen-Kurssturz, Marktereignis)                                                              |
+| Vorher (ADR-067/167)    | Kasse + 4 × Quartalsgewinn × KGV × 0,5, bei jedem Quartalsabschluss                                              |
+
+**Messung** (`pnpm exec tsx scripts/player-stock-drift-harness.ts 30 4`: der Markt von ADR-216 (10 KI-Aktien,
+Vertrauen, Stimmung, Vorfälle, Börsen-News, Marktkräfte) mit vier Spielerfirmen, je 1 Mio. Aktien, die Hälfte beim
+Gründer:
+
+- Wachstum (Tech): 2.000 €/h, +4 %/Tag (verblasst über 12 Tage), investiert täglich 10 % der Kasse (Rückfluss in 12
+  Tagen), Kasse 150.000 €, Spieler kaufen 3.000 €/h und jagen den Trend (10.000 €/h);
+- Reif, hortet Kasse (Handel): 5.000 €/h ohne Wachstum, Kasse 300.000 €, Käufe 6.000 €/h, Trendjagd 15.000 €/h;
+- Ruhig, CEO-Auszahlung 30 % (Logistik): 1.500 €/h, +1 %/Tag, Kasse 50.000 €, keine Spieler;
+- Investiert viel (Pharma): 3.000 €/h, +1 %/Tag, investiert täglich 25 % der Kasse, CEO-Auszahlung 10 %, Käufe
+  2.000 €/h, Trendjagd 5.000 €/h.
+
+Jede Stunde Rauschen auf den Gewinn (σ 0,2 bis 0,3) und ein Zufallspfad des Geschäfts (σ 1,5 bis 2,5 % je Stunde);
+4 Läufe über 30 Tage, 7-Tage-Fenster je Tag versetzt.)
+
+| Spieleraktien, 7 Tage       | p10   | Median | p90    | im Minus |
+| --------------------------- | ----- | ------ | ------ | -------- |
+| vorher: absolut             | −3 %  | +43 %  | +117 % | 13 %     |
+| vorher: gegen den KI-Markt  | −8 %  | +34 %  | +108 % | 16 %     |
+| nachher: absolut            | −32 % | +21 %  | +135 % | 34 %     |
+| nachher: gegen den KI-Markt | −32 % | +25 %  | +128 % | 34 %     |
+
+| Spielerfirma                          | Modell  | 7 Tage Median | im Minus | 30 Tage | fairer Wert 30 Tage | Gewinn 30 Tage | Vorfälle je 30 Tage |
+| ------------------------------------- | ------- | ------------- | -------- | ------- | ------------------- | -------------- | ------------------- |
+| Wachstum (Tech)                       | vorher  | +56 %         | 7 %      | +435 %  | +564 %              | +493 %         | 4,0                 |
+| Wachstum (Tech)                       | nachher | +60 %         | 17 %     | +450 %  | +368 %              | +493 %         | 4,8                 |
+| Reif, hortet Kasse (Handel)           | vorher  | +27 %         | 24 %     | +232 %  | +196 %              | −41 %          | 4,0                 |
+| Reif, hortet Kasse (Handel)           | nachher | −7 %          | 59 %     | −39 %   | −36 %               | −41 %          | 4,3                 |
+| Ruhig, CEO-Auszahlung 30 % (Logistik) | vorher  | +32 %         | 8 %      | +353 %  | +290 %              | +21 %          | 2,8                 |
+| Ruhig, CEO-Auszahlung 30 % (Logistik) | nachher | +5 %          | 47 %     | +59 %   | +70 %               | +21 %          | 4,0                 |
+| Investiert viel (Pharma)              | vorher  | +65 %         | 11 %     | +568 %  | +450 %              | +474 %         | 4,5                 |
+| Investiert viel (Pharma)              | nachher | +69 %         | 14 %     | +308 %  | +391 %              | +474 %         | 6,0                 |
+
+KI-Index am Ende (Median): vorher −3 %, nachher +1 %. Der Mittelwert über alle vier Firmen bleibt positiv, weil zwei
+von ihnen ihren Gewinn im Szenario versechsfachen; die beiden ohne starkes Gewinnwachstum laufen jetzt seitwärts
+(Median −7 % und +5 % je Woche, 59 % und 47 % der Wochen im Minus) statt +27 bis +32 % je Woche.
