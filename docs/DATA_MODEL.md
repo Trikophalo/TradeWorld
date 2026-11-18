@@ -8534,7 +8534,7 @@ Keine neue Tabelle. Alles intern (nur `service_role` bzw. Trigger), Spieler kön
 - `news_show_topic_cands_fresh(p_now, p_win) → table(topic, player_id, vals, ukey, score)`: Kandidaten der neuen
   Themen aus `company_locations`, `country_lobby`, `company_subsidiaries`, `talent_events`, `talents`, `player_jobs`
   (`is_clone`), `rich_list_snapshots`, `company_rank_snapshots`, `nexamon_copies` (Note 11), `nexamon_battles`
-  (`twist`), `nexamon_packs`, `vault_deposits`, `login_streaks`, `company_skills`, `player_companies.logo_redrawn_at`.
+  (`twist`), `nexamon_packs`, `vault_deposits`, `login_streaks`, `company_skills`, `player_companies.logo_redrawn_at`, `stock_tips` mit `source = 'market'` (ADR-214, nur wenn die Spalte existiert).
 - `news_show_event_segments(p_now, p_win) → jsonb` und `news_show_event_response(player_company_events, phase) → text`:
   je Ereignis von außen eine Meldung (`worldEvent`, `worldEventWon`, `worldEventLost`), Tatsachenschlüssel
   `fact:event:`, `fact:eventwon:`, `fact:eventlost:` + Ereignis-ID.

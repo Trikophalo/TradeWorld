@@ -179,6 +179,8 @@ export function demoTopicCandidates(ctx: DemoTopicContext): DemoTopicCandidate[]
       case "level":
         return between(fresh.facts.skillMinLevel, 20);
       case "what":
+        if (topic === "marketEvent")
+          return pick(["Gewinnmitnahmen", "Leerverkäufer-Report", "Marktkorrektur", "Blasenwarnung", "Erholung"]);
         return ctx.random() < 0.5
           ? "ein neues Zuhause bezogen"
           : `ein neues Auto gekauft für ${money(1_000_000, 20_000_000)}`;

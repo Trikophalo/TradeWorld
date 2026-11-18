@@ -5409,13 +5409,13 @@ eigene Meldung bekommen, mit Firma, Land, Lage und Gegenmaßnahme, und einen Nac
 
 **Entscheidung.**
 
-- **27 neue Themen** (`src/config/news-topics-fresh.ts`, drei neue Gruppen `world`, `talent`, `rank`): neue Zentrale,
+- **28 neue Themen** (`src/config/news-topics-fresh.ts`, drei neue Gruppen `world`, `talent`, `rank`): neue Zentrale,
   Ausbau ab Stufe 2, neuer Marktführer, Standortgebühr, Tochterfirma, Wetter auf der Weltkarte; Star-Einstellung ab
   Stufe Senior, Abwerbung (beide Firmen), Kündigung, Mit-Geschäftsführung, „Talent-Transfermarkt“ (bestes freies
   Talent), Klon mit Job; Aufsteiger der Reichenliste und der Top-Unternehmen (ab 3 Plätzen in 24 Stunden), „Pleite der
   Woche“ (ab 10 % Verlust in 7 Tagen); Black Label, Sieger eines Pack Battles mit Twist, Pack-Marathon (ab 10 Packs);
   großes Festgeld (ab 5.000 €) und seine Zinsen, Login-Serie (alle 7 Tage), Fertigkeit ab Stufe 3, neues Logo;
-  „Börsen-Orakel“ ohne Daten. Je Thema 3 bis 4 Rahmen und 10 bis 12 Begründungen, Gesichter je Thema. Schwellen in
+  „Börsen-Orakel“ ohne Daten; große Marktereignisse (ADR-214, `stock_tips.source = 'market'`, ab 3 %) als „Blasenwarnung“-Meldung, still, solange es sie nicht gibt. Je Thema 3 bis 4 Rahmen und 10 bis 12 Begründungen, Gesichter je Thema. Schwellen in
   `newsShow.fresh.facts`. `topics.count` steigt auf 4 (Plätze 25, 45, 65, 72).
 - **Ereignisse von außen nie im Los:** `news_show_event_segments()` baut für jedes Ereignis von außen (Schwere ab
   `facts.eventMinSeverity`) eine eigene Meldung `worldEvent` mit Firma, Land des Hauptsitzes (sonst „Nexa-Stadt“),

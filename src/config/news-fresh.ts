@@ -171,6 +171,8 @@ export const NEWS_FRESH = {
     spreeMinPacks: 10,
     /** An event from outside from this severity (1..3) on. */
     eventMinSeverity: 1,
+    /** A market event (ADR-214, a stock tip with source "market") from this move on. */
+    marketMinBps: 300,
     /** Subsidiaries: a new one counts from this number on (1 = every one). */
     subsidiaryMin: 1,
   },
@@ -431,6 +433,14 @@ export const NEWS_FRESH = {
         "Bitte nicht reißen lassen 🙏",
         "Meine Serie ist gestern gerissen 😭",
         "Treue wird belohnt, hoffentlich",
+      ],
+      marketEvent: [
+        "BLASE?! Ich verkaufe alles 😱",
+        "{stock} wieder 📉📈 ich bin seekrank",
+        "Gewinnmitnahmen, sag ich doch 🤑",
+        "Das Orakel wusste es!! 🔮",
+        "Jetzt nachkaufen oder weinen?",
+        "{pct} Bewegung, mein Puls auch",
       ],
       corpLogo: [
         "Neues Logo, wer dis?? 😂",

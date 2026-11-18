@@ -333,6 +333,16 @@ begin
     join public.player_companies pc on pc.company_id = k.company_id
    where k.ready_at between p_now - p_win and p_now
      and k.level >= coalesce((ff ->> 'skillMinLevel')::integer, 3)
+  -- ---- big market events (ADR-214): stock tips with source 'market', when the game has them
+  union all
+  select 'marketEvent', null::uuid,
+         jsonb_build_object('what', t.headline, 'stock', sec.name, 'pct', public.news_show_move(t.move_bps)),
+         'fact:market:' || t.id::text, t.move_bps::double precision
+    from public.stock_tips t
+    join public.securities sec on sec.id = t.security_id
+   where to_jsonb(t) ->> 'source' = 'market'
+     and t.published_at between p_now - p_win and p_now
+     and t.move_bps >= coalesce((ff ->> 'marketMinBps')::integer, 300)
   -- ---- a redrawn logo (ADR-200), when the game has it
   union all
   select 'corpLogo', pc.founder_id,

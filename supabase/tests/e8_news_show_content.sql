@@ -61,7 +61,7 @@ select tests.assert(
                                            'worldEventWon', 'worldEventLost', 'worldWeather', 'talentStar', 'talentPoach', 'talentQuit',
                                            'talentCoceo', 'talentMarket', 'cloneJob', 'rankForbes', 'rankCompany',
                                            'rankWeekLoser', 'cardBlackLabel', 'cardTwist', 'cardSpree', 'pVault',
-                                           'pVaultPaid', 'pStreak', 'corpSkill', 'corpLogo', 'oddOracle']) k
+                                           'pVaultPaid', 'pStreak', 'corpSkill', 'corpLogo', 'marketEvent', 'oddOracle']) k
                  where jsonb_array_length(coalesce(g.value #> array['texts', k, 'frames'], '[]'::jsonb)) < 3
                     or jsonb_array_length(coalesce(g.value #> array['texts', k, 'reasons'], '[]'::jsonb)) < 10
                     or jsonb_array_length(coalesce(g.value #> array['moods', k], '[]'::jsonb)) < 1
@@ -69,7 +69,7 @@ select tests.assert(
           and jsonb_array_length(g.value #> '{fresh,chat,polls,list}') >= 10
           and jsonb_array_length(g.value #> '{fresh,transitions}') >= 20
      from public.game_config g where g.key = 'newsShow'),
-  'config: 27 new topics with 3+ frames, 10+ reasons, moods and chat lines; polls and segues');
+  'config: 28 new topics with 3+ frames, 10+ reasons, moods and chat lines; polls and segues');
 select tests.assert(
   position('news_show_topic_cands_fresh' in pg_get_functiondef('public.news_show_topics(timestamptz, uuid[], uuid[], jsonb)'::regprocedure)) > 0
   and position('news_show_segue' in pg_get_functiondef('public.news_show_topics(timestamptz, uuid[], uuid[], jsonb)'::regprocedure)) > 0
@@ -231,6 +231,26 @@ select tests.assert(
   tests.e8_said(:'g'::jsonb) like '%Logo%' and tests.e8_said(:'g'::jsonb) like '%Bertsche Bohnen%'
   and :'g'::jsonb #>> '{subject,player_id}' = :b and tests.e8_said(:'g'::jsonb) not like '%{%',
   'corpLogo: a founder redrew the logo of the company, with the price');
+-- a big market event (ADR-214): a stock tip with source 'market', once the game has the column
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'stock_tips' and column_name = 'source') then
+    execute $q$
+      insert into public.stock_tips (security_id, direction, move_bps, strength, comes_true, headline, body, published_at, due_at, source)
+      select s.id, -1, 900, 2, true, 'Blasenwarnung', 'Test', now() - interval '5 minutes', now() + interval '10 minutes', 'market'
+        from public.securities s where s.kind = 'stock' and s.status = 'listed' order by s.id limit 1
+    $q$;
+  end if;
+end;
+$$;
+select tests.e8_topic('marketEvent') as mk \gset
+select tests.assert(
+  case when exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'stock_tips' and column_name = 'source')
+       then tests.e8_said(:'mk'::jsonb) like '%Blasenwarnung%' and tests.e8_said(:'mk'::jsonb) not like '%{%'
+       else :'mk'::jsonb = '{}'::jsonb end,
+  'marketEvent: a big market event is told (silent while the game has no market events)');
 -- a full draw with everything: one story per player, every text complete, the new groups take part
 select tests.set_cfg('newsShow', '{topics,count}', '500');
 select public.news_show_topics(now(), (select array_agg(p.id) from public.profiles p where p.nickname not like 'Frisch\_%'), '{}', '[]'::jsonb) as allsegs \gset

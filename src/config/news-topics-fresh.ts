@@ -913,6 +913,41 @@ export const NEWS_TOPICS_FRESH = {
       "Bitte nicht gleich wieder ändern, die Druckerei hat schon Albträume.",
     ],
   },
+  // ------------------------------------------------------------------ market events (ADR-214)
+  marketEvent: {
+    group: "odd",
+    kind: "world",
+    weight: 9,
+    tone: "neutral",
+    slots: ["what", "stock", "pct"],
+    moods: ["shocked", "smug", "confused"],
+    frames: [
+      {
+        headline: "Blasenwarnung: {stock}",
+        text: "Das Börsen-Orakel hat geflüstert, der Markt hat geschrien: „{what}“. Betroffen ist {stock}, Bewegung rund {pct}. {reason}",
+      },
+      {
+        headline: "Marktbeben bei {stock}",
+        text: "Aus dem Maschinenraum der Börse: „{what}“, und {stock} bewegt sich um etwa {pct}. {reason}",
+      },
+      {
+        headline: "Die Börse hat Laune: {stock}",
+        text: "Eilmeldung vom Parkett: „{what}“. Für {stock} heißt das rund {pct}. {reason} Ich habe es kommen sehen, nur nicht gesagt.",
+      },
+    ],
+    reasons: [
+      "Die Händler rennen, die Kaffeemaschinen glühen, die Analysten erfinden rückwirkend Gründe.",
+      "Wer jetzt panisch verkauft, verkauft dem, der nicht panisch ist. So einfach ist Börse.",
+      "Das Orakel sagt: Märkte übertreiben immer. In beide Richtungen, und meistens zur falschen Zeit.",
+      "Eine Blase platzt selten leise. Diese hier räuspert sich wenigstens vorher.",
+      "Gewinne mitnehmen ist eine Tugend. Sie zu früh mitzunehmen ist ein Volkssport.",
+      "Die Leerverkäufer reiben sich die Hände. Die Käufer reiben sich die Augen.",
+      "Korrekturen sind gesund, sagen die Profis. Die Profis haben vorher verkauft.",
+      "Ich habe in mein Kissen geschaut. Das Geld ist noch da, das Vertrauen nicht.",
+      "Die Erholung kommt bestimmt. Fragt sich nur, ob vor oder nach meinem Ruhestand.",
+      "Die Kurve zappelt wie ein Fisch auf dem Steg. Wir schauen gebannt zu.",
+    ],
+  },
   // ------------------------------------------------------------------ the Börsen-Orakel (no data needed)
   oddOracle: {
     group: "odd",
