@@ -20,6 +20,7 @@ import type {
   MyCompany,
   PitchMoveKind,
   PriceLevel,
+  StockConfidence,
 } from "@/features/game/types";
 import type { ListedCompany } from "@/features/game/listed-types";
 import type { CompanyHealth, HealthFactor, HealthFactorKey, HealthLever } from "@/lib/sim/company-health";
@@ -131,6 +132,8 @@ export interface MiraState {
   skills?: CompanySkillsState | null;
   /** Stellen & Talente (ADR-199). */
   talents?: CompanyTalentsState | null;
+  /** Investor confidence of the listed company (ADR-216). */
+  confidence?: StockConfidence | null;
   now: number;
 }
 
@@ -832,7 +835,56 @@ export function listedBriefings(state: MiraState, names: MiraNames): MiraTurn[] 
       ],
     });
   }
+  // ADR-216: weak investor confidence: why, and how to raise it
+  const c = state.confidence;
+  if (c && c.confidence < BALANCE.investorConfidence.miraBelow) {
+    const worst = c.reasons.find((r) => r.points < 0)?.key ?? null;
+    turns.push({
+      id: `confidence:${Math.floor(c.confidence / 10)}:${worst ?? ""}`,
+      lines: [
+        { key: "listed.brief.confidenceLow", values: { value: Math.round(c.confidence) } },
+        { key: worst ? `listed.brief.confidenceFix.${confidenceFixKey(worst)}` : "listed.brief.confidenceFix.general" },
+      ],
+      options: [
+        ...(state.event
+          ? [{ action: open("event"), label: { key: "listed.options.openEvent" }, tone: "best" as const }]
+          : []),
+        { action: open("dividends"), label: { key: "listed.options.openDividends" } },
+      ],
+    });
+  }
   return turns;
+}
+
+/** Which advice fits the strongest reason against the stock (ADR-216). */
+export function confidenceFixKey(reason: string): string {
+  switch (reason) {
+    case "incident":
+    case "incident_open":
+    case "event":
+    case "crisis":
+    case "scandal":
+      return "crisis";
+    case "withdraw":
+    case "insider":
+      return "insider";
+    case "earnings":
+    case "profit":
+      return "profit";
+    case "dilution":
+      return "dilution";
+    case "reputation":
+      return "reputation";
+    case "macro":
+    case "sector":
+      return "market";
+    case "valuation":
+    case "momentum":
+    case "volatility":
+      return "price";
+    default:
+      return "general";
+  }
 }
 
 /** Claude's answer format (edge function company-assistant) as Mira actions. */

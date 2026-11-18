@@ -5620,3 +5620,95 @@ immer). Die Demo zeigt keine Marktkräfte. Tests: `src/lib/sim/market-forces.tes
 (Formeln wie in TS; eine Spieleraktie mehr als verdoppelt sich an einem Tag und fällt danach unter die Hälfte; eine
 Aktie zum Dreifachen ihres Werts zieht in zehn Stunden viele dämpfende Kräfte, eine ruhige kaum eine; eine Kraft
 bewegt Kurs und Stimmung, nicht den fairen Wert; Geld-Invariante).
+
+## ADR-216: Anlegervertrauen als stärkster Kurstreiber, Marktstimmung mit Zyklen, schwere Vorfälle bei Spieleraktien — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Derzeit steigen Aktien nur. Es soll realistischer sein. Die KI-Anleger müssen richtigen
+Einfluss haben. Deren Vertrauen ist das Wichtigste.“ Nachgereicht: „Aktien von den Spielern steigen gerade ohne Ende.
+Es muss auch mal nach unten gehen durch Vorfälle, die echt komplex zu beheben sind.“
+
+**Warum alles stieg** (nachgestellt mit `scripts/investor-confidence-harness.ts` auf dem echten Takt-Modell, 10 KI- und
+3 Spieleraktien, 8 Läufe über 30 Tage):
+
+- **Der Takt selbst ist symmetrisch.** Gegen den fairen Wert lagen 7-Tage-Renditen schon vorher im Median bei 0 %
+  (KI −0 %, Spieler −0 %). Der Value-Fonds zieht den Kurs in rund einer Stunde zum Anker; Momentum, Herde und
+  Market Maker heben sich im Mittel auf.
+- **Der Anker wächst ohne Pause.** Das Geschäft jeder KI-Firma wächst je Quartal um das volle Branchenwachstum
+  (`demandGrowthBpsPerGameYear`, 1,5 bis 8 % je Spieljahr). Ein Spieljahr ist ein echter Tag: Jede KI-Aktie stieg
+  1,5 bis 8 % am Tag, im Median +27 % in 7 Tagen und +127 % in 30 Tagen, nur 6 % der Wochen endeten im Minus. Der
+  KI-Index stand nach 30 Tagen bei +511 %.
+- **Spieleraktien** folgen dem Firmenwert (ADR-167) und der Halteprämie; Spieler kaufen, kaum jemand verkauft. Es gab
+  keine Kraft, die eine gute Firma an der Börse auch einmal fallen ließ.
+
+**Entscheidung.** Werte in `src/config/investor-confidence.ts` (`game_config.investorConfidence`), Formeln in
+`src/lib/sim/investor-confidence.ts`, Server in den Migrationen `20261204011100_investor_confidence.sql`,
+`20261204011110_tick_confidence.sql` und `20261204011120_ai_business_cycle.sql`.
+
+- **Anlegervertrauen je Aktie (0 bis 100, 50 neutral).** Ziel = 50 + Summe der Faktoren, das Vertrauen läuft je Minute
+  7,5 % des Weges dorthin.
+  - Ereignisse (verblassen mit Halbwertszeit, je Schlüssel gedeckelt): Gewinn über/unter Erwartung (KI-Quartal, bei
+    Spielerfirmen der Quartalsgewinn gegen den davor), Börsen-News und Marktkräfte, die eintreten (ADR-119, ADR-214),
+    Krisen und Ereignisse von außen (ADR-209, × 1,3), Skandale (Shitstorm, Datenleck, Qualitätsskandal …),
+    Dividenden, Entnahmen des Gründers (Anteil der Kasse: „Gründer hat Kasse geleert“), Aktienverkäufe des Gründers,
+    Kapitalerhöhungen (Verwässerung; der Börsengang selbst zählt nicht).
+  - Zustand (jede Minute neu): Gewinntrend, Ruf (Spielerfirmen), laufende Krise, Länderrisiko der Zentrale (ADR-208),
+    Management (Talente, Mit-Geschäftsführung), Schwankung (σ der Stundenrenditen über 24 h), Marktstimmung
+    (× 0,5 je Punkt) und Branchenrotation (±7), Herde (Kursänderung 24 h, ±10), Bewertung (Kurs gegen fairen Wert,
+    ±12) und Gerüchte (ein Zufallspfad, σ ≈ 6 Punkte).
+  - Die Ereignisse kommen über kleine Trigger (keine Funktion wird umgeschrieben): `stock_tips`,
+    `player_company_events` (Beginn, Strategie, Ausgang), `company_event_steps`, `company_dividends`,
+    `player_companies.last_withdraw_at`, `trades` (Verkauf des Gründers), `companies.shares_outstanding`.
+- **KI-Anleger handeln danach.** `market_tick_at` (volle Kopie) bekommt einen siebten Orderstrom, die
+  Vertrauensanleger: je Takt Aktien × 0,25 × 0,0005 × Signal, Signal = (C − 50) / 50, unter 15 Panik (bis −1),
+  über 85 Euphorie. Er wird von Spieleraktivität nicht geschwächt. Mit dem Value-Fonds als Gegenkraft pendelt der Kurs
+  sich bei etwa fairer Wert × 0,6 (C = 0) bis × 1,6 (C = 100) ein; Herde und Momentum lassen ihn über- und
+  unterschießen, der Value-Fonds holt ihn zurück, wenn das Vertrauen zurückkehrt.
+- **Marktstimmung mit Zyklen** (`market_mood`): Bullenmarkt (Ziel 68, 20 bis 60 h), ruhiger Markt (50, 10 bis 40 h),
+  Bärenmarkt (28, 18 bis 54 h), gezogen mit 35/35/30 %. Die Stimmung läuft mit 5 h Zeitkonstante und etwas Rauschen
+  zum Ziel; im Mittel liegt sie bei 50. Alle 12 bis 36 Stunden schichten Anleger um: eine Branche +7, eine −7.
+  Phasenwechsel und Rotation sind Nachrichten (Kategorie „Markt“).
+- **KI-Geschäft im Zyklus** (`simulate_ai_companies`, volle Kopie): Wachstum je Spieljahr = Branchenwachstum × 0,1 +
+  8 % × (Stimmung − 50) / 50. Im Bärenmarkt schrumpfen Umsätze, im Bullenmarkt wachsen sie schneller; im Mittel
+  0,15 bis 0,8 % am Tag statt 1,5 bis 8 %. Überraschungen im Quartal bewegen das Vertrauen (± 30 × Überraschung).
+- **Schwere Vorfälle bei Spieleraktien** (Nachtrag des Eigentümers): acht neue Krisen im bestehenden Krisensystem
+  (`companyEvents`, `incident: true`, Gewicht 0, nie im Tageswurf): Bilanzskandal (Sonderprüfung →
+  Aufsichtsrat-Untersuchung → Bilanz neu → neuer Finanzchef), Produktrückruf (Verkaufsstopp → Rückruf →
+  Einzelklagen → Sammelklage), Datenleck (Lücke → Kunden → Anhörung bei der Behörde → Bußgeld anfechten), Skandal
+  um die Chefetage, Lieferant pleite, Patentklage, Rating-Herabstufung, Großkunde springt ab. Jede hat eine gründliche
+  Strategie mit 3 bis 4 bezahlten Schritten über viele Stunden, die scheitern können (Know-how, Talente, Fertigkeiten,
+  Lobby und Versicherung wirken wie bei jeder Krise), eine halbe Lösung und einen billigen Ausweg („Vertuschen“,
+  „Abstreiten“, „Ignorieren“, „Preise senken“), den die Anleger bestrafen (−6 × Stufe). Gezogen werden sie je Minute
+  für jede börsennotierte Spielerfirma ohne offene Krise: Chance je Stunde = min(0,5; 0,1 % + 7 % × Hitze (ADR-214))
+  × (1 + 0,25 × Zehnerstufen des Börsenwerts über 1 Mio. €), 24 Stunden Pause nach einem Vorfall, Stufe nach Hitze
+  (ab 0,6 Stufe 2, ab 1,6 Stufe 3). Eine Aktie beim Dreifachen ihres Werts trifft es binnen 24 Stunden mit über 90 %.
+  Beginn: Kurssturz (ADR-091, 4/9/15 %) und −9 × Stufe Vertrauen, solange offen −5 × Stufe; jeder geschaffte
+  Schritt +2,5 × Stufe, jeder gescheiterte −1,5 × Stufe, gelöst +4 × Stufe, Frist verpasst −5 × Stufe. Der Gründer
+  bekommt zusätzlich eine klare Mitteilung, Mr. Doodle liest die Börsen-Meldung (`news_items`, Kategorie „Markt“),
+  Mira und die Mit-Geschäftsführung (ADR-199) arbeiten damit wie mit jeder Krise.
+- **Sichtbar:** Aktienseite „Anlegervertrauen“ (Anzeige 0 bis 100 mit Stufe, Trend über 24 h, Verlauf, die vier
+  stärksten Gründe wie „Gewinn verfehlt“, „Skandal“, „Gründer hat Kasse geleert“, „Marktstimmung schwach“), Börse
+  „Marktstimmung“ (Phase, Trend, Durchschnitt, Branchenrotation, meiste und wenigste Zuversicht), Firmen-Dashboard
+  der Börsenfirma; Mira erklärt unter 40, was der größte Grund ist und was hilft. Ein Sprung um 15 Punkte in 6 Stunden
+  wird eine Nachricht. RPCs `get_stock_confidence(p_ticker)` und `get_market_mood()`. Schrittweise Offenlegung:
+  `stockConfidence`, `marketMood` (Stufe 2).
+
+**Gemessen** (`pnpm exec tsx scripts/investor-confidence-harness.ts 30 8`; vorher = Stand ADR-214, nachher = mit
+Vertrauen, Stimmung, KI-Zyklus und Vorfällen; volle Tabellen in docs/BALANCING.md):
+
+| Gruppe                         | 7 Tage p10 | Median | p90   | im Minus | 30 Tage Median |
+| ------------------------------ | ---------- | ------ | ----- | -------- | -------------- |
+| KI vorher                      | +4 %       | +27 %  | +77 % | 6 %      | +127 %         |
+| KI nachher                     | −25 %      | −0 %   | +35 % | 51 %     | −1 %           |
+| Spieler gegen fairen Wert vor  | −17 %      | −0 %   | +19 % | 51 %     |                |
+| Spieler gegen fairen Wert nach | −26 %      | −2 %   | +29 % | 52 %     |                |
+
+Der KI-Index endete vorher im Median bei +511 % (größter Rückgang −23 %), nachher bei −9 % mit Rückgängen von −43 %
+im Median und Rallys bis +124 %. Eine reine Hype-Spieleraktie (Firma ohne Wachstum, Spieler kaufen und jagen den
+Trend) stand vorher am Ende beim 1,47-Fachen ihres Werts, nachher beim 1,14-Fachen, mit 4,5 Vorfällen je Monat und
+7-Tage-Renditen von −30 % (p10) bis +39 % (p90). Eine Spielerfirma, die wirklich wächst, steigt weiter mit ihr.
+
+**Folgen.** Kursgewinne sind nicht mehr sicher: KI-Aktien laufen im Mittel seitwärts mit Bären- und Bullenphasen,
+Spieleraktien stürzen bei Übertreibung über Vorfälle ab und erholen sich nur mit echter Arbeit. Das Wachstum der
+KI-Firmen ist bewusst gedämpft; es betrifft nur ihr Geschäft, nicht die Märkte der Spielerfirmen. Tests:
+`src/lib/sim/investor-confidence.test.ts`, SQL `f4_investor_confidence.sql`, Vertragstest mit den Fixtures
+`get_stock_confidence` und `get_market_mood`.

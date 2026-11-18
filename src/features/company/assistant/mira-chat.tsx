@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BALANCE } from "@/config/balance";
 import { COUNTRIES } from "@/config/countries";
 import { useGameErrorText } from "@/features/game/errors";
+import { useStockConfidence } from "@/features/game/hooks";
 import { engine } from "@/features/game/store";
 import type { CompanyMoves, CompanyTask, MyCompany, PitchMoveKind } from "@/features/game/types";
 import { useDisclosed } from "@/features/progression/components/reveal";
@@ -193,6 +194,10 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
     refetchInterval: 60_000,
     enabled: founder && talentsOn,
   });
+  // ADR-216: the investor confidence of the listed company, so Mira can say how to raise it
+  const confidence = useStockConfidence(
+    founder && company?.listing?.status === "listed" ? (company.listing.ticker ?? null) : null,
+  );
   const now = useClock();
   return useMemo(() => {
     // The founder's Mira also needs the moves and the orders before she speaks.
@@ -224,6 +229,7 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
       interview: founder && interviews ? (interview.data?.interview ?? null) : null,
       skills: founder && skillsOn ? (skills.data ?? null) : null,
       talents: founder && talentsOn ? (talents.data ?? null) : null,
+      confidence: founder ? (confidence.data ?? null) : null,
       // a minute is precise enough for deadlines, and keeps the briefing ids stable
       now: Math.floor(now / 60_000) * 60_000,
     };
@@ -244,6 +250,7 @@ function useMiraState(applications: number, health: MiraHealth | null, company: 
     skillsOn,
     talents.data,
     talentsOn,
+    confidence.data,
     now,
   ]);
 }

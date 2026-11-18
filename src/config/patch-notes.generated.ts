@@ -1027,6 +1027,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen), das Mausrad und zwei Finger zoomen…",
       },
+      {
+        id: "m0-fundament-ba05dab6",
+        title: null,
+        text: "Anlegervertrauen: Aktien steigen nicht mehr einfach immer.",
+      },
     ],
   },
 ];

@@ -23,6 +23,7 @@ import { useSettings } from "@/stores/settings";
 import { cn } from "@/lib/utils";
 import { brandColor } from "../brand";
 import { CompanyLogo } from "./company-logo";
+import { StockConfidenceCard } from "./confidence";
 import { OrderBook } from "./order-book";
 import { OrderSheet, type OrderSide } from "./order-sheet";
 import { PriceChart } from "./price-chart";
@@ -225,6 +226,12 @@ export function StockDetail({ ticker }: { ticker: string }) {
               </p>
             )}
           </Card>
+
+          {security?.kind === "stock" && (
+            <Reveal feature="stockConfidence">
+              <StockConfidenceCard ticker={ticker} />
+            </Reveal>
+          )}
 
           {security?.kind === "stock" && (
             <Reveal feature="stockFigures">

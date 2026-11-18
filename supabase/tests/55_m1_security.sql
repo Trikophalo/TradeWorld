@@ -132,7 +132,9 @@ select tests.assert(
           -- risks and insurance of the own company (ADR-209)
           || array['get_company_risks', 'set_company_insurance']
           -- fixed and variable costs of the last hour (ADR-208, Nachtrag)
-          || array['get_company_hour_costs']) x),
+          || array['get_company_hour_costs']
+          -- investor confidence and market mood (ADR-216)
+          || array['get_stock_confidence', 'get_market_mood']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

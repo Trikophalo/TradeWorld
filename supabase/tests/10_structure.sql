@@ -200,7 +200,9 @@ select tests.assert(
            -- risks and insurance of the own company (ADR-209)
            'get_company_risks', 'set_company_insurance',
            -- fixed and variable costs of the last hour (ADR-208, Nachtrag)
-           'get_company_hour_costs']
+           'get_company_hour_costs',
+           -- investor confidence and market mood (ADR-216)
+           'get_stock_confidence', 'get_market_mood']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

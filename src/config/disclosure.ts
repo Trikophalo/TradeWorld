@@ -15,6 +15,9 @@ export const DISCLOSURE = {
   stockOrderBook: 3,
   /** Business figures of listed companies at the stock exchange (ADR-184): with the key figures. */
   stockFigures: 2,
+  /** Investor confidence on the stock page and the market mood on the overview (ADR-216): after the tutorial. */
+  stockConfidence: 2,
+  marketMood: 2,
   portfolioHistory: 2,
   profileCareer: 2,
   /** Friends (ADR-084): after the tutorial, when the game has a first shape. */

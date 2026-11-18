@@ -112,6 +112,43 @@ export interface SecurityDetails {
   news: NewsItem[];
 }
 
+/** Market mood (Marktstimmung, ADR-216): 0..100, phase, 24-hour trend, hourly history, sector rotation. */
+export interface MarketMoodBase {
+  readonly mood: number;
+  readonly phase: "bull" | "calm" | "bear";
+  readonly phaseStartedAt: string | null;
+  readonly trend: number;
+  /** Hourly values, oldest first. */
+  readonly history: readonly number[];
+  readonly sectors: readonly { readonly sector: string; readonly points: number }[];
+}
+
+/** One reason of the investor confidence: factor key and its points (negative = lowers it). */
+export interface ConfidenceReason {
+  readonly key: string;
+  readonly points: number;
+}
+
+/** Investor confidence of a stock (ADR-216). */
+export interface StockConfidence {
+  readonly ticker: string;
+  readonly confidence: number;
+  readonly target: number;
+  /** Change against the oldest hourly value (about 24 hours). */
+  readonly trend: number;
+  readonly history: readonly number[];
+  readonly reasons: readonly ConfidenceReason[];
+  readonly market: MarketMoodBase;
+}
+
+export interface MarketMood extends MarketMoodBase {
+  readonly avgConfidence: number;
+  readonly confident: number;
+  readonly stocks: number;
+  readonly leaders: readonly { readonly ticker: string; readonly name: string; readonly confidence: number }[];
+  readonly laggards: readonly { readonly ticker: string; readonly name: string; readonly confidence: number }[];
+}
+
 /**
  * Business figures of a listed company at the stock exchange (ADR-184). Player companies ("day"): their closed hours,
  * revenue and profit of the last 24 h; AI companies ("quarter"): their latest quarterly report.
@@ -2974,6 +3011,9 @@ export interface GameEngine
   details(ticker: string): Promise<SecurityDetails>;
   /** Business figures of listed companies (ADR-184): all of them, or one with its history. */
   stockFigures(ticker?: string): Promise<StockFigures[]>;
+  /** Investor confidence of a stock and the market mood (ADR-216). */
+  stockConfidence(ticker: string): Promise<StockConfidence>;
+  marketMood(): Promise<MarketMood>;
   portfolio(): Promise<Portfolio>;
   placeOrder(input: OrderInput): Promise<OrderResult>;
   /** ADR-189: the exact preview of a market order. */

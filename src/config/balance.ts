@@ -15,6 +15,7 @@ import { NEXAMON_RULES } from "./nexamon-rules.ts";
 import { LISTED_RULES } from "./listed.ts";
 import { COUNTRIES, WORLD_RULES, type CountryConfig } from "./countries.ts";
 import { MACRO, type MacroConfig } from "./macro.ts";
+import { INVESTOR_CONFIDENCE, type InvestorConfidenceConfig } from "./investor-confidence.ts";
 import { MARKET_FORCES, type MarketForcesConfig } from "./market-forces.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
@@ -991,6 +992,8 @@ export interface BalanceConfig {
   readonly macro: MacroConfig;
   /** Market forces from outside against overheated stocks (ADR-214), values in market-forces.ts. */
   readonly marketForces: MarketForcesConfig;
+  /** Investor confidence and market mood (ADR-216), values in investor-confidence.ts. */
+  readonly investorConfidence: InvestorConfidenceConfig;
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -2974,6 +2977,7 @@ export const BALANCE = {
   world: { ...WORLD_RULES, countries: COUNTRIES },
   macro: MACRO,
   marketForces: MARKET_FORCES,
+  investorConfidence: INVESTOR_CONFIDENCE,
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,

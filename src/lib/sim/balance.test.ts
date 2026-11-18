@@ -93,6 +93,7 @@ describe("BALANCE", () => {
       "companySkills",
       "talents",
       "interviews",
+      "investorConfidence",
       "companyAssistant",
       "companyHealth",
       "accessories",

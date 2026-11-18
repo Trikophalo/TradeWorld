@@ -11,6 +11,8 @@ update public.sim_runtime set is_paused = false;
 -- enough XP for limit orders and bonds
 update public.profiles set xp_total = public.xp_total_for_level(6) + 500, level = 6 where id = :p;
 select public.market_tick() is not null as ok \gset
+-- ADR-216: one run of the investor confidence (reasons, mood) before the RPCs below
+select public.investor_confidence_run() is not null as ok \gset
 select public.rich_list_snapshot(true) is not null as ok \gset
 select public.rich_news('rich_rank_entry', :p, 'Fixture', null, 87, 100, 1234567, null) is null as ok \gset
 \pset tuples_only on
@@ -45,6 +47,10 @@ select public.get_candles('NEXA30', '1y', 10);
 select public.get_order_book('KLS', 6);
 \o :fixture_dir/get_security_details.json
 select public.get_security_details('VLT');
+\o :fixture_dir/get_stock_confidence.json
+select public.get_stock_confidence('VLT');
+\o :fixture_dir/get_market_mood.json
+select public.get_market_mood();
 \o :fixture_dir/get_my_portfolio.json
 select public.get_my_portfolio();
 \o :fixture_dir/cancel_order.json

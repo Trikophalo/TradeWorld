@@ -86,6 +86,13 @@ import { NewsAudienceDemo } from "@/features/news/show/audience-demo";
 import { NewsStudioDemo } from "@/features/news/show/studio-demo";
 import { StockNewsCard } from "@/features/news/stock-news";
 import { StockFiguresCard } from "@/features/market/components/stock-figures";
+import {
+  ConfidenceGauge,
+  ConfidenceReasons,
+  ConfidenceSparkline,
+  MarketMoodCard,
+  StockConfidenceCard,
+} from "@/features/market/components/confidence";
 import { LevelCard } from "@/features/progression/components/level-card";
 import { PatchNotesButton, PatchNotesList } from "@/features/patch-notes/components/patch-notes";
 import { usePatchNotesSeen } from "@/features/patch-notes/seen";
@@ -984,6 +991,31 @@ export function Showcase() {
         <FriendCodeCard />
         <StockNewsCard />
         <StockFiguresCard ticker="VLT" />
+      </Section>
+
+      <Section
+        id="confidence"
+        title="Anlegervertrauen und Marktstimmung (ADR-216)"
+        className="grid gap-4 lg:grid-cols-2"
+      >
+        <StockConfidenceCard ticker="VLT" />
+        <MarketMoodCard />
+        <Card className="space-y-4">
+          {[8, 30, 50, 72, 93].map((value) => (
+            <ConfidenceGauge key={value} value={value} label={`Anlegervertrauen ${value} von 100`} />
+          ))}
+        </Card>
+        <Card className="space-y-3">
+          <ConfidenceSparkline values={[52, 50, 47, 41, 36, 30, 28, 31, 35]} label="Verlauf: Absturz und Erholung" />
+          <ConfidenceReasons
+            reasons={[
+              { key: "incident", points: -18 },
+              { key: "macro", points: -9.5 },
+              { key: "earnings", points: 6 },
+              { key: "withdraw", points: -4 },
+            ]}
+          />
+        </Card>
       </Section>
 
       <Section id="buttons" title={t("buttons")} className="grid gap-4 lg:grid-cols-2">

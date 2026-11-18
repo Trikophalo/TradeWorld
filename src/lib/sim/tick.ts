@@ -27,6 +27,8 @@ import type {
   TradingConfig,
 } from "../../config/balance.ts";
 import { bondYieldBps } from "./bonds.ts";
+import { INVESTOR_CONFIDENCE, type InvestorConfidenceConfig } from "../../config/investor-confidence.ts";
+import { confidencePressure } from "./investor-confidence.ts";
 import { computeAllPressures } from "./investors.ts";
 import { halfSpreadBps, quoteAround } from "./market-maker.ts";
 import { ZERO, absBig, roundToBigInt } from "./money.ts";
@@ -48,6 +50,8 @@ export interface TickConfig {
   readonly centralBank: CentralBankConfig;
   readonly bonds: BondsConfig;
   readonly sectors: Readonly<Record<SectorId, SectorConfig>>;
+  /** ADR-216; defaults to INVESTOR_CONFIDENCE. */
+  readonly investorConfidence?: InvestorConfidenceConfig;
 }
 
 const DEFAULT_TICK_CONFIG: TickConfig = BALANCE;
@@ -188,6 +192,17 @@ function stepSecurity(
   for (const a of INVESTOR_ARCHETYPES) {
     aiNet += pressures[a];
     aiGross += Math.abs(pressures[a]);
+  }
+  // ADR-216: the confidence investors buy while confidence is high and sell while it is low (not weakened by players).
+  if (security.confidence !== undefined) {
+    const conf = confidencePressure(
+      security.confidence,
+      Number(security.freeFloatShares),
+      liquidityFactor,
+      (cfg.investorConfidence ?? INVESTOR_CONFIDENCE).flow,
+    );
+    aiNet += conf;
+    aiGross += Math.abs(conf);
   }
 
   // 5. Return from order flow and noise, limited by the circuit breaker.

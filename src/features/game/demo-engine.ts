@@ -90,6 +90,7 @@ import {
   type DemoListedStock,
 } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
+import { demoMarketMood, demoStockConfidence } from "./demo/confidence";
 import { demoHourCosts } from "./demo/hour-costs";
 import { demoRisks, demoSetInsurance } from "./demo/risks";
 import { wealthSource, wealthTotal } from "@/features/rich-list/wealth";
@@ -650,6 +651,17 @@ function securityOf(ticker: string): Security {
  * Business figures at the stock exchange (ADR-184): the own listed company from its kept hours, the AI companies a
  * steady quarter derived from their size (like `details`), slightly different per quarter.
  */
+/** Demo investor confidence (ADR-216): the stock's move today and, for the own company, its reputation. */
+function confidenceInput(c: DemoCompany) {
+  const own = ownStock()?.ticker === c.ticker ? p().company : null;
+  return {
+    ticker: c.ticker,
+    sector: c.sector,
+    changeBps: securityOf(c.ticker).changeBps,
+    reputation: own ? (own.reputation ?? 50) : null,
+  };
+}
+
 function demoStockFigures(c: DemoCompany, withHistory: boolean): StockFigures {
   const own = ownStock()?.ticker === c.ticker ? p().company : null;
   if (own) {
@@ -2408,6 +2420,20 @@ export const demoEngine: GameEngine = {
     const list = stocks().filter((c) => !ticker || c.ticker === ticker);
     return Promise.resolve(list.map((c) => demoStockFigures(c, Boolean(ticker))));
   },
+
+  stockConfidence: (ticker) => {
+    const c = meta(ticker).company;
+    if (!c) return Promise.reject(new GameError("unknown_security"));
+    return Promise.resolve(demoStockConfidence(confidenceInput(c), Date.now()));
+  },
+
+  marketMood: () =>
+    Promise.resolve(
+      demoMarketMood(
+        stocks().map((c) => ({ ...confidenceInput(c), name: c.name })),
+        Date.now(),
+      ),
+    ),
 
   portfolio: () => {
     career.accrue();

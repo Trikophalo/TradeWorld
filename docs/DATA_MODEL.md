@@ -8597,3 +8597,28 @@ Keine neue Tabelle. Alles intern (nur `service_role` bzw. Trigger), Spieler kön
   `scheduled` → `aired`): Zeilen erfundener Zuschauer in `news_show_messages` (`player_id` null, `bot_name`), darunter
   Umfragen vom Konto `newsShow.fresh.chat.polls.host`. Neue Schlüssel in `news_show_used`: `t:<md5>` (Überleitung),
   `c:<md5>` (Chatzeile, Umfrage).
+
+## Anlegervertrauen und Marktstimmung (ADR-216, Migrationen `20261204011100` bis `20261204011120`)
+
+- `security_sim_state.confidence` (0..100, Standard 50): das Vertrauen, mit dem `market_tick_at` rechnet.
+- `stock_confidence` (intern, RLS ohne Policy): `security_id`, `confidence`, `target`, `events` (verblassende
+  Ereignis-Faktoren in Punkten), `factors` (alle Faktoren des letzten Laufs, Grundlage der Gründe), `chatter`,
+  `history` (Stundenwerte, neueste zuletzt, höchstens 25), `history_hour`, `news_at` (letzte Nachricht zu einem
+  Sprung), `updated_at`.
+- `market_mood` (intern, eine Zeile): `mood`, `phase` (`bull`, `calm`, `bear`), `phase_started_at`, `phase_ends_at`,
+  `sector_tilts` (Branche → Punkte), `rotation_at`, `history`, `history_hour`, `last_run_at`, `last_quarter_id`.
+- Interne Funktionen: `investor_confidence_signal`, `investor_confidence_ai_growth`, `investor_confidence_state`,
+  `investor_confidence_target`, `investor_confidence_reasons`, `investor_confidence_bump(_company)`,
+  `investor_confidence_incidents_run`, `investor_confidence_run` (Cron `nexa-investor-confidence` jede Minute), dazu
+  die Trigger-Funktionen `investor_confidence_on_tip`, `_on_company_event`, `_on_event_step`, `_on_dividend`,
+  `_on_withdraw`, `_on_trade`, `_on_shares`. `market_tick_at` und `simulate_ai_companies` sind volle Kopien mit dem
+  Vertrauensstrom bzw. dem KI-Zyklus.
+- Vorfälle sind `player_company_events` mit `definition.incident = true` (Archetypen `incident_*` aus
+  `companyEvents`); keine neue Tabelle.
+
+### RPCs
+
+- `get_stock_confidence(p_ticker text)` → `{ticker, confidence, target, trend, history[], reasons[{key, points}],
+market: MOOD, updated_at}`; Fehler `unknown_security` für unbekannte Ticker und Nicht-Aktien.
+- `get_market_mood()` → `MOOD ∪ {avg_confidence, confident, stocks, leaders[{ticker, name, confidence}],
+laggards[…]}` mit `MOOD = {mood, phase, phase_started_at, trend, history[], sectors[{sector, points}]}`.
