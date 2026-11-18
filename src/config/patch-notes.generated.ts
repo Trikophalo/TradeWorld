@@ -658,6 +658,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Mehr Nervenkitzel bei Packs und ASP",
         text: "Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-85634ad1",
+        title: "NEXA Nachrichten, dritte Staffel",
+        text: "Mr. Doodle Dangle berichtet jetzt von der Weltkarte (neue Zentralen, Ausbau, Marktführer, Standortgebühren, Tochterfirmen), über Talente…",
+      },
     ],
   },
   {
@@ -1006,6 +1011,21 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         id: "m0-fundament-847d6b10",
         title: null,
         text: "Talente sind nach oben viel teurer: Ein Junior kostet ab 60 € je Stunde, ein Profi 300 €, ein Senior 1.500 €, ein Experte 8.000 € und eine Legende…",
+      },
+      {
+        id: "m0-fundament-3fa5a3b5",
+        title: null,
+        text: "Aktien ohne Tagesgrenze: Kurse steigen und fallen an einem Tag so weit, wie der Markt sie trägt.",
+      },
+      {
+        id: "m0-fundament-9298c771",
+        title: null,
+        text: "Entnahmen aus der Firma: Du kannst alle 6 Stunden Geld entnehmen.",
+      },
+      {
+        id: "m0-fundament-f6048448",
+        title: null,
+        text: "Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen), das Mausrad und zwei Finger zoomen…",
       },
     ],
   },
