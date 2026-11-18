@@ -1660,3 +1660,10 @@ Leuten, höchstens der halbe Lohn. Aktien-Chance je Stunde Junior 1 %, Senior 3 
 Bewertet wird ohne eigene Spielwerte: Börsenwert = Aktien × letzter Kurs, Firmenwert wie bisher
 (`startups.valuationPeDiscount`, `sectors.*.peRatio`), Vermögensteile mit den Werten ihrer Bereiche (Geldkurs,
 Nexamon-Marktwert, `property.*`, Tresor).
+
+## Nachtrag: Logo neu zeichnen (ADR-200)
+
+| Wert                               | Stand    | Wirkung                                                        |
+| ---------------------------------- | -------- | -------------------------------------------------------------- |
+| `startups.logoRedrawCents`         | 50.000 € | Preis aus der Firmenkasse, geht an die Staatskasse (Geldsenke) |
+| `startups.logoRedrawCooldownHours` | 24 h     | Pause zwischen zwei bezahlten Neuzeichnungen                   |

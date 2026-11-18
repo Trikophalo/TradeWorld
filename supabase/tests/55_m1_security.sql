@@ -118,7 +118,9 @@ select tests.assert(
           || array['get_clone', 'create_clone', 'clone_apply_for_job', 'clone_sign_contract', 'clone_quit_job',
                    'clone_cancel_quit', 'clone_request_raise', 'clone_request_promotion', 'set_job_posting_perks']
           -- the own net worth in parts (ADR-203)
-          || array['get_my_net_worth']) x),
+          || array['get_my_net_worth']
+          -- redraw the company logo (ADR-200)
+          || array['redraw_company_logo', 'get_logo_redraw']) x),
   'authenticated can execute exactly the 9 helpers and the RPCs up to the market popularity (9g)');
 select tests.assert(
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

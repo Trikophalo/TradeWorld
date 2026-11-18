@@ -4,6 +4,8 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der
+  Firmenkasse neu, höchstens einmal am Tag. Das neue Logo erscheint sofort überall und in den Neuigkeiten.
 - Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines
   Packs bleibt gleich.
 - Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.

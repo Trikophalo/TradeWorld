@@ -4918,6 +4918,18 @@ value_cents, revenue_cents, team_size, is_mine }], mine: { rank, value_cents } |
   und Spiegelungen, Skalierung 1 bis 3, in der ganzen Zeichnung und in jeder Farbe, ein Fehlfeld Toleranz.
   Treffer: `logo_forbidden`.
 
+### Logo neu zeichnen (ADR-200)
+
+- `player_companies.logo_redrawn_at timestamptz` (null bis zum ersten bezahlten Neuzeichnen).
+- `redraw_company_logo(p_request_id, p_company_id, p_pixels)` → `{ company, cost_cents }`: nur der Gründer der aktiven
+  Firma (`forbidden`, `company_not_found`), Prüfung wie oben (`invalid_argument`, `logo_forbidden`), höchstens einmal je
+  `startups.logoRedrawCooldownHours` (`locked`), `startups.logoRedrawCents` aus der freien Firmenkasse
+  (`insufficient_funds`), Ledger Firmenkasse → `treasury` (`company_costs`, Schlüssel `logo_redraw:<firma>:<request>`).
+  Setzt `logo`, `logo_version + 1`, `logo_hidden = false`, `logo_redrawn_at`; Feed `logo_redrawn`
+  `{ company, company_id, logo }`. Idempotent.
+- `get_logo_redraw(p_company_id)` → `{ cost_cents, cooldown_hours, redrawn_at, available_at }` (`available_at` nur
+  während der Pause), nur für den Gründer.
+
 ### Neue Fehlerschlüssel
 
 | Schlüssel        | Code    |

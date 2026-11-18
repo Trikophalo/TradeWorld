@@ -1867,6 +1867,16 @@ export interface CompanyQuarter {
   bonusCents: number;
 }
 
+/** Redrawing the company logo for a price (ADR-200). */
+export interface LogoRedrawInfo {
+  costCents: number;
+  cooldownHours: number;
+  /** Last paid redraw, null before the first. */
+  redrawnAt: string | null;
+  /** Next possible redraw while the cooldown runs, else null. */
+  availableAt: string | null;
+}
+
 export interface MyCompany {
   id: string;
   name: string;
@@ -2823,6 +2833,9 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   forgiveLoan(requestId: string, dealId: string): Promise<Deal>;
   playerCard(nickname: string): Promise<PlayerCard>;
   setCompanyLogo(requestId: string, logo: CompanyLogoData): Promise<MyCompany>;
+  /** The founder redraws the logo for startups.logoRedrawCents from the company cash (ADR-200). */
+  logoRedraw(companyId: string): Promise<LogoRedrawInfo>;
+  redrawCompanyLogo(requestId: string, companyId: string, logo: CompanyLogoData): Promise<MyCompany>;
   /** Pixel banner, may be redrawn any time; null removes it (ADR-078). */
   setCompanyBanner(requestId: string, banner: CompanyLogoData | null): Promise<MyCompany>;
   reportCompanyLogo(requestId: string, companyId: string): Promise<void>;

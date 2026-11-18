@@ -4970,3 +4970,27 @@ wertvollen Karten steigen. Die Pfeile und die 24-h-Prozente zeigen einen Tag lan
 `tests.vault_quiet` ihn in SQL-Tests ein, die Vermögen über mehrere Anweisungen vergleichen. Liegt der Börsenkurs weit
 unter dem Ertragswert (wie beim Eigentümer: 3 Mio. gegen 49,4 Mio.), zeigt die Firmenseite das jetzt offen; ob der
 Kurs einer Spieler-AG zu langsam zum fairen Wert findet, ist eine eigene Frage. SQL-Test `d9_toplists.sql`.
+
+## ADR-200: Firmenlogo für 50.000 € neu zeichnen — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Man soll das Profilbild vom Unternehmen für 50.000 € neu machen können.“ Bisher stand
+das Logo nach dem ersten Zeichnen fest (ADR-076); nur ein nach Meldungen ausgeblendetes Logo durfte ersetzt werden.
+
+**Entscheidung.**
+
+- Der **Gründer** kann das Logo seiner aktiven Firma jederzeit neu zeichnen, für `startups.logoRedrawCents`
+  (50.000 €) aus der **Firmenkasse** (frei = Kasse − offene Rechnungen). Buchung Firmenkasse → Staatskasse
+  (`company_costs`, Summe 0), Schlüssel je Anfrage, also idempotent.
+- Dieselben Prüfungen wie beim ersten Logo: `logo_valid` und `logo_has_forbidden_symbol` (`logo_forbidden`).
+- Höchstens einmal je `startups.logoRedrawCooldownHours` (24 h), sonst `locked`. Gespeichert in
+  `player_companies.logo_redrawn_at`.
+- `logo_version` steigt: Meldungen gegen das alte Logo zählen nicht mehr, ein ausgeblendetes Logo ist wieder sichtbar.
+- Neuigkeit `logo_redrawn` („… verkündet: {Firma} hat ein neues Logo.“), mit dem neuen Logo als Symbol.
+- Oberfläche: Controlling → Marke & Firma, Knopf „Logo neu zeichnen · 50.000 €“ statt des gesperrten „Logo
+  zeichnen“. Der Editor startet mit dem jetzigen Logo, „Weiter“ erst nach einer Änderung, dann ein Bestätigungs-Sheet
+  mit alt und neu, Preis und Pause. In der Pause ein Countdown, bei zu wenig Geld ein Hinweis.
+- `get_logo_redraw(firma)` liefert Preis, Pause und den nächsten möglichen Zeitpunkt. Ein eigenes RPC statt eines
+  Feldes in `company_state`, weil eine spätere Migration (`toplists`) `company_state` neu schreibt.
+
+**Folgen.** Das Logo bleibt etwas Bleibendes (der Preis ist spürbar, aber für eine laufende Firma erreichbar), ein
+Fehlgriff ist nicht mehr für immer. Das erste Logo bleibt kostenlos.

@@ -31,6 +31,7 @@ import { FirmSection, FoldBlock, MergedCard, SectionNav, SubSection, type Pane }
 import { Reveal } from "@/features/progression/components/reveal";
 import { CompanySkillsCard } from "../company-skills";
 import { GrowthAndExpansion } from "../growth-expansion";
+import { LogoRedraw } from "../logo-redraw";
 import { ListingCard } from "../listing";
 import { PitchCard } from "../pitch-card";
 import { ProductionCard } from "../production";
@@ -338,16 +339,14 @@ export function ControllingTab({
                 <Button size="sm" variant="secondary" onClick={onEditBanner} data-testid="brand-banner">
                   {tb("title")}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={onDrawLogo}
-                  disabled={logoLocked}
-                  title={logoLocked ? tl("locked") : undefined}
-                  data-testid="brand-logo"
-                >
-                  {tl("draw")}
-                </Button>
+                {/* A fixed logo can be redrawn for a price (ADR-200). */}
+                {logoLocked ? (
+                  <LogoRedraw company={company} />
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={onDrawLogo} data-testid="brand-logo">
+                    {tl("draw")}
+                  </Button>
+                )}
               </div>
             </Card>
           </SubSection>

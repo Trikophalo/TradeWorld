@@ -957,6 +957,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines Packs bleibt gleich.",
       },
+      {
+        id: "m0-fundament-0f4829aa",
+        title: null,
+        text: "Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der Firmenkasse neu, höchstens einmal…",
+      },
     ],
   },
 ];
