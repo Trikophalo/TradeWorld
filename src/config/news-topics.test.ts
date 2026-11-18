@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NEWS_SHOW_RULES } from "./news-show";
 import { NEWS_RAMBLE_EXTRA, NEWS_TOPIC_GROUPS, NEWS_TOPICS, type NewsTopicKey } from "./news-topics";
+import { NEWS_TOPIC_GROUPS_FRESH } from "./news-topics-fresh";
 
 const keys = Object.keys(NEWS_TOPICS) as NewsTopicKey[];
 const placeholders = (text: string) => [...new Set([...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!))];
@@ -73,8 +74,12 @@ const BANNED = [
 describe("NEXA Nachrichten topics (ADR-169)", () => {
   it("has many topics in every group, each a full script", () => {
     expect(keys.length).toBeGreaterThanOrEqual(40);
+    // the groups of season three (ADR-210) start with at least three topics each
+    const fresh: readonly string[] = NEWS_TOPIC_GROUPS_FRESH;
     for (const group of NEWS_TOPIC_GROUPS)
-      expect(keys.filter((key) => NEWS_TOPICS[key].group === group).length, group).toBeGreaterThanOrEqual(5);
+      expect(keys.filter((key) => NEWS_TOPICS[key].group === group).length, group).toBeGreaterThanOrEqual(
+        fresh.includes(group) ? 3 : 5,
+      );
     for (const key of keys) {
       const topic = NEWS_TOPICS[key];
       expect(topic.frames.length, key).toBeGreaterThanOrEqual(3);

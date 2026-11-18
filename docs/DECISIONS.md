@@ -5434,6 +5434,52 @@ oder Bequeme; der Belegcheck spart ab mittlerer Größe ein Vielfaches. Tests: `
 `growth.test.ts`, `listed.test.ts`, SQL `e7_macro_events.sql`, E2E „an event from outside“ in
 `e2e/company-growth.spec.ts`.
 
+## ADR-210: NEXA Nachrichten, dritte Staffel – neue Themen, Ereignisse von außen als eigene Meldung, ein Chat, der mitredet — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Update Mr. Doodle Dangle auch. Auch den Chat, es braucht neuen Content.“ Seit ADR-169
+sind Weltkarte (ADR-208), Ereignisse von außen (ADR-209), Talente (ADR-199), Klone mit Job (ADR-206), Ranglisten
+(ADR-203), Festgeld (ADR-201), Pack-Battle-Modi (ADR-205), Fertigkeiten und Logo neu zeichnen (ADR-200) dazugekommen,
+die Sendung wusste davon nichts. Nachgereicht: Jedes große Ereignis von außen, das eine Spielerfirma trifft, soll eine
+eigene Meldung bekommen, mit Firma, Land, Lage und Gegenmaßnahme, und einen Nachtrag, wenn es vorbei ist.
+
+**Entscheidung.**
+
+- **28 neue Themen** (`src/config/news-topics-fresh.ts`, drei neue Gruppen `world`, `talent`, `rank`): neue Zentrale,
+  Ausbau ab Stufe 2, neuer Marktführer, Standortgebühr, Tochterfirma, Wetter auf der Weltkarte; Star-Einstellung ab
+  Stufe Senior, Abwerbung (beide Firmen), Kündigung, Mit-Geschäftsführung, „Talent-Transfermarkt“ (bestes freies
+  Talent), Klon mit Job; Aufsteiger der Reichenliste und der Top-Unternehmen (ab 3 Plätzen in 24 Stunden), „Pleite der
+  Woche“ (ab 10 % Verlust in 7 Tagen); Black Label, Sieger eines Pack Battles mit Twist, Pack-Marathon (ab 10 Packs);
+  großes Festgeld (ab 5.000 €) und seine Zinsen, Login-Serie (alle 7 Tage), Fertigkeit ab Stufe 3, neues Logo;
+  „Börsen-Orakel“ ohne Daten; große Marktereignisse (ADR-214, `stock_tips.source = 'market'`, ab 3 %) als „Blasenwarnung“-Meldung, still, solange es sie nicht gibt. Je Thema 3 bis 4 Rahmen und 10 bis 12 Begründungen, Gesichter je Thema. Schwellen in
+  `newsShow.fresh.facts`. `topics.count` steigt auf 4 (Plätze 25, 45, 65, 72).
+- **Ereignisse von außen nie im Los:** `news_show_event_segments()` baut für jedes Ereignis von außen (Schwere ab
+  `facts.eventMinSeverity`) eine eigene Meldung `worldEvent` mit Firma, Land des Hauptsitzes (sonst „Nexa-Stadt“),
+  Lage (angespannt, ernst, verheerend) und Antwort der Firma (`news_show_event_response()`: Versicherungsanteil aus dem
+  Schnappschuss, gewählte Strategie oder „noch keine“, Lobby-Stufe bei Politik, Zöllen und Kartell). Ist es vorbei,
+  folgt `worldEventWon` (gelöst, mit Strategie und neuer Lobby-Stufe) oder `worldEventLost` (Frist abgelaufen, mit
+  Minderung). Höchstens `fresh.events.max` (3) je Sendung an den Plätzen 21 bis 23, neue zuerst, dann nach Schwere;
+  jede Tatsache einmal (`news_show_used`). Sie zählen nicht zu `topics.count`.
+- **Keine Wiederholung in `fresh.noRepeatShows` (6) Sendungen:** `news_show_pick()` (vollständig neu definiert, Stand 2000) merkt sich zusätzlich den Rahmen (`f:<Art>:<Rahmen>`) und nimmt zuerst ein Paar, dessen Rahmen und Begründung in
+  den letzten sechs Sendungen nicht liefen (`news_show_fresh_cutoff()`: Erstellzeit der sechstletzten Sendung). Gleiche
+  Regel für Überleitungen und Chatzeilen; die Demo rechnet dasselbe (`pickScript(…, recent)`).
+- **Mehr Mr. Doodle Dangle:** 24 Überleitungen (vor 60 % der Themen, `news_show_segue()`), 22 neue Abschweifungen ohne
+  echte Personen, je 4 bis 8 neue Begründungen für die klassischen Meldungen. Vorspann-Spruch und Abschied (je 24) und
+  10 neue Laufbandzeilen kommen aus `messages`, gewählt nach der Stunde der Sendung (`showEpisode`,
+  `episodeVariant`): alle sehen dasselbe, 24 Sendungen hintereinander unterscheiden sich.
+- **Chat:** 30 neue Namen (46). Beim Sendestart (Trigger `news_shows_fresh_chat` nach dem Statuswechsel, statt eines
+  Textersatzes in `news_show_start()`) schreibt `news_show_fresh_chat()` je Meldung 2 Zeilen aus dem Topf ihres Themas
+  oder ihrer Art (über 250 Zeilen, höchstens 24 je Sendung), mit 45 % Chance eine Umfrage („Wer wird nächste Woche
+  Marktführer in Japan?“) vom „📊 NEXA-Umfrage“-Konto mit 3 bis 6 Stimmen und nach großen Zügen, Black Labels, Twist-Siegen
+  und gelösten Krisen 4 bis 7 Emote-Zeilen. Gleiche Regel in TS (`src/lib/sim/news-chat.ts`), die Demo nutzt sie. Echte
+  Chatzeilen, Filter und Limits bleiben unberührt; die bisherigen Zuschauerzeilen und der Running Gag laufen weiter.
+- **Grenzen** wie ADR-169: nur Spielgeschehen, erfundene Leute, keine echten Personen oder Marken. Die Namen der
+  Ereignisse (auch Erdbeben, Tsunami) kommen nur über `{event}` aus `fresh.eventNames`, sie sind Spielereignisse.
+
+**Folgen.** Migration `20261204010400_news_show_fresh.sql` (`news_show_topics()` vollständig aus 5700 kopiert, plus
+Aufruf der neuen Kandidaten, der Ereignis-Meldungen und der Überleitung). Tests: `src/lib/sim/news-chat.test.ts`,
+`src/features/news/show/variants.test.ts`, `news-topics.test.ts`, SQL `e8_news_show_content.sql`; `a4` und `9k`
+angepasst (Zahl der Themen, Umfrage-Konto). Der Running Gag bleibt unverändert und steht weiter nicht in den Patchnotes.
+
 ## ADR-212: Flyer für kleine Firmen gedeckelt — `Entscheidung (Eigentümer: „mach, was am besten ist“)`
 
 **Kontext.** Eine Kampagne kostet `costHours` × die Nachfrage der letzten Stunde (ADR-097). Die Nachfrage folgt aus

@@ -1874,3 +1874,25 @@ vorher = Band +100 %/−50 % ohne Kräfte, nachher = ohne Band mit Kräften):
 
 Große Tage bleiben möglich (bis rund +270 % in den Läufen); anhaltende Übertreibung wird deutlich langsamer und kehrt
 zum fairen Wert zurück; wächst die Firma selbst, folgt die Aktie ihr weiter.
+
+## NEXA Nachrichten, dritte Staffel (ADR-210)
+
+Werte in `src/config/news-fresh.ts` (`BALANCE.newsShow.fresh`), Texte der Themen in `src/config/news-topics-fresh.ts`.
+
+| Wert                                 | Wert                         |
+| ------------------------------------ | ---------------------------- |
+| Themen je Sendung (`topics.count`)   | 4 (vorher 3)                 |
+| Keine Wiederholung in                | 6 Sendungen                  |
+| Überleitung vor einem Thema          | 60 %                         |
+| Ereignisse von außen je Sendung      | höchstens 3, Plätze 21–23    |
+| Zentrale-Ausbau ab Stufe             | 2                            |
+| Star-Talent ab Stufe                 | 2 (Senior)                   |
+| Ranglisten-Aufsteiger ab             | 3 Plätzen in 24 Stunden      |
+| Pleite der Woche ab                  | 10 % Verlust in 7 Tagen      |
+| Festgeld ab / Zinsen ab              | 5.000 € / 50 €               |
+| Login-Serie                          | alle 7 Tage                  |
+| Fertigkeit ab Stufe                  | 3                            |
+| Pack-Marathon ab                     | 10 Packs in 24 Stunden       |
+| Chat: Zeilen je Meldung / je Sendung | 2 / 24                       |
+| Umfrage je Sendung                   | 45 %, 3 bis 6 Stimmen        |
+| Emote-Sturm nach großem Zug          | 4 bis 7 Zeilen in 5 Sekunden |

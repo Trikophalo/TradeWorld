@@ -8567,3 +8567,23 @@ issue_locked_cents, issue_locked_until}`.
 - Neu definiert: `stock_news_run_due` (Stand 1200) – Hinweise mit `source = 'market'` laufen über
   `market_force_shock`, zählen nicht für den Takt der normalen Börsen-News, am Ende `market_forces_run`; Rückgabe
   zusätzlich `market_forces`. `get_stock_news` zeigt die Kräfte wie andere Hinweise (Antwort unverändert).
+
+## Nachtrag: NEXA Nachrichten, dritte Staffel (ADR-210, Migration `20261204010400_news_show_fresh.sql`)
+
+Keine neue Tabelle. Alles intern (nur `service_role` bzw. Trigger), Spieler können nichts davon aufrufen:
+
+- `news_show_topic_cands_fresh(p_now, p_win) → table(topic, player_id, vals, ukey, score)`: Kandidaten der neuen
+  Themen aus `company_locations`, `country_lobby`, `company_subsidiaries`, `talent_events`, `talents`, `player_jobs`
+  (`is_clone`), `rich_list_snapshots`, `company_rank_snapshots`, `nexamon_copies` (Note 11), `nexamon_battles`
+  (`twist`), `nexamon_packs`, `vault_deposits`, `login_streaks`, `company_skills`, `player_companies.logo_redrawn_at`, `stock_tips` mit `source = 'market'` (ADR-214, nur wenn die Spalte existiert).
+- `news_show_event_segments(p_now, p_win) → jsonb` und `news_show_event_response(player_company_events, phase) → text`:
+  je Ereignis von außen eine Meldung (`worldEvent`, `worldEventWon`, `worldEventLost`), Tatsachenschlüssel
+  `fact:event:`, `fact:eventwon:`, `fact:eventlost:` + Ereignis-ID.
+- `news_show_topics()` (vollständig neu, Stand 5700) ruft beide auf; `news_show_segue(jsonb)` setzt eine Überleitung
+  vor den Text.
+- `news_show_pick(text)` (vollständig neu, Stand 2000) schreibt zusätzlich `f:<Art>:<Rahmen>` in `news_show_used`;
+  `news_show_fresh_cutoff(p_exclude bigint)` liefert die Grenze für „in den letzten `fresh.noRepeatShows` Sendungen“.
+- `news_show_fresh_chat(show_id, now) → integer` über Trigger `news_shows_fresh_chat` (AFTER UPDATE OF status,
+  `scheduled` → `aired`): Zeilen erfundener Zuschauer in `news_show_messages` (`player_id` null, `bot_name`), darunter
+  Umfragen vom Konto `newsShow.fresh.chat.polls.host`. Neue Schlüssel in `news_show_used`: `t:<md5>` (Überleitung),
+  `c:<md5>` (Chatzeile, Umfrage).

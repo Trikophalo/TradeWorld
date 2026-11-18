@@ -26,6 +26,7 @@ import { bubblesAt, stageAudience } from "./audience";
 import { AudienceStage } from "./audience-stage";
 import { useDisclosed } from "@/features/progression/components/reveal";
 import { NewsStudio, type NewsStudioProps } from "./studio";
+import { showEpisode } from "./variants";
 
 const cfg = BALANCE.newsShow;
 export const NEWS_SHOW_KEY = ["news-show"] as const;
@@ -100,11 +101,18 @@ export function NewsShow() {
     if (show && replaying && replayAt !== null && now !== null) {
       const phase = showPhase(now, replayAt, count);
       if (phase.mode !== "over")
-        return { ...studioProps(phase, show.segments), replay: true, live: false, over: false };
+        return {
+          ...studioProps(phase, show.segments),
+          episode: showEpisode(show.startedAt),
+          replay: true,
+          live: false,
+          over: false,
+        };
     }
     if (show) {
       const phase = showPhase(serverNow, Date.parse(show.startedAt), count);
-      if (phase.mode !== "over") return { ...studioProps(phase, show.segments), live: true, over: false };
+      if (phase.mode !== "over")
+        return { ...studioProps(phase, show.segments), episode: showEpisode(show.startedAt), live: true, over: false };
     }
     // before the show: the countdown, in our own clock
     return { mode: "standby", startsAt: Date.parse(data.nextAirsAt) - offset, live: false, over: show !== null };

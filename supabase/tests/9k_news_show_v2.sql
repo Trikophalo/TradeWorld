@@ -101,7 +101,9 @@ select tests.assert(
   :bots::int >= 10 and :'bot_first'::timestamptz > (select started_at from public.news_shows where id = :show)
   and :'bot_last'::timestamptz < (select started_at from public.news_shows where id = :show)
         + make_interval(secs => 12 + 22 * jsonb_array_length(:'segs'::jsonb) + 6)
-  and not exists (select 1 from public.news_show_messages where bot_name is not null and bot_name not in ('Jürgen Test', 'Chantal Test'))
+  and not exists (select 1 from public.news_show_messages where bot_name is not null and bot_name not in ('Jürgen Test', 'Chantal Test')
+                    -- the poll host of ADR-210
+                    and bot_name is distinct from (select value #>> '{fresh,chat,polls,host}' from public.game_config where key = 'newsShow'))
   and not exists (select 1 from public.news_show_messages where bot_name is not null and body like '%{%')
   and not exists (select 1 from jsonb_array_elements(:'v1'::jsonb -> 'chat') c where c ->> 'nickname' in ('Jürgen Test', 'Chantal Test')),
   'made-up viewers: lines for the whole show, written at the start, none visible before its time');

@@ -658,6 +658,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Mehr Nervenkitzel bei Packs und ASP",
         text: "Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-85634ad1",
+        title: "NEXA Nachrichten, dritte Staffel",
+        text: "Mr. Doodle Dangle berichtet jetzt von der Weltkarte (neue Zentralen, Ausbau, Marktführer, Standortgebühren, Tochterfirmen), über Talente…",
+      },
     ],
   },
   {

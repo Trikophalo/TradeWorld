@@ -422,9 +422,11 @@ interface TitleCardProps {
   reduced: boolean;
   /** Which way he waves right now. */
   wave: 0 | 1;
+  /** The tagline of this show (ADR-210); the classic one when left out. */
+  tagline?: string;
 }
 
-function TitleCard({ beat, scale, wide, reduced, wave }: TitleCardProps) {
+function TitleCard({ beat, scale, wide, reduced, wave, tagline }: TitleCardProps) {
   const t = useTranslations("newsStudio");
   const on = (step: keyof typeof TITLE_STEPS) => reduced || beat >= TITLE_STEPS[step];
   const gap = 2 * scale;
@@ -502,7 +504,7 @@ function TitleCard({ beat, scale, wide, reduced, wave }: TitleCardProps) {
             animate={{ opacity: on("tagline") ? 1 : 0 }}
             transition={{ duration: DURATION.slow }}
           >
-            {t("introTagline")}
+            {tagline ?? t("introTagline")}
           </motion.p>
         </div>
         <motion.div
@@ -538,10 +540,12 @@ export interface IntroMontageProps {
   reduced: boolean;
   /** Which way he waves on the title card (idle life of the studio). */
   wave: 0 | 1;
+  /** The tagline of this show (ADR-210). */
+  tagline?: string;
 }
 
 /** The opening montage; fills the picture of the TV. */
-export function IntroMontage({ frame, scale, cols, wide, reduced, wave }: IntroMontageProps): JSX.Element {
+export function IntroMontage({ frame, scale, cols, wide, reduced, wave, tagline }: IntroMontageProps): JSX.Element {
   const t = useTranslations("newsStudio");
   const id = reduced ? "title" : frame.id;
   const shot: ShotProps = { frame, scale, cols };
@@ -562,6 +566,7 @@ export function IntroMontage({ frame, scale, cols, wide, reduced, wave }: IntroM
           wide={wide}
           reduced={reduced}
           wave={wave}
+          tagline={tagline}
         />
       )}
       {id !== "title" && (

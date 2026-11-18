@@ -20,6 +20,7 @@ import {
   type NewsShowState,
 } from "../types";
 import { buildGagSegment, gagChatLines, matchesNamePattern } from "@/lib/sim/running-gag";
+import { freshChatLines, type FreshChatSegment } from "@/lib/sim/news-chat";
 import { demoTopicCandidates } from "./news-topics";
 import type { NexamonSetKey } from "@/config/nexamon/types";
 
@@ -53,6 +54,11 @@ export interface DemoNewsShowState {
   lastTopics?: string[];
   /** Running gags (ADR-179): aired episodes and the last host line per gag and company. Missing in older states. */
   gags?: Record<string, { company: string; episodes: number; lastLine: number | null }>;
+  /**
+   * ADR-210: what the last `fresh.noRepeatShows` shows said (frame and reason keys, segues, chat templates), one list
+   * per show; none of it comes back while the pools have something else. Missing in older states.
+   */
+  recent?: string[][];
 }
 
 export interface NewsShowHost {
@@ -117,9 +123,13 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
     host.state() ?? { used: [], show: null, doneSlot: 0, forcedAt: null, chat: [], seq: 0, botUntil: 0 };
   const between = (lo: number, hi: number) => lo + Math.floor(host.random() * (hi - lo + 1));
 
+  /** While a show is written: what the last shows said and what this one says (ADR-210). */
+  let airing: { recent: Set<string>; keys: string[] } | null = null;
+
   function script(s: DemoNewsShowState, kind: NewsShowTextKey, values: Record<string, string | number>) {
-    const pick = pickScript(kind, s.used, () => host.random());
+    const pick = pickScript(kind, s.used, () => host.random(), cfg, airing?.recent);
     s.used = [...s.used, ...usedKeys(pick)].slice(-2_000);
+    airing?.keys.push(...usedKeys(pick));
     const moods = cfg.moods[kind] as readonly NewsShowMood[];
     return {
       mood: moods[between(0, moods.length - 1)] ?? ("neutral" as const),
@@ -130,6 +140,26 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
 
   /** Writes the show and applies its effects, like news_show_build() and news_show_start(). */
   function air(s: DemoNewsShowState, slot: number, startedAt: number): DemoShow {
+    airing = { recent: new Set((s.recent ?? []).flat()), keys: [] };
+    const show = writeShow(s, slot, startedAt);
+    s.recent = [...(s.recent ?? []), airing.keys].slice(-cfg.fresh.noRepeatShows);
+    airing = null;
+    return show;
+  }
+
+  /** A segue in front of a topic now and then (ADR-210), not one of the last shows. */
+  function segue(): string | null {
+    if (host.random() * 10_000 >= cfg.fresh.transitionChanceBps) return null;
+    const pool = cfg.fresh.transitions.filter((t) => !airing?.recent.has(`t:${t}`));
+    const line = pool[Math.floor(host.random() * pool.length)];
+    if (!line) return null;
+    airing?.keys.push(`t:${line}`);
+    return line;
+  }
+
+  function writeShow(s: DemoNewsShowState, slot: number, startedAt: number): DemoShow {
+    /** What the made-up viewers react to per segment (ADR-210). */
+    const chatInfo = new Map<NewsShowSegment, FreshChatSegment>();
     // every story carries its place in the running order, like the server's "ord"
     const stories: { ord: number; segment: NewsShowSegment }[] = [];
     const segments = { push: (segment: NewsShowSegment, ord: number) => stories.push({ ord, segment }) };
@@ -322,19 +352,21 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
       const meta = cfg.topics.list[pick.topic];
       const paid = meta.tone === "bad" && (meta.group === "person" || meta.group === "cards") && pick.player != null;
       const friend = friends.find((f) => f.nickname === pick.player);
-      segments.push(
-        {
-          kind: meta.kind,
-          ...script(s, pick.topic, pick.values),
-          effects: paid
-            ? [{ label: `+${formatMoney(cfg.topics.hushMoneyCents, { whole: true })} Schmerzensgeld`, tone: "gain" }]
-            : [],
-          ...(pick.player != null
-            ? { figure: friend ?? { nickname: pick.player, avatarKey: null, accessories: [] } }
-            : {}),
-        },
-        cfg.topics.ords[i] ?? 85 + i,
-      );
+      const said = script(s, pick.topic, pick.values);
+      const lead = segue();
+      const segment: NewsShowSegment = {
+        kind: meta.kind,
+        ...said,
+        ...(lead ? { text: `${lead} ${said.text}` } : {}),
+        effects: paid
+          ? [{ label: `+${formatMoney(cfg.topics.hushMoneyCents, { whole: true })} Schmerzensgeld`, tone: "gain" }]
+          : [],
+        ...(pick.player != null
+          ? { figure: friend ?? { nickname: pick.player, avatarKey: null, accessories: [] } }
+          : {}),
+      };
+      chatInfo.set(segment, { kind: meta.kind, topic: pick.topic, values: pick.values });
+      segments.push(segment, cfg.topics.ords[i] ?? 85 + i);
     });
     s.lastTopics = topics.map((pick) => pick.topic);
 
@@ -370,6 +402,36 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
         });
       }
     }
+    // ADR-210: the viewers react to what is on air (topic lines, a poll now and then, emotes after a big pull)
+    const lines = freshChatLines(
+      kept.map(
+        (segment) =>
+          chatInfo.get(segment) ?? {
+            kind: segment.kind,
+            values: segment.figure ? { name: segment.figure.nickname } : {},
+          },
+      ),
+      cfg.fresh.chat,
+      {
+        introSeconds: cfg.introSeconds,
+        segmentSeconds: cfg.segmentSeconds,
+        names: bots.names,
+        random: () => host.random(),
+        recent: new Set([...(airing?.recent ?? [])].filter((k) => k.startsWith("c:")).map((k) => k.slice(2))),
+      },
+    );
+    for (const line of lines) {
+      if (line.template) airing?.keys.push(`c:${line.template}`);
+      s.seq += 1;
+      s.chat.push({
+        id: s.seq,
+        nickname: line.name,
+        body: line.body,
+        at: startedAt + line.atSeconds * 1000,
+        mine: false,
+        bot: true,
+      });
+    }
     return { slot, startedAt, segments: kept };
   }
 
@@ -403,7 +465,9 @@ export function createNewsShowEngine(host: NewsShowHost): Pick<GameEngine, "news
         bot: friend === null,
       });
     }
-    s.chat = s.chat.slice(-cfg.chat.history);
+    // keep the last lines that are out and every line still to come (ADR-210 writes a show's reactions ahead)
+    const out = s.chat.filter((m) => m.at <= now).sort((x, y) => x.at - y.at);
+    s.chat = [...out.slice(-cfg.chat.history), ...s.chat.filter((m) => m.at > now)];
   }
 
   function tick(): DemoNewsShowState {

@@ -9138,7 +9138,141 @@
       "Schnurrbart von Mr. Doodle Dangle weiterhin stabil",
       "Spielgeld bleibt Spielgeld",
       "Bulle und Bär streiten sich um den Kaffeeautomaten",
-      "Zur vollen Stunde: die nächste Sendung"
+      "Zur vollen Stunde: die nächste Sendung",
+      "Weltkarte: neue Fähnchen gesichtet",
+      "Talent-Transfermarkt hat geöffnet",
+      "Klon verdient mehr als Original, Original beleidigt",
+      "Börsen-Orakel sieht Nebel",
+      "Pleite der Woche: Nominierungen laufen",
+      "Finanzamt grüßt alle Zuschauer",
+      "Tresor meldet: Festgeld schläft gut",
+      "Pack Battle mit Twist: Chaos bestätigt",
+      "Wetter auf der Weltkarte: heiter bis gierig",
+      "Reichenliste wird stündlich neu sortiert"
+    ],
+    "introTaglines": [
+      "Volle Stunde, volle Wahrheit.",
+      "Wir berichten, Sie verlieren.",
+      "Nachrichten mit Schnurrbart.",
+      "Frisch gepresst aus dem Faxgerät.",
+      "Ihre Pleite, unser Programm.",
+      "Live, laut und leider wahr.",
+      "Jetzt mit noch mehr Weltkarte.",
+      "Wo Talente kommen und gehen.",
+      "Heute mit Börsen-Orakel. Vielleicht.",
+      "Die Sendung, vor der Ihr Depot Angst hat.",
+      "Kein Echtgeld, echter Spott.",
+      "Von Pappe bis Konzern.",
+      "Mit Klon-Garantie: doppelt so viel Drama.",
+      "Stündlich frisch, nie geprüft.",
+      "Das Wetter auf der Weltkarte inklusive.",
+      "Wir zählen Ihre Verluste, damit Sie es nicht müssen.",
+      "Seriös seit zwölf Sekunden.",
+      "Mehr Meinung als Fakten. Aber auch Fakten.",
+      "Exklusiv: alles, was schiefging.",
+      "Die Reichenliste zittert.",
+      "Unabhängig, ungefragt, unverbesserlich.",
+      "Nachrichten wie ein Pack: Man weiß nie, was kommt.",
+      "Gnadenlos pünktlich zur vollen Stunde.",
+      "Heute mit extra Krawatte."
+    ],
+    "outros": [
+      {
+        "headline": "Bis zur nächsten vollen Stunde!",
+        "text": "Das war’s von mir. Kaufen Sie klug, verkaufen Sie klüger. Bis zur nächsten vollen Stunde!"
+      },
+      {
+        "headline": "Gute Nacht, Depot!",
+        "text": "Das waren die Nachrichten. Gehen Sie jetzt ins Bett, Ihr Depot braucht seine Ruhe. Ich auch."
+      },
+      {
+        "headline": "Schalten Sie wieder ein",
+        "text": "Mehr Pleiten, Pappe und Peinlichkeiten in einer Stunde. Bis dahin: Finger weg vom Hebel!"
+      },
+      {
+        "headline": "Das war die Sendung",
+        "text": "Ich bin Mr. Doodle Dangle, und ich habe recht. Meistens. Bis gleich!"
+      },
+      {
+        "headline": "Auf Wiedersehen!",
+        "text": "Wenn Sie diese Sendung verpasst haben, haben Sie Glück gehabt. Die nächste kommt trotzdem."
+      },
+      {
+        "headline": "Tschüss und viel Glück",
+        "text": "Viel Glück beim Handeln. Sie werden es brauchen. Wir sehen uns zur vollen Stunde!"
+      },
+      {
+        "headline": "Feierabend im Studio",
+        "text": "Der Schnurrbart muss jetzt gekämmt werden. Bis zur nächsten Sendung, und bitte keine Dummheiten!"
+      },
+      {
+        "headline": "Bleiben Sie reich",
+        "text": "Oder werden Sie es. Oder schauen Sie einfach wieder zu. Das ist billiger."
+      },
+      {
+        "headline": "Das Orakel verabschiedet sich",
+        "text": "Das Börsen-Orakel sagt: Wir sehen uns in einer Stunde. Das Orakel lag schon öfter richtig."
+      },
+      {
+        "headline": "Die Weltkarte schläft",
+        "text": "Auf der Weltkarte gehen die Lichter aus. Nur das Finanzamt bleibt wach. Bis bald!"
+      },
+      {
+        "headline": "Ende der Durchsage",
+        "text": "Ich schalte jetzt ab. Sie sollten das auch tun, mindestens bis zur nächsten vollen Stunde."
+      },
+      {
+        "headline": "Bis gleich, ihr Zocker",
+        "text": "Und denken Sie daran: Ein Verlust ist nur ein Gewinn, der sich verlaufen hat. Bis gleich!"
+      },
+      {
+        "headline": "Danke fürs Zuschauen",
+        "text": "Danke, dass Sie zugeschaut haben. Die Redaktion bedankt sich auch, sie wird pro Zuschauer bezahlt."
+      },
+      {
+        "headline": "Klappe zu",
+        "text": "Klappe zu, Kurse weg. Kleiner Scherz, die Kurse sind noch da. Noch. Bis zur nächsten Stunde!"
+      },
+      {
+        "headline": "Mr. Doodle Dangle sagt Tschüss",
+        "text": "Ich gehe jetzt zum Kaffeeautomaten. Er ist mein einziger Freund. Bis zur nächsten Sendung!"
+      },
+      {
+        "headline": "Nicht vergessen",
+        "text": "Festgeld läuft, Talente kündigen, Packs warten. Und ich warte auf Sie, in einer Stunde."
+      },
+      {
+        "headline": "Das war es für heute",
+        "text": "Für heute? Für diese Stunde. Ich bin gleich wieder da. Ich bin immer gleich wieder da."
+      },
+      {
+        "headline": "Schönen Tag noch",
+        "text": "Haben Sie einen schönen Tag. Falls nicht, erzähle ich davon in der nächsten Sendung."
+      },
+      {
+        "headline": "Bitte weitersagen",
+        "text": "Erzählen Sie Ihren Freunden von dieser Sendung. Oder lieber nicht, sonst kommen sie auch drin vor."
+      },
+      {
+        "headline": "Studio aus",
+        "text": "Die Kameras gehen aus, das Gelächter im Chat geht weiter. Bis zur vollen Stunde!"
+      },
+      {
+        "headline": "Bis zum nächsten Skandal",
+        "text": "Irgendwo baut gerade jemand Mist. Wir sind in einer Stunde wieder da und erzählen es allen."
+      },
+      {
+        "headline": "Und tschüss",
+        "text": "Zum Abschied ein Rat meines Großvaters: „Verkauf nie in Panik.“ Er hat alles in Panik verkauft."
+      },
+      {
+        "headline": "Gute Geschäfte!",
+        "text": "Gute Geschäfte, gute Ziehungen und gute Nerven. Von allem genug bis zur nächsten Sendung!"
+      },
+      {
+        "headline": "Pause für den Schnurrbart",
+        "text": "Der Schnurrbart braucht eine Pause, ich auch. Bleiben Sie dran oder schauen Sie Ihr Depot an. Ich empfehle das Erste."
+      }
     ]
   },
   "wardrobe": {
