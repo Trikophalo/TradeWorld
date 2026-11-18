@@ -574,7 +574,8 @@ security definer
 set search_path = ''
 as $$
 begin
-  if to_regprocedure('public.world_tax_rate_bps(uuid)') is not null then
+  -- a company without a headquarters (world_tax_rate_bps null) keeps the normal rate
+  if to_regprocedure('public.world_tax_rate_bps(uuid)') is not null and public.world_tax_rate_bps(p_company) is not null then
     return greatest(public.cfg_num(public.listed_cfg(), '{taxes,minRateBps}', 800),
                     public.world_tax_rate_bps(p_company) + public.cfg_num(public.listed_effects(p_company), '{taxRateBps}', 0))::integer;
   end if;
