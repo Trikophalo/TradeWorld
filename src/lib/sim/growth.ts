@@ -124,7 +124,10 @@ export function runGrowth(scenario: GrowthScenario, options: GrowthOptions): Gro
 
   let tier: StartupTier = "garage";
   let level = 0;
-  let state: StartupState = { ...initialStartup(scenario.potentialAnnualCents, 1_000_000n, sc), quality: QUALITY };
+  let state: StartupState = {
+    ...initialStartup(scenario.potentialAnnualCents, 1_000_000n, cfg.startups as typeof BALANCE.startups),
+    quality: QUALITY,
+  };
   let quarterProfit = 0n;
   let lastQuarterProfit = 0n;
   let dayProfit = 0;

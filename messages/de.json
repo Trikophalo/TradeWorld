@@ -4368,7 +4368,9 @@
     },
     "progress": "Abgewendet",
     "demoTrigger": "Demo: Lage auslösen",
-    "demoFinish": "Demo: Schritt sofort beenden"
+    "demoFinish": "Demo: Schritt sofort beenden",
+    "external": "Von außen",
+    "insurable": "Versicherbar"
   },
   "companyNews": {
     "title": "Firmen-News",
@@ -4408,7 +4410,11 @@
       "task_missed": ["{task}"],
       "pitch_success": ["{outcome}"],
       "pitch_failure": ["{outcome}"],
-      "pitch_backfire": ["{outcome}"]
+      "pitch_backfire": ["{outcome}"],
+      "lobby_level": [
+        "Die Lobby von {company} gewinnt an Einfluss (Stufe {level}).",
+        "In der Hauptstadt hört man jetzt öfter auf {company}: Lobby-Stufe {level}."
+      ]
     },
     "more": "Alle Meldungen",
     "less": "Weniger anzeigen"
@@ -10697,7 +10703,8 @@
           "budget": "Günstig",
           "normal": "Normal",
           "premium": "Premium"
-        }
+        },
+        "risks": "Wie groß deine Firma ist, was von außen droht, Versicherung und Lobby. Ab vielen Millionen wird jeder Schritt schwerer."
       }
     },
     "restrictions": {
@@ -11212,7 +11219,8 @@
         "staff-team": "Team & Plätze",
         "staff-mood": "Stimmung",
         "staff-value": "Wert des Teams",
-        "skills": "Fertigkeiten"
+        "skills": "Fertigkeiten",
+        "risks": "Risiken"
       }
     },
     "groupCards": {
@@ -11590,5 +11598,46 @@
     "trainingLabel": "In Schulung, wirkt in",
     "capLabel": "max.",
     "empty": "Gründe zuerst eine Firma, dann lernt sie hier Fertigkeiten."
+  },
+  "risks": {
+    "title": "Risiken",
+    "intro": "Kleine Firmen wachsen schnell. Je größer deine Firma wird, desto satter ist der Markt, desto mehr kostet die Verwaltung und desto öfter trifft sie etwas von außen: Politik, Zölle, Katastrophen, Streiks.",
+    "empty": "Die Risiken lassen sich gerade nicht laden.",
+    "worth": "Firmenwert",
+    "chance": "Lage pro Tag",
+    "crisisShare": "davon {pct} % Krisen",
+    "saturation": "Marktsättigung",
+    "saturationNote": "weniger Nachfrage",
+    "overhead": "Verwaltung",
+    "overheadNote": "vom Umsatz",
+    "smallHint": "Noch spürt deine Firma ihre Größe nicht. Ab {from} Firmenwert wird Wachstum mühsamer.",
+    "bigHint": "Große Firmen zahlen für jede Reaktion mehr: Eine Kosteneinheit kostet jetzt {unit}.",
+    "insuranceTitle": "Versicherung",
+    "insuranceText": "Versichert gegen Erdbeben, Tsunami, Überschwemmung, Waldbrand und Cyberangriffe. Die Prämie geht jede Stunde vom Umsatz ab. Eine höhere Stufe gilt erst nach einer Wartezeit, Nachkaufen nach dem Beben klappt also nicht.",
+    "coverageNow": "Deckt jetzt {pct} %",
+    "coverage": "Übernimmt vom Schaden",
+    "premium": "Prämie pro Stunde",
+    "premiumNote": "{pct} % vom Umsatz",
+    "waiting": "Volle Deckung in",
+    "apply": "Versicherung ändern",
+    "current": "Aktuelle Stufe",
+    "saved": "Versicherung geändert",
+    "levels": {
+      "none": "Keine",
+      "basic": "Basis",
+      "full": "Voll"
+    },
+    "lobbyTitle": "Lobby",
+    "lobbyLevel": "Stufe {level} von {max}",
+    "lobbyNone": "Noch keine Lobby. Jede gewonnene Lobby-Kampagne gegen eine politische Krise macht die nächste leichter.",
+    "lobbyEffect": "Lobby-Schritte gelingen um {bonus} Prozentpunkte öfter, politische Krisen kommen {cut} % seltener.",
+    "leader": "Marktführer",
+    "exposureTitle": "Was von außen droht",
+    "exposureNone": "Ereignisse von außen treffen erst Firmen ab {from} Firmenwert.",
+    "perDay": "{pct} % / Tag",
+    "insurable": "Versicherbar",
+    "upcoming": "Mit mehr Wert kommt dazu: {list}.",
+    "country": "Hauptsitz: {name}. Das Land bestimmt, was wahrscheinlicher ist.",
+    "noCountry": "Kein Hauptsitz gewählt: Länderrisiken zählen neutral."
   }
 }

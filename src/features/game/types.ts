@@ -336,6 +336,38 @@ export interface CompanyWorth {
   shares: number | null;
 }
 
+/** Risks of the own company (ADR-209): what size and the world outside do to it. */
+export interface CompanyRisks {
+  companyId: string;
+  worthCents: number;
+  /** Tenfolds above the event pivot (0 = small company, nothing changed). */
+  decades: number;
+  eventPivotCents: number;
+  frictionPivotCents: number;
+  /** Demand left after market saturation, bps (10 000 = none). */
+  saturationBps: number;
+  /** Overhead as a share of the revenue, bps. */
+  overheadBps: number;
+  chancePerDayBps: number;
+  crisisShareBps: number;
+  unitCents: number;
+  /** Daily probability of every external event that can hit the company, most likely first. */
+  exposure: { archetype: string; bps: number; insurable: boolean; risk: string | null }[];
+  /** External events that start with more company value. */
+  upcoming: { archetype: string; fromCents: number }[];
+  refRevenueCents: number;
+  insurance: {
+    level: number;
+    coverageBps: number;
+    changedAt: string | null;
+    /** A raised level covers from this moment on. */
+    fullFrom: string | null;
+    levels: { level: number; key: string; coverageBps: number; premiumBps: number; premiumCentsPerHour: number }[];
+  };
+  lobby: { level: number; max: number; bonusBps: number; politicalCutBps: number; leader: boolean };
+  country: { key: string; name: string | null } | null;
+}
+
 export interface NetWorthBreakdown {
   serverTime: string;
   totalCents: number;
@@ -2710,6 +2742,9 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   companyRanking(scope: RichListScope, limit: number, sector?: SectorKey | null): Promise<CompanyRanking>;
   /** The own net worth in parts (ADR-203). */
   myNetWorth(): Promise<NetWorthBreakdown>;
+  /** Risks of the own company: size, external events, insurance, lobby (ADR-209). */
+  companyRisks(): Promise<CompanyRisks>;
+  setCompanyInsurance(requestId: string, level: number): Promise<CompanyRisks>;
   // Artworks (ADR-080)
   artworks(sort: ArtSort, origin: ArtOrigin, onAuction: boolean, limit: number, offset: number): Promise<ArtworkList>;
   artwork(id: string): Promise<ArtworkDetail>;

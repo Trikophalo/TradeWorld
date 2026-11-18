@@ -130,6 +130,13 @@ function ActiveSituation({ state, event }: { state: CompanyEventState; event: Co
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={crisis ? "loss" : "gain"}>{crisis ? t("crisis") : t("chance")}</Badge>
         <span className="font-pixel text-2xs text-fg-2 uppercase">{story.archetypeName(event.archetype)}</span>
+        {/* ADR-209: events from outside, and those an insurance softens */}
+        {a?.external && (
+          <Badge tone="warn" data-testid="situation-external">
+            {t("external")}
+          </Badge>
+        )}
+        {a?.insurable && <Badge tone="info">{t("insurable")}</Badge>}
         <span
           className="flex gap-0.5"
           aria-label={t(`severity.${event.severity}`)}

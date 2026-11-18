@@ -54,6 +54,14 @@ export const MACRO = {
     imageBoost: 1,
     disasterListed: 2.5,
     disasterOther: 0.4,
+    /** Disaster kinds of the world map and the archetypes they make likelier. */
+    disasterMap: {
+      earthquake: ["earthquake", "tsunami"],
+      flood: ["flood"],
+      storm: ["flood", "tsunami"],
+      wildfire: ["wildfire"],
+      drought: ["wildfire"],
+    } as Readonly<Record<string, readonly string[]>>,
   },
   /**
    * Insurance against disasters and cyber attacks: an optional running cost (share of the own revenue, booked with

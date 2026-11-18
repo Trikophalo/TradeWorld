@@ -50,6 +50,8 @@ export const DISCLOSURE = {
   newsPromo: 2,
   /** The clone on the job tab (ADR-206): shown locked a few levels ahead, usable from jobs.clone.minLevel (20). */
   jobClone: 15,
+  /** Risks of the own company (ADR-209): size, external events, insurance, lobby; with the company. */
+  companyRisks: 3,
 } as const;
 
 export type DisclosureKey = keyof typeof DISCLOSURE;

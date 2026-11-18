@@ -82,6 +82,7 @@ import {
   type DemoListedStock,
 } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
+import { demoRisks, demoSetInsurance } from "./demo/risks";
 import { wealthSource, wealthTotal } from "@/features/rich-list/wealth";
 import {
   GameError,
@@ -2568,6 +2569,23 @@ export const demoEngine: GameEngine = {
       entries: entries.slice(0, limit),
       mine: entries.find((e) => e.isMine) ?? null,
     };
+  },
+
+  companyRisks: async () => {
+    const mine = (await company.engine.myCompany()).company;
+    if (!mine) throw new GameError("company_not_found");
+    return demoRisks(mine.id, company.worth()?.cents ?? 0, mine.live?.revenuePerHourCents ?? 0);
+  },
+
+  setCompanyInsurance: async (_requestId, level) => {
+    try {
+      demoSetInsurance(level);
+    } catch {
+      throw new GameError("invalid_argument");
+    }
+    const mine = (await company.engine.myCompany()).company;
+    if (!mine) throw new GameError("company_not_found");
+    return demoRisks(mine.id, company.worth()?.cents ?? 0, mine.live?.revenuePerHourCents ?? 0);
   },
 
   myNetWorth: async () => {

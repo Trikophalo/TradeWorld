@@ -102,19 +102,10 @@ export function riskShare(v: number | undefined): number {
   return clamp(v / 100, 0, 1);
 }
 
-/** Disaster kinds of the world map (ADR-208) and the archetypes they make likelier. */
-export const DISASTER_ARCHETYPES: Readonly<Record<string, readonly string[]>> = {
-  earthquake: ["earthquake", "tsunami"],
-  flood: ["flood"],
-  storm: ["flood", "tsunami"],
-  wildfire: ["wildfire"],
-  drought: ["wildfire"],
-};
-
-function disasterKinds(country: CountryRisk): string[] {
+function disasterKinds(country: CountryRisk, cfg: MacroConfig): string[] {
   return (country.disasterRisk ?? [])
     .map((d) => (typeof d === "string" ? d : (d.kind ?? d.key ?? "")))
-    .flatMap((d) => DISASTER_ARCHETYPES[d] ?? [d])
+    .flatMap((d) => cfg.country.disasterMap[d] ?? [d])
     .filter((d) => d.length > 0);
 }
 
@@ -137,7 +128,7 @@ export function countryFactor(
       // a bad image (negative imageBps) makes shitstorms likelier
       return 1 + c.imageBoost * clamp(-(country.imageBps ?? 0) / 10_000, 0, 1);
     case "disaster": {
-      const kinds = disasterKinds(country);
+      const kinds = disasterKinds(country, cfg);
       if (kinds.length === 0) return 1;
       return kinds.includes(archetype.key) ? c.disasterListed : c.disasterOther;
     }
