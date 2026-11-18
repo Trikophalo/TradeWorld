@@ -171,7 +171,7 @@ function VaultBoosts({ boosts }: { boosts: VaultBoost[] }) {
           <span className="font-semibold">{t("maxed")}</span> · {t("maxedText")}
         </p>
       )}
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid gap-2">
         {boosts.map((boost) => (
           <li key={boost.key}>
             <BoostRow boost={boost} />

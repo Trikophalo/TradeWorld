@@ -195,7 +195,7 @@ function UpgradeGroups({ levels, cash }: { levels: Partial<Record<UpgradeKey, nu
                 remember(group.key, next);
               }}
             >
-              <ul className="grid gap-4 pt-1 lg:grid-cols-2">
+              <ul className="grid gap-4 pt-1 *:min-w-0 lg:grid-cols-2">
                 {group.keys.map((key) => (
                   <li key={key}>
                     <UpgradeCard upgradeKey={key} level={levels[key] ?? 0} />
