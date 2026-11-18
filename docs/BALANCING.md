@@ -1982,3 +1982,69 @@ rund 45 % auf 14 %: die letzte Stufe kostete bei 1 Mrd. € über 35 Tage Gewinn
 40 Stunden Gewinn, egal wie groß die Firma ist; Sparforschung halbiert das auf 20 Stunden und dauert dafür 3 statt
 1, 9 statt 3, 24 statt 8 und 72 statt 24 Stunden. Der Baum (28 Schritte) kostet bei 1 Mrd. € zusammen rund 22 Tage
 Gewinn statt rund 450.
+
+## Nachtrag: Anlegervertrauen, Marktstimmung, Vorfälle (ADR-216)
+
+Werte in `src/config/investor-confidence.ts` (`game_config.investorConfidence`), die acht Vorfälle in
+`src/config/company-events.ts` (`incident: true`).
+
+| Hebel                           | Wert                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| Vertrauensanleger je Takt       | Aktien × 0,25 × 0,0005 × Signal (Value-Fonds 0,3 × 0,0005)                |
+| Signal                          | (C − 50) / 50, unter 15 Panik bis −1, über 85 Euphorie bis +1             |
+| Glättung                        | 7,5 % des Weges zum Ziel je Minute (Halbwertszeit ≈ 9 min)                |
+| Gewinn über/unter Erwartung     | 30 × Überraschung, höchstens ±22, Halbwertszeit 12 h                      |
+| Börsen-News / Marktkraft        | 6 / 5 Punkte je 10 % Kursbewegung, ±14 / ±18, 5 h / 8 h                   |
+| Krise, extern, Skandal          | −5 × Stufe (extern × 1,3), Skandal −7 × Stufe; gelöst +3 × Stufe          |
+| Dividende                       | 4 Punkte je 1 % Rendite, mindestens 1, höchstens 10, 24 h                 |
+| Entnahme des Gründers           | −32 × Anteil der Kasse, mindestens −2, höchstens −30, 24 h                |
+| Aktienverkauf des Gründers      | −(3 + 25 × Anteil seines Pakets), höchstens −25, 24 h                     |
+| Kapitalerhöhung                 | −40 × neue Aktien / alte, höchstens −18, 24 h                             |
+| Gewinntrend, Verlust            | ±8 × tanh(Änderung), Verlust −5                                           |
+| Ruf, Krise, Land, Management    | (Ruf − 50) × 0,2; −3 × Stufe; −0,12 × Risiko; bis +7                      |
+| Schwankung                      | −120 × (σ der Stundenrenditen − 2,5 %), höchstens −10                     |
+| Marktstimmung, Branche          | (Stimmung − 50) × 0,5; Rotation ±7                                        |
+| Herde, Bewertung, Gerüchte      | ±10 × tanh(r24 / 0,15); −12 × tanh(ln(Kurs/fair) / 0,35); σ ≈ 6           |
+| Phasen (Ziel, Dauer, Gewicht)   | Bulle 68, 20–60 h, 35 %; ruhig 50, 10–40 h, 35 %; Bär 28, 18–54 h, 30 %   |
+| KI-Geschäft je Spieljahr        | Branchenwachstum × 0,1 + 8 % × (Stimmung − 50) / 50                       |
+| Vorfälle je Stunde              | min(0,5; 0,1 % + 7 % × Hitze) × (1 + 0,25 × log10(Börsenwert / 1 Mio. €)) |
+| Vorfall: Beginn, offen          | −9 × Stufe; solange offen −5 × Stufe                                      |
+| Vorfall: Schritt, gelöst, Frist | +2,5 / −1,5 × Stufe je Schritt; gelöst +4 × Stufe; verpasst −5 × Stufe    |
+| Billiger Ausweg                 | −6 × Stufe (Vertuschen, Abstreiten, Ignorieren, Preise senken)            |
+| Mira, Nachricht                 | Mira erklärt unter 40; Nachricht bei ±15 Punkten in 6 h (12 h Pause)      |
+
+**Messung** (`pnpm exec tsx scripts/investor-confidence-harness.ts 30 8`: 10 KI-Aktien, je 2 je Branche, und drei
+Spieleraktien zu 1 €: S1 Firma +3 %/Quartal mit Käufen 5.000 €/h und Trendjagd 15.000 €/h, S2 Firma +0 % mit
+10.000 €/h und Trendjagd 20.000 €/h, S3 Firma +1 %/Quartal ohne Spieler; Börsen-News und Marktkräfte wie auf dem
+Server, 8 Läufe über 30 Tage, 7-Tage-Fenster je Tag versetzt):
+
+| Gruppe, Zeitraum                          | p10   | Median | p90     | min   | max     | im Minus |
+| ----------------------------------------- | ----- | ------ | ------- | ----- | ------- | -------- |
+| vorher: KI 7 Tage                         | +4 %  | +27 %  | +77 %   | −18 % | +147 %  | 6 %      |
+| vorher: KI 7 Tage gegen fairen Wert       | −10 % | −0 %   | +11 %   | −28 % | +36 %   | 52 %     |
+| vorher: KI 30 Tage                        | +54 % | +127 % | +1081 % | +16 % | +1973 % | 0 %      |
+| vorher: Spieler 7 Tage                    | −8 %  | +33 %  | +145 %  | −32 % | +218 %  | 15 %     |
+| vorher: Spieler 7 Tage gegen fairen Wert  | −17 % | −0 %   | +19 %   | −35 % | +65 %   | 51 %     |
+| nachher: KI 7 Tage                        | −25 % | −0 %   | +35 %   | −55 % | +97 %   | 51 %     |
+| nachher: KI 7 Tage gegen fairen Wert      | −22 % | −1 %   | +26 %   | −47 % | +82 %   | 51 %     |
+| nachher: KI 30 Tage                       | −36 % | −1 %   | +25 %   | −50 % | +139 %  | 53 %     |
+| nachher: Spieler 7 Tage                   | −13 % | +41 %  | +140 %  | −53 % | +279 %  | 19 %     |
+| nachher: Spieler 7 Tage gegen fairen Wert | −26 % | −2 %   | +29 %   | −53 % | +81 %   | 52 %     |
+
+| Spieleraktie     | Modell  | 7 Tage p10 | Median | p90    | Kurs/fair am Ende | Vorfälle je 30 Tage |
+| ---------------- | ------- | ---------- | ------ | ------ | ----------------- | ------------------- |
+| S1 wächst, Hype  | vorher  | +86 %      | +125 % | +175 % | 1,22              | 0                   |
+| S1 wächst, Hype  | nachher | +69 %      | +117 % | +185 % | 0,89              | 5,4                 |
+| S2 reiner Hype   | vorher  | −18 %      | +2 %   | +29 %  | 1,47              | 0                   |
+| S2 reiner Hype   | nachher | −30 %      | +1 %   | +39 %  | 1,14              | 4,5                 |
+| S3 ruhig, wächst | vorher  | +16 %      | +31 %  | +49 %  | 1,05              | 0                   |
+| S3 ruhig, wächst | nachher | +2 %       | +33 %  | +63 %  | 1,01              | 2,6                 |
+
+| Modell  | KI-Index am Ende (Median) | größter Rückgang (Median) | größter Rückgang (max) | größte Rally (max) | Stunden Bärenphase je Lauf |
+| ------- | ------------------------- | ------------------------- | ---------------------- | ------------------ | -------------------------- |
+| vorher  | +511 %                    | −23 %                     | −26 %                  | +978 %             | 0                          |
+| nachher | −9 %                      | −43 %                     | −50 %                  | +124 %             | 265                        |
+
+Die Spieleraktien S1 und S3 steigen nachher weiter, weil ihre Firmen im Szenario wirklich wachsen (S1 +12 % am Tag);
+gegen den fairen Wert liegen sie im Median leicht darunter (Vorfälle und ihre Nachwirkung). Der größte Rückgang des
+KI-Index über 30 Tage enthält meist mehr als eine Bärenphase; eine einzelne Phase drückt den Index um 20 bis 40 %.

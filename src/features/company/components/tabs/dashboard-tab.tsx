@@ -31,6 +31,7 @@ import { countryOf, useWorld } from "../../world/hooks";
 import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { ChartLink, DashLink, FirmSection, SectionNav, useWhere, type NavItem } from "../firm-layout";
 import { HealthPanel, type AskMira } from "../health-panel";
+import { StockConfidenceCard } from "@/features/market/components/confidence";
 import { PulseCard } from "../pulse-card";
 import { reputationOf, ReputationCard } from "../reputation-card";
 import { CloseErrorNote } from "../strengths-card";
@@ -122,6 +123,11 @@ export function DashboardTab({
         <ChartLink testId="chart-reputation" {...link({ tab: "controlling", section: "moves" })}>
           <ReputationCard company={company} listed={listed} />
         </ChartLink>
+        {company.listing?.status === "listed" && company.listing.ticker && (
+          <Reveal feature="stockConfidence">
+            <StockConfidenceCard ticker={company.listing.ticker} variant="company" />
+          </Reveal>
+        )}
         {showMood && (
           <ChartLink testId="chart-mood" {...link({ tab: "staff", section: "staff-mood", target: "satisfaction" })}>
             {listed ? <MoodCard listed={listed} go={go} /> : <Skeleton className="h-64 w-full rounded-lg" />}

@@ -4486,6 +4486,266 @@
           "solar_park": "Solarpark bauen",
           "grid_deal": "Netzvertrag schließen"
         }
+      },
+      "incident_accounting": {
+        "name": "Bilanzskandal",
+        "headlines": [
+          "Bilanzskandal: Zahlen von {company} offenbar geschönt",
+          "Sonderprüfung bei {company} – Anleger fliehen",
+          "Aufsichtsrat untersucht die Bücher von {company}"
+        ],
+        "bodies": [
+          "Ein Whistleblower behauptet, {company} habe Umsätze mit {product} zu früh verbucht. Die Börse straft die Aktie ab, eine Sonderprüfung droht.",
+          "Prüfer finden Lücken in den Büchern von {company}. Bis alles aufgeklärt ist, trauen die Anleger keiner Zahl mehr."
+        ],
+        "strategies": {
+          "full_audit": "Vollständig aufklären",
+          "settle_regulator": "Mit der Aufsicht einigen",
+          "cover_up": "Vertuschen",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "full_audit": "Sonderprüfung, Untersuchung durch den Aufsichtsrat, Bilanz neu aufstellen und einen neuen Finanzchef holen. Teuer und langwierig, stellt das Vertrauen aber ganz wieder her.",
+          "settle_regulator": "Anwälte handeln mit der Aufsicht eine Strafe aus. Schneller, aber die Zweifel bleiben zum Teil.",
+          "cover_up": "Unterlagen verschwinden lassen. Billig, doch die Anleger merken es: Das Vertrauen fällt noch tiefer.",
+          "accept": "Nichts tun und hoffen, dass es sich legt. Die Aktie bleibt unter Druck."
+        },
+        "steps": {
+          "special_audit": "Sonderprüfung",
+          "board_inquiry": "Untersuchung durch den Aufsichtsrat",
+          "restate_books": "Bilanz neu aufstellen",
+          "new_cfo": "Neuen Finanzchef holen",
+          "lawyers": "Anwälte einschalten",
+          "fine_deal": "Strafe aushandeln",
+          "shred": "Akten verschwinden lassen"
+        }
+      },
+      "incident_recall": {
+        "name": "Produktrückruf mit Klagen",
+        "headlines": [
+          "Rückruf: {product} von {company} gefährlich?",
+          "Klagewelle gegen {company} nach Rückruf",
+          "Sammelklage droht: {company} unter Druck"
+        ],
+        "bodies": [
+          "Bei {product} von {company} häufen sich Defekte. Erste Kunden klagen, Anwälte sammeln Fälle für eine Sammelklage.",
+          "Ein Prüfinstitut warnt vor {product}. {company} muss zurückrufen, und die Klagen kommen hinterher."
+        ],
+        "strategies": {
+          "full_recall": "Großer Rückruf",
+          "quiet_fix": "Leise nachbessern",
+          "deny": "Abstreiten",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "full_recall": "Verkauf stoppen, alles zurückholen, Klagen und Sammelklage durchstehen. Bindet Leute und Kapazität, macht aber reinen Tisch.",
+          "quiet_fix": "Fehlerhafte Charge reparieren und Kunden entschädigen. Halbiert den Schaden.",
+          "deny": "Alles abstreiten. Kostet nichts, aber Anleger und Kunden glauben es nicht: Das Vertrauen sinkt weiter.",
+          "accept": "Die Klagen laufen lassen."
+        },
+        "steps": {
+          "stop_sales": "Verkauf stoppen",
+          "recall_wave": "Rückrufaktion",
+          "lawsuits": "Einzelklagen abwehren",
+          "class_action": "Sammelklage verhandeln",
+          "fix_batch": "Charge nachbessern",
+          "goodwill": "Kulanz für Kunden",
+          "statement": "Dementi herausgeben"
+        }
+      },
+      "incident_data_leak": {
+        "name": "Datenleck mit Behördenverfahren",
+        "headlines": [
+          "Datenleck: Kundendaten von {company} im Netz",
+          "Behörde ermittelt gegen {company} wegen Datenleck",
+          "Bußgeld droht: {company} hat Daten nicht geschützt"
+        ],
+        "bodies": [
+          "Hacker haben Kundendaten von {company} veröffentlicht. Die Datenschutzbehörde leitet ein Verfahren ein, ein Bußgeld droht.",
+          "Ein Forscher findet eine offene Datenbank von {company}. Kunden sind wütend, die Behörden schauen genau hin."
+        ],
+        "strategies": {
+          "forensics": "Aufklären und kooperieren",
+          "lobby_authority": "Lücke schließen und lobbyieren",
+          "cover_up": "Vertuschen",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "forensics": "Lücke schließen, Kunden informieren, die Anhörung bei der Behörde bestehen und das Bußgeld anfechten. Lang, aber sauber.",
+          "lobby_authority": "Lücke schließen und über Gespräche mit der Politik ein mildes Verfahren erreichen.",
+          "cover_up": "Protokolle löschen. Die Anleger merken es, das Vertrauen fällt noch tiefer.",
+          "accept": "Das Bußgeld abwarten."
+        },
+        "steps": {
+          "close_hole": "Sicherheitslücke schließen",
+          "inform_customers": "Kunden informieren",
+          "authority_hearing": "Anhörung bei der Behörde",
+          "fine_appeal": "Bußgeld anfechten",
+          "lobby_talks": "Gespräche mit der Politik",
+          "delete_logs": "Protokolle löschen"
+        }
+      },
+      "incident_ceo_scandal": {
+        "name": "Skandal um die Chefetage",
+        "headlines": [
+          "Skandal um die Chefetage von {company}",
+          "Vorwürfe gegen die Führung von {company}",
+          "{company}: Anleger verlangen Konsequenzen"
+        ],
+        "bodies": [
+          "Schwere Vorwürfe gegen die Führung von {company} machen die Runde. Große Anleger drohen mit dem Ausstieg.",
+          "Private Eskapaden der Chefetage von {company} landen in den Schlagzeilen. Kunden von {product} wenden sich ab."
+        ],
+        "strategies": {
+          "clean_sweep": "Reinen Tisch machen",
+          "apology": "Öffentlich entschuldigen",
+          "ignore": "Ignorieren",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "clean_sweep": "Unabhängige Untersuchung, Übergangschef und eine Vertrauenskampagne. Ein Co-Geschäftsführer hilft.",
+          "apology": "Pressekonferenz und eine Spende. Beruhigt nur zum Teil.",
+          "ignore": "Schweigen. Anleger lesen das als Schuldeingeständnis, das Vertrauen sinkt weiter.",
+          "accept": "Abwarten."
+        },
+        "steps": {
+          "independent_probe": "Unabhängige Untersuchung",
+          "interim_ceo": "Übergangschef einsetzen",
+          "trust_campaign": "Vertrauenskampagne",
+          "press_conference": "Pressekonferenz",
+          "donation": "Spende",
+          "no_comment": "Kein Kommentar"
+        }
+      },
+      "incident_supplier_bankrupt": {
+        "name": "Wichtiger Lieferant pleite",
+        "headlines": [
+          "Lieferant pleite: {company} gehen die Teile aus",
+          "{company}: Produktion von {product} stockt",
+          "Insolvenz beim Zulieferer trifft {company}"
+        ],
+        "bodies": [
+          "Der wichtigste Zulieferer von {company} hat Insolvenz angemeldet. Für {product} fehlen ab sofort Teile.",
+          "Ohne den Lieferanten steht bei {company} bald die Produktion. Anleger fürchten einen Umsatzeinbruch."
+        ],
+        "strategies": {
+          "new_suppliers": "Neue Lieferanten aufbauen",
+          "buy_supplier": "Den Lieferanten übernehmen",
+          "accept": "Aussitzen",
+          "ignore": "Ignorieren"
+        },
+        "strategyText": {
+          "new_suppliers": "Notvorrat kaufen, neue Lieferanten suchen und deren Teile prüfen. Mehrere Schritte, die schiefgehen können.",
+          "buy_supplier": "Den insolventen Lieferanten kaufen. Sehr teuer, sichert die Lieferkette aber.",
+          "accept": "Mit weniger Kapazität weitermachen.",
+          "ignore": "Abwarten, bis sich ein neuer Lieferant meldet. Die Anleger lesen das als Ratlosigkeit, das Vertrauen sinkt weiter."
+        },
+        "steps": {
+          "emergency_stock": "Notvorrat kaufen",
+          "supplier_search": "Lieferanten suchen",
+          "qualify_parts": "Teile prüfen und freigeben",
+          "due_diligence": "Prüfung der Bücher",
+          "takeover": "Übernahme",
+          "no_comment": "Kein Kommentar"
+        }
+      },
+      "incident_patent_suit": {
+        "name": "Patentklage",
+        "headlines": [
+          "Patentklage gegen {company}",
+          "Konkurrent verklagt {company} wegen {product}",
+          "Verkaufsverbot droht: {company} vor Gericht"
+        ],
+        "bodies": [
+          "Ein Konkurrent wirft {company} vor, mit {product} ein Patent zu verletzen. Er will ein Verkaufsverbot erwirken.",
+          "Ein Patentverwerter verklagt {company} auf hohe Lizenzgebühren. Bis zum Urteil bleibt die Aktie unter Druck."
+        ],
+        "strategies": {
+          "fight": "Vor Gericht kämpfen",
+          "license": "Lizenz zahlen",
+          "redesign": "Produkt umbauen",
+          "accept": "Aussitzen",
+          "ignore": "Ignorieren"
+        },
+        "strategyText": {
+          "fight": "Ältere Erfindungen suchen, einstweilige Verfügung abwehren und den Prozess führen. Riskant, gewinnt aber alles.",
+          "license": "Eine Lizenz kaufen. Teuer, aber sicher.",
+          "redesign": "{product} so umbauen, dass das Patent nicht mehr greift.",
+          "accept": "Die Gebühren zahlen.",
+          "ignore": "Die Klage ignorieren. Kostet nichts, aber die Anleger fürchten das Urteil: Das Vertrauen sinkt weiter."
+        },
+        "steps": {
+          "prior_art": "Ältere Erfindungen suchen",
+          "injunction": "Verfügung abwehren",
+          "trial": "Prozess",
+          "license_talks": "Lizenzverhandlung",
+          "workaround": "Produkt umbauen",
+          "relaunch": "Neustart im Verkauf",
+          "no_comment": "Kein Kommentar"
+        }
+      },
+      "incident_rating_downgrade": {
+        "name": "Rating-Herabstufung",
+        "headlines": [
+          "Ratingagentur stuft {company} herab",
+          "{company}: Kredite werden teurer",
+          "Herabstufung: Zweifel an {company} wachsen"
+        ],
+        "bodies": [
+          "Eine Ratingagentur senkt die Bonität von {company}. Kredite werden teurer, Fonds müssen die Aktie verkaufen.",
+          "Analysten zweifeln an den Finanzen von {company}. Die Herabstufung trifft die Aktie hart."
+        ],
+        "strategies": {
+          "restore_rating": "Rating zurückholen",
+          "cost_program": "Sparprogramm",
+          "accept": "Aussitzen",
+          "ignore": "Ignorieren"
+        },
+        "strategyText": {
+          "restore_rating": "Schulden abbauen, mit der Agentur sprechen und einen Investorentag halten.",
+          "cost_program": "Kosten senken. Bindet Kapazität, hilft zum Teil.",
+          "accept": "Höhere Kosten hinnehmen.",
+          "ignore": "Die Herabstufung kleinreden. Die Anleger glauben es nicht, das Vertrauen sinkt weiter."
+        },
+        "steps": {
+          "cut_debt": "Schulden abbauen",
+          "rating_meeting": "Gespräch mit der Ratingagentur",
+          "investor_day": "Investorentag",
+          "savings": "Sparprogramm",
+          "no_comment": "Kein Kommentar"
+        }
+      },
+      "incident_key_customer": {
+        "name": "Großkunde springt ab",
+        "headlines": [
+          "Großkunde kündigt bei {company}",
+          "{company} verliert seinen wichtigsten Kunden",
+          "Schock für {company}: Großauftrag weg"
+        ],
+        "bodies": [
+          "Der größte Kunde von {company} kauft {product} ab sofort bei der Konkurrenz. Ein großer Teil des Umsatzes fällt weg.",
+          "Ein Großkunde beendet die Zusammenarbeit mit {company}. Anleger rechnen mit einem schwachen Quartal."
+        ],
+        "strategies": {
+          "win_back": "Kunden zurückgewinnen",
+          "new_customers": "Neue Kunden suchen",
+          "price_war": "Preise senken",
+          "accept": "Aussitzen"
+        },
+        "strategyText": {
+          "win_back": "Krisengespräch, neues Angebot und besserer Service. Mehrere Schritte, die scheitern können.",
+          "new_customers": "Vertrieb verstärken und auf eine Messe gehen.",
+          "price_war": "Mit Kampfpreisen locken. Schnell, aber die Marge leidet und die Anleger mögen das nicht.",
+          "accept": "Mit weniger Nachfrage leben."
+        },
+        "steps": {
+          "crisis_meeting": "Krisengespräch",
+          "new_offer": "Neues Angebot",
+          "service_upgrade": "Service verbessern",
+          "sales_push": "Vertrieb verstärken",
+          "trade_fair": "Messe",
+          "dump_prices": "Preise senken"
+        }
       }
     },
     "effects": {
@@ -8698,7 +8958,18 @@
         "researchNext": "{count, plural, one {Eine Forschung ist} other {# Forschungen sind}} fertig und das Labor steht still. Weiter geht’s?",
         "researchDone": "{count, plural, one {Eine Forschung ist} other {# Forschungen sind}} fertig. Für die nächste fehlt noch Geld oder eine Voraussetzung.",
         "greed": "Du zahlst dir {ratio} % des Gewinns aus. Der Ruf sinkt ({reputation}), das kostet schon {demand} % Nachfrage. Weniger Auszahlung, Dividenden und Investitionen holen ihn zurück.",
-        "greedEarly": "Du zahlst dir {ratio} % des Gewinns aus. Der Ruf ({reputation}) sinkt deshalb. Noch hebt er die Nachfrage um {demand} %, unter 50 kostet er Kundschaft."
+        "greedEarly": "Du zahlst dir {ratio} % des Gewinns aus. Der Ruf ({reputation}) sinkt deshalb. Noch hebt er die Nachfrage um {demand} %, unter 50 kostet er Kundschaft.",
+        "confidenceLow": "Die Anleger verlieren das Vertrauen in unsere Aktie: Anlegervertrauen {value} von 100. KI-Fonds verkaufen, der Kurs rutscht unter den Wert der Firma.",
+        "confidenceFix": {
+          "crisis": "Der größte Grund ist die Krise. Löse sie Schritt für Schritt mit einer gründlichen Strategie, jeder geschaffte Schritt holt Vertrauen zurück. Vertuschen oder Abstreiten macht es schlimmer.",
+          "insider": "Die Anleger stört, dass du Geld entnimmst oder Aktien verkaufst. Lass das Geld eine Weile in der Firma, dann beruhigen sie sich.",
+          "profit": "Die Zahlen enttäuschen. Mehr Gewinn hilft am meisten: Kosten senken, Nachfrage steigern, Aufgaben erledigen.",
+          "dilution": "Die neuen Aktien verwässern die Anteile. Zeig mit Gewinn und einer Dividende, dass sich das Geld lohnt.",
+          "reputation": "Unser Ruf ist schlecht. Bessere Qualität, faire Auszahlungen und Vorteile fürs Team heben ihn.",
+          "market": "Gerade ist der ganze Markt schwach. Das geht vorbei. Bis dahin helfen gute Zahlen und eine Dividende.",
+          "price": "Der Kurs ist zu schnell gestiegen oder schwankt stark. Die Anleger wollen erst Taten sehen: Gewinn, Dividende, keine Entnahmen.",
+          "general": "Vertrauen bringen: Gewinn steigern, Krisen lösen, Dividende zahlen, kein Geld entnehmen, gute Leute ins Management holen."
+        }
       },
       "options": {
         "openBooks": "Bücher öffnen",
@@ -8710,7 +8981,8 @@
         "payTax": "{amount} Steuer zahlen",
         "hireAdvisor": "Steuerberater einstellen",
         "fireAdvisor": "Steuerberater entlassen",
-        "openPayout": "Zur CEO-Auszahlung"
+        "openPayout": "Zur CEO-Auszahlung",
+        "openEvent": "Zur Krise"
       },
       "why": {
         "cost": "Kostet {cost}.",
@@ -12455,5 +12727,141 @@
     "upcoming": "Mit mehr Wert kommt dazu: {list}.",
     "country": "Hauptsitz: {name}. Das Land bestimmt, was wahrscheinlicher ist.",
     "noCountry": "Kein Hauptsitz gewählt: Länderrisiken zählen neutral."
+  },
+  "confidence": {
+    "title": "Anlegervertrauen",
+    "intro": "Wie sehr die KI-Anleger dieser Aktie vertrauen. Hohes Vertrauen: Sie kaufen. Niedriges: Sie verkaufen, auch ohne Nachrichten.",
+    "value": "{value} von 100",
+    "gaugeLabel": "Anlegervertrauen {value} von 100",
+    "trend": "24 h",
+    "trendLabel": "Veränderung in 24 Stunden",
+    "reasonsTitle": "Gründe",
+    "noReasons": "Gerade gibt es nichts Besonderes. Das Vertrauen ist neutral.",
+    "historyLabel": "Verlauf der letzten 24 Stunden, von {from} auf {to}",
+    "levels": {
+      "panic": "Panik",
+      "low": "Schwach",
+      "neutral": "Neutral",
+      "high": "Stark",
+      "euphoria": "Euphorie"
+    },
+    "points": "{points} Punkte",
+    "loadError": "Das Anlegervertrauen ist gerade nicht abrufbar.",
+    "companyTitle": "Anlegervertrauen deiner Aktie",
+    "companyHint": "Das wichtigste für den Kurs. Gewinn, gelöste Krisen und Dividenden heben es, Entnahmen, Aktienverkäufe und Skandale senken es.",
+    "companyLow": "Die Anleger verkaufen. Mira sagt dir im Chat, wie du ihr Vertrauen zurückholst.",
+    "reasons": {
+      "earnings": {
+        "up": "Gewinn übertroffen",
+        "down": "Gewinn verfehlt"
+      },
+      "news": {
+        "up": "Gute Nachrichten",
+        "down": "Schlechte Nachrichten"
+      },
+      "market": {
+        "up": "Rückenwind vom Markt",
+        "down": "Druck vom Markt"
+      },
+      "event": {
+        "up": "Krise gemeistert",
+        "down": "Krise"
+      },
+      "scandal": {
+        "up": "Skandal ausgeräumt",
+        "down": "Skandal"
+      },
+      "incident": {
+        "up": "Vorfall wird gelöst",
+        "down": "Schwerer Vorfall"
+      },
+      "incident_open": {
+        "up": "Vorfall gelöst",
+        "down": "Vorfall ungelöst"
+      },
+      "payout": {
+        "up": "Dividende gezahlt",
+        "down": "Dividende gekürzt"
+      },
+      "withdraw": {
+        "up": "Geld in der Firma",
+        "down": "Gründer hat Kasse geleert"
+      },
+      "insider": {
+        "up": "Gründer kauft",
+        "down": "Gründer verkauft Aktien"
+      },
+      "dilution": {
+        "up": "Weniger Aktien",
+        "down": "Neue Aktien verwässern"
+      },
+      "profit": {
+        "up": "Gewinn wächst",
+        "down": "Gewinn sinkt"
+      },
+      "reputation": {
+        "up": "Guter Ruf",
+        "down": "Schlechter Ruf"
+      },
+      "crisis": {
+        "up": "Krise vorbei",
+        "down": "Krise läuft"
+      },
+      "country": {
+        "up": "Sicherer Standort",
+        "down": "Länderrisiko"
+      },
+      "management": {
+        "up": "Starkes Management",
+        "down": "Schwaches Management"
+      },
+      "volatility": {
+        "up": "Ruhiger Kurs",
+        "down": "Kurs schwankt stark"
+      },
+      "macro": {
+        "up": "Marktstimmung gut",
+        "down": "Marktstimmung schwach"
+      },
+      "sector": {
+        "up": "Branche gefragt",
+        "down": "Branche gemieden"
+      },
+      "momentum": {
+        "up": "Kurs steigt, Anleger folgen",
+        "down": "Kurs fällt, Anleger folgen"
+      },
+      "valuation": {
+        "up": "Aktie günstig",
+        "down": "Aktie zu teuer"
+      },
+      "chatter": {
+        "up": "Positive Gerüchte",
+        "down": "Negative Gerüchte"
+      },
+      "other": {
+        "up": "Weiterer Grund",
+        "down": "Weiterer Grund"
+      }
+    },
+    "mood": {
+      "title": "Marktstimmung",
+      "intro": "Wie zuversichtlich die KI-Anleger am ganzen Markt sind. Im Bärenmarkt fallen auch gute Aktien, im Bullenmarkt steigen sie.",
+      "gaugeLabel": "Marktstimmung {value} von 100",
+      "phases": {
+        "bull": "Bullenmarkt",
+        "calm": "Ruhiger Markt",
+        "bear": "Bärenmarkt"
+      },
+      "since": "seit {time}",
+      "average": "Ø Anlegervertrauen {value}",
+      "confident": "{count} von {total} Aktien mit Vertrauen",
+      "leaders": "Am meisten Vertrauen",
+      "laggards": "Am wenigsten Vertrauen",
+      "rotation": "Branchen",
+      "sectorUp": "gefragt",
+      "sectorDown": "gemieden",
+      "loadError": "Die Marktstimmung ist gerade nicht abrufbar."
+    }
   }
 }

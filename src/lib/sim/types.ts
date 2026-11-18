@@ -92,6 +92,8 @@ export interface SecurityState {
   readonly playerHeldShares?: number;
   /** Player trading volume in cents with an exponential half-life; weakens the AI traders. Default 0. */
   readonly playerActivityCents?: number;
+  /** Investor confidence 0..100 (ADR-216); the confidence investors trade on it. Undefined = no confidence flow. */
+  readonly confidence?: number;
 }
 
 export interface MarketState {

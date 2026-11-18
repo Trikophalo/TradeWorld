@@ -1,0 +1,21 @@
+{
+  "mood": 49.8,
+  "phase": "calm",
+  "trend": 0.0,
+  "stocks": 32,
+  "history": [49.8],
+  "leaders": [
+    { "name": "Helix Robotik", "ticker": "HLX", "confidence": 52.8 },
+    { "name": "Kaufrausch Märkte", "ticker": "KFR", "confidence": 52.2 },
+    { "name": "Fundgrube Discount", "ticker": "FGD", "confidence": 51.5 }
+  ],
+  "sectors": [],
+  "laggards": [
+    { "name": "Luftpost Drohnen", "ticker": "DRN", "confidence": 47.8 },
+    { "name": "Brotzeit Handel AG", "ticker": "BRZ", "confidence": 48.0 },
+    { "name": "Methusalem Bio", "ticker": "MTH", "confidence": 48.0 }
+  ],
+  "confident": 11,
+  "avg_confidence": 49.7,
+  "phase_started_at": "2026-11-18T14:49:35.325609+00:00"
+}

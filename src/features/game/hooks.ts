@@ -73,6 +73,28 @@ export function useStockFigureDetail(ticker: string, enabled = true) {
   });
 }
 
+/** Investor confidence of a stock (ADR-216): value, trend, history, top reasons, market mood. */
+export function useStockConfidence(ticker: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["stockConfidence", ticker],
+    queryFn: () => engine.stockConfidence(ticker!),
+    enabled: enabled && ticker !== null,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+/** Market mood (Marktstimmung, ADR-216) for the market overview. */
+export function useMarketMood(enabled = true) {
+  return useQuery({
+    queryKey: ["marketMood"],
+    queryFn: () => engine.marketMood(),
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
 /** Securities of one kind in snapshot order. */
 export function useSecurities(kind: "stock" | "bond") {
   const snapshot = useGame((state) => state.snapshot);

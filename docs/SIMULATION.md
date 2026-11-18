@@ -1263,3 +1263,25 @@ h = `profitHoursByTier[Stufe]`:
 `Preis = round(min(maxProfitHours × G, max(minCostCentsByTier[Stufe], h × (1 + growthPerDoneBps × n / 10 000) × G)))`,
 Sparforschung `floor(Preis × slow.costBps / 10 000)` bei `item.hours × slow.hoursFactor` Stunden.
 `profitHoursOf` und `affordableInHours` rechnen für die Anzeige um („≈ 14 Std. Gewinn“, „leistbar in etwa 2 Tagen“).
+
+## Nachtrag: Anlegervertrauen und Marktstimmung (ADR-216)
+
+`src/lib/sim/investor-confidence.ts`, gespiegelt in `20261204011100_investor_confidence.sql` und
+`20261204011110_tick_confidence.sql`.
+
+- **Takt:** Zu den Archetypen kommt der Orderstrom der Vertrauensanleger,
+  `confidencePressure = freeFloat × 0,25 × 0,0005 × confidenceSignal(C)` mit
+  `confidenceSignal(C) = clamp((C − 50) / 50 − 0,8 × max(0, 15 − C) / 15 + 0,8 × max(0, C − 85) / 15, −1, 1)`.
+  Er geht wie jeder KI-Strom durch das Tiefenmodell (`impactReturn`) und wird nicht mit der Spieleraktivität gewichtet.
+  Gleichgewicht mit dem Value-Fonds: `ln(fair / Kurs) = 0,01 − 0,5 × (0,25 / 0,3) × Signal`, also Kurs ≈ fair × 0,6
+  bei C = 0 und × 1,6 bei C = 100. `SecurityState.confidence` ist optional; ohne Wert gibt es diesen Strom nicht.
+- **Vertrauen (Minutenjob `investor_confidence_run`):** Ereignis-Faktoren `decayEvents` (Halbwertszeit je Schlüssel),
+  Zustands-Faktoren `stateFactors`, Ziel `confidenceTarget = clamp(50 + Σ, 0, 100)`,
+  `C ← C + (Ziel − C) × (1 − (1 − 0,075)^Minuten)`. Gerüchte: `x ← x × (1 − 1/360)^m + 0,45 × √m × N`.
+- **Marktstimmung:** `stepMood`: Phase endet → neue Phase nach Gewicht, Dauer gleichverteilt;
+  `M ← M + (Ziel − M) × (1 − (1 − 1/300)^m) + 0,35 × √m × N`. Langfristiger Mittelwert ≈ 50 (Test).
+- **KI-Geschäft:** `aiGrowthPerGameYear(g, M) = g × 0,1 + 0,08 × (M − 50) / 50` ersetzt das volle Branchenwachstum in
+  `simulate_ai_companies`.
+- **Vorfälle:** `incidentChancePerHour(heat, Börsenwert)`, `incidentSeverity(heat)`, `incidentBump(kind, Stufe)`.
+- **Harness:** `src/lib/sim/confidence-market.ts` (`simulateMarket`) rechnet einen kleinen Markt mit dem echten
+  `stepMarketTick` Minute für Minute; `scripts/investor-confidence-harness.ts` druckt die Verteilungen (docs/BALANCING.md).

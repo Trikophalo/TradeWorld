@@ -3,7 +3,9 @@ import { getTranslations } from "next-intl/server";
 import { BULL } from "@/components/pixel/art";
 import { Page, PageHeader } from "@/components/layout/page";
 import { OffersCard } from "@/features/company/components/listing";
+import { MarketMoodCard } from "@/features/market/components/confidence";
 import { MarketBrowser } from "@/features/market/components/market-browser";
+import { Reveal } from "@/features/progression/components/reveal";
 import { StockNewsCard } from "@/features/news/stock-news";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,6 +19,9 @@ export default async function MarketsPage() {
   return (
     <Page>
       <PageHeader title={t("title")} intro={th("markets")} art={BULL} />
+      <Reveal feature="marketMood">
+        <MarketMoodCard />
+      </Reveal>
       <StockNewsCard />
       <OffersCard />
       <MarketBrowser />

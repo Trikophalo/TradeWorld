@@ -8,6 +8,14 @@ Erste, navigierbare Fassung ohne Spiellogik.
   Stunden), nie mehr als 40 Stunden Gewinn, egal wie groß oder wie viel wert die Firma ist. Jede Forschung macht die
   nächste etwas teurer. Neu ist die Sparforschung für den halben Preis bei dreifacher Dauer, und das Blatt zeigt, wie
   viel Gewinn ein Schritt kostet und wann du ihn dir leisten kannst.
+
+- Anlegervertrauen: Aktien steigen nicht mehr einfach immer. Jede Aktie hat jetzt ein Anlegervertrauen von 0 bis 100,
+  und das ist der wichtigste Grund für den Kurs: Ist es hoch, kaufen die KI-Anleger, ist es niedrig, verkaufen sie, auch
+  ohne Nachrichten. Gewinne, Skandale, Dividenden, Entnahmen des Gründers, neue Aktien, Krisen und die Marktstimmung
+  bewegen es. Die Aktienseite zeigt das Vertrauen mit seinen Gründen, die Börse die Marktstimmung mit Bullen- und
+  Bärenmärkten. Heiß gelaufene Spieleraktien treffen schwere Vorfälle wie Bilanzskandal, Rückruf mit Sammelklage oder
+  Datenleck, die du nur Schritt für Schritt lösen kannst. Mira sagt dir, wie du das Vertrauen zurückholst.
+
 - Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen),
   das Mausrad und zwei Finger zoomen nur noch die Karte statt die Seite zu scrollen, jedes Land hat seine richtige
   Flagge, alle Kennzahl-Kacheln sind gleich groß, und neue Kacheln zeigen Fixkosten und variable Kosten je Stunde mit

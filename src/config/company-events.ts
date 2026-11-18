@@ -52,6 +52,11 @@ export interface CompanyEventArchetype {
   readonly risk?: ExternalRisk;
   /** Insurance takes its coverage of the effect (disasters, cyber attacks). */
   readonly insurable?: boolean;
+  /**
+   * Stock incident (ADR-216): only for listed player companies, never in the daily roll (weight 0); drawn by
+   * investor_confidence_run() when the stock overheats. Crashes the investor confidence until the steps are solved.
+   */
+  readonly incident?: boolean;
   /** Snapshot when an event starts (never in the catalog): share of the effect the insurance takes. */
   readonly insuredShare?: number;
   /** Snapshot: market leaders of their country feel political events less (ADR-208 world.lobby). */
@@ -125,6 +130,297 @@ const disasterStrategies: readonly CompanyEventStrategy[] = [
 ];
 
 /**
+ * Stock incidents (ADR-216): serious, company-specific crises of listed player companies. Weight 0, so the daily roll
+ * never draws them; investor_confidence_run() draws them more often the hotter the stock (price far above its value,
+ * fast rise) and the bigger the company. Each is a chain of several paid, failing steps over many hours; the investor
+ * confidence only comes back step by step. Cheap ways out ("cover_up", "deny", "ignore") are worse: the investors
+ * notice (investorConfidence.incidents.badStrategies).
+ */
+const INCIDENT_ARCHETYPES: readonly CompanyEventArchetype[] = [
+  {
+    key: "incident_accounting",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    effect: { demand: -0.12, cost: 0.1 },
+    deadlineHours: 36,
+    lastsHours: 120,
+    strategies: [
+      {
+        key: "full_audit",
+        mitigation: 1,
+        steps: [
+          { key: "special_audit", hours: 6, cost: 4, branch: "finance", baseBps: 7_500 },
+          { key: "board_inquiry", hours: 8, cost: 3, branch: "law", staff: 1, baseBps: 6_500 },
+          { key: "restate_books", hours: 6, cost: 5, branch: "finance", capacityHit: 0.15, baseBps: 7_000 },
+          { key: "new_cfo", hours: 4, cost: 4, branch: "management", baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "settle_regulator",
+        mitigation: 0.6,
+        steps: [
+          { key: "lawyers", hours: 4, cost: 3, branch: "law", baseBps: 8_000 },
+          { key: "fine_deal", hours: 6, cost: 6, branch: "law", baseBps: 6_500 },
+        ],
+      },
+      {
+        key: "cover_up",
+        mitigation: 0.2,
+        steps: [{ key: "shred", hours: 2, cost: 1, branch: "finance", baseBps: 5_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "incident_recall",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    insurable: true,
+    effect: { demand: -0.2, cost: 0.08 },
+    deadlineHours: 30,
+    lastsHours: 120,
+    strategies: [
+      {
+        key: "full_recall",
+        mitigation: 1,
+        bonus: { quality: 0.02 },
+        steps: [
+          { key: "stop_sales", hours: 2, cost: 2, branch: "logistics", baseBps: 9_000 },
+          { key: "recall_wave", hours: 8, cost: 6, branch: "logistics", staff: 2, capacityHit: 0.2, baseBps: 7_000 },
+          { key: "lawsuits", hours: 6, cost: 4, branch: "law", baseBps: 6_500 },
+          { key: "class_action", hours: 8, cost: 5, branch: "law", baseBps: 6_000 },
+        ],
+      },
+      {
+        key: "quiet_fix",
+        mitigation: 0.5,
+        steps: [
+          { key: "fix_batch", hours: 6, cost: 3, branch: "craft", staff: 1, baseBps: 7_500 },
+          { key: "goodwill", hours: 3, cost: 2, branch: "sales", baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "deny",
+        mitigation: 0.15,
+        steps: [{ key: "statement", hours: 1, cost: 0, branch: "sales", baseBps: 5_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "incident_data_leak",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    insurable: true,
+    effect: { demand: -0.15, cost: 0.06 },
+    deadlineHours: 30,
+    lastsHours: 96,
+    strategies: [
+      {
+        key: "forensics",
+        mitigation: 1,
+        steps: [
+          { key: "close_hole", hours: 4, cost: 3, branch: "it", staff: 1, baseBps: 7_500 },
+          { key: "inform_customers", hours: 3, cost: 2, branch: "sales", baseBps: 8_500 },
+          { key: "authority_hearing", hours: 8, cost: 4, branch: "law", baseBps: 6_500 },
+          { key: "fine_appeal", hours: 6, cost: 4, branch: "law", baseBps: 6_000 },
+        ],
+      },
+      {
+        key: "lobby_authority",
+        mitigation: 0.7,
+        steps: [
+          { key: "close_hole", hours: 4, cost: 3, branch: "it", staff: 1, baseBps: 7_500 },
+          { key: "lobby_talks", hours: 6, cost: 5, branch: "management", baseBps: 6_000 },
+        ],
+      },
+      {
+        key: "cover_up",
+        mitigation: 0.2,
+        steps: [{ key: "delete_logs", hours: 1, cost: 1, branch: "it", baseBps: 5_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "incident_ceo_scandal",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    effect: { demand: -0.18 },
+    deadlineHours: 24,
+    lastsHours: 96,
+    strategies: [
+      {
+        key: "clean_sweep",
+        mitigation: 1,
+        steps: [
+          { key: "independent_probe", hours: 6, cost: 3, branch: "law", baseBps: 7_500 },
+          { key: "interim_ceo", hours: 4, cost: 4, branch: "management", staff: 1, baseBps: 7_000 },
+          { key: "trust_campaign", hours: 6, cost: 4, branch: "sales", baseBps: 7_000 },
+        ],
+      },
+      {
+        key: "apology",
+        mitigation: 0.5,
+        steps: [
+          { key: "press_conference", hours: 2, cost: 1, branch: "management", baseBps: 7_500 },
+          { key: "donation", hours: 3, cost: 3, branch: "sales", baseBps: 8_500 },
+        ],
+      },
+      {
+        key: "ignore",
+        mitigation: 0.1,
+        steps: [{ key: "no_comment", hours: 1, cost: 0, branch: "management", baseBps: 9_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "incident_supplier_bankrupt",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    insurable: true,
+    effect: { capacity: -0.35, cost: 0.1 },
+    deadlineHours: 24,
+    lastsHours: 96,
+    strategies: [
+      {
+        key: "new_suppliers",
+        mitigation: 1,
+        steps: [
+          { key: "emergency_stock", hours: 3, cost: 4, branch: "logistics", baseBps: 8_500 },
+          { key: "supplier_search", hours: 6, cost: 3, branch: "logistics", staff: 1, baseBps: 7_000 },
+          { key: "qualify_parts", hours: 8, cost: 4, branch: "craft", capacityHit: 0.15, baseBps: 6_500 },
+        ],
+      },
+      {
+        key: "buy_supplier",
+        mitigation: 0.9,
+        steps: [
+          { key: "due_diligence", hours: 4, cost: 2, branch: "finance", baseBps: 8_000 },
+          { key: "takeover", hours: 8, cost: 9, branch: "law", baseBps: 6_000 },
+        ],
+      },
+      {
+        key: "ignore",
+        mitigation: 0.1,
+        steps: [{ key: "no_comment", hours: 1, cost: 0, branch: "management", baseBps: 9_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "incident_patent_suit",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    effect: { demand: -0.1, cost: 0.12 },
+    deadlineHours: 36,
+    lastsHours: 144,
+    strategies: [
+      {
+        key: "fight",
+        mitigation: 1,
+        steps: [
+          { key: "prior_art", hours: 6, cost: 3, branch: "science", baseBps: 7_000 },
+          { key: "injunction", hours: 6, cost: 4, branch: "law", baseBps: 6_000 },
+          { key: "trial", hours: 10, cost: 6, branch: "law", staff: 1, baseBps: 5_500 },
+        ],
+      },
+      {
+        key: "license",
+        mitigation: 0.6,
+        steps: [{ key: "license_talks", hours: 4, cost: 5, branch: "law", baseBps: 8_500 }],
+      },
+      {
+        key: "redesign",
+        mitigation: 0.8,
+        steps: [
+          { key: "workaround", hours: 8, cost: 4, branch: "science", staff: 1, capacityHit: 0.2, baseBps: 7_000 },
+          { key: "relaunch", hours: 4, cost: 2, branch: "sales", baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "ignore",
+        mitigation: 0.1,
+        steps: [{ key: "no_comment", hours: 1, cost: 0, branch: "management", baseBps: 9_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "incident_rating_downgrade",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    effect: { cost: 0.12 },
+    deadlineHours: 30,
+    lastsHours: 120,
+    strategies: [
+      {
+        key: "restore_rating",
+        mitigation: 1,
+        steps: [
+          { key: "cut_debt", hours: 6, cost: 6, branch: "finance", baseBps: 7_500 },
+          { key: "rating_meeting", hours: 4, cost: 2, branch: "finance", baseBps: 6_500 },
+          { key: "investor_day", hours: 4, cost: 3, branch: "management", staff: 1, baseBps: 7_500 },
+        ],
+      },
+      {
+        key: "cost_program",
+        mitigation: 0.6,
+        steps: [{ key: "savings", hours: 8, cost: 2, branch: "management", capacityHit: 0.2, baseBps: 8_000 }],
+      },
+      {
+        key: "ignore",
+        mitigation: 0.1,
+        steps: [{ key: "no_comment", hours: 1, cost: 0, branch: "management", baseBps: 9_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "incident_key_customer",
+    polarity: "crisis",
+    weight: 0,
+    incident: true,
+    effect: { demand: -0.3 },
+    deadlineHours: 24,
+    lastsHours: 96,
+    strategies: [
+      {
+        key: "win_back",
+        mitigation: 1,
+        steps: [
+          { key: "crisis_meeting", hours: 2, cost: 1, branch: "sales", baseBps: 8_000 },
+          { key: "new_offer", hours: 6, cost: 4, branch: "sales", staff: 1, baseBps: 6_500 },
+          { key: "service_upgrade", hours: 6, cost: 3, branch: "craft", capacityHit: 0.1, baseBps: 7_000 },
+        ],
+      },
+      {
+        key: "new_customers",
+        mitigation: 0.7,
+        steps: [
+          { key: "sales_push", hours: 6, cost: 3, branch: "sales", staff: 1, baseBps: 7_500 },
+          { key: "trade_fair", hours: 6, cost: 3, branch: "sales", baseBps: 7_500 },
+        ],
+      },
+      {
+        key: "price_war",
+        mitigation: 0.3,
+        steps: [{ key: "dump_prices", hours: 2, cost: 2, branch: "sales", baseBps: 8_000 }],
+      },
+      accept,
+    ],
+  },
+];
+
+/**
  * External events "von außen" (ADR-209): only for big companies (minWorthCents), more and worse the bigger the company
  * (macro.events), weighted by the country risk of the headquarters (macro.country). All are crises; every one can be
  * answered with real work or sat out.
@@ -190,7 +486,11 @@ const EXTERNAL_ARCHETYPES: readonly CompanyEventArchetype[] = [
           { key: "negotiation", hours: 6, cost: 4, branch: "law", baseBps: 6_000 },
         ],
       },
-      { key: "pass_on", mitigation: 0.5, steps: [{ key: "price_talk", hours: 3, cost: 1, branch: "sales", baseBps: 8_500 }] },
+      {
+        key: "pass_on",
+        mitigation: 0.5,
+        steps: [{ key: "price_talk", hours: 3, cost: 1, branch: "sales", baseBps: 8_500 }],
+      },
       accept,
     ],
   },
@@ -421,7 +721,11 @@ const EXTERNAL_ARCHETYPES: readonly CompanyEventArchetype[] = [
           { key: "remedies", hours: 8, cost: 6, branch: "management", baseBps: 7_500 },
         ],
       },
-      { key: "divest", mitigation: 0.7, steps: [{ key: "sell_unit", hours: 6, cost: 8, branch: "finance", baseBps: 9_000 }] },
+      {
+        key: "divest",
+        mitigation: 0.7,
+        steps: [{ key: "sell_unit", hours: 6, cost: 8, branch: "finance", baseBps: 9_000 }],
+      },
       accept,
     ],
   },
@@ -444,7 +748,11 @@ const EXTERNAL_ARCHETYPES: readonly CompanyEventArchetype[] = [
           { key: "sign", hours: 2, cost: 1, branch: "law", baseBps: 9_000 },
         ],
       },
-      { key: "mediation", mitigation: 0.8, steps: [{ key: "mediator", hours: 6, cost: 3, branch: "law", baseBps: 8_000 }] },
+      {
+        key: "mediation",
+        mitigation: 0.8,
+        steps: [{ key: "mediator", hours: 6, cost: 3, branch: "law", baseBps: 8_000 }],
+      },
       accept,
     ],
   },
@@ -467,7 +775,11 @@ const EXTERNAL_ARCHETYPES: readonly CompanyEventArchetype[] = [
           { key: "currency_hedge", hours: 4, cost: 5, branch: "finance", baseBps: 7_000 },
         ],
       },
-      { key: "local_pricing", mitigation: 0.6, steps: [{ key: "reprice", hours: 3, cost: 2, branch: "sales", baseBps: 8_500 }] },
+      {
+        key: "local_pricing",
+        mitigation: 0.6,
+        steps: [{ key: "reprice", hours: 3, cost: 2, branch: "sales", baseBps: 8_500 }],
+      },
       accept,
     ],
   },
@@ -959,5 +1271,6 @@ export const COMPANY_EVENTS: CompanyEventsConfig = {
       ],
     },
     ...EXTERNAL_ARCHETYPES,
+    ...INCIDENT_ARCHETYPES,
   ],
 };
