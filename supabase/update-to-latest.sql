@@ -82910,6 +82910,1025 @@ revoke all on function public.open_vault_deposit(uuid, bigint, integer) from pub
 grant execute on function public.open_vault_deposit(uuid, bigint, integer) to authenticated;
 revoke all on function public.close_vault_deposit(uuid, bigint) from public, anon;
 grant execute on function public.close_vault_deposit(uuid, bigint) to authenticated;
+-- ===== idempotent copy of migrations/20261204009400_level_curve_lower.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 9400 · A lower level curve and more mission XP (ADR-202)
+-- =============================================================================
+-- * progression.xpBase 250 -> 200: from level 2 on every level needs 20 % less XP (firstLevelXp stays 100).
+--   progression.missionXpScalePerLevel 0.15 -> 0.18: mission XP grow faster with the level (cap 8 unchanged).
+--   An active player reaches every level about 1.3 to 1.4 times as fast (docs/BALANCING.md, section 3.2).
+-- * Nobody loses a level: the total XP of every level only falls, so xp_total keeps the level or lifts it.
+--   raise_levels_after_curve_change() lifts every profile to the level its XP reach under the new curve, with the
+--   free skill points and unlocks of grant_xp(); it never lowers a level. Idempotent (a second run changes nothing).
+-- * update-to-latest.sql writes the config only after the schema steps, so the two curve values are set here once
+--   (only where they still have the old value; the generated seed writes the same values afterwards).
+-- Idempotent: runs unchanged as supabase/updates/20261204009400_level_curve_lower.sql.
+
+update public.game_config
+   set value = value || jsonb_build_object('xpBase', 200)
+ where key = 'progression' and (value ->> 'xpBase') is not null and (value ->> 'xpBase')::numeric = 250;
+update public.game_config
+   set value = value || jsonb_build_object('missionXpScalePerLevel', 0.18)
+ where key = 'progression' and (value ->> 'missionXpScalePerLevel') is not null
+   and (value ->> 'missionXpScalePerLevel')::numeric = 0.15;
+
+-- The curve functions (latest definitions, 20261114000100) with the new fallback xpBase 200, so a database whose
+-- config is written later (setup-all.sql) computes the same curve.
+-- XP needed from p_level to p_level + 1 (0 at the technical maximum).
+create or replace function public.xp_for_next_level(p_level integer)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when p_level is null or p_level < 1 then null
+    when p_level >= public.cfg_num(c.v, '{maxLevel}', 10000)::integer then 0::bigint
+    when p_level = 1 then round(public.cfg_num(c.v, '{firstLevelXp}', 100))::bigint
+    else round(public.cfg_num(c.v, '{xpBase}', 200) * power(p_level, public.cfg_num(c.v, '{xpExponent}', 1.5)))::bigint
+  end
+  from (select coalesce(public.config_jsonb('progression'), '{}'::jsonb) as v) c;
+$$;
+comment on function public.xp_for_next_level(integer) is 'XP from level p_level to p_level + 1 (ADR-055, ADR-202: firstLevelXp, then xpBase x level^xpExponent).';
+
+-- Total XP needed to reach p_level from level 1 with 0 XP.
+create or replace function public.xp_total_for_level(p_level integer)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog  jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_first double precision := public.cfg_num(v_prog, '{firstLevelXp}', 100);
+  v_base  double precision := public.cfg_num(v_prog, '{xpBase}', 200);
+  v_exp   double precision := public.cfg_num(v_prog, '{xpExponent}', 1.5);
+  v_total bigint := 0;
+  n       integer;
+begin
+  if p_level is null or p_level < 1 then
+    return null;
+  end if;
+  for n in 1 .. p_level - 1 loop
+    v_total := v_total + case when n = 1 then round(v_first)::bigint else round(v_base * power(n, v_exp))::bigint end;
+  end loop;
+  return v_total;
+end;
+$$;
+comment on function public.xp_total_for_level(integer) is 'Total XP needed to reach a level (ADR-055 curve, xpBase 200 since ADR-202).';
+
+create or replace function public.level_progress(p_xp bigint)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog  jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_first double precision := public.cfg_num(v_prog, '{firstLevelXp}', 100);
+  v_base  double precision := public.cfg_num(v_prog, '{xpBase}', 200);
+  v_exp   double precision := public.cfg_num(v_prog, '{xpExponent}', 1.5);
+  v_max   integer := public.cfg_num(v_prog, '{maxLevel}', 10000)::integer;
+  v_level integer := 1;
+  v_rem   bigint := greatest(coalesce(p_xp, 0), 0);
+  v_need  bigint;
+begin
+  loop
+    if v_level >= v_max then
+      return jsonb_build_object('level', v_level, 'xp_into_level', v_rem, 'xp_for_next', 0);
+    end if;
+    v_need := case when v_level = 1 then round(v_first)::bigint else round(v_base * power(v_level, v_exp))::bigint end;
+    if v_rem < v_need then
+      return jsonb_build_object('level', v_level, 'xp_into_level', v_rem, 'xp_for_next', v_need);
+    end if;
+    v_rem := v_rem - v_need;
+    v_level := v_level + 1;
+  end loop;
+end;
+$$;
+
+revoke all on function public.xp_for_next_level(integer) from public, anon, authenticated;
+revoke all on function public.xp_total_for_level(integer) from public, anon, authenticated;
+revoke all on function public.level_progress(bigint) from public, anon, authenticated;
+grant execute on function public.xp_for_next_level(integer) to service_role;
+grant execute on function public.xp_total_for_level(integer) to service_role;
+grant execute on function public.level_progress(bigint) to service_role;
+
+-- Lifts every profile to the level its XP reach under the current curve (never down). Returns the number of
+-- lifted profiles. Free skill points and unlocks as in grant_xp(); the feed trigger on profiles posts level-ups.
+create or replace function public.raise_levels_after_curve_change()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r      record;
+  v_new  integer;
+  v_pts  integer := greatest(0, public.config_double('skills', '{freePointsPerLevel}', 1))::integer;
+  v_n    integer := 0;
+begin
+  for r in select p.id, p.level, p.xp_total from public.profiles p order by p.id for update loop
+    v_new := public.level_for_xp(r.xp_total);
+    continue when v_new is null or v_new <= r.level;
+    update public.profiles p set level = v_new where p.id = r.id;
+    perform public.skill_points_ensure(r.id);
+    update public.player_skill_points set free_points = free_points + (v_new - r.level) * v_pts where player_id = r.id;
+    insert into public.player_unlocks (player_id, unlock_key)
+    select r.id, u.key from public.unlocks u where u.level <= v_new
+    on conflict do nothing;
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end;
+$$;
+revoke all on function public.raise_levels_after_curve_change() from public, anon, authenticated;
+grant execute on function public.raise_levels_after_curve_change() to service_role;
+comment on function public.raise_levels_after_curve_change() is
+  'ADR-202: lifts every profile to the level its XP reach under the current curve (never down), with skill points and unlocks.';
+
+do $$ begin perform public.raise_levels_after_curve_change(); end $$;
+
+-- Reference table levels (documentation of the curve, levels 1..50)
+update public.levels l
+   set xp_to_next = case when l.level < 50 then public.xp_for_next_level(l.level) end,
+       xp_cumulative = public.xp_total_for_level(l.level)
+ where l.xp_cumulative is distinct from public.xp_total_for_level(l.level)
+    or l.xp_to_next is distinct from case when l.level < 50 then public.xp_for_next_level(l.level) end;
+comment on table public.levels is
+  'XP curve (ADR-055, ADR-202): xp_to_next = firstLevelXp at level 1, then round(xpBase * level^1.5); xp_cumulative = XP needed to reach the level.';
+-- ===== idempotent copy of migrations/20261204009410_mission_variety.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 9410 · More mission variety, no repeats, never an impossible mission (ADR-202)
+-- =============================================================================
+-- * The draw (missions_assign): a quick, daily or weekly mission is drawn in tiers. Best: not among the last
+--   progression.missionDraw.recentDraws draws of its kind, not drawn within cooldownHours, and no open mission
+--   counts the same thing. A template only falls back to a worse tier when nothing better is doable, so the slots
+--   always fill. Within a tier the draw is weighted: missions of an unlocked feature (params unlock or requires)
+--   x featureWeightBps, of a feature unlocked within the last newFeatureLevels levels x newFeatureWeightBps.
+--   Every draw gets a draw_seq and drawn_at (game time) for this history.
+-- * Never impossible: what is drawn passes mission_doable() (level, unlock, requirement, money, state of the world).
+--   An open mission that became impossible is replaced at the next look: without progress whenever
+--   mission_doable() says no, with progress when its requirement is gone (no company any more, no job).
+--   Replaced rows get reset_at (the slot frees, the row is marked state.replaced). A replaced milestone may come
+--   back later with the progress it had.
+-- * skip_mission(): progression.missionSkipsPerDay (1) times per Berlin day one open quick, daily or weekly
+--   mission is swapped for another one, free. Counted in mission_resets.skips. get_my_missions() reports
+--   skip_available, skips_left and next_skip_at. Errors mission_skip_used NX420, mission_skip_invalid NX421.
+-- * Counted missions with params.fixedCount keep their target (no level scale): campaigns, Fertigkeiten, upgrades.
+-- * New metrics, fed by triggers (no RPC is redefined): crypto_trade, crypto_buy, crypto_distinct, crypto_created,
+--   short_opened, watchlist_add, nexamon_quick_sold (bulk and instant sale), nexamon_grading_sent, pack_battle_join,
+--   news_promo, campaign_started, company_skill, upgrade_bought, work_task_done, daily_reward, feed_react.
+--   mission_more_doable() knows their preconditions and those of a few older metrics (sell, Nexamon packs, sales
+--   and purchases, minting an NFT).
+-- * 52 new templates across stocks, crypto, Nexamon, NFTs, the news show, company, jobs, upgrades and the feed.
+-- Idempotent: runs unchanged as supabase/updates/20261204009410_mission_variety.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys, schema
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+  v_old text := $q$    else 'NX007'
+$q$;
+begin
+  if position('''mission_skip_used''' in v_def) = 0 then
+    if position(v_old in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the mission skip error keys (NX420, NX421) by hand';
+    end if;
+    execute replace(v_def, v_old, $q$    when 'mission_skip_used'          then 'NX420'
+    when 'mission_skip_invalid'       then 'NX421'
+    else 'NX007'
+$q$);
+  end if;
+end;
+$do$;
+
+create sequence if not exists public.player_missions_draw_seq;
+alter table public.player_missions add column if not exists draw_seq bigint;
+alter table public.player_missions add column if not exists drawn_at timestamptz;
+comment on column public.player_missions.draw_seq is
+  'Order of the draws (ADR-202): the last recentDraws of a kind are not drawn again while anything else is doable.';
+comment on column public.player_missions.drawn_at is 'Game time of the draw (ADR-202), for the cooldown per template.';
+-- history of older rows: drawn in the order they were created
+with o as (select m.id, m.created_at from public.player_missions m where m.draw_seq is null order by m.created_at, m.id)
+update public.player_missions m set draw_seq = nextval('public.player_missions_draw_seq'), drawn_at = coalesce(m.drawn_at, o.created_at)
+  from o where m.id = o.id;
+create index if not exists player_missions_draw_idx on public.player_missions (player_id, kind, draw_seq desc);
+revoke all on sequence public.player_missions_draw_seq from public, anon, authenticated;
+
+alter table public.mission_resets add column if not exists skips integer not null default 0;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'mission_resets_skips_check') then
+    alter table public.mission_resets add constraint mission_resets_skips_check check (skips >= 0);
+  end if;
+end $$;
+comment on column public.mission_resets.skips is 'Single missions swapped with skip_mission() on this Berlin day (ADR-202).';
+
+-- ---------------------------------------------------------------------------
+-- B. What a mission needs (ADR-202)
+-- ---------------------------------------------------------------------------
+-- Price of the cheapest released Nexamon pack, null without any.
+create or replace function public.mission_cheapest_pack_cents()
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select min((s.value ->> 'packPriceCents')::bigint)
+    from jsonb_each(coalesce(public.nexamon_cfg() -> 'sets', '{}'::jsonb)) s
+   where (s.value ->> 'packPriceCents') is not null and public.nexamon_set_released(s.key, public.game_now());
+$$;
+revoke all on function public.mission_cheapest_pack_cents() from public, anon, authenticated;
+grant execute on function public.mission_cheapest_pack_cents() to service_role;
+
+-- Preconditions of the metrics of ADR-202 and a few older ones. Milestones are saving goals: money never stops them,
+-- but the state of the world (a company, a coin, a running promotion) does.
+create or replace function public.mission_more_doable(p_player uuid, p_key text, p_metric text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog  jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  nx      jsonb := coalesce(public.nexamon_cfg(), '{}'::jsonb);
+  v_now   timestamptz := public.game_now();
+  t       record;
+  v_goal  boolean;
+  v_level integer;
+  v_cash  bigint;
+  v_min   bigint;
+  v_n     integer;
+  v_pack  bigint;
+  v_cnt   integer;
+  v_cost  bigint;
+  v_i     integer;
+  v_made  integer;
+  pc      public.player_companies;
+  v_free  bigint;
+begin
+  select mt.kind, mt.target_min, mt.target_max, mt.params into t from public.mission_templates mt where mt.key = p_key;
+  v_goal := t.kind is null or t.kind not in ('quick', 'daily', 'weekly');
+  select p.level into v_level from public.profiles p where p.id = p_player;
+  v_level := coalesce(v_level, 1);
+  select greatest(a.balance_cents, 0) into v_cash
+    from public.ledger_accounts a where a.owner_player_id = p_player and a.kind = 'player_cash';
+  v_cash := coalesce(v_cash, 0);
+  v_min := public.cfg_num(v_prog, '{missionAfford,minCashCents}', 1000)::bigint;
+  -- a week leaves time to earn the rest: only part of a weekly count has to be possible right now
+  v_n := case when t.kind = 'weekly'
+              then greatest(1, ceil(coalesce(t.target_min, 1) * public.cfg_num(v_prog, '{missionAfford,weeklyCountShareBps}', 5000) / 10000)::integer)
+              else greatest(1, coalesce(t.target_min, 1)::integer) end;
+
+  -- stocks and crypto
+  if p_metric = 'sell' then
+    return v_goal or v_cash >= v_min
+        or exists (select 1 from public.positions p where p.player_id = p_player and p.status = 'open' and p.quantity_e6 > 0);
+  elsif p_metric in ('crypto_buy', 'crypto_trade', 'crypto_distinct') then
+    select count(*) into v_cnt from public.crypto_coins c where c.status = 'listed';
+    return v_cnt >= case when p_metric = 'crypto_distinct' then coalesce(t.target_max, 1)::integer else 1 end
+       and (v_goal or v_cash >= v_min);
+  elsif p_metric = 'crypto_created' then
+    return not exists (select 1 from public.crypto_coins c where c.creator_id = p_player);
+  elsif p_metric = 'short_opened' then
+    return v_goal or v_cash >= v_min;
+  elsif p_metric = 'watchlist_add' then
+    return (select count(*) from public.watchlist_items w where w.player_id = p_player) + v_n <= 200
+       and (select count(*) from public.securities s
+             where s.kind in ('stock', 'crypto')
+               and not exists (select 1 from public.watchlist_items w where w.player_id = p_player and w.security_id = s.id))
+           >= v_n;
+  end if;
+
+  -- Nexamon
+  if p_metric in ('nexamon_pack', 'pack_battle_join', 'nexamon_quick_sold', 'nexamon_listed', 'nexamon_sold',
+                  'nexamon_bought', 'nexamon_grading_sent') then
+    v_pack := public.mission_cheapest_pack_cents();
+    if p_metric = 'nexamon_pack' then
+      return v_pack is not null and (v_goal or v_pack * v_n <= v_cash);
+    elsif p_metric = 'pack_battle_join' then
+      return v_pack is not null and not public.nexamon_battle_busy(p_player, v_now)
+         and public.nexamon_battles_last_hour(p_player, v_now) < coalesce((nx #>> '{battles,perHour}')::integer, 6)
+         and (v_goal or v_pack <= v_cash);
+    elsif p_metric = 'nexamon_quick_sold' then
+      -- raw copies of a rarity the game buys, not listed or at ASP; or a pack that brings some
+      select count(*) into v_cnt
+        from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+       where c.owner_id = p_player and c.grade is null and c.grading_until is null
+         and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+         and coalesce(nx #> array['quickSell', 'setRarities', k.set_key], nx #> '{quickSell,rarities}', '[]'::jsonb) ? k.rarity;
+      return v_goal or v_cnt >= v_n or (v_pack is not null and v_pack <= v_cash);
+    elsif p_metric in ('nexamon_listed', 'nexamon_sold') then
+      return v_goal
+          or exists (select 1 from public.nexamon_copies c
+                      where c.owner_id = p_player and c.grading_until is null
+                        and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id))
+          or (v_pack is not null and v_pack <= v_cash);
+    elsif p_metric = 'nexamon_bought' then
+      return v_goal or exists (select 1 from public.nexamon_listings l
+                                where l.seller_id is distinct from p_player and l.price_cents <= v_cash);
+    else
+      -- grading: room at ASP and as many raw copies as the mission counts, their fees affordable
+      if (select count(*) from public.nexamon_copies x where x.owner_id = p_player and x.grading_until is not null) + v_n
+         > coalesce((nx #>> '{grading,maxOpen}')::integer, 10) then
+        return false;
+      end if;
+      if v_goal then
+        return true;
+      end if;
+      select count(*), coalesce(sum(s.fee), 0) into v_cnt, v_cost
+        from (select greatest(coalesce((nx #>> '{grading,minFeeCents}')::bigint, 100),
+                              public.div_round_half_even(public.nexamon_copy_value_cents(k.value_e4, c.condition, null)::numeric
+                                                         * coalesce((nx #>> '{grading,feeBps}')::integer, 5000), 10000)) as fee
+                from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
+               where c.owner_id = p_player and c.grade is null and c.grading_until is null
+                 and not exists (select 1 from public.nexamon_listings l where l.copy_id = c.id)
+               order by 1 limit v_n) s;
+      return v_cnt >= v_n and v_cost <= v_cash;
+    end if;
+  end if;
+
+  -- NFTs and the news show
+  if p_metric = 'art_painted' then
+    if p_key = 'm_art_paint' then
+      return not exists (select 1 from public.artworks a where a.creator_id = p_player);
+    end if;
+    if v_goal then
+      return true;
+    end if;
+    -- every NFT of the day costs more: the next v_n mints together
+    v_made := public.player_artworks_minted_today(p_player);
+    v_cost := 0;
+    for v_i in 0 .. v_n - 1 loop
+      v_cost := v_cost + coalesce(public.player_artwork_create_cost_cents(p_player, v_made + v_i), 0);
+    end loop;
+    return v_cost <= v_cash;
+  elsif p_metric = 'news_promo' then
+    -- a running free-NFT promotion (ADR-193) the player has not used, with a few minutes left
+    return v_level >= coalesce(public.unlock_level('artworks'), 1)
+       and exists (select 1 from public.news_promos x
+                    where x.kind = 'free_nft' and x.starts_at <= v_now and x.ends_at > v_now + interval '5 minutes'
+                      and not exists (select 1 from public.news_promo_claims c where c.promo_id = x.id and c.player_id = p_player));
+  elsif p_metric = 'feed_react' then
+    return (select count(*) from public.feed_items fi join public.profiles p on p.id = fi.actor_id
+             where not p.is_deactivated
+               and (fi.actor_id = p_player or fi.actor_id in (select public.friend_ids(p_player)))
+               and not exists (select 1 from public.feed_reactions r where r.item_id = fi.id and r.player_id = p_player))
+           >= v_n;
+  end if;
+
+  -- the own company
+  if p_metric in ('campaign_started', 'company_skill') then
+    select * into pc from public.player_companies c where c.founder_id = p_player and c.status = 'active' limit 1;
+    if pc.company_id is null then
+      return false;
+    end if;
+    select a.balance_cents - coalesce(pc.unpaid_cents, 0) into v_free
+      from public.ledger_accounts a where a.id = public.company_cash_account(pc.company_id);
+    v_free := greatest(coalesce(v_free, 0), 0);
+    if p_metric = 'campaign_started' then
+      -- one campaign at a time: a quick one needs none running, a week has room for the next one
+      if t.kind = 'quick' and exists (select 1 from public.company_campaigns x where x.company_id = pc.company_id and x.ends_at > v_now) then
+        return false;
+      end if;
+      return v_goal or v_free >= (select min(e.value::bigint) from jsonb_each_text(public.company_campaign_costs(pc.company_id)) e);
+    end if;
+    -- a Fertigkeit that can be trained now: not at the top, not in training, its skill held, the fee affordable
+    return exists (
+      select 1 from jsonb_array_elements(coalesce(public.company_skills_cfg() -> 'skills', '[]'::jsonb)) s(x)
+        left join public.company_skills cs on cs.company_id = pc.company_id and cs.skill_key = s.x ->> 'key'
+       where coalesce(cs.level, 0) < coalesce((public.company_skills_cfg() ->> 'maxLevel')::integer, 5)
+         and (cs.ready_at is null or cs.ready_at <= v_now)
+         and ((s.x -> 'requires' ->> (coalesce(cs.level, 0)::integer)) is null
+              or (s.x -> 'requires' ->> (coalesce(cs.level, 0)::integer)) = any (public.company_held_skills(pc.company_id)))
+         and (v_goal or coalesce((public.company_skills_cfg() -> 'costCentsByLevel' ->> (coalesce(cs.level, 0)::integer))::bigint, 0) <= v_free));
+  end if;
+
+  -- upgrades: a next stage the level allows and the cash pays
+  if p_metric = 'upgrade_bought' then
+    return exists (select 1 from unnest(public.upgrade_keys()) u(key)
+                    cross join lateral (select public.player_upgrade_level(p_player, u.key) as lvl) l
+                    where public.upgrade_cost_cents(u.key, l.lvl) is not null
+                      and public.upgrade_stage_level(u.key, l.lvl) <= v_level
+                      and (v_goal or public.upgrade_cost_cents(u.key, l.lvl) <= v_cash));
+  end if;
+
+  -- jobs and daily habits
+  if p_metric = 'work_task_done' then
+    return exists (select 1 from public.player_jobs j where j.player_id = p_player and j.status = 'active');
+  elsif p_metric = 'daily_reward' then
+    return t.kind is distinct from 'quick' and t.kind is distinct from 'daily'
+        or coalesce((public.daily_reward_next(p_player) ->> 'claimable')::boolean, false);
+  end if;
+  return true;
+end;
+$$;
+revoke all on function public.mission_more_doable(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.mission_more_doable(uuid, text, text) to service_role;
+comment on function public.mission_more_doable(uuid, text, text) is
+  'ADR-202: can the player do this mission right now (crypto, Nexamon, NFTs, news promotions, company, upgrades, jobs, feed)?';
+
+-- mission_doable(): latest definition (3500, with mission_affordable from 5350), plus ADR-202
+create or replace function public.mission_doable(p_player uuid, p_key text, p_metric text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with co as (
+    select pc.company_id, pc.ai_workers, c.max_employees, public.company_headcount(pc.company_id) as heads
+      from public.player_companies pc join public.companies c on c.id = pc.company_id
+     where pc.founder_id = p_player and pc.status = 'active'
+     limit 1
+  ), home as (
+    select h.tier, coalesce((select (t ->> 'garageSlots')::integer
+                               from jsonb_array_elements(public.config_jsonb('property', '{tiers}')) t
+                              where t ->> 'key' = h.tier), 0) as garage,
+           (select max(ord) from jsonb_array_elements(public.config_jsonb('property', '{tiers}')) with ordinality x(t, ord)) as top,
+           (select ord from jsonb_array_elements(public.config_jsonb('property', '{tiers}')) with ordinality x(t, ord)
+             where t ->> 'key' = h.tier) as pos
+      from public.player_homes h where h.player_id = p_player
+  )
+  select case
+    -- ADR-166: nothing the player cannot pay for
+    when not public.mission_affordable(p_player, p_key, p_metric) then false
+    -- ADR-202: crypto, Nexamon, NFTs, news promotions, company, upgrades, jobs, feed
+    when p_metric in ('sell', 'crypto_buy', 'crypto_trade', 'crypto_distinct', 'crypto_created', 'short_opened', 'watchlist_add',
+                      'nexamon_pack', 'pack_battle_join', 'nexamon_quick_sold', 'nexamon_listed', 'nexamon_sold',
+                      'nexamon_bought', 'nexamon_grading_sent', 'art_painted', 'news_promo', 'feed_react',
+                      'campaign_started', 'company_skill', 'upgrade_bought', 'work_task_done', 'daily_reward') then
+      public.mission_more_doable(p_player, p_key, p_metric)
+    -- hiring needs a free place in the company; the "first" one only for who never had an AI worker
+    when p_metric = 'ai_worker_hired' then
+      exists (select 1 from co where co.heads < co.max_employees
+                                 and (p_key <> 'm_first_ai_worker' or co.ai_workers = 0))
+    when p_metric = 'job_posted' then
+      exists (select 1 from co where co.heads < co.max_employees
+                                 and (p_key <> 'm_first_posting'
+                                      or not exists (select 1 from public.job_postings j where j.company_id = co.company_id)))
+    -- property: buy one only without a home, move only below the top tier, cars only with a free garage place
+    when p_metric = 'home_bought' then not exists (select 1 from home)
+    when p_metric = 'home_upgraded' then exists (select 1 from home where home.pos < home.top)
+    when p_metric = 'car_bought' then
+      exists (select 1 from home where home.garage > (select count(*) from public.player_cars c where c.player_id = p_player))
+    when p_metric in ('furniture_bought', 'furniture_placed') then exists (select 1 from home)
+    -- ADR-159: poking needs a friend; the team chat a company; wearing something needs something to wear
+    when p_metric = 'friend_poke' then exists (select 1 from public.friendships f
+                                                where f.status = 'accepted' and p_player in (f.requester_id, f.addressee_id))
+    -- ADR-164: writing to a friend needs a friend
+    when p_metric = 'friend_chat' then exists (select 1 from public.friendships f
+                                                where f.status = 'accepted' and p_player in (f.requester_id, f.addressee_id))
+    when p_metric = 'company_chat' then public.mission_requirement_ok(p_player, 'team')
+    when p_key = 'm_first_accessory' then not exists (select 1 from public.player_accessories a where a.player_id = p_player)
+    -- rentals (ADR-158)
+    when p_metric = 'rental_offered' then
+      exists (select 1 from home where home.tier is not null)
+      and not exists (select 1 from public.rental_offers o where o.owner_id = p_player and o.is_open)
+    when p_metric in ('tenant_found', 'rent_earned', 'wohnwert') then exists (select 1 from home where home.tier is not null)
+    when p_metric = 'home_rented' then
+      not exists (select 1 from public.rental_tenancies r where r.tenant_id = p_player and r.status = 'active')
+      and exists (select 1 from public.rental_offers o join public.player_homes h on h.player_id = o.owner_id
+                   where o.is_open and o.owner_id <> p_player and h.tier is not null
+                     and (select count(*) from public.rental_tenancies r where r.owner_id = o.owner_id and r.status = 'active')
+                         < public.rental_places(h.tier))
+    -- listed companies (ADR-167)
+    when p_metric in ('research_started', 'research_done', 'product_launched', 'region_opened', 'benefit_added', 'team_action',
+                      'satisfaction_green', 'dividend_paid', 'dividend_cents', 'books_done', 'books_streak', 'tax_paid',
+                      'board_motion', 'board_vote', 'audit_survived', 'listed_invested') then
+      public.listed_mission_doable(p_player, p_key, p_metric)
+    -- "your first ..." only for who has not done it yet
+    when p_key = 'm_first_skill' then not exists (select 1 from public.player_skills s where s.player_id = p_player)
+    when p_key = 'm_first_move' then not exists (select 1 from public.company_moves m where m.started_by = p_player)
+    when p_key = 'm_first_trade' then not exists (select 1 from public.trades t where t.player_id = p_player)
+    when p_key = 'm_first_bond' then not exists (select 1 from public.trades t join public.securities s on s.id = t.security_id
+                                                  where t.player_id = p_player and s.kind = 'bond')
+    else true end;
+$$;
+revoke all on function public.mission_doable(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.mission_doable(uuid, text, text) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- C. Mission events from the features (triggers: the RPCs stay as they are)
+-- ---------------------------------------------------------------------------
+create or replace function public.mission_more_events()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_kind   public.security_kind;
+  v_ticker text;
+  v_player uuid;
+begin
+  if tg_table_name = 'trades' then
+    if new.player_id is not null and not coalesce(new.is_wash_trade, false) then
+      select s.kind, s.ticker into v_kind, v_ticker from public.securities s where s.id = new.security_id;
+      if v_kind = 'crypto' then
+        perform public.mission_event(new.player_id, 'crypto_trade', 1, v_ticker);
+        if new.side = 'buy' then
+          perform public.mission_event(new.player_id, 'crypto_buy', 1, v_ticker);
+          perform public.mission_event(new.player_id, 'crypto_distinct', 1, v_ticker);
+        end if;
+      end if;
+    end if;
+  elsif tg_table_name = 'orders' then
+    -- sell/short opens a short position (orders comment, M1)
+    if new.status = 'filled' and new.side = 'sell' and new.position_side = 'short'
+       and (tg_op = 'INSERT' or old.status is distinct from 'filled') then
+      perform public.mission_event(new.player_id, 'short_opened', 1, null);
+    end if;
+  elsif tg_table_name = 'watchlist_items' then
+    perform public.mission_event(new.player_id, 'watchlist_add', 1, new.security_id::text);
+  elsif tg_table_name = 'crypto_coins' then
+    if new.creator_id is not null then
+      perform public.mission_event(new.creator_id, 'crypto_created', 1, null);
+    end if;
+  elsif tg_table_name = 'nexamon_sales' then
+    -- bulk and instant sales to the game (kind quick)
+    if new.kind = 'quick' and new.seller_id is not null then
+      perform public.mission_event(new.seller_id, 'nexamon_quick_sold', 1, null);
+    end if;
+  elsif tg_table_name = 'nexamon_copies' then
+    if new.grading_until is not null and old.grading_until is null and new.owner_id is not null then
+      perform public.mission_event(new.owner_id, 'nexamon_grading_sent', 1, null);
+    end if;
+  elsif tg_table_name = 'nexamon_battle_seats' then
+    perform public.mission_event(new.player_id, 'pack_battle_join', 1, null);
+  elsif tg_table_name = 'news_promo_claims' then
+    perform public.mission_event(new.player_id, 'news_promo', 1, null);
+  elsif tg_table_name = 'company_campaigns' then
+    v_player := new.created_by;
+    if v_player is null then
+      select pc.founder_id into v_player from public.player_companies pc where pc.company_id = new.company_id;
+    end if;
+    perform public.mission_event(v_player, 'campaign_started', 1, null);
+  elsif tg_table_name = 'company_skills' then
+    if tg_op = 'INSERT' or new.level > old.level then
+      select pc.founder_id into v_player from public.player_companies pc where pc.company_id = new.company_id;
+      perform public.mission_event(v_player, 'company_skill', 1, new.skill_key);
+    end if;
+  elsif tg_table_name = 'player_upgrades' then
+    if tg_op = 'INSERT' or new.level > old.level then
+      perform public.mission_event(new.player_id, 'upgrade_bought', 1, new.key);
+    end if;
+  elsif tg_table_name = 'work_tasks' then
+    if new.status = 'submitted' and old.status is distinct from 'submitted' then
+      perform public.mission_event(new.player_id, 'work_task_done', 1, null);
+    end if;
+  elsif tg_table_name = 'daily_reward_claims' then
+    perform public.mission_event(new.player_id, 'daily_reward', 1, null);
+  elsif tg_table_name = 'feed_reactions' then
+    -- distinct by item: taking a reaction back and giving it again counts once
+    perform public.mission_event(new.player_id, 'feed_react', 1, new.item_id::text);
+  end if;
+  return null;
+end;
+$$;
+revoke all on function public.mission_more_events() from public, anon, authenticated;
+comment on function public.mission_more_events() is
+  'Trigger: mission events of crypto, shorts, watchlist, Nexamon, news promotions, campaigns, Fertigkeiten, upgrades, work tasks, daily rewards and the feed (ADR-202).';
+
+do $$
+declare
+  r record;
+begin
+  for r in select * from (values
+      ('trades', 'after insert'),
+      ('orders', 'after insert or update of status'),
+      ('watchlist_items', 'after insert'),
+      ('crypto_coins', 'after insert'),
+      ('nexamon_sales', 'after insert'),
+      ('nexamon_copies', 'after update of grading_until'),
+      ('nexamon_battle_seats', 'after insert'),
+      ('news_promo_claims', 'after insert'),
+      ('company_campaigns', 'after insert'),
+      ('company_skills', 'after insert or update of level'),
+      ('player_upgrades', 'after insert or update of level'),
+      ('work_tasks', 'after update of status'),
+      ('daily_reward_claims', 'after insert'),
+      ('feed_reactions', 'after insert')) v(tbl, ev)
+  loop
+    execute format('drop trigger if exists mission_more_events on public.%I', r.tbl);
+    execute format('create trigger mission_more_events %s on public.%I for each row execute function public.mission_more_events()',
+                   r.ev, r.tbl);
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. Templates
+-- ---------------------------------------------------------------------------
+insert into public.mission_templates
+  (key, kind, title, description, icon_key, metric, mode, params, target_min, target_max, xp_min, xp_max, min_level, chain_order,
+   scale_with_level, weight, reward_skill_points)
+values
+  -- stocks
+  ('q_watchlist', 'quick', 'Merk dir eine Aktie', 'Setz ein Wertpapier auf deine Merkliste.', 'mission_trade', 'watchlist_add', 'distinct', '{"unlock": "watchlist"}'::jsonb, 1, 1, 20, 30, 3, null, false, 40, 0),
+  ('d_watchlist', 'daily', 'Merk dir {target} neue Werte', 'Behalte mehr im Blick als nur dein Depot.', 'mission_trade', 'watchlist_add', 'distinct', '{"unlock": "watchlist", "fixedCount": true}'::jsonb, 3, 3, 200, 250, 3, null, false, 30, 0),
+  ('q_short', 'quick', 'Wette auf fallende Kurse', 'Eröffne eine Short-Position.', 'mission_short', 'short_opened', 'count', '{"unlock": "short_selling"}'::jsonb, 1, 1, 50, 70, 8, null, false, 35, 0),
+  ('d_shorts', 'daily', 'Eröffne {target} Short-Positionen', 'Auch fallende Kurse bringen Geld.', 'mission_short', 'short_opened', 'count', '{"unlock": "short_selling"}'::jsonb, 2, 2, 300, 400, 8, null, false, 30, 0),
+  ('w_shorts', 'weekly', 'Eröffne {target} Short-Positionen', 'Eine Woche gegen den Markt.', 'mission_short', 'short_opened', 'count', '{"unlock": "short_selling"}'::jsonb, 5, 6, 900, 1100, 8, null, true, 25, 1),
+  ('m_first_short', 'milestone', 'Deine erste Short-Position', 'Verkauf, was du nicht hast, und kauf es billiger zurück.', 'mission_short', 'short_opened', 'count', '{"unlock": "short_selling"}'::jsonb, 1, 1, 400, 400, 8, 66, false, 100, 1),
+  -- crypto
+  ('q_crypto_buy', 'quick', 'Kauf einen Coin', 'Ein Bruchstück reicht schon.', 'mission_trade', 'crypto_buy', 'count', '{"unlock": "crypto"}'::jsonb, 1, 1, 30, 50, 10, null, false, 60, 0),
+  ('q_crypto_trades_2', 'quick', 'Handle {target}-mal Krypto', 'Kaufen oder verkaufen, beides zählt.', 'mission_trade', 'crypto_trade', 'count', '{"unlock": "crypto"}'::jsonb, 2, 2, 40, 60, 10, null, false, 40, 0),
+  ('d_crypto_trades', 'daily', 'Handle heute {target}-mal Krypto', 'Der Kryptomarkt schläft nie.', 'mission_trade', 'crypto_trade', 'count', '{"unlock": "crypto"}'::jsonb, 3, 5, 250, 350, 10, null, true, 60, 0),
+  ('d_crypto_coins', 'daily', 'Kauf {target} verschiedene Coins', 'Streu dein Risiko über mehrere Coins.', 'mission_sectors', 'crypto_distinct', 'distinct', '{"unlock": "crypto", "fixedCount": true}'::jsonb, 2, 3, 250, 350, 10, null, false, 50, 0),
+  ('w_crypto_trades', 'weekly', 'Handle {target}-mal Krypto', 'Eine Woche am Kryptomarkt.', 'mission_trade', 'crypto_trade', 'count', '{"unlock": "crypto"}'::jsonb, 15, 25, 800, 1100, 10, null, true, 50, 1),
+  ('w_crypto_coins', 'weekly', 'Kauf {target} verschiedene Coins', 'Lerne die Coins kennen.', 'mission_sectors', 'crypto_distinct', 'distinct', '{"unlock": "crypto", "fixedCount": true}'::jsonb, 5, 6, 800, 1100, 10, null, false, 40, 1),
+  ('m_crypto_first', 'milestone', 'Dein erster Coin', 'Kauf deinen ersten Kryptocoin.', 'mission_trade', 'crypto_buy', 'count', '{"unlock": "crypto"}'::jsonb, 1, 1, 400, 400, 10, 70, false, 100, 1),
+  ('m_crypto_trades_100', 'milestone', '{target} Krypto-Trades', 'Ein alter Hase am Kryptomarkt.', 'mission_trade', 'crypto_trade', 'count', '{"unlock": "crypto"}'::jsonb, 100, 100, 2000, 2000, 10, 112, false, 60, 1),
+  ('m_crypto_create', 'milestone', 'Bring deinen eigenen Coin raus', 'Gründe einen Kryptocoin mit deinem Namen dran.', 'mission_growth', 'crypto_created', 'count', '{"unlock": "crypto_create"}'::jsonb, 1, 1, 2500, 2500, 14, 96, false, 100, 1),
+  -- Nexamon
+  ('q_nexamon_pack', 'quick', 'Öffne ein Nexamon-Pack', 'Vielleicht ist diesmal die Seltene dabei.', 'mission_art', 'nexamon_pack', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 40, 60, 10, null, false, 50, 0),
+  ('q_nexamon_grade', 'quick', 'Schick eine Karte zu ASP', 'Lass eine Karte bewerten. Mit Glück wird es eine 10.', 'mission_art', 'nexamon_grading_sent', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 40, 60, 10, null, false, 40, 0),
+  ('q_nexamon_quick_sell', 'quick', 'Verkauf eine Karte sofort', 'Doppelte Karten bringen sofort Geld.', 'mission_art', 'nexamon_quick_sold', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 30, 50, 10, null, false, 40, 0),
+  ('q_nexamon_list', 'quick', 'Biete eine Karte an', 'Stell eine Karte auf den Nexamon-Markt.', 'mission_art', 'nexamon_listed', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 30, 50, 10, null, false, 30, 0),
+  ('q_nexamon_market', 'quick', 'Kauf eine Karte am Markt', 'Die fehlende Karte gibt es vielleicht schon am Markt.', 'mission_art', 'nexamon_bought', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 40, 60, 10, null, false, 30, 0),
+  ('d_nexamon_packs', 'daily', 'Öffne heute {target} Packs', 'Sammeln ist Arbeit.', 'mission_art', 'nexamon_pack', 'count', '{"unlock": "nexamon", "fixedCount": true}'::jsonb, 2, 3, 250, 350, 10, null, false, 40, 0),
+  ('d_nexamon_grades', 'daily', 'Schick {target} Karten zu ASP', 'Mehr Bewertungen, mehr Chancen auf eine 10.', 'mission_art', 'nexamon_grading_sent', 'count', '{"unlock": "nexamon", "fixedCount": true}'::jsonb, 2, 3, 250, 350, 10, null, false, 40, 0),
+  ('d_nexamon_quick_sells', 'daily', 'Verkauf {target} Karten sofort', 'Weg mit den Doppelten.', 'mission_art', 'nexamon_quick_sold', 'count', '{"unlock": "nexamon", "fixedCount": true}'::jsonb, 3, 4, 200, 300, 10, null, false, 35, 0),
+  ('d_pack_battle', 'daily', 'Spiel ein Pack Battle', 'Starte eines oder tritt einem bei.', 'mission_art', 'pack_battle_join', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 250, 350, 10, null, false, 35, 0),
+  ('w_nexamon_packs', 'weekly', 'Öffne {target} Packs', 'Eine Woche voller Booster.', 'mission_art', 'nexamon_pack', 'count', '{"unlock": "nexamon"}'::jsonb, 8, 12, 800, 1100, 10, null, true, 40, 1),
+  ('w_nexamon_grades', 'weekly', 'Schick {target} Karten zu ASP', 'ASP kennt dich schon beim Namen.', 'mission_art', 'nexamon_grading_sent', 'count', '{"unlock": "nexamon", "fixedCount": true}'::jsonb, 6, 8, 800, 1100, 10, null, false, 35, 1),
+  ('w_pack_battles', 'weekly', 'Spiel {target} Pack Battles', 'Wer zieht die wertvolleren Karten?', 'mission_art', 'pack_battle_join', 'count', '{"unlock": "nexamon", "fixedCount": true}'::jsonb, 3, 5, 900, 1200, 10, null, false, 30, 1),
+  ('m_nexamon_first_grade', 'milestone', 'Deine erste Bewertung', 'Schick eine Karte zu ASP.', 'mission_art', 'nexamon_grading_sent', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 400, 400, 10, 72, false, 60, 1),
+  ('m_nexamon_first_battle', 'milestone', 'Dein erstes Pack Battle', 'Starte ein Pack Battle oder tritt einem bei.', 'mission_art', 'pack_battle_join', 'count', '{"unlock": "nexamon"}'::jsonb, 1, 1, 600, 600, 10, 74, false, 60, 1),
+  ('m_nexamon_packs_50', 'milestone', '{target} Packs geöffnet', 'Deine Sammlung wächst und wächst.', 'mission_art', 'nexamon_pack', 'count', '{"unlock": "nexamon"}'::jsonb, 50, 50, 2500, 2500, 10, 114, false, 50, 1),
+  ('m_nexamon_quick_100', 'milestone', '{target} Karten sofort verkauft', 'Der Händler kennt dich.', 'mission_art', 'nexamon_quick_sold', 'count', '{"unlock": "nexamon"}'::jsonb, 100, 100, 1500, 1500, 10, 108, false, 40, 1),
+  -- NFTs and the news show
+  ('q_nft_mint', 'quick', 'Präge ein NFT', 'Mal ein Bild und präge es.', 'mission_art', 'art_painted', 'count', '{"unlock": "artworks"}'::jsonb, 1, 1, 40, 60, 4, null, false, 35, 0),
+  ('d_nft_mint', 'daily', 'Präge heute {target} NFTs', 'Ein Künstler ruht nie.', 'mission_art', 'art_painted', 'count', '{"unlock": "artworks", "fixedCount": true}'::jsonb, 2, 2, 300, 400, 4, null, false, 25, 0),
+  ('w_nft_mint', 'weekly', 'Präge {target} NFTs', 'Deine Galerie wird größer.', 'mission_art', 'art_painted', 'count', '{"unlock": "artworks", "fixedCount": true}'::jsonb, 4, 6, 800, 1100, 4, null, false, 30, 1),
+  ('m_nft_10', 'milestone', '{target} NFTs geprägt', 'Eine ganze Ausstellung aus deiner Hand.', 'mission_art', 'art_painted', 'count', '{"unlock": "artworks"}'::jsonb, 10, 10, 1500, 1500, 4, 92, false, 60, 1),
+  ('q_news_promo', 'quick', 'Nutz die News-Aktion', 'Mr. Doodle Dangle verschenkt gerade etwas. Schnell sein!', 'mission_bell', 'news_promo', 'count', '{"unlock": "artworks"}'::jsonb, 1, 1, 50, 70, 4, null, false, 150, 0),
+  -- friends and habits
+  ('q_feed_react', 'quick', 'Reagier im Feed', 'Zeig deinen Freunden, dass dir etwas gefällt.', 'mission_bell', 'feed_react', 'distinct', '{}'::jsonb, 1, 1, 20, 30, 1, null, false, 40, 0),
+  ('d_feed_react', 'daily', 'Reagier auf {target} Beiträge', 'Ein bisschen Applaus für deine Freunde.', 'mission_bell', 'feed_react', 'distinct', '{"fixedCount": true}'::jsonb, 3, 4, 200, 250, 1, null, false, 30, 0),
+  ('q_daily_reward', 'quick', 'Hol deine Tagesbelohnung', 'Jeden Tag ein kleines Geschenk.', 'mission_vault', 'daily_reward', 'count', '{}'::jsonb, 1, 1, 20, 30, 1, null, false, 80, 0),
+  ('w_daily_rewards', 'weekly', 'Hol {target}-mal die Tagesbelohnung', 'Wer jeden Tag kommt, bekommt mehr.', 'mission_vault', 'daily_reward', 'count', '{"fixedCount": true}'::jsonb, 5, 5, 700, 900, 1, null, false, 40, 1),
+  -- jobs
+  ('q_work_task', 'quick', 'Erledige eine Arbeitsaufgabe', 'Dein Chef hat etwas für dich.', 'mission_work', 'work_task_done', 'count', '{"unlock": "first_job", "requires": "job"}'::jsonb, 1, 1, 40, 60, 2, null, false, 50, 0),
+  ('d_work_tasks', 'daily', 'Erledige {target} Arbeitsaufgaben', 'Fleiß zahlt sich aus.', 'mission_work', 'work_task_done', 'count', '{"unlock": "first_job", "requires": "job", "fixedCount": true}'::jsonb, 2, 3, 250, 350, 2, null, false, 60, 0),
+  ('w_work_tasks', 'weekly', 'Erledige {target} Arbeitsaufgaben', 'Eine Woche voller Einsatz.', 'mission_work', 'work_task_done', 'count', '{"unlock": "first_job", "requires": "job"}'::jsonb, 10, 14, 900, 1200, 2, null, true, 50, 1),
+  ('m_work_tasks_50', 'milestone', '{target} Arbeitsaufgaben erledigt', 'Auf dich ist Verlass.', 'mission_work', 'work_task_done', 'count', '{"unlock": "first_job"}'::jsonb, 50, 50, 1500, 1500, 2, 98, false, 60, 1),
+  -- company
+  ('q_campaign', 'quick', 'Starte eine Werbekampagne', 'Flyer, online oder Fernsehen: Hauptsache, man kennt dich.', 'mission_company', 'campaign_started', 'count', '{"unlock": "found_garage", "requires": "company"}'::jsonb, 1, 1, 50, 70, 6, null, false, 40, 0),
+  ('w_campaigns', 'weekly', 'Starte {target} Werbekampagnen', 'Bleib im Gespräch.', 'mission_company', 'campaign_started', 'count', '{"unlock": "found_garage", "requires": "company", "fixedCount": true}'::jsonb, 2, 3, 900, 1200, 6, null, false, 35, 1),
+  ('q_company_skill', 'quick', 'Schul deine Firma', 'Bring deiner Firma eine neue Stufe einer Fertigkeit bei.', 'mission_company', 'company_skill', 'count', '{"unlock": "found_garage", "requires": "company"}'::jsonb, 1, 1, 50, 70, 6, null, false, 40, 0),
+  ('w_company_skills', 'weekly', 'Schul deine Firma {target}-mal', 'Eine Firma, die dazulernt.', 'mission_company', 'company_skill', 'count', '{"unlock": "found_garage", "requires": "company", "fixedCount": true}'::jsonb, 2, 3, 900, 1200, 6, null, false, 30, 1),
+  ('m_company_skill_first', 'milestone', 'Die erste Fertigkeit deiner Firma', 'Schul deine Firma zum ersten Mal.', 'mission_company', 'company_skill', 'count', '{"unlock": "found_garage", "requires": "company"}'::jsonb, 1, 1, 500, 500, 6, 76, false, 60, 1),
+  ('m_company_skills_10', 'milestone', '{target} Fertigkeitsstufen', 'Deine Firma kann jetzt richtig was.', 'mission_company', 'company_skill', 'count', '{"unlock": "found_garage", "requires": "company"}'::jsonb, 10, 10, 2500, 2500, 6, 116, false, 40, 1),
+  -- upgrades
+  ('q_upgrade', 'quick', 'Kauf eine Verbesserung', 'Mach dich ein Stück stärker.', 'mission_growth', 'upgrade_bought', 'count', '{}'::jsonb, 1, 1, 50, 70, 1, null, false, 35, 0),
+  ('w_upgrades', 'weekly', 'Kauf {target} Verbesserungen', 'Jede Stufe bringt dich weiter.', 'mission_growth', 'upgrade_bought', 'count', '{"fixedCount": true}'::jsonb, 2, 3, 900, 1200, 1, null, false, 30, 1),
+  ('m_first_upgrade', 'milestone', 'Deine erste Verbesserung', 'Kauf eine Verbesserung.', 'mission_growth', 'upgrade_bought', 'count', '{}'::jsonb, 1, 1, 400, 400, 1, 61, false, 100, 1),
+  ('m_upgrades_10', 'milestone', '{target} Verbesserungen gekauft', 'Du holst alles aus dir raus.', 'mission_growth', 'upgrade_bought', 'count', '{}'::jsonb, 10, 10, 2000, 2000, 1, 104, false, 60, 1)
+on conflict (key) do update
+   set kind = excluded.kind, title = excluded.title, description = excluded.description, icon_key = excluded.icon_key,
+       metric = excluded.metric, mode = excluded.mode, params = excluded.params, target_min = excluded.target_min,
+       target_max = excluded.target_max, xp_min = excluded.xp_min, xp_max = excluded.xp_max, min_level = excluded.min_level,
+       chain_order = excluded.chain_order, scale_with_level = excluded.scale_with_level, weight = excluded.weight,
+       reward_skill_points = excluded.reward_skill_points, is_active = true, updated_at = now();
+
+-- ---------------------------------------------------------------------------
+-- E. missions_assign(): the tiered draw, impossible missions replaced (latest definition 5350, plus ADR-202)
+-- ---------------------------------------------------------------------------
+create or replace function public.missions_assign(p_player uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_prog     jsonb := coalesce(public.config_jsonb('progression'), '{}'::jsonb);
+  v_draw     jsonb;
+  v_now      timestamptz := public.game_now();
+  v_today    date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday   date;
+  v_level    integer;
+  v_scale    double precision;
+  v_xpscale  double precision;
+  v_cscale   double precision;
+  v_need     integer;
+  v_got      integer;
+  v_tries    integer;
+  v_n        integer := 0;
+  v_kind     text;
+  v_period   date;
+  v_expires  timestamptz;
+  v_rank     integer;
+  v_target   bigint;
+  v_cap      bigint;
+  v_recent   integer;
+  v_cool     double precision;
+  v_featw    double precision;
+  v_neww     double precision;
+  v_newlv    integer;
+  v_skip     text[];
+  v_seq      bigint;
+  t          record;
+begin
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  select p.level into v_level from public.profiles p where p.id = p_player for update;
+  if v_level is null then
+    return 0;
+  end if;
+  v_draw := coalesce(v_prog -> 'missionDraw', '{}'::jsonb);
+  v_scale := least(public.cfg_num(v_prog, '{missionTargetScaleMax}', 5),
+                   1 + public.cfg_num(v_prog, '{missionTargetScalePerLevel}', 0.2) * (v_level - 1));
+  -- ADR-159: counted missions get harder with the level
+  v_cscale := least(public.cfg_num(v_prog, '{missionCountScaleMax}', 1),
+                    1 + public.cfg_num(v_prog, '{missionCountScalePerLevel}', 0) * (v_level - 1));
+  -- ADR-142: mission XP grows with the level, so missions stay worth it as levels need more XP
+  v_xpscale := least(public.cfg_num(v_prog, '{missionXpScaleMax}', 1),
+                     1 + public.cfg_num(v_prog, '{missionXpScalePerLevel}', 0) * (v_level - 1));
+  -- ADR-202: weights towards the features the player has, most towards the newest ones
+  v_featw := public.cfg_num(v_draw, '{featureWeightBps}', 15000) / 10000;
+  v_neww := public.cfg_num(v_draw, '{newFeatureWeightBps}', 25000) / 10000;
+  v_newlv := public.cfg_num(v_draw, '{newFeatureLevels}', 5)::integer;
+
+  -- ADR-154/166/202: an open mission that became impossible makes room for another. Without progress whenever
+  -- mission_doable() says no; with progress only when its requirement is gone (a company, a job). Milestones only
+  -- without progress, and they may come back later.
+  update public.player_missions m
+     set status = 'expired', reset_at = v_now, expires_at = least(coalesce(m.expires_at, v_now), v_now),
+         state = m.state || jsonb_build_object('replaced', true)
+    from public.mission_templates mt
+   where mt.key = m.template_key and m.player_id = p_player and m.status = 'active'
+     and mt.mode is not null and mt.mode <> 'state'
+     and (m.expires_at is null or m.expires_at > v_now)
+     and case when m.kind = 'milestone' then m.progress = 0 and not public.mission_doable(p_player, mt.key, mt.metric)
+              else not public.mission_requirement_ok(p_player, mt.params ->> 'requires')
+                   or (m.progress = 0 and not public.mission_doable(p_player, mt.key, mt.metric)) end;
+
+  -- expire what ran out
+  update public.player_missions set status = 'expired'
+   where player_id = p_player and status in ('active', 'completed') and expires_at is not null and expires_at <= v_now;
+
+  foreach v_kind in array array['quick', 'daily', 'weekly', 'milestone'] loop
+    if v_kind = 'quick' then
+      v_need := public.cfg_num(v_prog, '{xpSources,quickMission,active}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'quick' and m.status in ('active', 'completed'));
+      v_period := v_today; v_expires := null;
+    elsif v_kind = 'daily' then
+      -- ADR-166: a mission swapped by reset_missions() (or replaced, skipped) no longer fills its slot
+      v_need := public.cfg_num(v_prog, '{xpSources,dailyMission,perDay}', 3)::integer
+              - (select count(*) from public.player_missions m
+                  where m.player_id = p_player and m.kind = 'daily' and m.period_start = v_today and m.reset_at is null);
+      v_period := v_today; v_expires := ((v_today + 1)::timestamp) at time zone 'Europe/Berlin';
+    elsif v_kind = 'weekly' then
+      v_need := public.cfg_num(v_prog, '{xpSources,weeklyMission,perWeek}', 3)::integer
+              - (select count(*) from public.player_missions m
+                  where m.player_id = p_player and m.kind = 'weekly' and m.period_start = v_monday and m.reset_at is null);
+      v_period := v_monday; v_expires := ((v_monday + 7)::timestamp) at time zone 'Europe/Berlin';
+    else
+      v_need := public.cfg_num(v_prog, '{xpSources,milestoneMission,visible}', 3)::integer
+              - (select count(*) from public.player_missions m where m.player_id = p_player and m.kind = 'milestone' and m.status in ('active', 'completed'));
+      v_period := date '2000-01-01'; v_expires := null;
+    end if;
+    continue when v_need <= 0;
+    v_recent := public.cfg_num(v_draw, array['recentDraws', v_kind],
+                               case v_kind when 'quick' then 12 when 'daily' then 9 when 'weekly' then 6 else 0 end)::integer;
+    v_cool := public.cfg_num(v_draw, array['cooldownHours', v_kind],
+                             case v_kind when 'quick' then 48 when 'daily' then 96 when 'weekly' then 504 else 0 end);
+    v_skip := array[]::text[];
+    v_got := 0;
+    v_tries := 0;
+
+    -- one at a time, so every pick sees the ones before it (no two open missions counting the same thing)
+    while v_got < v_need and v_tries < v_need + 25 loop
+      v_tries := v_tries + 1;
+      select mt.* into t
+        from public.mission_templates mt
+       where mt.kind = v_kind and mt.mode is not null and mt.is_active
+         and mt.min_level <= v_level
+         and not (mt.key = any (v_skip))
+         and (not (mt.params ? 'unlock') or v_level >= public.unlock_level(mt.params ->> 'unlock'))
+         and public.mission_requirement_ok(p_player, mt.params ->> 'requires')
+         and public.mission_doable(p_player, mt.key, mt.metric)
+         -- never twice at once; a swapped mission comes back after 20 hours at the earliest; daily, weekly and
+         -- milestone rows are one per period, a quick mission may come again the same day (the draw tiers decide)
+         and not exists (select 1 from public.player_missions m
+                          where m.player_id = p_player and m.template_key = mt.key
+                            and ((m.status in ('active', 'completed') and (m.expires_at is null or m.expires_at > v_now))
+                                 or (m.period_start = v_period
+                                     and (m.reset_at > v_now - interval '20 hours'
+                                          or (m.reset_at is null and v_kind <> 'quick')))))
+       order by case when v_kind = 'milestone' then mt.chain_order end,
+                -- ADR-202: fresh first, then the cooldown, the last draws only when nothing else is doable
+                case when v_kind = 'milestone' then 0 else
+                  (case when mt.key in (select h.template_key
+                                          from (select pm.template_key from public.player_missions pm
+                                                 where pm.player_id = p_player and pm.kind = v_kind
+                                                 order by pm.draw_seq desc nulls last, pm.created_at desc
+                                                 limit v_recent) h) then 4
+                        when exists (select 1 from public.player_missions pm
+                                      where pm.player_id = p_player and pm.template_key = mt.key
+                                        and coalesce(pm.drawn_at, pm.created_at) > v_now - make_interval(secs => v_cool * 3600)) then 2
+                        else 0 end)
+                  + case when exists (select 1 from public.player_missions pm join public.mission_templates x on x.key = pm.template_key
+                                       where pm.player_id = p_player and pm.status = 'active' and pm.kind <> 'milestone'
+                                         and (pm.expires_at is null or pm.expires_at > v_now) and x.metric = mt.metric) then 1
+                         else 0 end end,
+                -ln(1 - random()) / (greatest(mt.weight, 1)
+                                     * case when mt.params ? 'unlock' or mt.params ? 'requires' then v_featw else 1 end
+                                     * case when greatest(mt.min_level, coalesce(public.unlock_level(mt.params ->> 'unlock'), 1)) > 1
+                                                 and greatest(mt.min_level, coalesce(public.unlock_level(mt.params ->> 'unlock'), 1)) > v_level - v_newlv
+                                            then v_neww else 1 end)
+       limit 1;
+      exit when not found;
+      v_skip := v_skip || t.key;
+      if t.metric = 'rich_rank_improve' then
+        v_rank := public.player_rich_rank(p_player);
+        continue when v_rank is null or v_rank <= 1;
+      end if;
+      v_target := case when t.scale_with_level and public.mission_is_money_metric(t.metric)
+                       then round((t.target_min + floor(random() * (t.target_max - t.target_min + 1))) * v_scale / 100)::bigint * 100
+                       when t.mode in ('count', 'sum') and not public.mission_is_money_metric(t.metric)
+                            and not coalesce((t.params ->> 'fixedCount')::boolean, false)
+                            and (v_kind in ('daily', 'weekly') or (v_kind = 'quick' and t.target_min >= 2))
+                       then greatest(t.target_min, round((t.target_min + floor(random() * (t.target_max - t.target_min + 1))) * v_cscale))::bigint
+                       else t.target_min + floor(random() * (t.target_max - t.target_min + 1))::bigint end;
+      -- ADR-166: a money target never asks for more than the player can move (full euros)
+      v_cap := public.mission_money_cap(p_player, v_kind, t.metric);
+      if v_cap is not null and v_target > v_cap then
+        v_target := greatest(v_cap / 100 * 100, 1);
+      end if;
+      -- a quick mission drawn again the same day replaces its finished row (claimed XP stay booked by the old id)
+      if v_kind = 'quick' then
+        delete from public.player_missions x
+         where x.player_id = p_player and x.template_key = t.key and x.period_start = v_period
+           and x.status in ('claimed', 'expired');
+      end if;
+      v_seq := nextval('public.player_missions_draw_seq');
+      insert into public.player_missions as pm (player_id, template_key, kind, period_start, target, xp_reward, expires_at, state,
+                                                draw_seq, drawn_at)
+      values (p_player, t.key, v_kind, v_period, v_target,
+              case when coalesce((t.params ->> 'fixedXp')::boolean, false)
+                   then t.xp_min + floor(random() * (t.xp_max - t.xp_min + 1))::integer
+                   else round((t.xp_min + floor(random() * (t.xp_max - t.xp_min + 1))) * v_xpscale)::integer end,
+              v_expires,
+              case when t.metric = 'rich_rank_improve' then jsonb_build_object('baseline_rank', v_rank) else '{}'::jsonb end,
+              v_seq, v_now)
+      -- a row swapped long enough ago is used again (one row per template and period); a milestone keeps its progress
+      on conflict (player_id, template_key, period_start) do update
+         set status = 'active',
+             progress = case when pm.kind = 'milestone' then least(pm.progress, excluded.target) else 0 end,
+             target = excluded.target, xp_reward = excluded.xp_reward,
+             expires_at = excluded.expires_at, state = excluded.state, reset_at = null,
+             completed_at = null, claimed_at = null, created_at = now(),
+             draw_seq = excluded.draw_seq, drawn_at = excluded.drawn_at
+       where pm.reset_at is not null and pm.reset_at <= v_now - interval '20 hours';
+      if found then
+        v_n := v_n + 1;
+        v_got := v_got + 1;
+      end if;
+    end loop;
+  end loop;
+  if v_n > 0 then
+    perform public.mission_refresh_state(p_player);
+  end if;
+  return v_n;
+end;
+$$;
+revoke all on function public.missions_assign(uuid) from public, anon, authenticated;
+grant execute on function public.missions_assign(uuid) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- F. The missions answer and the single skip
+-- ---------------------------------------------------------------------------
+create or replace function public.missions_state(p_player uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_mult   double precision := public.config_double('progression', '{xpMultiplier}', 2);
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday date;
+  v_limit  integer := public.config_bigint('progression', '{missionResetsPerDay}', 1)::integer;
+  v_slimit integer := public.config_bigint('progression', '{missionSkipsPerDay}', 1)::integer;
+  v_used   integer;
+  v_skips  integer;
+begin
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  perform public.missions_assign(p_player);
+  perform public.mission_refresh_state(p_player);
+  select coalesce((select r.used from public.mission_resets r where r.player_id = p_player and r.reset_day = v_today), 0),
+         coalesce((select r.skips from public.mission_resets r where r.player_id = p_player and r.reset_day = v_today), 0)
+    into v_used, v_skips;
+  return jsonb_build_object(
+    'server_time', public.game_now(),
+    -- ADR-166: one swap of the open missions per Berlin day
+    'reset_available', v_used < v_limit,
+    'next_reset_at', case when v_limit > 0 and v_used >= v_limit
+                          then ((v_today + 1)::timestamp) at time zone 'Europe/Berlin' end,
+    -- ADR-202: one free skip of a single mission per Berlin day
+    'skip_available', v_skips < v_slimit,
+    'skips_left', greatest(0, v_slimit - v_skips),
+    'next_skip_at', case when v_slimit > 0 and v_skips >= v_slimit
+                         then ((v_today + 1)::timestamp) at time zone 'Europe/Berlin' end,
+    'groups', (
+      select jsonb_agg(jsonb_build_object(
+               'kind', g.kind,
+               'resets_at', case g.kind when 'daily' then ((v_today + 1)::timestamp) at time zone 'Europe/Berlin'
+                                        when 'weekly' then ((v_monday + 7)::timestamp) at time zone 'Europe/Berlin' end,
+               'missions', coalesce((
+                 select jsonb_agg(jsonb_build_object(
+                          'id', m.id, 'key', m.template_key,
+                          'title', public.mission_text(t.title, t.metric, m.target),
+                          'description', public.mission_text(t.description, t.metric, m.target),
+                          'progress', m.progress, 'target', m.target,
+                          'xp', greatest(0, round(m.xp_reward * v_mult))::integer,
+                          'status', m.status, 'expires_at', m.expires_at)
+                          order by t.chain_order nulls last, m.created_at, m.id)
+                   from public.player_missions m
+                   join public.mission_templates t on t.key = m.template_key
+                  where m.player_id = p_player and m.kind = g.kind
+                    and case g.kind
+                          when 'quick' then m.status in ('active', 'completed')
+                          when 'daily' then m.period_start = v_today and m.status <> 'expired'
+                          when 'weekly' then m.period_start = v_monday and m.status <> 'expired'
+                          else m.status in ('active', 'completed') end), '[]'::jsonb))
+               order by g.ord)
+        from (values ('quick', 1), ('daily', 2), ('weekly', 3), ('milestone', 4)) as g(kind, ord)));
+end;
+$$;
+revoke all on function public.missions_state(uuid) from public, anon, authenticated;
+grant execute on function public.missions_state(uuid) to service_role;
+comment on function public.missions_state(uuid) is
+  'The missions of a player in the shape of get_my_missions(), with the daily reset (ADR-166) and the daily skip (ADR-202).';
+
+create or replace function public.skip_mission(p_request_id uuid, p_mission_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_now    timestamptz := public.game_now();
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_monday date;
+  v_limit  integer := public.config_bigint('progression', '{missionSkipsPerDay}', 1)::integer;
+  v_skips  integer;
+  m        public.player_missions;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_mission_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'skip_mission');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_monday := v_today - (extract(isodow from v_today)::integer - 1);
+  -- one skip at a time
+  perform 1 from public.profiles p where p.id = v_player for update;
+  select * into m from public.player_missions x where x.id = p_mission_id and x.player_id = v_player for update;
+  if m.id is null then
+    perform public.api_error('mission_not_found');
+  end if;
+  -- only an open quick, daily or weekly mission of the current period; finished ones are claimed, milestones stay
+  if m.status <> 'active' or m.kind not in ('quick', 'daily', 'weekly')
+     or (m.expires_at is not null and m.expires_at <= v_now)
+     or (m.kind = 'daily' and m.period_start <> v_today)
+     or (m.kind = 'weekly' and m.period_start <> v_monday) then
+    perform public.api_error('mission_skip_invalid');
+  end if;
+  select coalesce((select r.skips from public.mission_resets r where r.player_id = v_player and r.reset_day = v_today), 0)
+    into v_skips;
+  if v_skips >= v_limit then
+    perform public.api_error('mission_skip_used');
+  end if;
+  update public.player_missions x
+     set status = 'expired', reset_at = v_now, expires_at = least(coalesce(x.expires_at, v_now), v_now),
+         state = x.state || jsonb_build_object('skipped', true)
+   where x.id = m.id;
+  insert into public.mission_resets (player_id, reset_day, used, skips, last_at) values (v_player, v_today, 0, 1, v_now)
+  on conflict (player_id, reset_day) do update set skips = public.mission_resets.skips + 1, last_at = excluded.last_at;
+  return public.request_complete(v_player, p_request_id,
+    public.missions_state(v_player) || jsonb_build_object('skipped', m.template_key));
+end;
+$$;
+revoke all on function public.skip_mission(uuid, uuid) from public, anon;
+grant execute on function public.skip_mission(uuid, uuid) to authenticated, service_role;
+comment on function public.skip_mission(uuid, uuid) is
+  'Swaps one open quick, daily or weekly mission for another, free, progression.missionSkipsPerDay times per Berlin day (ADR-202).';
 -- ===== idempotent copy of migrations/20261204009500_toplists.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
 -- =============================================================================
@@ -86110,7 +87129,7 @@ insert into public.game_config (key, value, description) values
   ('loans', '{"basePremiumBps":150,"reputationBpsPerPoint":4,"leverageBpsPerDebtToEquity":150,"maxLeveragePremiumBps":600,"lossMakingPremiumBps":200,"coverageDiscountBpsPerTurn":10,"maxCoverageDiscountBps":100,"cfoDiscountBpsPerSkill":10,"minPremiumBps":50,"maxPremiumBps":1500,"creditLinesByLevel":[{"level":15,"limitCents":5000000},{"level":20,"limitCents":25000000},{"level":25,"limitCents":200000000}],"creditLineReputationFactorMin":0.5,"creditLineReputationFactorMax":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "loans"'),
   ('employees', '{"minSkill":1,"maxSkill":10,"skillCapacityExponent":1.1,"salaryBaseCentsPerQuarter":18500,"salarySkillExponent":1.3,"playerProductivityMultiplier":2,"traits":[{"key":"ambitious","performanceMultiplier":1.15,"salaryMultiplier":1,"loyaltyDecayMultiplier":2},{"key":"loyal","performanceMultiplier":1,"salaryMultiplier":1,"loyaltyDecayMultiplier":0.5},{"key":"frugal","performanceMultiplier":1,"salaryMultiplier":0.9,"loyaltyDecayMultiplier":1},{"key":"genius","performanceMultiplier":1.25,"salaryMultiplier":1.3,"loyaltyDecayMultiplier":1.2},{"key":"easygoing","performanceMultiplier":0.92,"salaryMultiplier":0.95,"loyaltyDecayMultiplier":0.7},{"key":"mentor","performanceMultiplier":1.05,"salaryMultiplier":1.1,"loyaltyDecayMultiplier":0.8}],"loyalty":{"start":70,"quitThreshold":25,"decayPerQuarterOnSalaryFreeze":3,"gainPerQuarterOnRaise":8,"poachingSalaryPremiumBps":2000},"leadership":{"cooCapacityBonusPerSkill":0.015,"ctoDevelopmentTimeReductionPerSkill":0.03,"headOfSalesBoostPerSkill":0.02,"cfoGuidanceBandReductionPerSkill":0.02},"applicantPoolSize":6,"insiderLockHours":2,"insiderDetectionProbability":0.6,"insiderFineBps":15000,"maxSideRoles":1,"optionVestingQuarters":4}'::jsonb, 'Defaults from src/config/balance.ts, section "employees"'),
   ('careers', '{"tiers":[{"id":"intern","minLevel":2,"salaryCentsPerHour":15000,"stockOptions":false},{"id":"junior","minLevel":5,"salaryCentsPerHour":30000,"stockOptions":false},{"id":"senior","minLevel":12,"salaryCentsPerHour":70000,"stockOptions":false},{"id":"team_lead","minLevel":20,"salaryCentsPerHour":130000,"stockOptions":false},{"id":"c_level","minLevel":25,"salaryCentsPerHour":250000,"stockOptions":true}],"paidHoursPerDayCap":8,"inactivity":{"steps":[{"afterHours":24,"payBps":7500},{"afterHours":48,"payBps":5000},{"afterHours":72,"payBps":2500}],"fireAfterHours":120},"playerCompanyExperienceMultiplier":2,"promotion":{"hoursByTier":{"junior":12,"senior":36,"team_lead":72,"c_level":120},"rankHoursPerRealHour":24,"managementFrom":["team_lead","c_level"],"baseChanceBps":4000,"chancePerExtraScoreBps":800,"maxChanceBps":9000,"retryHours":24,"raiseBps":1500,"requestValidHours":72},"workTask":{"intervalHours":3,"bonusSalaryHours":1,"expiresHours":3,"fastAnswerSeconds":45}}'::jsonb, 'Defaults from src/config/balance.ts, section "careers"'),
-  ('progression', '{"firstLevelXp":100,"xpBase":250,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"missionXpScalePerLevel":0.15,"missionXpScaleMax":8,"missionCountScalePerLevel":0.04,"missionCountScaleMax":3,"missionResetsPerDay":1,"missionAfford":{"buyShareBps":5000,"volumeShareBps":{"quick":5000,"daily":10000,"weekly":30000},"profitShareBps":{"quick":100,"daily":200,"weekly":1000},"minBuyTargetCents":2000,"minProfitTargetCents":500,"minCashCents":1000,"weeklyCountShareBps":5000,"aiWageHours":6},"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":8},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"watchlist"},{"level":4,"key":"artworks"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":6,"key":"found_garage"},{"level":6,"key":"deals"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"property"},{"level":8,"key":"short_selling"},{"level":9,"key":"ipo"},{"level":10,"key":"found_small_business"},{"level":10,"key":"crypto"},{"level":10,"key":"nexamon"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":14,"key":"crypto_create"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":15,"key":"found_gmbh"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
+  ('progression', '{"firstLevelXp":100,"xpBase":200,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"missionXpScalePerLevel":0.18,"missionXpScaleMax":8,"missionCountScalePerLevel":0.04,"missionCountScaleMax":3,"missionResetsPerDay":1,"missionSkipsPerDay":1,"missionDraw":{"recentDraws":{"quick":12,"daily":9,"weekly":6},"cooldownHours":{"quick":48,"daily":96,"weekly":504},"featureWeightBps":15000,"newFeatureLevels":5,"newFeatureWeightBps":25000},"missionAfford":{"buyShareBps":5000,"volumeShareBps":{"quick":5000,"daily":10000,"weekly":30000},"profitShareBps":{"quick":100,"daily":200,"weekly":1000},"minBuyTargetCents":2000,"minProfitTargetCents":500,"minCashCents":1000,"weeklyCountShareBps":5000,"aiWageHours":6},"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":8},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"watchlist"},{"level":4,"key":"artworks"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":6,"key":"found_garage"},{"level":6,"key":"deals"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"property"},{"level":8,"key":"short_selling"},{"level":9,"key":"ipo"},{"level":10,"key":"found_small_business"},{"level":10,"key":"crypto"},{"level":10,"key":"nexamon"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":14,"key":"crypto_create"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":15,"key":"found_gmbh"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
   ('valuation', '{"growthWeight":1,"growthFactorMin":0.6,"growthFactorMax":1.8,"macroSensitivityPer100Bps":0.04,"macroFactorMin":0.6,"macroFactorMax":1.3,"bookValueFloorShare":0.5,"lossMakerRevenueElasticity":0.5,"analystTargetNoise":0.08,"analystWrongProbability":0.25}'::jsonb, 'Defaults from src/config/balance.ts, section "valuation"'),
   ('aiInvestors', '{"tickNoiseBps":{"bluechip":6,"midcap":15,"penny":45},"tickNoiseScale":0.45,"emaFastAlpha":0.15,"emaSlowAlpha":0.0165,"sentimentDecayPerTick":0.0019,"baselineVolumeDepthFraction":0.02,"playerWeight":{"activityHalfLifeHours":6,"referenceActivityCents":{"bluechip":100000000,"midcap":25000000,"penny":5000000},"minAiWeight":0.15},"archetypes":{"market_maker":{"capitalShare":0.05,"reactionSpeed":0.005,"params":{}},"value_fund":{"capitalShare":0.3,"reactionSpeed":0.0005,"params":{"gapScale":0.5,"deadBand":0.01}},"momentum_trader":{"capitalShare":0.1,"reactionSpeed":0.0002,"params":{"trendScale":0.02}},"pension_fund":{"capitalShare":0.2,"reactionSpeed":0.002,"params":{"rateSensitivityPer100Bps":-0.05,"yieldTiltPer100Bps":0.03,"minWeight":0.2,"maxWeight":1.8}},"index_fund":{"capitalShare":0.04,"reactionSpeed":0.005,"params":{}},"retail_herd":{"capitalShare":0.1,"reactionSpeed":0.002,"params":{"chaseGain":0.1,"trendScale":0.02}}}}'::jsonb, 'Defaults from src/config/balance.ts, section "aiInvestors"'),
   ('index', '{"size":30,"baseLevel":1000,"reviewEveryQuarters":4,"minListedQuarters":1,"entryBuffer":3}'::jsonb, 'Defaults from src/config/balance.ts, section "index"'),
