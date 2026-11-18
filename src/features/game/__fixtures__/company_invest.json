@@ -5,30 +5,35 @@
       "quality_add": 0,
       "fixed_factor": 1,
       "awareness_add": 0,
-      "demand_factor": 1,
+      "demand_factor": 0.9989707130434783,
       "capacity_factor": 1
     },
     "name": "Fixture Labor",
-    "board": { "to_vote": 0, "can_convene": true, "my_share_bps": 7472, "open_motions": 0 },
+    "board": { "to_vote": 0, "can_convene": true, "my_share_bps": 8000, "open_motions": 0 },
     "books": {
       "stage": "none",
       "streak": 0,
+      "brackets": [
+        { "extraBps": 200, "fromCentsPerDay": 10000000 },
+        { "extraBps": 500, "fromCentsPerDay": 100000000 },
+        { "extraBps": 800, "fromCentsPerDay": 1000000000 }
+      ],
       "last_day": null,
       "rate_bps": 1500,
       "receipts": [
-        { "id": 1, "key": "lab_equipment", "amount_cents": 40018 },
-        { "id": 2, "key": "office_rent", "amount_cents": 32330 },
-        { "id": 3, "key": "payslip", "amount_cents": 33881 }
+        { "id": 1, "key": "prototype", "amount_cents": 28037 },
+        { "id": 2, "key": "online_shop_payout", "amount_cents": 33615 },
+        { "id": 3, "key": "team_dinner", "amount_cents": 29105 }
       ],
       "can_close": false,
       "done_today": false,
       "hours_open": 0.0,
       "by_category": { "benefit": -5000 },
       "costs_cents": 5000,
-      "estimate_at": "2026-11-19T11:55:05.389564+00:00",
-      "late_fee_at": "2026-11-18T17:55:05.389564+00:00",
-      "reminder_at": "2026-11-18T05:55:05.389564+00:00",
-      "period_start": "2026-11-16T23:55:05.389564+00:00",
+      "estimate_at": "2026-11-21T02:13:25.110294+00:00",
+      "late_fee_at": "2026-11-20T08:13:25.110294+00:00",
+      "reminder_at": "2026-11-19T20:13:25.110294+00:00",
+      "period_start": "2026-11-18T14:13:25.110294+00:00",
       "profit_cents": -5000,
       "revenue_cents": 0,
       "loss_carry_cents": 0,
@@ -44,9 +49,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 203490,
+        "cost_cents": 60000,
+        "slow_hours": 3,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 30000
       },
       {
         "key": "r_quality_2",
@@ -56,9 +63,11 @@
         "missing": ["r_quality_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 610470,
+        "cost_cents": 160000,
+        "slow_hours": 9,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 80000
       },
       {
         "key": "r_quality_3",
@@ -68,9 +77,11 @@
         "missing": ["r_quality_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2500000,
+        "cost_cents": 400000,
+        "slow_hours": 24,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 200000
       },
       {
         "key": "r_quality_4",
@@ -80,9 +91,11 @@
         "missing": ["r_quality_3", "r_efficiency_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 15000000,
+        "cost_cents": 800000,
+        "slow_hours": 72,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 400000
       },
       {
         "key": "r_efficiency_1",
@@ -92,9 +105,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 203490,
+        "cost_cents": 60000,
+        "slow_hours": 3,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 30000
       },
       {
         "key": "r_efficiency_2",
@@ -104,9 +119,11 @@
         "missing": ["r_efficiency_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 610470,
+        "cost_cents": 160000,
+        "slow_hours": 9,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 80000
       },
       {
         "key": "r_efficiency_3",
@@ -116,9 +133,11 @@
         "missing": ["r_efficiency_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2500000,
+        "cost_cents": 400000,
+        "slow_hours": 24,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 200000
       },
       {
         "key": "r_efficiency_4",
@@ -128,9 +147,11 @@
         "missing": ["r_efficiency_3", "r_automation_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 15000000,
+        "cost_cents": 800000,
+        "slow_hours": 72,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 400000
       },
       {
         "key": "r_brand_1",
@@ -140,9 +161,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 203490,
+        "cost_cents": 60000,
+        "slow_hours": 3,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 30000
       },
       {
         "key": "r_brand_2",
@@ -152,9 +175,11 @@
         "missing": ["r_brand_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 610470,
+        "cost_cents": 160000,
+        "slow_hours": 9,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 80000
       },
       {
         "key": "r_brand_3",
@@ -164,9 +189,11 @@
         "missing": ["r_brand_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2500000,
+        "cost_cents": 400000,
+        "slow_hours": 24,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 200000
       },
       {
         "key": "r_brand_4",
@@ -176,9 +203,11 @@
         "missing": ["r_quality_2", "r_brand_3"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 15000000,
+        "cost_cents": 800000,
+        "slow_hours": 72,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 400000
       },
       {
         "key": "r_automation_1",
@@ -188,9 +217,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 203490,
+        "cost_cents": 60000,
+        "slow_hours": 3,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 30000
       },
       {
         "key": "r_automation_2",
@@ -200,9 +231,11 @@
         "missing": ["r_automation_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 610470,
+        "cost_cents": 160000,
+        "slow_hours": 9,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 80000
       },
       {
         "key": "r_automation_3",
@@ -212,9 +245,11 @@
         "missing": ["r_automation_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2500000,
+        "cost_cents": 400000,
+        "slow_hours": 24,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 200000
       },
       {
         "key": "r_automation_4",
@@ -224,9 +259,11 @@
         "missing": ["r_automation_3", "r_efficiency_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 15000000,
+        "cost_cents": 800000,
+        "slow_hours": 72,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 400000
       },
       {
         "key": "r_logistics_1",
@@ -236,9 +273,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 203490,
+        "cost_cents": 60000,
+        "slow_hours": 3,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 30000
       },
       {
         "key": "r_logistics_2",
@@ -248,9 +287,11 @@
         "missing": ["r_logistics_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 610470,
+        "cost_cents": 160000,
+        "slow_hours": 9,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 80000
       },
       {
         "key": "r_logistics_3",
@@ -260,9 +301,11 @@
         "missing": ["r_logistics_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2500000,
+        "cost_cents": 400000,
+        "slow_hours": 24,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 200000
       },
       {
         "key": "r_logistics_4",
@@ -272,9 +315,11 @@
         "missing": ["r_logistics_3", "r_automation_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 15000000,
+        "cost_cents": 800000,
+        "slow_hours": 72,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 400000
       },
       {
         "key": "r_sustainability_1",
@@ -284,9 +329,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 203490,
+        "cost_cents": 60000,
+        "slow_hours": 3,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 30000
       },
       {
         "key": "r_sustainability_2",
@@ -296,9 +343,11 @@
         "missing": ["r_sustainability_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 610470,
+        "cost_cents": 160000,
+        "slow_hours": 9,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 80000
       },
       {
         "key": "r_sustainability_3",
@@ -308,9 +357,11 @@
         "missing": ["r_sustainability_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2500000,
+        "cost_cents": 400000,
+        "slow_hours": 24,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 200000
       },
       {
         "key": "r_sustainability_4",
@@ -320,9 +371,11 @@
         "missing": ["r_sustainability_3", "r_brand_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 15000000,
+        "cost_cents": 800000,
+        "slow_hours": 72,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 400000
       },
       {
         "key": "r_finance_1",
@@ -332,9 +385,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 203490,
+        "cost_cents": 60000,
+        "slow_hours": 3,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 30000
       },
       {
         "key": "r_finance_2",
@@ -344,9 +399,11 @@
         "missing": ["r_finance_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 610470,
+        "cost_cents": 160000,
+        "slow_hours": 9,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 80000
       },
       {
         "key": "r_finance_3",
@@ -356,9 +413,11 @@
         "missing": ["r_finance_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2500000,
+        "cost_cents": 400000,
+        "slow_hours": 24,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 200000
       },
       {
         "key": "r_finance_4",
@@ -368,9 +427,11 @@
         "missing": ["r_logistics_2", "r_finance_3"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 15000000,
+        "cost_cents": 800000,
+        "slow_hours": 72,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": 400000
       },
       {
         "key": "p_second",
@@ -380,9 +441,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 406980,
-        "upkeep_cents": 509,
-        "cooldown_until": null
+        "cost_cents": 614748,
+        "slow_hours": null,
+        "upkeep_cents": 768,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "p_budget",
@@ -392,9 +455,11 @@
         "missing": ["r_efficiency_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 542640,
-        "upkeep_cents": 678,
-        "cooldown_until": null
+        "cost_cents": 819664,
+        "slow_hours": null,
+        "upkeep_cents": 1025,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "p_premium",
@@ -404,9 +469,11 @@
         "missing": ["r_quality_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1017450,
-        "upkeep_cents": 1017,
-        "cooldown_until": null
+        "cost_cents": 1536870,
+        "slow_hours": null,
+        "upkeep_cents": 1537,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "p_subscription",
@@ -416,9 +483,11 @@
         "missing": ["p_second", "r_brand_1"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 1500000,
-        "upkeep_cents": 1187,
-        "cooldown_until": null
+        "cost_cents": 1844244,
+        "slow_hours": null,
+        "upkeep_cents": 1793,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "p_merch",
@@ -428,9 +497,11 @@
         "missing": ["r_brand_2"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 271320,
-        "upkeep_cents": 339,
-        "cooldown_until": null
+        "cost_cents": 409832,
+        "slow_hours": null,
+        "upkeep_cents": 512,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "p_enterprise",
@@ -441,8 +512,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 6000000,
-        "upkeep_cents": 1696,
-        "cooldown_until": null
+        "slow_hours": null,
+        "upkeep_cents": 2561,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "g_south",
@@ -452,9 +525,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 678300,
-        "upkeep_cents": 678,
-        "cooldown_until": null
+        "cost_cents": 1024580,
+        "slow_hours": null,
+        "upkeep_cents": 1025,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "g_dach",
@@ -464,9 +539,11 @@
         "missing": ["g_south"],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 2000000,
-        "upkeep_cents": 1017,
-        "cooldown_until": null
+        "cost_cents": 2049160,
+        "slow_hours": null,
+        "upkeep_cents": 1537,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "g_europe",
@@ -477,8 +554,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 6000000,
-        "upkeep_cents": 1357,
-        "cooldown_until": null
+        "slow_hours": null,
+        "upkeep_cents": 2049,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "g_america",
@@ -489,8 +568,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 15000000,
-        "upkeep_cents": 1696,
-        "cooldown_until": null
+        "slow_hours": null,
+        "upkeep_cents": 2561,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "g_asia",
@@ -501,8 +582,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 30000000,
-        "upkeep_cents": 2035,
-        "cooldown_until": null
+        "slow_hours": null,
+        "upkeep_cents": 3074,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "m_machines",
@@ -512,9 +595,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 5,
-        "cost_cents": 339150,
-        "upkeep_cents": 170,
-        "cooldown_until": null
+        "cost_cents": 512290,
+        "slow_hours": null,
+        "upkeep_cents": 256,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "m_datacenter",
@@ -524,9 +609,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 3,
-        "cost_cents": 500000,
-        "upkeep_cents": 203,
-        "cooldown_until": null
+        "cost_cents": 717206,
+        "slow_hours": null,
+        "upkeep_cents": 307,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "m_showroom",
@@ -536,9 +623,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 3,
-        "cost_cents": 406980,
-        "upkeep_cents": 203,
-        "cooldown_until": null
+        "cost_cents": 614748,
+        "slow_hours": null,
+        "upkeep_cents": 307,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "a_kleinhirn",
@@ -549,8 +638,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 8000000,
-        "upkeep_cents": 678,
-        "cooldown_until": null
+        "slow_hours": null,
+        "upkeep_cents": 1025,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "a_datenkrake",
@@ -561,8 +652,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 10000000,
-        "upkeep_cents": 848,
-        "cooldown_until": null
+        "slow_hours": null,
+        "upkeep_cents": 1281,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "a_robobutze",
@@ -573,8 +666,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 12000000,
-        "upkeep_cents": 678,
-        "cooldown_until": null
+        "slow_hours": null,
+        "upkeep_cents": 1025,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "l_patent",
@@ -584,9 +679,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 339150,
-        "upkeep_cents": 339,
-        "cooldown_until": null
+        "cost_cents": 512290,
+        "slow_hours": null,
+        "upkeep_cents": 512,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "l_brand",
@@ -596,9 +693,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 339150,
-        "upkeep_cents": 407,
-        "cooldown_until": null
+        "cost_cents": 512290,
+        "slow_hours": null,
+        "upkeep_cents": 615,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "l_export",
@@ -608,9 +707,11 @@
         "missing": [],
         "ready_at": null,
         "max_level": 1,
-        "cost_cents": 508725,
-        "upkeep_cents": 170,
-        "cooldown_until": null
+        "cost_cents": 768435,
+        "slow_hours": null,
+        "upkeep_cents": 256,
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_obstkorb",
@@ -621,8 +722,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 5000,
+        "slow_hours": null,
         "upkeep_cents": 160,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_kaffee",
@@ -633,8 +736,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 8000,
+        "slow_hours": null,
         "upkeep_cents": 200,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_tischkicker",
@@ -645,8 +750,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 60000,
+        "slow_hours": null,
         "upkeep_cents": 40,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_hundebuero",
@@ -657,8 +764,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 10000,
+        "slow_hours": null,
         "upkeep_cents": 80,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_massagesessel",
@@ -669,8 +778,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 150000,
+        "slow_hours": null,
         "upkeep_cents": 80,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_jobrad",
@@ -681,8 +792,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 20000,
+        "slow_hours": null,
         "upkeep_cents": 480,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_fitness",
@@ -693,8 +806,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 30000,
+        "slow_hours": null,
         "upkeep_cents": 600,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_homeoffice",
@@ -705,8 +820,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 50000,
+        "slow_hours": null,
         "upkeep_cents": 400,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_weiterbildung",
@@ -717,8 +834,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 40000,
+        "slow_hours": null,
         "upkeep_cents": 1000,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_feelgood",
@@ -729,8 +848,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 100000,
+        "slow_hours": null,
         "upkeep_cents": 1200,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_betriebsrente",
@@ -741,8 +862,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 80000,
+        "slow_hours": null,
         "upkeep_cents": 1600,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_kita",
@@ -753,8 +876,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 500000,
+        "slow_hours": null,
         "upkeep_cents": 2000,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_bonus",
@@ -765,8 +890,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 0,
+        "slow_hours": null,
         "upkeep_cents": 3600,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "b_viertagewoche",
@@ -777,8 +904,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 200000,
+        "slow_hours": null,
         "upkeep_cents": 1200,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "x_pizza",
@@ -789,8 +918,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 11000,
+        "slow_hours": null,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "x_teamevent",
@@ -801,8 +932,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 54000,
+        "slow_hours": null,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "x_firmenfeier",
@@ -813,8 +946,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 148000,
+        "slow_hours": null,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       },
       {
         "key": "x_sonderbonus",
@@ -825,8 +960,10 @@
         "ready_at": null,
         "max_level": 1,
         "cost_cents": 200000,
+        "slow_hours": null,
         "upkeep_cents": 0,
-        "cooldown_until": null
+        "cooldown_until": null,
+        "slow_cost_cents": null
       }
     ],
     "taxes": {
@@ -835,7 +972,7 @@
       "rate_bps": 1500,
       "due_cents": 0,
       "loss_carry_cents": 0,
-      "advisor_wage_cents": 4000,
+      "advisor_wage_cents": 6000,
       "advisor_discount_bps": 800
     },
     "ticker": "FIX",
@@ -857,21 +994,21 @@
     "dividends": {
       "last": [],
       "streak": 0,
-      "total_e6": 1070639000000,
-      "max_cents": 14073143,
+      "total_e6": 1000000000000,
+      "max_cents": 10553206,
       "min_cents": 10000,
       "can_declare": true,
-      "founder_share_bps": 7472
+      "founder_share_bps": 8000
     },
     "headcount": 4,
-    "cash_cents": 28146287,
-    "company_id": "e260de99-c5d0-46e1-9bdd-4db274f89a60",
+    "cash_cents": 21106413,
+    "company_id": "df2920a5-0383-42f4-82e1-9c3acc755c59",
     "reputation": {
-      "value": 50.0,
-      "target": 50.0,
+      "value": 49.74,
+      "target": 49.74,
       "drivers": {},
       "price_factor": 1.0,
-      "demand_factor": 1.0,
+      "demand_factor": 0.999,
       "payout_ratio_bps": 0
     },
     "restrictions": {
@@ -894,8 +1031,11 @@
     },
     "unpaid_cents": 0,
     "reserved_cents": 0,
-    "free_cash_cents": 28146287,
-    "ref_revenue_cents": 33915,
+    "free_cash_cents": 21106413,
+    "avg_profit_cents": 6514,
+    "ref_profit_cents": 20000,
+    "research_started": 0,
+    "ref_revenue_cents": 51229,
     "founder_payout_bps": 0,
     "upkeep_per_hour_cents": 160
   }

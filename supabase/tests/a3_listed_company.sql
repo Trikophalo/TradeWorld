@@ -58,8 +58,14 @@ grant execute on all functions in schema tests to public;
 -- =============================================================================
 select tests.assert(
   jsonb_array_length(public.listed_cfg() -> 'items') >= 60
-  and public.listed_item_cost(public.listed_item('r_quality_3'), 0, 100000, 3) = 4800000
-  and public.listed_item_cost(public.listed_item('r_quality_3'), 0, 20000, 3) = 2500000
+  -- ADR-215: research is priced from the earnings (listed_research_cost), the rest from the revenue
+  and public.listed_research_cost(public.listed_item('r_quality_3'), 100000, 0) = 1600000
+  and public.listed_research_cost(public.listed_item('r_quality_3'), 20000, 0) = 400000
+  and public.listed_research_cost(public.listed_item('r_quality_4'), 20000, 0) = 800000
+  and public.listed_research_cost(public.listed_item('r_quality_4'), 1000000, 27) = 40000000
+  and public.listed_research_cost(public.listed_item('r_quality_2'), 123457, 3) = 1061730
+  and public.listed_research_cost(public.listed_item('r_quality_2'), 123457, 3, true) = 530865
+  and public.listed_item_cost(public.listed_item('p_premium'), 0, 100000, 3) = 3000000
   and public.listed_item_cost(public.listed_item('m_machines'), 2, 35000, 3) = 896000
   and public.listed_item_cost(public.listed_item('x_teamevent'), 0, 35000, 7) = 72000
   and public.listed_item_cost(public.listed_item('x_teamevent'), 0, 35000, 0) = 36000
@@ -208,7 +214,8 @@ select tests.assert(
   and (:'l0'::jsonb #>> '{taxes,rate_bps}')::int = 1500 and not (:'l0'::jsonb #>> '{taxes,advisor}')::boolean
   and (:'l0'::jsonb #>> '{books,stage}') = 'none' and not (:'l0'::jsonb #>> '{books,can_close}')::boolean
   and (select count(*) from jsonb_array_elements(:'l0'::jsonb -> 'items') i where i ->> 'status' <> 'none') = 0
-  and (select i ->> 'cost_cents' from jsonb_array_elements(:'l0'::jsonb -> 'items') i where i ->> 'key' = 'r_quality_1')::bigint = 120000
+  and (select i ->> 'cost_cents' from jsonb_array_elements(:'l0'::jsonb -> 'items') i where i ->> 'key' = 'r_quality_1')::bigint
+      = public.listed_research_cost(public.listed_item('r_quality_1'), public.listed_ref_profit(:'co'), 0)
   and (select i -> 'missing' from jsonb_array_elements(:'l0'::jsonb -> 'items') i where i ->> 'key' = 'r_quality_2') = '["r_quality_1"]'::jsonb,
   'get_listed_company(): starts at the green line (60), reputation 50, every item of the catalogue with its price');
 
@@ -300,6 +307,7 @@ reset role;
 select tests.company_cash(:'co') as cc1 \gset
 select tests.households() as hh1 \gset
 select public.listed_ref_revenue(:'co') as ref1 \gset
+select public.listed_ref_profit(:'co') as refp1 \gset
 select tests.login_as('authenticated', :f);
 \set rq1 '''0a30a30a-0000-4000-8000-0000000000e1'''
 select public.company_invest(:rq1, 'r_quality_1') -> 'listed' as i1 \gset
@@ -307,9 +315,9 @@ select public.company_invest(:rq1, 'r_quality_1') -> 'listed' as i1b \gset
 select tests.throws_key($$select public.company_invest(gen_random_uuid(), 'r_quality_1')$$, 'item_running',
   'company_invest(): a running research cannot be started twice');
 reset role;
-select public.listed_item_cost(public.listed_item('r_quality_1'), 0, :ref1, 0) as cost1 \gset
+select public.listed_research_cost(public.listed_item('r_quality_1'), :refp1, 0) as cost1 \gset
 select tests.assert(
-  :cost1::bigint = greatest(100000, 6 * :ref1::bigint) and :'i1'::jsonb = :'i1b'::jsonb
+  :cost1::bigint = least(40 * :refp1::bigint, greatest(50000, 3 * :refp1::bigint)) and :'i1'::jsonb = :'i1b'::jsonb
   and tests.company_cash(:'co') = :cc1::bigint - :cost1::bigint and tests.households() = :hh1::bigint + :cost1::bigint
   and (select i ->> 'status' from jsonb_array_elements(:'i1'::jsonb -> 'items') i where i ->> 'key' = 'r_quality_1') = 'running'
   and (select (i ->> 'ready_at')::timestamptz > now() + interval '50 minutes' from jsonb_array_elements(:'i1'::jsonb -> 'items') i
@@ -317,7 +325,7 @@ select tests.assert(
   and (public.listed_effects(:'co') ->> 'qualityBps')::int = 0
   and (select t.metadata from public.ledger_transactions t where t.idempotency_key = 'invest:' || :rq1)
       = '{"cat": "research", "item": "r_quality_1", "one_off": true}'::jsonb,
-  'company_invest(): a research costs max(1 000 EUR, 6 h of revenue), runs an hour and has no effect before; idempotent');
+  'company_invest(): a research costs max(500 EUR, 3 h of profit) (ADR-215), runs an hour and has no effect before; idempotent');
 
 -- time is up: the research is active, its effect lasts
 insert into public.player_missions (player_id, template_key, kind, period_start, target, xp_reward)
@@ -568,7 +576,8 @@ select tests.throws_key($$select public.company_invest(gen_random_uuid(), 'p_sec
   'company_invest(): a product cannot be paid from the research budget');
 select public.company_invest(gen_random_uuid(), 'r_sustainability_1') -> 'listed' as l3 \gset
 reset role;
-select public.listed_item_cost(public.listed_item('r_sustainability_1'), 0, public.listed_ref_revenue(:'co'), 10) as cost2 \gset
+select public.listed_research_cost(public.listed_item('r_sustainability_1'), public.listed_ref_profit(:'co'),
+                                   public.listed_research_started(:'co') - 1) as cost2 \gset
 select tests.assert(
   :'m2f'::jsonb #>> '{history,0,status}' = 'passed' and (:'m2f'::jsonb #>> '{history,0,result,amount_cents}')::bigint = 5000000
   and :'m2f'::jsonb -> 'budgets' = '[{"purpose": "research", "amount_cents": 5000000}]'::jsonb

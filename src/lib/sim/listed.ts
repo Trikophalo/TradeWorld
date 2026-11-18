@@ -33,6 +33,61 @@ export function refRevenueCents(hourRevenuesCents: readonly number[], cfg: Liste
   return Math.max(cfg.refRevenue.minCents, Math.round(avg));
 }
 
+/** Raw average operating profit per hour of the research window (may be negative; 0 without hours). */
+export function avgProfitCents(hourProfitsCents: readonly number[], cfg: ListedRules = RULES): number {
+  const hours = hourProfitsCents.slice(-cfg.research.refProfit.windowHours);
+  return hours.length > 0 ? Math.round(hours.reduce((s, p) => s + p, 0) / hours.length) : 0;
+}
+
+/** The earnings capacity research is priced from (ADR-215): average profit per hour, never below the minimum. */
+export function refProfitCents(hourProfitsCents: readonly number[], cfg: ListedRules = RULES): number {
+  return Math.max(cfg.research.refProfit.minCents, avgProfitCents(hourProfitsCents, cfg));
+}
+
+/**
+ * Price of a research step (ADR-215): profitHoursByTier x reference profit, grown by every research step started so
+ * far, at least the floor of the tier, never more than maxProfitHours of reference profit. Slow: costBps of it.
+ */
+export function researchCostCents(
+  item: ListedItem,
+  refProfit: number,
+  researchStarted: number,
+  slow = false,
+  cfg: ListedRules = RULES,
+): number {
+  const r = cfg.research;
+  const i = clamp(Math.floor(item.tier ?? 1), 1, r.profitHoursByTier.length) - 1;
+  const p = Math.max(r.refProfit.minCents, refProfit);
+  const hours =
+    r.profitHoursByTier[i]! * (1 + (r.growthPerDoneBps * Math.max(0, Math.floor(researchStarted))) / 10_000);
+  const full = Math.round(Math.min(r.maxProfitHours * p, Math.max(r.minCostCentsByTier[i]!, hours * p)));
+  return slow ? Math.floor((full * r.slow.costBps) / 10_000) : full;
+}
+
+/** Duration of a research step in hours; slow research takes hoursFactor times as long. */
+export function researchHours(item: ListedItem, slow = false, cfg: ListedRules = RULES): number {
+  return slow ? item.hours * cfg.research.slow.hoursFactor : item.hours;
+}
+
+/** How many hours of the average profit a price is (null without profit). */
+export function profitHoursOf(costCents: number, avgProfitPerHourCents: number): number | null {
+  return avgProfitPerHourCents > 0 ? costCents / avgProfitPerHourCents : null;
+}
+
+/**
+ * Hours until the company can pay `costCents` from what it may spend now plus its average profit (0 = now, null =
+ * not without profit).
+ */
+export function affordableInHours(
+  costCents: number,
+  spendableCents: number,
+  avgProfitPerHourCents: number,
+): number | null {
+  const gap = costCents - Math.max(0, spendableCents);
+  if (gap <= 0) return 0;
+  return avgProfitPerHourCents > 0 ? Math.ceil(gap / avgProfitPerHourCents) : null;
+}
+
 const heads = (headcount: number) => Math.max(1, Math.floor(headcount));
 
 /** One-off price of the next level of an item (`level` = levels owned so far, 0 for the first). */
@@ -415,7 +470,9 @@ export function booksTax(
   const used = Math.min(carry, profit);
   const taxable = profit - used;
   const gross =
-    periodHours === undefined ? Math.floor((taxable * rateBps) / 10_000) : progressiveTaxCents(taxable, rateBps, periodHours);
+    periodHours === undefined
+      ? Math.floor((taxable * rateBps) / 10_000)
+      : progressiveTaxCents(taxable, rateBps, periodHours);
   const discount = Math.floor((gross * clamp(discountBps, 0, 10_000)) / 10_000);
   return {
     profitCents: profit,
@@ -490,7 +547,10 @@ export function pickReceipts(uniforms: readonly number[], cfg: ListedRules = RUL
 export function advisorRateBps(refCents: number, cfg: ListedRules = RULES): number {
   const a = cfg.taxes.advisor;
   if (!(refCents > a.pivotCentsPerHour)) return a.revenueBps;
-  return Math.min(a.maxRevenueBps, a.revenueBps * Math.pow(a.growthPerDecade, Math.log10(refCents / a.pivotCentsPerHour)));
+  return Math.min(
+    a.maxRevenueBps,
+    a.revenueBps * Math.pow(a.growthPerDecade, Math.log10(refCents / a.pivotCentsPerHour)),
+  );
 }
 
 /** Hourly wage of the tax advisor. */
@@ -503,7 +563,12 @@ export function advisorWageCents(refCents: number, cfg: ListedRules = RULES): nu
  * Corporate tax with the progressive brackets (ADR-209): rate on everything, plus extraBps on the part above each
  * bracket's threshold; thresholds are per day and scaled to the period's hours. Rounded down.
  */
-export function progressiveTaxCents(taxableCents: number, rateBps: number, periodHours: number, cfg: ListedRules = RULES) {
+export function progressiveTaxCents(
+  taxableCents: number,
+  rateBps: number,
+  periodHours: number,
+  cfg: ListedRules = RULES,
+) {
   const taxable = Math.max(0, Math.floor(taxableCents));
   const days = Math.max(1, periodHours) / 24;
   let tax = taxable * rateBps;

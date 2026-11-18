@@ -1398,8 +1398,8 @@ Alle Werte in `src/config/listed.ts` (`BALANCE.listed`, `game_config.listed`).
 | Belege                             | `taxes.check`                                          | 3 Belege, 5 % Rabatt                                                                   |
 | Steuerberater                      | `taxes.advisor`                                        | max(40 €, 1 % des Referenzumsatzes) je Stunde, 8 % Rabatt                              |
 
-**Katalog** (66 Posten): Forschung 4 Stufen je Zweig zu 6 / 18 / 48 / 120 Stunden Referenzumsatz (mindestens 1.000 /
-5.000 / 25.000 / 150.000 €), Dauer 1 / 3 / 8 / 24 h. Produkte 8–80 h, laufend 1–5 %. Regionen 20–200 h, laufend 2–6 %.
+**Katalog** (66 Posten): Forschung 4 Stufen je Zweig, Dauer 1 / 3 / 8 / 24 h; Preis seit ADR-215 aus dem Gewinn
+(3 / 8 / 16 / 28 Gewinnstunden, siehe Nachtrag unten; vorher 6 / 18 / 48 / 120 Stunden Referenzumsatz). Produkte 8–80 h, laufend 1–5 %. Regionen 20–200 h, laufend 2–6 %.
 Maschinen 10–14 h je Stufe (× 1,6–1,8), laufend 0,5–0,6 % je Stufe. Zukäufe 90–130 h, laufend 2–2,5 %. Lizenzen
 10–15 h, laufend 0,5–1,2 %. Benefits 0–5.000 € einmalig und 0,10–9 € je Kopf und Stunde für +2 … +10 Punkte.
 Aktionen 50–1.000 € + 15–500 € je Kopf für +3 … +15 Punkte sofort.
@@ -1933,3 +1933,52 @@ Werte in `src/config/news-fresh.ts` (`BALANCE.newsShow.fresh`), Texte der Themen
 | Chat: Zeilen je Meldung / je Sendung | 2 / 24                       |
 | Umfrage je Sendung                   | 45 %, 3 bis 6 Stimmen        |
 | Emote-Sturm nach großem Zug          | 4 bis 7 Zeilen in 5 Sekunden |
+
+## Nachtrag: Forschung nach Gewinn statt nach Größe (ADR-215)
+
+Werte in `src/config/listed.ts` (`LISTED_RULES.research`, `game_config.listed.research`), Formel
+`researchCostCents` in `src/lib/sim/listed.ts`, gespiegelt in `listed_research_cost` (Migration
+`20261204011000_research_cost.sql`).
+
+| Wert                   | Schlüssel                     | Stand                                                            |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| Bezugsgewinn           | `refProfit`                   | Schnitt der letzten 48 Betriebsstunden, mindestens 200 €/h       |
+| Gewinnstunden je Stufe | `profitHoursByTier`           | 3 / 8 / 16 / 28                                                  |
+| Untergrenze je Stufe   | `minCostCentsByTier`          | 500 / 1.500 / 4.000 / 10.000 €                                   |
+| Wachstum je Forschung  | `growthPerDoneBps`            | +2,5 % je schon begonnener Forschung                             |
+| Deckel                 | `maxProfitHours`              | höchstens 40 Gewinnstunden je Schritt (gilt vor der Untergrenze) |
+| Sparforschung          | `slow.costBps`, `hoursFactor` | 50 % des Preises, dreifache Dauer                                |
+
+Preis = min(40 × G, max(Untergrenze, Stunden der Stufe × G × (1 + 2,5 % × begonnene Forschungen))), G = Bezugsgewinn.
+Firmenwert, Börsenwert und Umsatz gehen nicht ein. Produkte, Regionen, Maschinen, Zukäufe und Lizenzen bleiben beim
+Referenzumsatz (ADR-167).
+
+**Vorher und nachher** (Umsatz und Gewinn je Stunde aus `src/lib/sim/growth.ts` mit der Reibung aus ADR-209,
+Schnitt der 48 Stunden, in denen die Firma den Wert erreicht; 1 und 100 Mio. € Pharma-Nische, 10 Mio. € und 1 Mrd. €
+Tech-Nische; nachher in der Reihenfolge des Baums: Stufe 1 als erste Forschung, Stufe 2 nach 7, Stufe 3 nach 14,
+Stufe 4 nach 21 begonnenen):
+
+| Firmenwert |  Umsatz/h |  Gewinn/h | Stufe |       vorher | vorher in Gewinn |     nachher | nachher in Gewinn |
+| ---------- | --------: | --------: | :---: | -----------: | ---------------: | ----------: | ----------------: |
+| 1 Mio. €   |   7.373 € |   2.516 € |   1   |     44.238 € |             18 h |     7.548 € |               3 h |
+|            |           |           |   2   |    132.714 € |         2,2 Tage |    23.650 € |               9 h |
+|            |           |           |   3   |    353.904 € |         5,9 Tage |    54.346 € |              22 h |
+|            |           |           |   4   |    884.760 € |        14,7 Tage |   100.640 € |              40 h |
+| 10 Mio. €  |  32.455 € |  16.748 € |   1   |    194.730 € |             12 h |    50.244 € |               3 h |
+|            |           |           |   2   |    584.190 € |             35 h |   157.431 € |               9 h |
+|            |           |           |   3   |  1,56 Mio. € |         3,9 Tage |   361.757 € |              22 h |
+|            |           |           |   4   |  3,89 Mio. € |         9,7 Tage |   669.920 € |              40 h |
+| 100 Mio. € | 497.306 € | 114.511 € |   1   |  2,98 Mio. € |             26 h |   343.533 € |               3 h |
+|            |           |           |   2   |  8,95 Mio. € |         3,3 Tage | 1,08 Mio. € |               9 h |
+|            |           |           |   3   | 23,87 Mio. € |         8,7 Tage | 2,47 Mio. € |              22 h |
+|            |           |           |   4   | 59,68 Mio. € |        21,7 Tage | 4,58 Mio. € |              40 h |
+| 1 Mrd. €   | 611.205 € |  85.871 € |   1   |  3,67 Mio. € |             43 h |   257.613 € |               3 h |
+|            |           |           |   2   |    11 Mio. € |         5,3 Tage |   807.187 € |               9 h |
+|            |           |           |   3   | 29,34 Mio. € |        14,2 Tage | 1,85 Mio. € |              22 h |
+|            |           |           |   4   | 73,34 Mio. € |        35,6 Tage | 3,43 Mio. € |              40 h |
+
+Vorher wuchs der Preis mit dem Umsatz, die Marge fiel durch Sättigung, Verwaltung und Steuerstufen (ADR-209) von
+rund 45 % auf 14 %: die letzte Stufe kostete bei 1 Mrd. € über 35 Tage Gewinn. Nachher kostet jede Stufe höchstens
+40 Stunden Gewinn, egal wie groß die Firma ist; Sparforschung halbiert das auf 20 Stunden und dauert dafür 3 statt
+1, 9 statt 3, 24 statt 8 und 72 statt 24 Stunden. Der Baum (28 Schritte) kostet bei 1 Mrd. € zusammen rund 22 Tage
+Gewinn statt rund 450.

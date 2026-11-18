@@ -21,6 +21,8 @@ import {
   sortedDrivers,
   taxPeriodState,
   upkeepShareBps,
+  hourSpan,
+  researchPrice,
 } from "./view";
 
 const NOW = Date.parse("2026-11-16T12:00:00Z");
@@ -36,6 +38,8 @@ function states(patch: Record<string, Partial<ListedItemState>> = {}): ListedIte
     readyAt: null,
     cooldownUntil: null,
     costCents: item.minCostCents,
+    slowCostCents: item.kind === "research" ? 0 : null,
+    slowHours: item.kind === "research" ? item.hours * 3 : null,
     upkeepCents: 0,
     missing: [...(item.requires ?? [])],
     ...patch[item.key],
@@ -163,6 +167,28 @@ describe("catalogue", () => {
   it("puts running costs against the reference revenue", () => {
     expect(upkeepShareBps(5_000, 100_000)).toBe(500);
     expect(upkeepShareBps(5_000, 0)).toBe(0);
+  });
+});
+
+describe("research price in profit (ADR-215)", () => {
+  it("reads a span of hours", () => {
+    expect(hourSpan(0.4)).toEqual({ unit: "lessHour" });
+    expect(hourSpan(13.6)).toEqual({ unit: "hours", value: 14 });
+    expect(hourSpan(47.9)).toEqual({ unit: "hours", value: 48 });
+    expect(hourSpan(60)).toEqual({ unit: "days", value: 2.5 });
+  });
+
+  it("tells how much profit a price is and when it is affordable", () => {
+    expect(researchPrice(1_400_000, 2_000_000, 100_000)).toEqual({
+      profit: { unit: "hours", value: 14 },
+      affordable: "now",
+    });
+    expect(researchPrice(4_000_000, 1_000_000, 50_000)).toEqual({
+      profit: { unit: "days", value: 3.3 },
+      affordable: { unit: "days", value: 2.5 },
+    });
+    expect(researchPrice(500_000, 0, -10_000)).toEqual({ profit: null, affordable: null });
+    expect(researchPrice(500_000, 600_000, 0)).toEqual({ profit: null, affordable: "now" });
   });
 });
 

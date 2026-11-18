@@ -43,7 +43,10 @@ export interface ListedItem {
   readonly tier?: number;
   /** The board budget that may pay for it. */
   readonly purpose: ListedPurpose;
-  /** One-off price: max(minCostCents, costHours x reference revenue per hour) x costGrowth^level. */
+  /**
+   * One-off price: max(minCostCents, costHours x reference revenue per hour) x costGrowth^level. Research is priced
+   * from the earnings instead (LISTED_RULES.research, ADR-215); its costHours and minCostCents are 0.
+   */
   readonly costHours: number;
   readonly minCostCents: number;
   /** One-off price on top, per head (players and AI workers, at least one). */
@@ -65,11 +68,12 @@ export interface ListedItem {
   readonly effects: ListedEffects;
 }
 
+/** Research steps: only the duration here; the price comes from LISTED_RULES.research (ADR-215). */
 const RESEARCH_TIERS = [
-  { costHours: 6, minCostCents: 100_000, hours: 1 },
-  { costHours: 18, minCostCents: 500_000, hours: 3 },
-  { costHours: 48, minCostCents: 2_500_000, hours: 8 },
-  { costHours: 120, minCostCents: 15_000_000, hours: 24 },
+  { costHours: 0, minCostCents: 0, hours: 1 },
+  { costHours: 0, minCostCents: 0, hours: 3 },
+  { costHours: 0, minCostCents: 0, hours: 8 },
+  { costHours: 0, minCostCents: 0, hours: 24 },
 ] as const;
 
 /** One branch of the research tree: four steps, each needs the one before; the last one also a step elsewhere. */
@@ -504,6 +508,22 @@ export const LISTED_PURPOSES: readonly ListedPurpose[] = ["research", "products"
 export const LISTED_RULES = {
   /** Prices follow the company's size: the average revenue per hour of the last hours, never below the minimum. */
   refRevenue: { windowHours: 24, minCents: 20_000 },
+  /**
+   * ADR-215: research is priced from the earnings, not from the revenue (which grows far faster than the profit once
+   * the size friction of ADR-209 bites). Price of a step = min(maxProfitHours x P, max(minCostCentsByTier[tier],
+   * profitHoursByTier[tier] x P x (1 + growthPerDoneBps x research started so far))), P = average operating profit
+   * per hour of the last refProfit.windowHours hours, at least refProfit.minCents. Never more than maxProfitHours of
+   * profit; diminishing returns come from the tier and the number of research steps, not from the company value.
+   * "Sparforschung" (slow): costBps of the price, the duration x hoursFactor.
+   */
+  research: {
+    refProfit: { windowHours: 48, minCents: 20_000 },
+    profitHoursByTier: [3, 8, 16, 28],
+    minCostCentsByTier: [50_000, 150_000, 400_000, 1_000_000],
+    growthPerDoneBps: 250,
+    maxProfitHours: 40,
+    slow: { costBps: 5_000, hoursFactor: 3 },
+  },
   satisfaction: {
     /** A fresh listing starts exactly at the green line: the first hour is neutral. */
     start: 60,

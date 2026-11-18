@@ -4,6 +4,10 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Forschung bleibt bezahlbar: Ein Forschungsschritt kostet jetzt Stunden deines Gewinns (Schnitt der letzten 48
+  Stunden), nie mehr als 40 Stunden Gewinn, egal wie groß oder wie viel wert die Firma ist. Jede Forschung macht die
+  nächste etwas teurer. Neu ist die Sparforschung für den halben Preis bei dreifacher Dauer, und das Blatt zeigt, wie
+  viel Gewinn ein Schritt kostet und wann du ihn dir leisten kannst.
 - Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen),
   das Mausrad und zwei Finger zoomen nur noch die Karte statt die Seite zu scrollen, jedes Land hat seine richtige
   Flagge, alle Kennzahl-Kacheln sind gleich groß, und neue Kacheln zeigen Fixkosten und variable Kosten je Stunde mit

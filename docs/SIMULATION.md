@@ -1253,3 +1253,13 @@ Die Bewegung trifft nach 3 bis 15 Minuten zu 85 % ein und wirkt wie `event_price
 Ereignisfaktor und EMAs (`market_force_shock`): Der Kurs nähert sich dem Anker, Momentum-Händler sehen den Rückschlag,
 die Kleinanleger folgen der Stimmung. Messung: `scripts/stock-heat-harness.ts` (`simulateStockPath`, echtes
 `stepMarketTick`), Ergebnisse in docs/BALANCING.md.
+
+## Nachtrag: Preis der Forschung (ADR-215)
+
+`researchCostCents(item, G, n, slow)` in `src/lib/sim/listed.ts`: G = `refProfitCents` (Schnitt des Betriebsgewinns
+der letzten `research.refProfit.windowHours` Stunden, mindestens `minCents`), n = begonnene Forschungen,
+h = `profitHoursByTier[Stufe]`:
+
+`Preis = round(min(maxProfitHours × G, max(minCostCentsByTier[Stufe], h × (1 + growthPerDoneBps × n / 10 000) × G)))`,
+Sparforschung `floor(Preis × slow.costBps / 10 000)` bei `item.hours × slow.hoursFactor` Stunden.
+`profitHoursOf` und `affordableInHours` rechnen für die Anzeige um („≈ 14 Std. Gewinn“, „leistbar in etwa 2 Tagen“).

@@ -1027,6 +1027,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Weltkarte und Dashboard: Die Karte ist jetzt viel feiner (Küsten, Inseln, Seen, Gebirge, Wüsten, Ländergrenzen), das Mausrad und zwei Finger zoomen…",
       },
+      {
+        id: "m0-fundament-a7206c70",
+        title: null,
+        text: "Forschung bleibt bezahlbar: Ein Forschungsschritt kostet jetzt Stunden deines Gewinns (Schnitt der letzten 48 Stunden), nie mehr als 40 Stunden…",
+      },
     ],
   },
 ];
