@@ -12,6 +12,8 @@ import { DEMO_COMPANIES, DEMO_INDEX, type DemoCompany } from "@/lib/demo/market"
 import { bondPriceE4, bondYieldBps } from "@/lib/sim/bonds";
 import { withholdIncome } from "@/lib/sim/insolvency";
 import { planMarketOrder, type FillPlan } from "@/lib/sim/order-fill";
+import { drawMissions } from "@/lib/sim/mission-draw";
+import { createRng } from "@/lib/sim/rng";
 import { anchoredFairValue, playerImpactReturn } from "@/lib/sim/player-influence";
 import { needsFullTimeFounder } from "@/lib/sim/startup";
 import { popularityScore, viewCounts } from "@/lib/sim/popularity";
@@ -39,6 +41,8 @@ import {
   missionXp,
   resetAvailableOn,
   resetStateOn,
+  skipAvailableOn,
+  skippable,
   splitForReset,
   type Metric,
   type MissionResetState,
@@ -200,6 +204,10 @@ interface PlayerState {
   missionSeq: number;
   /** ADR-166: the swaps of the current Berlin day. */
   missionReset?: MissionResetState;
+  /** ADR-202: today's free skip of one mission. */
+  missionSkip?: MissionResetState;
+  /** ADR-202: the latest quick, daily and weekly draws (for the draw without repeats). */
+  missionDraws?: { key: string; kind: MissionKind; atMs: number }[];
   checkInDay: string | null;
   streakDays: number;
   /** Avatar, skills, daily reward, jobs (demo/careers.ts). */
@@ -1124,7 +1132,10 @@ function assignMissions(): void {
     milestone: progression.xpSources.milestoneMission.visible,
   };
   const means = { cashCents: pl.cashCents, tradableCents: pl.cashCents + holdingsValue() };
-  const rested = new Set(resetStateOn(pl.missionReset, berlinDay()).keys);
+  const rested = new Set([
+    ...resetStateOn(pl.missionReset, berlinDay()).keys,
+    ...resetStateOn(pl.missionSkip, berlinDay()).keys,
+  ]);
   // Drop expired daily and weekly missions and replaced quick ones.
   pl.missions = pl.missions.filter((mission) => {
     if (mission.kind === "daily" || mission.kind === "weekly") return mission.period === periodOf(mission.kind);
@@ -1141,10 +1152,16 @@ function assignMissions(): void {
       (t) =>
         t.kind === kind && availableFor(t, lvl) && !used.has(t.key) && !rested.has(t.key) && affordableFor(t, means),
     );
-    for (let i = current.length; i < limits[kind] && pool.length > 0; i++) {
-      // Quick missions rotate through the pool; the others take the next ones in order.
-      const pick = kind === "quick" ? pool.splice(pl.missionSeq % pool.length, 1)[0]! : pool.shift()!;
+    // ADR-202: quick, daily and weekly missions avoid repeats (same rules as the server); the story keeps its order
+    const picks =
+      kind === "milestone"
+        ? pool.slice(0, Math.max(0, limits[kind] - current.length))
+        : drawDemoMissions(pool, limits[kind] - current.length, kind);
+    for (const pick of picks) {
       pl.missionSeq += 1;
+      if (kind !== "milestone") {
+        pl.missionDraws = [...(pl.missionDraws ?? []), { key: pick.key, kind, atMs: Date.now() }].slice(-60);
+      }
       pl.missions.push({
         id: `mission-${pl.missionSeq}`,
         key: pick.key,
@@ -1154,11 +1171,37 @@ function assignMissions(): void {
         period: periodOf(kind),
       });
     }
-    // Quick missions whose pool ran dry start over.
-    if (kind === "quick" && pool.length === 0 && current.length < limits.quick) {
-      pl.missions = pl.missions.filter((mission) => mission.kind !== "quick" || mission.status !== "claimed");
-    }
   }
+}
+
+/** The tiered draw of ADR-202 over the demo catalogue (seeded by the mission counter, so it stays deterministic). */
+function drawDemoMissions(pool: readonly MissionTemplate[], count: number, kind: "quick" | "daily" | "weekly") {
+  const pl = p();
+  if (count <= 0) return [];
+  const history = (pl.missionDraws ?? []).filter((d) => d.kind === kind);
+  // a new player starts calmly: the very first missions of a kind follow the catalogue order
+  if (history.length === 0) return pool.slice(0, count);
+  const open = pl.missions.filter((mission) => mission.status === "active" || mission.status === "completed");
+  const rng = createRng(1_000 + pl.missionSeq);
+  return drawMissions(
+    pool.map((t) => ({
+      ...t,
+      weight: 100,
+      feature: t.requires !== undefined,
+      fromLevel: t.requires ? (unlockLevel(t.requires) ?? 1) : 1,
+    })),
+    count,
+    kind,
+    {
+      level: level(),
+      nowMs: Date.now(),
+      history,
+      openKeys: new Set(open.map((mission) => mission.key)),
+      openMetrics: new Set(open.map((mission) => template(mission.key).metric)),
+    },
+    progression.missionDraw,
+    () => rng.next(),
+  );
 }
 
 /** The missions with the state of the daily reset (ADR-166). */
@@ -1166,12 +1209,12 @@ function missionsState(): MissionsState {
   const groups = missionGroups();
   const today = berlinDay();
   const available = resetAvailableOn(p().missionReset, today);
+  const skip = skipAvailableOn(p().missionSkip, today);
+  const tomorrow = new Date(new Date(`${today}T00:00:00`).getTime() + DAY).toISOString();
   return {
     groups,
-    reset: {
-      available,
-      nextAt: available ? null : new Date(new Date(`${today}T00:00:00`).getTime() + DAY).toISOString(),
-    },
+    reset: { available, nextAt: available ? null : tomorrow },
+    skip: { available: skip, nextAt: skip ? null : tomorrow },
   };
 }
 
@@ -2647,6 +2690,23 @@ export const demoEngine: GameEngine = {
         const state = resetStateOn(pl.missionReset, today);
         pl.missionReset = { day: today, used: state.used + 1, keys: [...state.keys, ...removed.map((x) => x.key)] };
         pl.missions = kept;
+        return missionsState();
+      }),
+    ),
+
+  skipMission: (requestId, missionId) =>
+    delay(() =>
+      idempotent(requestId, () => {
+        const pl = p();
+        const today = berlinDay();
+        missionGroups(); // refresh progress and status
+        const mission = pl.missions.find((x) => x.id === missionId);
+        if (!mission) throw new GameError("mission_not_found");
+        if (!skippable(mission)) throw new GameError("mission_skip_invalid");
+        if (!skipAvailableOn(pl.missionSkip, today)) throw new GameError("mission_skip_used");
+        const state = resetStateOn(pl.missionSkip, today);
+        pl.missionSkip = { day: today, used: state.used + 1, keys: [...state.keys, mission.key] };
+        pl.missions = pl.missions.filter((x) => x !== mission);
         return missionsState();
       }),
     ),

@@ -1572,6 +1572,16 @@ select tests.login_as('authenticated', :p) is null as ok \gset
 select public.reset_missions(gen_random_uuid());
 \o
 reset role;
+-- ADR-202: and skips one of the new ones
+select m.id as fx_skip from public.player_missions m
+ where m.player_id = :p and m.status = 'active' and m.kind in ('quick', 'daily', 'weekly')
+   and (m.expires_at is null or m.expires_at > public.game_now())
+ order by m.kind = 'quick' desc, m.draw_seq desc limit 1 \gset
+select tests.login_as('authenticated', :p) is null as ok \gset
+\o :fixture_dir/skip_mission.json
+select public.skip_mission(gen_random_uuid(), :'fx_skip');
+\o
+reset role;
 
 -- Company fixes (5300): a small business upgraded to GmbH with closed hours, a 16-colour banner, a running campaign
 -- and a resting business move

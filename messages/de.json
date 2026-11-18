@@ -764,6 +764,8 @@
     "mission_already_claimed": "Die Belohnung hast du schon abgeholt.",
     "mission_reset_used": "Heute hast du schon neu gewürfelt. Morgen geht es wieder.",
     "mission_reset_nothing": "Gerade ist keine Mission offen, die du tauschen könntest.",
+    "mission_skip_used": "Heute hast du schon eine Mission übersprungen. Morgen geht es wieder.",
+    "mission_skip_invalid": "Diese Mission lässt sich nicht überspringen.",
     "avatar_unknown": "Dieses Profilbild gibt es nicht.",
     "avatar_locked": "Dieses Profilbild schaltest du mit einem höheren Level frei.",
     "daily_reward_claimed": "Die heutige Belohnung hast du schon abgeholt.",
@@ -1007,7 +1009,16 @@
       "cancel": "Lieber nicht",
       "doneTitle": "Neu gewürfelt",
       "doneText": "Frische Missionen warten auf dich. Morgen kannst du wieder würfeln.",
-      "failed": "Neu würfeln fehlgeschlagen"
+      "failed": "Neu würfeln fehlgeschlagen",
+      "skipHint": "Eine einzelne Mission kannst du außerdem einmal am Tag kostenlos tauschen.",
+      "skipUsed": "Einzeltausch für heute verbraucht. Wieder in"
+    },
+    "skip": {
+      "button": "Tauschen",
+      "label": "{title} gegen eine andere Mission tauschen",
+      "doneTitle": "Mission getauscht",
+      "doneText": "Eine neue Mission wartet auf dich.",
+      "failed": "Tauschen fehlgeschlagen"
     },
     "goTo": "{title} – dorthin gehen"
   },

@@ -159,6 +159,8 @@ select tests.assert(
            'buy_nexamon_packs', 'create_nexamon_pack_battle', 'join_nexamon_pack_battle',
            -- mission reset (ADR-166)
            'reset_missions',
+           -- single mission skip (ADR-202)
+           'skip_mission',
            -- listed companies (ADR-167)
            'get_listed_company', 'company_invest', 'company_invest_stop', 'company_declare_dividend',
            'company_books_close', 'company_tax_pay', 'company_tax_advisor', 'get_company_accounting',

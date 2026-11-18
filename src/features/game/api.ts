@@ -257,6 +257,9 @@ const missionsSchema = z.object({
   // ADR-166: one swap of the open missions per Berlin day
   reset_available: z.boolean().default(false),
   next_reset_at: iso.nullable().default(null),
+  // ADR-202: one free skip of a single mission per Berlin day
+  skip_available: z.boolean().default(false),
+  next_skip_at: iso.nullable().default(null),
   groups: z.array(
     z.object({
       kind: z.enum(["quick", "daily", "weekly", "milestone"]),
@@ -295,6 +298,7 @@ const mapMissions = (r: z.infer<typeof missionsSchema>): MissionsState => ({
     })),
   })),
   reset: { available: r.reset_available, nextAt: r.next_reset_at },
+  skip: { available: r.skip_available, nextAt: r.next_skip_at },
 });
 
 const checkInSchema = z.object({
@@ -503,6 +507,7 @@ export const RPC_SCHEMAS = {
   delete_account: z.object({ ok: z.literal(true) }),
   get_my_missions: missionsSchema,
   reset_missions: missionsSchema,
+  skip_mission: missionsSchema,
   claim_mission: progressSchema,
   daily_check_in: checkInSchema,
   track_event: z.object({ ok: z.boolean() }),
@@ -971,6 +976,10 @@ export const liveEngine: GameEngine = {
 
   async resetMissions(requestId) {
     return mapMissions(await rpc("reset_missions", { p_request_id: requestId }, missionsSchema));
+  },
+
+  async skipMission(requestId, missionId) {
+    return mapMissions(await rpc("skip_mission", { p_request_id: requestId, p_mission_id: missionId }, missionsSchema));
   },
 
   async claimMission(requestId, missionId) {

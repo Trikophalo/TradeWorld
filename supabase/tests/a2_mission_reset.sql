@@ -89,9 +89,12 @@ select tests.set_cash(:a, 500);
 select tests.assert(
   not public.mission_doable(:a, 'q_buy', 'buy') and not public.mission_doable(:a, 'd_buy_tech', 'buy_sector')
   and not public.mission_doable(:a, 'q_bond', 'bond_bought') and not public.mission_doable(:a, 'd_sectors', 'sectors_bought')
-  and public.mission_doable(:a, 'm_first_trade', 'trade') and public.mission_doable(:a, 'q_sell', 'sell')
+  and public.mission_doable(:a, 'm_first_trade', 'trade')
+  -- ADR-202: selling needs something to sell (or the money to buy it first)
+  and public.mission_doable(:a, 'q_sell', 'sell')
+      = exists (select 1 from public.positions p where p.player_id = :a and p.status = 'open' and p.quantity_e6 > 0)
   and public.mission_doable(:a, 'm_trades_25', 'trade'),
-  'mission_doable(): with 5 € no buying missions; selling and milestones stay');
+  'mission_doable(): with 5 € no buying missions; selling only with a position; milestones stay');
 
 -- a quick mission without progress the player can no longer pay for makes room
 delete from public.player_missions where player_id = :a;
@@ -284,7 +287,12 @@ select (select status = 'expired' from public.player_missions where player_id = 
 delete from public.player_missions where player_id = :r and kind = 'daily' and template_key <> 'd_rich_list';
 update public.player_missions set reset_at = public.game_now() - interval '21 hours'
  where player_id = :r and template_key = 'd_rich_list';
+-- ADR-202 would rather draw a template that was not drawn lately; here only the 20 hours count
+select public.config_jsonb('progression', '{missionDraw}') as a2_draw \gset
+select tests.set_cfg('progression', '{missionDraw}',
+                     :'a2_draw'::jsonb || '{"recentDraws": {"quick": 12, "daily": 0, "weekly": 6}, "cooldownHours": {"quick": 48, "daily": 0, "weekly": 504}}');
 select public.missions_assign(:r) is not null as ok \gset
+select tests.set_cfg('progression', '{missionDraw}', :'a2_draw'::jsonb);
 update public.mission_templates set weight = 30 where key = 'd_rich_list';
 select tests.assert(
   :'fresh_rests'::boolean

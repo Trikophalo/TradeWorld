@@ -193,7 +193,8 @@ Gehaltsverhandlung einmal je Woche: Erfolgschance 30 % plus 0,2 Punkte je Erfahr
 
 ### 1.9 Level (`progression`)
 
-`XP für Level n → n+1 = round(100 × n^1.5)`, höchstens Level 50. **Alpha-Bonus: `xpMultiplier` = 2**, alle XP
+`XP für Level n → n+1 = round(xpBase × n^1.5)` ab Level 2, Level 1 → 2 kostet 100 XP; `xpBase` ist 200 (ADR-202,
+vorher 250 nach ADR-055, ursprünglich 100). Levels sind endlos (ADR-039). Messung und Vergleich: Abschnitt 3.2. **Alpha-Bonus: `xpMultiplier` = 2**, alle XP
 zählen doppelt (Entscheidung des Auftraggebers). Die Tabelle zeigt die Grundwerte aus dem Prompt; verdoppelt wird
 genau einmal beim Gutschreiben (`scaledXp()`), die Levelkurve bleibt unverändert.
 
@@ -445,6 +446,48 @@ Daraus die Tage bis zum Level **mit Alpha-Bonus** (in Klammern ohne Bonus):
   **Vorschlag:** Gewinn-XP ebenfalls auf einen Tageswert begrenzen.
 - **Arbeits-XP läuft passiv.** 480 XP am Tag (mit Bonus 960) ohne Zutun sind ein Drittel der XP eines
   Gelegenheitsspielers. Das ist gewollt (Offline-Fortschritt), sollte aber bekannt sein.
+
+### 3.2 Messung ADR-202: Zeit bis zum Level für einen aktiven Spieler
+
+Die Tabellen oben stammen aus der ersten Kurve. Seitdem gelten ADR-055 (`xpBase` 250), ADR-142 (Missions-XP wachsen
+mit dem Level) und viele neue XP-Quellen. Gemessen wird mit `src/lib/sim/level-pace.ts` (Test daneben): Die XP eines
+aktiven Spielers je Tag werden aus der Konfiguration geschätzt und über die Kurve aufsummiert.
+
+Annahmen (`ACTIVE_PLAYER`): 14 Tage Login-Serie, 20 Trades, 100 Grund-XP aus Gewinnen, 8 Arbeitsstunden und
+4 Arbeitsaufgaben (ab dem ersten Job), 6 schnelle Missionen, alle täglichen und wöchentlichen Missionen,
+300 Grund-XP aus Meilensteinen (Missionen jeweils mit Level-Skalierung), 1 NFT am Tag (ab Level 4), ein Battle-Sieg
+alle vier Tage (1 600 Grund-XP), 72 XP aus dem Zuhause (ab Level 8), ein Gewinnquartal am Tag ab 4 Level nach der
+Garagenfirma. Alles mal Alpha-Bonus (×2).
+
+| Abschnitt  | vorher (Tage) | nachher (Tage) | Zeit      | Tempo     |
+| ---------- | ------------- | -------------- | --------- | --------- |
+| 1 → 5      | 0,51          | 0,40           | −21 %     | ×1,27     |
+| 5 → 10     | 2,22          | 1,67           | −25 %     | ×1,33     |
+| 10 → 20    | 8,81          | 6,43           | −27 %     | ×1,37     |
+| 20 → 30    | 14,36         | 10,23          | −29 %     | ×1,40     |
+| 30 → 40    | 19,06         | 13,40          | −30 %     | ×1,42     |
+| **1 → 40** | **45,0**      | **32,1**       | **−29 %** | **×1,40** |
+
+| Level            | 5     | 10     | 20      | 30      | 40      |
+| ---------------- | ----- | ------ | ------- | ------- | ------- |
+| XP gesamt vorher | 4 106 | 27 612 | 167 689 | 472 427 | 980 350 |
+| XP gesamt jetzt  | 3 305 | 22 109 | 134 172 | 377 962 | 784 299 |
+| XP am Tag vorher | 9 242 | 13 125 | 18 602  | 24 079  | 29 556  |
+| XP am Tag jetzt  | 9 680 | 14 111 | 20 683  | 27 256  | 33 755  |
+
+**Änderung:** `xpBase` 250 → 200 (jedes Level ab 2 braucht 20 % weniger XP) und `missionXpScalePerLevel`
+0,15 → 0,18 (Level 10: ×2,62 statt ×2,35, Level 30: ×6,22 statt ×5,35, die Kappe ×8 ab Level 40 statt 48). Zusammen
+steigt ein aktiver Spieler 1,3- bis 1,4-mal so schnell auf, am meisten in den späten Leveln, wo die Klage herkam.
+Die ersten Level bleiben fast gleich, sie waren schon am ersten Tag erreicht. Level 30 bleibt ein Ziel von gut zwei
+Wochen, Level 40 von einem Monat; nicht „zu leicht“ (Test: höchstens ×1,45 je Abschnitt).
+
+**Niemand verliert ein Level:** Die Gesamt-XP jedes Levels fallen nur (Test bis Level 500 und in SQL bis 120), die
+XP eines Spielers reichen also für sein Level oder mehr. Die Migration hebt jedes Profil auf das Level seiner XP
+(mit Skillpunkten und Freischaltungen) und senkt nie; `grant_xp` nimmt ohnehin `greatest(alt, neu)`.
+
+**Freischaltungen:** Sie hängen am Level, nicht an XP. Die Prüfungen nach ADR-115 und ADR-134 (letzte Stufe jeder
+Verbesserung spätestens mit Level 30, `minLevel` der Verbesserungen, `disclosure.ts`) gelten unverändert; sie kommen
+nur rund 30 % früher. Die Reihenfolge der Bereiche bleibt.
 
 ---
 

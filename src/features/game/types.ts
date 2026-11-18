@@ -729,9 +729,18 @@ export interface MissionReset {
   nextAt: string | null;
 }
 
+/** The daily free skip of one open mission (ADR-202). */
+export interface MissionSkip {
+  /** A skip is still possible today. */
+  available: boolean;
+  /** When the next one is possible (midnight in Berlin); null while one is available. */
+  nextAt: string | null;
+}
+
 export interface MissionsState {
   groups: MissionGroup[];
   reset: MissionReset;
+  skip: MissionSkip;
 }
 
 /** Client-only events that count for a few quick missions. */
@@ -2317,6 +2326,8 @@ export const GAME_ERROR_KEYS = [
   "mission_already_claimed",
   "mission_reset_used",
   "mission_reset_nothing",
+  "mission_skip_used",
+  "mission_skip_invalid",
   "avatar_unknown",
   "avatar_locked",
   "daily_reward_claimed",
@@ -2763,6 +2774,8 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   missions(): Promise<MissionsState>;
   /** Swaps the open quick, daily and weekly missions for new ones, once per Berlin day (ADR-166). */
   resetMissions(requestId: string): Promise<MissionsState>;
+  /** Swaps one open quick, daily or weekly mission for another, free, once per Berlin day (ADR-202). */
+  skipMission(requestId: string, missionId: string): Promise<MissionsState>;
   claimMission(requestId: string, missionId: string): Promise<ProgressResult>;
   checkIn(requestId: string): Promise<ProgressResult & { streakDays: number; alreadyCheckedIn: boolean }>;
   track(event: TrackedEvent, ref?: string): Promise<void>;

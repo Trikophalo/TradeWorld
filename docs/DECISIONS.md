@@ -4778,6 +4778,55 @@ Mint-Gradings, eine reine 10 also 35 %. Die anderen Zustände bleiben unverände
 Mehr 10er bringen mehr Slabs mit hohem Wert in Umlauf; Marktwert und KI-Käufe für Slabs (`gradePremiumBps`) bleiben
 und sind zu beobachten.
 
+## ADR-202: Flachere Levelkurve, mehr Missions-XP, Missionen ohne Wiederholung und ohne Sackgasse — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Die XP-Kurve ist zu schwer, es dauert viel zu lange, aufzusteigen. Entweder mehr XP aus
+Missionen oder eine flachere Kurve, aber nicht ZU leicht.“ Und: „Mehr Abwechslung bei den Missionen, man bekommt
+sehr oft dieselben. Nie einen Spieler mit einer Mission festsetzen.“ Gemessen (`src/lib/sim/level-pace.ts`,
+docs/BALANCING.md 3.2) brauchte ein aktiver Spieler 45 Tage bis Level 40, davon 19 für 30 → 40. Missionen wurden
+gewichtet zufällig gezogen; nur offene und in den letzten 24 Stunden gezogene schnelle Missionen waren gesperrt,
+tägliche konnten jeden Tag wiederkommen. Unmöglich gewordene Missionen wurden nur bei schnellen Missionen und
+Meilensteinen ohne Fortschritt ersetzt.
+
+**Entscheidung.**
+
+1. **Kurve und Missions-XP:** `progression.xpBase` 250 → 200 (jedes Level ab 2 braucht 20 % weniger XP, Level 1 → 2
+   bleibt 100), `missionXpScalePerLevel` 0,15 → 0,18 (Kappe ×8 unverändert). Ein aktiver Spieler steigt je Abschnitt
+   1,27- (Level 1 → 5) bis 1,42-mal (30 → 40) so schnell auf, insgesamt ×1,40 (45 → 32 Tage bis Level 40). Der Test
+   hält jeden Abschnitt zwischen ×1,25 und ×1,45.
+2. **Niemand verliert ein Level:** Die Gesamt-XP jedes Levels fallen nur. `raise_levels_after_curve_change()` hebt
+   jedes Profil einmal auf das Level seiner XP, mit freien Skillpunkten und Freischaltungen, und senkt nie.
+   Freischaltungen, `minLevel` der Verbesserungen und die Prüfungen aus ADR-115/134 hängen am Level und bleiben;
+   sie kommen nur früher.
+3. **Ziehung ohne Wiederholung** (`progression.missionDraw`, SQL `missions_assign`, TypeScript
+   `src/lib/sim/mission-draw.ts` für die Demo): Eine Vorlage, die unter den letzten 12 (schnell), 9 (täglich) bzw.
+   6 (wöchentlich) Ziehungen ihrer Art ist, kommt nur, wenn sonst nichts machbar ist; danach kommen Vorlagen in der
+   Abkühlzeit (48 Stunden, 4 Tage, 3 Wochen), am liebsten frische. Zählt eine offene Mission schon dieselbe Metrik,
+   rutscht die Vorlage eine halbe Stufe nach hinten. Die Plätze werden so immer gefüllt. Innerhalb einer Stufe
+   gewichtet: Missionen freigeschalteter Bereiche ×1,5, eines in den letzten 5 Leveln freigeschalteten Bereichs
+   zusätzlich ×2,5. Jede Ziehung bekommt `draw_seq` und `drawn_at`.
+4. **Nie unmöglich:** Gezogen wird nur, was `mission_doable` erlaubt (Level, Freischaltung, Voraussetzung, Geld, Lage
+   der Welt). Offene Missionen werden bei jedem Blick geprüft: ohne Fortschritt ersetzt, sobald sie nicht mehr
+   machbar sind; mit Fortschritt, sobald die Voraussetzung fehlt (keine Firma, kein Job). Das gilt jetzt auch für
+   tägliche und wöchentliche Missionen. Meilensteine werden nur ohne Fortschritt ersetzt und dürfen später mit ihrem
+   Fortschritt wiederkommen.
+5. **Einzeltausch:** `skip_mission` tauscht einmal am Berliner Tag (`missionSkipsPerDay`) eine offene schnelle,
+   tägliche oder wöchentliche Mission kostenlos gegen eine andere, zusätzlich zum Neuwürfeln aller (ADR-166).
+   Meilensteine nicht.
+6. **52 neue Missionen** über die Metriken `crypto_trade`, `crypto_buy`, `crypto_distinct`, `crypto_created`,
+   `short_opened`, `watchlist_add`, `nexamon_quick_sold`, `nexamon_grading_sent`, `pack_battle_join`, `news_promo`,
+   `campaign_started`, `company_skill`, `upgrade_bought`, `work_task_done`, `daily_reward`, `feed_react` sowie die
+   bisher ungenutzten `art_painted` (Prägen), `nexamon_bought`, `nexamon_listed`. Gezählt wird über Trigger auf den
+   Tabellen, keine RPC wird umgeschrieben (auch nicht die Verbesserungen und der Tresor, die parallel umgebaut
+   werden). Zählungen, die nicht mit dem Level wachsen sollen (Kampagnen, Fertigkeiten, Verbesserungen, Packs),
+   tragen `params.fixedCount`.
+
+**Folgen.** Bei einem neuen Spieler auf Level 1 sind 27 schnelle Vorlagen machbar; im SQL-Test kommt über 120
+Ziehungen keine innerhalb von 12 Ziehungen wieder, über 12 Tage keine tägliche innerhalb von 3 Tagen. Ein Spieler auf
+Level 16 mit Firma bekommt in 120 Ziehungen über 50 verschiedene Vorlagen. Mehr XP und mehr erledigbare Missionen
+beschleunigen auch die Wirtschaft etwas (Missionen zahlen nur XP). Die Werte der Ziehung stehen in der
+Konfiguration; wird der Katalog kleiner als die Sperrliste, wiederholt sich die älteste Ziehung zuerst.
+
 ## ADR-205: Pack-Battle-Modi „Umgekehrt“ und „Twist“ — `Entscheidung (Eigentümer)`
 
 **Kontext.** Der Eigentümer wünscht mehr Optionen im Pack Battle (ADR-192): „Eine Einstellung, bei der der Spieler mit

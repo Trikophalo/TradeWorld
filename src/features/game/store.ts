@@ -10,6 +10,7 @@ import type {
   MarketSnapshot,
   MissionGroup,
   MissionReset,
+  MissionSkip,
   OrderInput,
   OrderResult,
   Portfolio,
@@ -45,6 +46,8 @@ interface GameState {
   missions: MissionGroup[] | null;
   /** The daily swap of the open missions (ADR-166); null until the missions are loaded. */
   missionReset: MissionReset | null;
+  /** The daily free skip of one mission (ADR-202); null until the missions are loaded. */
+  missionSkip: MissionSkip | null;
   /** Local clock minus server clock in ms, for countdowns. */
   clockSkewMs: number;
   refreshSnapshot: () => Promise<void>;
@@ -57,6 +60,8 @@ interface GameState {
   claimMission: (missionId: string) => Promise<ProgressResult>;
   /** Swaps the open quick, daily and weekly missions for new ones (once per Berlin day). */
   resetMissions: () => Promise<void>;
+  /** Swaps one open mission for another, free, once per Berlin day (ADR-202). */
+  skipMission: (missionId: string) => Promise<void>;
   checkIn: () => Promise<{ xpAwarded: number; streakDays: number; alreadyCheckedIn: boolean }>;
   changeNickname: (nickname: string) => Promise<void>;
   track: (event: TrackedEvent, ref?: string) => void;
@@ -79,6 +84,7 @@ export const useGame = create<GameState>((set, get) => ({
   portfolio: null,
   missions: null,
   missionReset: null,
+  missionSkip: null,
   clockSkewMs: 0,
 
   refreshSnapshot: () =>
@@ -114,7 +120,7 @@ export const useGame = create<GameState>((set, get) => ({
   refreshMissions: () =>
     (missionsInFlight ??= engine
       .missions()
-      .then(({ groups, reset }) => set({ missions: groups, missionReset: reset }))
+      .then(({ groups, reset, skip }) => set({ missions: groups, missionReset: reset, missionSkip: skip }))
       .catch(() => undefined)
       .finally(() => {
         missionsInFlight = null;
@@ -133,8 +139,13 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   resetMissions: async () => {
-    const { groups, reset } = await engine.resetMissions(crypto.randomUUID());
-    set({ missions: groups, missionReset: reset });
+    const { groups, reset, skip } = await engine.resetMissions(crypto.randomUUID());
+    set({ missions: groups, missionReset: reset, missionSkip: skip });
+  },
+
+  skipMission: async (missionId) => {
+    const { groups, reset, skip } = await engine.skipMission(crypto.randomUUID(), missionId);
+    set({ missions: groups, missionReset: reset, missionSkip: skip });
   },
 
   checkIn: async () => {
@@ -148,7 +159,7 @@ export const useGame = create<GameState>((set, get) => ({
     await get().refreshPortfolio();
   },
 
-  resetPlayer: () => set({ portfolio: null, missions: null, missionReset: null }),
+  resetPlayer: () => set({ portfolio: null, missions: null, missionReset: null, missionSkip: null }),
 
   track: (event, ref) => {
     void engine.track(event, ref).then(() => get().refreshMissions());

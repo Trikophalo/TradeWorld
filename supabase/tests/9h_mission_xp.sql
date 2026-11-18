@@ -15,12 +15,12 @@ select tests.set_level(:hi, 21);
 delete from public.player_missions where player_id in (:lo, :hi);
 select public.missions_assign(:lo) is not null and public.missions_assign(:hi) is not null as ok \gset
 
--- the same template pays more at a higher level: x (1 + 0.15 x 20) = x 4 at level 21, x 1.15 at level 2
+-- the same template pays more at a higher level: x (1 + 0.18 x 20) = x 4.6 at level 21, x 1.18 at level 2 (ADR-202)
 select tests.assert(
-  (select bool_and(h.xp_reward >= floor(t.xp_min * 4) and h.xp_reward <= ceil(t.xp_max * 4))
+  (select bool_and(h.xp_reward >= floor(t.xp_min * 4.6) and h.xp_reward <= ceil(t.xp_max * 4.6))
      from public.player_missions h join public.mission_templates t on t.key = h.template_key
     where h.player_id = :hi and not coalesce((t.params ->> 'fixedXp')::boolean, false))
-  and (select bool_and(l.xp_reward <= ceil(t.xp_max * 1.15))
+  and (select bool_and(l.xp_reward <= ceil(t.xp_max * 1.18))
      from public.player_missions l join public.mission_templates t on t.key = l.template_key
     where l.player_id = :lo and not coalesce((t.params ->> 'fixedXp')::boolean, false)),
   'missions_assign(): mission XP grow with the level (ADR-142)');

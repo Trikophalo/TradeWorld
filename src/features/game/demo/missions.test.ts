@@ -106,3 +106,26 @@ describe("demoEngine.resetMissions (ADR-166)", () => {
     expect(keys(await demoEngine.missions(), ["quick", "daily", "weekly"])).toEqual(fresh);
   });
 });
+
+describe("demoEngine.skipMission (ADR-202)", () => {
+  beforeEach(() => resetDemoPlayer());
+
+  it("swaps one open mission once per day, free, never a milestone", async () => {
+    const before = await demoEngine.missions();
+    expect(before.skip).toEqual({ available: true, nextAt: null });
+    const quick = before.groups.find((g) => g.kind === "quick")!.missions[0]!;
+    const milestone = before.groups.find((g) => g.kind === "milestone")!.missions[0]!;
+    await expect(demoEngine.skipMission("skip-0", milestone.id)).rejects.toEqual(new GameError("mission_skip_invalid"));
+
+    const after = await demoEngine.skipMission("skip-1", quick.id);
+    const quickAfter = after.groups.find((g) => g.kind === "quick")!.missions;
+    expect(quickAfter).toHaveLength(3);
+    expect(quickAfter.map((m) => m.key)).not.toContain(quick.key);
+    expect(after.skip.available).toBe(false);
+    expect(after.reset.available).toBe(true);
+    expect(await demoEngine.skipMission("skip-1", quick.id)).toEqual(after);
+    await expect(demoEngine.skipMission("skip-2", quickAfter[0]!.id)).rejects.toEqual(
+      new GameError("mission_skip_used"),
+    );
+  });
+});

@@ -22,6 +22,7 @@ export function MissionReset() {
   const t = useTranslations("missions.reset");
   const errorText = useGameErrorText();
   const reset = useGame((state) => state.missionReset);
+  const skip = useGame((state) => state.missionSkip);
   const groups = useGame((state) => state.missions);
   const resetMissions = useGame((state) => state.resetMissions);
   const [open, setOpen] = useState(false);
@@ -69,6 +70,17 @@ export function MissionReset() {
               </>
             )}
           </p>
+          {skip && (
+            <p className="mt-1 text-sm text-pretty text-fg-3" data-testid="missions-skip-hint">
+              {skip.available ? (
+                t("skipHint")
+              ) : (
+                <>
+                  {t("skipUsed")} <Countdown target={Date.parse(skip.nextAt!)} className="text-fg-2" />
+                </>
+              )}
+            </p>
+          )}
         </div>
         <Button
           variant="secondary"

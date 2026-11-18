@@ -8229,6 +8229,45 @@ total_cents }`: eigene rohe Kopien aus einem Pack (`source = 'pack'`), höchsten
   `ai.excludedRarities`; `nexamon_copies_ai_guard` lässt ihn zu, `nexamon_ai_reset()` mustert ihn nie aus.
 - Bulk (`bulk_sell_nexamon`): `quickSell.bps` jetzt 8 000 (20 % Gebühr).
 
+## Nachtrag: Flachere Levelkurve, Missionen ohne Wiederholung und ohne Sackgasse (ADR-202)
+
+Migrationen `20261204009400_level_curve_lower.sql` und `20261204009410_mission_variety.sql`.
+
+- Levelkurve: `game_config.progression.xpBase` 250 → 200, `missionXpScalePerLevel` 0,15 → 0,18 (die Migration setzt
+  beide Werte einmal, wo noch die alten stehen). `raise_levels_after_curve_change()` (intern, idempotent) hebt jedes
+  Profil auf das Level seiner XP, mit freien Skillpunkten und Freischaltungen wie `grant_xp`; es senkt nie. Die
+  Referenztabelle `levels` wird nachgezogen.
+- `player_missions.draw_seq bigint` (Sequenz `player_missions_draw_seq`) und `drawn_at timestamptz` (Spielzeit):
+  Reihenfolge und Zeit jeder Ziehung, Index `(player_id, kind, draw_seq desc)`. Ältere Zeilen bekommen sie in der
+  Reihenfolge von `created_at`. Eine schnelle Mission, die am selben Tag noch einmal gezogen wird, ersetzt ihre
+  erledigte Zeile (`claimed`/`expired`; die XP-Buchung hängt an der alten ID).
+- `player_missions.state.replaced` bzw. `state.skipped`: von `missions_assign` ersetzt (unmöglich geworden) bzw. mit
+  `skip_mission` getauscht; beide setzen `reset_at`, der Platz wird frei.
+- `mission_resets.skips integer` (≥ 0): Einzeltausche des Berliner Tages.
+- `missions_assign(p_player)` (intern): Ziehung in Stufen (frisch → Abkühlzeit → letzte Ziehungen; +1, wenn eine
+  offene Mission dieselbe Metrik zählt), Gewichte für freigeschaltete und neu freigeschaltete Bereiche
+  (`progression.missionDraw`), `params.fixedCount` ohne Level-Skalierung. Ersetzt offene unmögliche Missionen
+  (ohne Fortschritt, wenn `mission_doable` nein sagt; mit Fortschritt, wenn die Voraussetzung `requires` fehlt;
+  Meilensteine nur ohne Fortschritt, sie dürfen nach 20 Stunden mit ihrem Fortschritt wiederkommen).
+- `mission_doable` (neu definiert) fragt für die neuen Metriken und `sell`, `nexamon_pack`, `nexamon_listed`,
+  `nexamon_sold`, `nexamon_bought`, `art_painted` die interne `mission_more_doable(p_player, p_key, p_metric)`;
+  `mission_cheapest_pack_cents()` (intern) liefert den billigsten erschienenen Nexamon-Pack.
+- Trigger `mission_more_events` (Funktion `mission_more_events()`) auf `trades` (Krypto: `crypto_trade`,
+  `crypto_buy`, `crypto_distinct`), `orders` (`short_opened`), `watchlist_items` (`watchlist_add`, je Wertpapier
+  einmal), `crypto_coins` (`crypto_created`), `nexamon_sales` (`nexamon_quick_sold`, Bulk und Sofortverkauf),
+  `nexamon_copies` (`nexamon_grading_sent`), `nexamon_battle_seats` (`pack_battle_join`), `news_promo_claims`
+  (`news_promo`), `company_campaigns` (`campaign_started`), `company_skills` (`company_skill`), `player_upgrades`
+  (`upgrade_bought`), `work_tasks` (`work_task_done`), `daily_reward_claims` (`daily_reward`), `feed_reactions`
+  (`feed_react`, je Beitrag einmal). Die RPCs bleiben unverändert.
+- 52 neue Vorlagen in `mission_templates` (Schlüssel `q_watchlist` … `m_upgrades_10`).
+
+| RPC                                        | Antwort                                                                                                                                                                                                                                                                           |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_my_missions()`                        | zusätzlich `skip_available boolean`, `skips_left integer`, `next_skip_at timestamptz \| null`                                                                                                                                                                                     |
+| `skip_mission(p_request_id, p_mission_id)` | wie `get_my_missions` plus `skipped` (Vorlage); idempotent. Nur offene schnelle, tägliche und wöchentliche Missionen der laufenden Periode, `progression.missionSkipsPerDay` je Berliner Tag. Fehler `mission_skip_used` NX420, `mission_skip_invalid` NX421, `mission_not_found` |
+
+Test `supabase/tests/e1_mission_draw.sql`.
+
 ## Nachtrag: Titans Revenge neu gewichtet (ADR-207)
 
 - Interne Funktion `nexamon_scale_card_values(p_set, p_rarity, p_num, p_den)` → Anzahl Karten: `start_e4`, `value_e4`,

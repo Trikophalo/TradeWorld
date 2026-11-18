@@ -634,9 +634,9 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder…",
       },
       {
-        id: "startseite-waehrung-zur-wahl-freundescode-7357c84e",
-        title: "Mehr Nervenkitzel bei Packs und ASP",
-        text: "Liegt in den letzten zwei Karten eines Packs ein großer Treffer, wartet er verdeckt, lädt sich bebend auf und dreht sich mit Blitz, Pixel-Konfetti…",
+        id: "startseite-waehrung-zur-wahl-freundescode-e3f3e70c",
+        title: "Schneller aufsteigen, abwechslungsreichere Missionen",
+        text: "Jedes Level ab Level 2 braucht 20 % weniger XP, Missionen bringen mit dem Level mehr XP: Ein aktiver Spieler steigt etwa 1,3- bis 1,4-mal so schnell…",
       },
     ],
   },
