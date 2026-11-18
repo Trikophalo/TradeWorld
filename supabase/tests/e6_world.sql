@@ -196,9 +196,9 @@ select hc.fixed_cents::float8 / greatest(1, hd.fixed_cents) as fratio
    and hc.hour_start = date_trunc('hour', public.game_now()) - interval '1 hour' and hd.hour_start = hc.hour_start \gset
 select tests.assert(:fratio::float8 > 0.86 and :fratio::float8 < 0.90,
   format('e6: the close takes China''s labour costs (fixed costs x %s)', :fratio));
-select tests.assert(public.world_tax_rate_bps(:'cco') = 2500 and public.world_tax_rate_bps(:'dco') is null
-                    and public.world_tax_rate_bps(:'aco') < (public.country_cfg('de') ->> 'taxRateBps')::integer,
-  'e6: tax rate of the country; the leader gets the lobby discount');
+select tests.assert(public.world_tax_rate_bps(:'cco') = 2250 and public.world_tax_rate_bps(:'dco') is null
+                    and public.world_tax_rate_bps(:'aco') = round(round(0.85 * 3000 + 0.15 * 2000) * 0.9)::integer,
+  'e6: tax rate of the country, blended with the subsidiary; both leaders get the 10 % lobby discount');
 
 -- ---------------------------------------------------------------------------
 -- 6. Relocation and image campaigns

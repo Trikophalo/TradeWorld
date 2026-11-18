@@ -26,6 +26,7 @@ import { itemByKey } from "@/lib/sim/listed";
 import type { CompanySection } from "../tabs";
 import { actionEnabled, adviceTurns, enabledOptions, reportLines } from "./advisor";
 import { companyFacts } from "./facts";
+import { countryInText, isWorldQuestion } from "./world";
 
 const cfg = BALANCE.companyAssistant;
 const taskCfg = BALANCE.companyTasks;
@@ -399,6 +400,8 @@ export type MiraIntent =
   | { kind: "report" }
   | { kind: "reputation" }
   | { kind: "strengths" }
+  /** The world map and its countries (ADR-208); null = how it works. */
+  | { kind: "world"; country: string | null }
   | { kind: "autopilot" }
   | { kind: "ai" }
   | { kind: "unknown"; reason: "nothing" }
@@ -528,6 +531,7 @@ export function parseCommand(text: string, state: MiraState, names: MiraNames): 
   if (AI_STAFF.test(norm) && !/\b(gib|geb\w*|uebergib|an die)\b/.test(norm)) return { kind: "ai" };
   if (REPUTATION.test(norm)) return { kind: "reputation" };
   if (STRENGTHS.test(norm)) return { kind: "strengths" };
+  if (isWorldQuestion(text)) return { kind: "world", country: countryInText(text)?.key ?? null };
 
   const open = state.tasks.tasks.filter((t) => t.status === "open" && t.canDelegate);
   const mine = state.tasks.tasks.filter((t) => t.mine && t.status === "assigned");

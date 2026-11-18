@@ -8348,7 +8348,7 @@
       }
     },
     "open": {
-      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} skills {Zu den Fertigkeiten} other {Hinschauen}}"
+      "label": "{section, select, situation {Zur Lage} money {Zu Kasse und Einzahlung} marketing {Zum Marketing} campaign {Zu den Kampagnen} moves {Zu den Geschäftszügen} expansion {Zu Ausbau und Rechtsform} business {Zum Betrieb} capital {Zum Kapital} profit {Zu Preis und Gewinn} team {Zum Team} applications {Zu den Bewerbungen} training {Zu den Schulungen} tasks {Zu den Aufgaben} satisfaction {Zur Zufriedenheit} staff {Zur Zufriedenheit} books {Zu den Büchern} taxes {Zu den Steuern} board {Zum Geschäftsrat} research {Zur Forschung} dividends {Zu Auszahlung und Dividende} growth {Zum Wachstum} autopilot {Zum Autopiloten} strengths {Zu den Stärken} reputation {Zum Ruf} health {Zu „Wo es fehlt“} interview {Zum Interview} skills {Zu den Fertigkeiten} location {Zum Standort} other {Hinschauen}}"
     },
     "advice": {
       "distress": "Alarm: Die Firma hat {unpaid} offene Rechnungen. Bleiben sie offen, droht die Insolvenz. Zahl Geld ein, bevor die Schonfrist abläuft.",
@@ -8465,6 +8465,13 @@
       "todo": "Offen: {tasks, plural, =0 {keine Aufgabe} one {eine Aufgabe} other {# Aufgaben}}{event, select, crisis {, eine Krise} chance {, eine Chance} other {}}.",
       "best": "Mein wichtigster Tipp:",
       "calm": "Gerade gibt es nichts, was sich lohnt anzupacken."
+    },
+    "world": {
+      "about": "Ab {amount} Firmenwert platzierst du deine Firma auf der Weltkarte. Jedes Land hat Vor- und Nachteile, keins ist das beste. Später kommen Tochterfirmen in anderen Ländern dazu.",
+      "tip": "Frag mich nach einem Land, zum Beispiel: „Wie ist China?“",
+      "country": "{name}: Produktion {production}, Arbeit {labour}, Nachfrage {demand}, Image {image}, Steuern {tax}.",
+      "strength": "Stärke: {best, select, production {günstige Produktion} labour {günstige Arbeit} demand {große Nachfrage} image {gutes Image} tax {niedrige Steuern} other {{best}}}. Schwäche: {worst, select, production {teure Produktion} labour {teure Arbeit} demand {kleine Nachfrage} image {schwaches Image} tax {hohe Steuern} other {{worst}}}.",
+      "risks": "Risiken (0 bis 100): Politik {political}, Zölle {tariff}, Konflikte {war}, {disasters, plural, =0 {keine Naturgefahren} one {eine Naturgefahr} other {# Naturgefahren}}."
     }
   },
   "newsShow": {
@@ -11192,7 +11199,8 @@
       "legendHq": "Zentrale",
       "legendSub": "Tochterfirma",
       "legendAi": "KI-Firma",
-      "legendMine": "Deine Firma"
+      "legendMine": "Deine Firma",
+      "countries": "Alle Länder"
     },
     "traits": {
       "title": "Eigenschaften",
@@ -11349,6 +11357,13 @@
         "flags": "Fahnen",
         "lights": "Laternen"
       }
+    },
+    "dash": {
+      "label": "Standort",
+      "hint": "Land, Zentrale und Tochterfirmen",
+      "placed": "{country} · {tier}",
+      "ready": "Weltkarte offen",
+      "locked": "{pct} % bis zur Weltkarte"
     }
   }
 }

@@ -415,6 +415,8 @@ export const HQ_STYLE_OPTIONS = {
 export const WORLD_RULES = {
   /** Company value (company_worth_cents, ADR-203) from which a company can place its headquarters. */
   unlockWorthCents: 1_000_000_000,
+  /** Large AI companies shown on the map for flavor (never leaders, never fees). */
+  aiOnMap: 12,
   hqTiers: [
     {
       tier: 1,

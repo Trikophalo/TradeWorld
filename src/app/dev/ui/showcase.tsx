@@ -57,6 +57,7 @@ import { CoinLogo } from "@/features/crypto/components/coin-logo";
 import { SignaturePad } from "@/features/career/components/signature-pad";
 import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { CompanySkillsCard } from "@/features/company/components/company-skills";
+import { WorldShowcase } from "@/features/company/world/world-showcase";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
 import { FirmSection, InfoTip, SectionNav, SubSection } from "@/features/company/components/firm-layout";
 import { ReputationCard } from "@/features/company/components/reputation-card";
@@ -1339,6 +1340,7 @@ export function Showcase() {
         ))}
         <InterviewCard preview={SAMPLE_INTERVIEW} />
         <CompanySkillsCard preview={SAMPLE_COMPANY_SKILLS} />
+        <WorldShowcase />
         <NewsPromoShowcase />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />

@@ -105,7 +105,7 @@ export function createWorldEngine(host: WorldHost): WorldEngine {
         });
       }
     }
-    for (const ai of DEMO_COMPANIES.slice(0, 12)) {
+    for (const ai of DEMO_COMPANIES.slice(0, cfg.aiOnMap)) {
       places.push({
         companyId: `demo-company-${ai.ticker}`,
         name: ai.name,

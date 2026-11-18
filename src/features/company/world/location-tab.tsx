@@ -13,11 +13,12 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
-import { WORLD_RULES, type CountryConfig } from "@/config/countries";
+import { COUNTRIES, WORLD_RULES, type CountryConfig } from "@/config/countries";
+import { flagArt } from "@/components/pixel/hq";
 import { useGameErrorText } from "@/features/game/errors";
 import { useClockSkew, useServerClock } from "@/features/game/server-clock";
 import { engine } from "@/features/game/store";
-import type { WorldMine, WorldState } from "@/features/game/world-types";
+import type { WorldMine, WorldPlace, WorldState } from "@/features/game/world-types";
 import { formatBps, formatMoney, formatPercentBps } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { hqTier, worldUnlockProgress } from "@/lib/sim/world";
@@ -135,6 +136,7 @@ export function LocationTab({ preview }: { preview?: WorldState } = {}) {
         {!me && !unlocked && <p className="text-sm text-pretty text-fg-3">{t("locked.preview")}</p>}
         <WorldMap places={data.places} selected={selected} focus={me?.country} onSelect={setSelected} />
         <Legend />
+        <CountryList byCountry={byCountry} mine={me} onSelect={setSelected} />
       </Card>
 
       <CountrySheet
@@ -634,6 +636,51 @@ function CountryActions({
     );
   }
   return <div className="space-y-2">{blocks}</div>;
+}
+
+/** Every country as a chip under the map: the same choice without panning, for small screens and keyboards. */
+function CountryList({
+  byCountry,
+  mine,
+  onSelect,
+}: {
+  byCountry: Map<string, WorldPlace[]>;
+  mine: WorldMine | null;
+  onSelect: (country: string) => void;
+}) {
+  const t = useTranslations("world.map");
+  const list = [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name, "de"));
+  return (
+    <div className="space-y-1.5">
+      <p className="label-pixel text-fg-2">{t("countries")}</p>
+      <ul className="flex flex-wrap gap-1.5" data-testid="world-country-list">
+        {list.map((c) => {
+          const count = byCountry.get(c.key)?.length ?? 0;
+          const own = mine?.country === c.key || (mine?.subsidiaries.some((s) => s.country === c.key) ?? false);
+          return (
+            <li key={c.key}>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("tap");
+                  onSelect(c.key);
+                }}
+                data-testid={`world-chip-${c.key}`}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs ring-1 focus-ring transition duration-fast active:scale-95",
+                  own ? "bg-accent-soft text-accent ring-accent" : "bg-surface-2 text-fg-2 ring-line-1 hover:text-fg-1",
+                )}
+              >
+                <PixelIcon {...flagArt(c.flag, c.flagVertical)} scale={2} />
+                {c.name}
+                {count > 0 && <span className="nums text-2xs text-fg-3">{count}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 function Legend() {
