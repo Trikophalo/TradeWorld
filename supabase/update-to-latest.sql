@@ -91660,285 +91660,484 @@ begin
   end loop;
 end;
 $$;
--- ===== idempotent copy of migrations/20261204010700_withdraw_interval.sql =====
+-- ===== idempotent copy of migrations/20261204010900_stock_unbounded.sql =====
 -- (the migration itself is written idempotently; keep both files identical below this line)
 -- =============================================================================
--- NEXA · 10700 · Withdrawals from the own company every 6 hours (ADR-213)
+-- NEXA · 010900 · Stocks without a daily limit, market forces against overheated stocks (ADR-214)
 -- =============================================================================
--- The owner: "Man soll Geld aus der Firma alle 6 Stunden entnehmen können."
--- Until now company_withdraw() had no timing rule at all; it only refused money that is not free (open bills,
--- ADR-083; money the board earmarked, ADR-167; issue proceeds for issueProceedsLockHours, ADR-170) and withdrawals
--- while the board's ban holds (ADR-167). The UI showed neither the issue lock nor any rhythm.
--- * player_companies.last_withdraw_at: the last successful withdrawal (set by company_withdraw()).
--- * company_withdraw(): a further withdrawal only startups.withdrawIntervalHours (6) after the last one, error
---   withdraw_cooldown (NX213). The automatic founder payout (ADR-086) and dividends are not withdrawals and do not
---   count. Full copy of the latest definition (m3d + the listed checks of 20261204005400) with the rule.
--- * company_withdraw_json(): interval, last and next possible withdrawal, issue-locked money and until when;
---   company_state() (full copy of 20261204009500) returns it as 'withdraw' for the money card's countdown.
--- Idempotent: runs unchanged as supabase/updates/.
--- =============================================================================
+-- The owner: "Aktien sollen unendlich steigen und sinken können am Tag ohne Grenze. Aber es steigt gerade zu schnell.
+-- Es soll mehr Ereignisse von außen geben, welche das verhindern oder verlangsamen."
+--
+-- 1. No daily band: trading.playerStocks.dailyBandBps is 0 in game_config (src/config/balance.ts). market_tick_at and
+--    market_order_plan already treat 0 as "no band" (ADR-170/ADR-189), so the tick and the fair-fill path run as for
+--    any other stock; the per-tick circuit breaker maxTickReturnBps (and with it the fair fill of big orders) stays.
+-- 2. Market forces: once a minute (inside stock_news_run_due) every listed stock without an open hint may draw a force
+--    from outside: profit taking, analyst downgrade, short-seller report, insider probe, margin calls, special audit,
+--    capital-increase rumours, bubble warning; bargain hunters, buyback rumours and upgrades for stocks far below their
+--    value; a small background rate (rotation, fund entry) for every stock. Chance and size grow with the heat of the
+--    stock (price / fair value, 24-hour and 7-day gain). Waves hit several hot stocks at once (market correction,
+--    sector correction, rate fears) or lift the coldest (relief rally). Formulas = src/lib/sim/market-forces.ts.
+--    Every force is a stock hint with a lead (stock_tips.source = 'market', ADR-119): announced in the stock news and the
+--    news feed, settled by stock_news_run_due through market_force_shock(), which moves the price and the mood
+--    (sentiment) but never the fair value.
+-- 3. stock_news_run_due: the 1200 definition plus (a) market hints do not hold back the ordinary news rhythm,
+--    (b) they settle through market_force_shock, (c) market_forces_run() at the end.
+--
+-- Values: game_config.marketForces (src/config/market-forces.ts). Without that row no force is drawn.
+-- New internal functions: market_force_heat, market_force_chance_per_hour, market_force_weight, market_force_pick,
+-- market_force_move_bps, market_force_shock, market_forces_run. No new RPCs, no new error keys.
+-- Idempotent: runs unchanged as supabase/updates/20261204010900_stock_unbounded.sql.
 
-alter table public.player_companies add column if not exists last_withdraw_at timestamptz;
-comment on column public.player_companies.last_withdraw_at is
-  'Last successful company_withdraw() (ADR-213); the next one is allowed startups.withdrawIntervalHours later.';
-
--- Error key withdraw_cooldown (NX213)
-do $do$
-declare
-  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+alter table public.stock_tips add column if not exists source text not null default 'news';
+alter table public.stock_tips add column if not exists force_key text;
+alter table public.stock_tips add column if not exists sentiment_delta double precision not null default 0;
+do $$
 begin
-  if position('''withdraw_cooldown''' in v_def) = 0 then
-    v_def := replace(v_def, $q$    else 'NX007'
-$q$, $q$    when 'withdraw_cooldown'          then 'NX213'
-    else 'NX007'
-$q$);
-    if position('''withdraw_cooldown''' in v_def) = 0 then
-      raise exception 'api_error() has an unexpected shape; add withdraw_cooldown (NX213) by hand';
-    end if;
-    execute v_def;
+  if not exists (select 1 from pg_constraint where conname = 'stock_tips_source_check') then
+    alter table public.stock_tips add constraint stock_tips_source_check check (source in ('news', 'market'));
   end if;
 end;
-$do$;
+$$;
+comment on column public.stock_tips.source is
+  'news: ordinary stock news (ADR-119); market: a market force against an overheated or a fallen stock (ADR-214).';
+comment on column public.stock_tips.force_key is 'Key of the market force (game_config marketForces.forces[].key or wave:<kind>).';
+comment on column public.stock_tips.sentiment_delta is 'Mood change applied with a market force when it comes true (ADR-214).';
+create index if not exists stock_tips_source_published_idx on public.stock_tips (source, published_at desc);
 
--- The next moment the founder may withdraw again; null when a withdrawal is allowed now
-create or replace function public.company_withdraw_next_at(p_company uuid)
-returns timestamptz
+-- -----------------------------------------------------------------------------
+-- Formulas (src/lib/sim/market-forces.ts)
+-- -----------------------------------------------------------------------------
+
+-- stockHeat: heat and cold of a stock; p_p24 / p_p7 null while there is no history
+create or replace function public.market_force_heat(p_price bigint, p_fair bigint, p_p24 bigint, p_p7 bigint, p_cfg jsonb,
+                                                    out heat double precision, out cold double precision)
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  h       jsonb := coalesce(p_cfg -> 'heat', '{}'::jsonb);
+  v_prem  double precision := case when p_fair > 0 and p_price > 0 then ln(p_price::double precision / p_fair) else 0 end;
+  v_g24   double precision := case when p_p24 > 0 and p_price > 0 then ln(p_price::double precision / p_p24) else 0 end;
+  v_g7    double precision := case when p_p7 > 0 and p_price > 0 then ln(p_price::double precision / p_p7) else 0 end;
+  v_max   double precision := public.cfg_num(h, '{maxHeat}', 4);
+  v_gains double precision := 0;
+begin
+  if v_prem >= -public.cfg_num(h, '{gainGate}', 0.1) then
+    v_gains := greatest(0, v_g24 - public.cfg_num(h, '{gain24hFree}', 0.2)) / public.cfg_num(h, '{gain24hScale}', 0.4)
+             + greatest(0, v_g7 - public.cfg_num(h, '{gain7dFree}', 0.5)) / public.cfg_num(h, '{gain7dScale}', 0.8);
+  end if;
+  heat := least(v_max, greatest(0, v_prem - public.cfg_num(h, '{premiumFree}', 0.25)) / public.cfg_num(h, '{premiumScale}', 0.5)
+                       + v_gains);
+  cold := least(v_max, greatest(0, -v_prem - public.cfg_num(h, '{discountFree}', 0.3)) / public.cfg_num(h, '{discountScale}', 0.6)
+                       + greatest(0, -v_g24 - public.cfg_num(h, '{loss24hFree}', 0.3)) / public.cfg_num(h, '{loss24hScale}', 0.5));
+end;
+$$;
+
+-- forceChancePerHour
+create or replace function public.market_force_chance_per_hour(p_heat double precision, p_cold double precision, p_cfg jsonb)
+returns double precision
 language sql
-stable
-security definer
+immutable
 set search_path = ''
 as $$
-  select case when x.next_at > public.game_now() then x.next_at end
-    from (select pc.last_withdraw_at
-                 + make_interval(secs => greatest(0, public.config_double('startups', '{withdrawIntervalHours}', 6)) * 3600)
-                 as next_at
-            from public.player_companies pc where pc.company_id = p_company) x;
+  select least(public.cfg_num(p_cfg, '{chance,maxPerHour}', 3),
+               public.cfg_num(p_cfg, '{chance,basePerHour}', 0.012)
+               + public.cfg_num(p_cfg, '{chance,perHeatPerHour}', 0.9) * p_heat
+               + public.cfg_num(p_cfg, '{chance,perColdPerHour}', 0.35) * p_cold);
 $$;
-comment on function public.company_withdraw_next_at(uuid) is
-  'When the founder may withdraw from the company again (ADR-213); null when allowed now.';
 
--- What the money card needs to say when and how much the founder may withdraw
-create or replace function public.company_withdraw_json(p_company uuid)
+-- forceWeight
+create or replace function public.market_force_weight(p_force jsonb, p_heat double precision, p_cold double precision)
+returns double precision
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_force ->> 'when'
+           when 'hot' then case when p_heat > 0 and p_heat >= coalesce((p_force ->> 'minHeat')::double precision, 0)
+                                then (p_force ->> 'weight')::double precision * p_heat else 0 end
+           when 'cold' then (p_force ->> 'weight')::double precision * p_cold
+           else case when (p_heat > 0 and (p_force ->> 'direction')::integer > 0)
+                       or (p_cold > 0 and (p_force ->> 'direction')::integer < 0) then 0
+                     else (p_force ->> 'weight')::double precision end
+         end;
+$$;
+
+-- pickForce: the force for a uniform draw p_u in [0, 1), in config order; null when none has weight
+create or replace function public.market_force_pick(p_heat double precision, p_cold double precision, p_u double precision,
+                                                    p_cfg jsonb)
 returns jsonb
 language plpgsql
-stable
-security definer
+immutable
 set search_path = ''
 as $$
 declare
-  v_listed boolean := public.listed_is(p_company);
-  v_locked bigint := 0;
-  v_until  timestamptz;
-begin
-  if v_listed then
-    v_locked := public.listed_issue_locked_cents(p_company);
-    if v_locked > 0 then
-      select max(e.created_at) + public.config_double('startups', '{ipo,issueProceedsLockHours}', 72) * interval '1 hour'
-        into v_until
-        from public.ledger_accounts ca
-        join public.ledger_entries e on e.account_id = ca.id and e.amount_cents > 0
-        join public.ledger_transactions t on t.id = e.transaction_id and t.ref_type = 'share_offer'
-       where ca.owner_company_id = p_company and ca.kind = 'company_cash'
-         and e.created_at > now() - public.config_double('startups', '{ipo,issueProceedsLockHours}', 72) * interval '1 hour';
-    end if;
-  end if;
-  return (select jsonb_build_object(
-            'interval_hours', public.config_double('startups', '{withdrawIntervalHours}', 6),
-            'last_at', pc.last_withdraw_at,
-            'next_at', public.company_withdraw_next_at(p_company),
-            'issue_locked_cents', v_locked,
-            'issue_locked_until', v_until)
-            from public.player_companies pc where pc.company_id = p_company);
-end;
-$$;
-comment on function public.company_withdraw_json(uuid) is
-  'Withdrawal rhythm of the own company (ADR-213): interval, last and next withdrawal, issue proceeds still locked.';
-
--- company_withdraw as in m3d with the listed checks of 20261204005400 (full copy), plus the 6-hour rhythm
-create or replace function public.company_withdraw(p_request_id uuid, p_amount_cents bigint)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_company uuid;
-  v_player  uuid;
-  v_replay  jsonb;
-  v_free    bigint;
-  v_next    timestamptz;
-begin
-  v_company := public.require_own_company();
-  v_player := public.require_player();
-  if p_request_id is null or p_amount_cents is null or p_amount_cents < 1 then
-    perform public.api_error('invalid_argument');
-  end if;
-  v_replay := public.request_begin(v_player, p_request_id, 'company_withdraw');
-  if v_replay is not null then
-    return v_replay;
-  end if;
-  perform 1 from public.player_companies pc where pc.company_id = v_company for update;
-  perform public.listed_withdraw_check(v_company, p_amount_cents);  -- ADR-167
-  select a.balance_cents - pc.unpaid_cents - public.listed_reserved_cents(v_company) into v_free
-    from public.ledger_accounts a join public.player_companies pc on pc.company_id = a.owner_company_id
-   where a.owner_company_id = v_company and a.kind = 'company_cash';
-  if coalesce(v_free, 0) < p_amount_cents then
-    perform public.api_error('insufficient_funds');
-  end if;
-  -- ADR-213: one withdrawal every startups.withdrawIntervalHours (checked last, so a too large amount still says why)
-  v_next := public.company_withdraw_next_at(v_company);
-  if v_next is not null then
-    perform public.api_error('withdraw_cooldown');
-  end if;
-  perform public.ledger_transfer(public.company_cash_account(v_company), public.ledger_player_account(v_player, 'player_cash'),
-                                 p_amount_cents, 'transfer', 'Entnahme', 'company', v_company,
-                                 'withdraw:' || p_request_id::text, v_player);
-  perform public.loan_withhold(v_player, p_amount_cents, 'withdraw:' || p_request_id::text);
-  update public.player_companies set last_withdraw_at = public.game_now() where company_id = v_company;
-  return public.request_complete(v_player, p_request_id, jsonb_build_object('company', public.company_state(v_company)));
-end;
-$$;
-
--- company_state as in 20261204009500_toplists.sql (full copy), plus 'withdraw'
-create or replace function public.company_state(p_company uuid)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  pc       public.player_companies;
-  c        public.companies;
-  v_team   jsonb;
-  v_tier   jsonb;
-  v_sb     jsonb;
-  v_level  integer;
-  v_cash   bigint;
-  v_spread double precision;
+  v_forces jsonb := coalesce(p_cfg -> 'forces', '[]'::jsonb);
+  v_total  double precision := 0;
+  v_x      double precision;
+  v_w      double precision;
   v_last   jsonb;
-  v_hist   jsonb;
-  v_cost   bigint;
-  v_mf     double precision;
-  v_camp   public.company_campaigns;
+  f        jsonb;
 begin
-  select * into pc from public.player_companies where company_id = p_company;
-  if pc.company_id is null then
+  for f in select value from jsonb_array_elements(v_forces) loop
+    v_total := v_total + public.market_force_weight(f, p_heat, p_cold);
+  end loop;
+  if v_total <= 0 then
     return null;
   end if;
-  select * into c from public.companies where id = p_company;
-  v_team := public.player_company_team(p_company);
-  v_tier := public.company_tier_cfg(pc.tier);
-  v_sb := public.company_tier_cfg('small_business');
-  select p.level into v_level from public.profiles p where p.id = pc.founder_id;
-  v_cash := coalesce((select a.balance_cents from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash'), 0);
-  v_spread := public.config_double('startups', '{estimate,initialSpread}', 2.3)
-            * power(public.config_double('startups', '{estimate,decayPerQuarter}', 0.85), pc.quarters_active);
-  select jsonb_build_object(
-           'label', r.label, 'demand_cents', r.demand_cents, 'capacity_cents', r.capacity_cents,
-           'revenue_cents', r.revenue_cents, 'cogs_cents', r.cogs_cents, 'fixed_cents', r.fixed_cents,
-           'ai_worker_cents', r.ai_worker_cents, 'marketing_cents', r.marketing_cents, 'wages_cents', r.wages_cents,
-           'operating_profit_cents', r.operating_profit_cents, 'utilization_bps', r.utilization_bps,
-           'bonus_cents', r.bonus_cents)
-    into v_last
-    from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
-   where r.company_id = p_company order by gq.ends_at desc limit 1;
-  select coalesce(jsonb_agg(jsonb_build_object('label', h.label, 'revenue_cents', h.revenue_cents,
-                                               'profit_cents', h.operating_profit_cents) order by h.ends_at), '[]'::jsonb)
-    into v_hist
-    from (select r.label, r.revenue_cents, r.operating_profit_cents, gq.ends_at
-            from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
-           where r.company_id = p_company order by gq.ends_at desc limit 12) h;
-  v_cost := public.company_upgrade_cost(pc.tier);
-  -- the estimate describes the market the company reaches (ADR-083)
-  v_mf := public.company_market_factor(pc.tier, pc.expansion_level);
-  v_camp := public.company_campaign_at(p_company, public.game_now());
-  return jsonb_build_object(
-    'id', c.id,
-    'name', c.name,
-    'idea', pc.idea,
-    'sector', c.sector_key,
-    'color', c.brand_color,
-    'logo', public.company_logo(p_company),
-    'logo_hidden', pc.logo_hidden,
-    'founder_has_job', exists (select 1 from public.player_jobs x where x.player_id = pc.founder_id and x.status = 'active'),
-    'full_time_from', public.config_double('startups', '{fullTimeFromEmployees}', 5)::integer,
-    'training_from', public.config_double('startups', '{training,fromEmployees}', 5)::integer,
-    'headcount', public.company_headcount(p_company),
-    'tier', pc.tier,
-    'founded_at', c.founded_at,
-    'cash_cents', v_cash,
-    'value_cents', public.company_value_cents(p_company),
-    'unpaid_cents', pc.unpaid_cents,
-    'distress', pc.distress,
-    'distress_quarters', pc.distress_quarters,
-    'grace_quarters', public.config_double('startups', '{insolvency,graceQuarters}', 4)::integer,
-    'pay_factor_bps', pc.pay_factor_bps,
-    'product_key', public.company_product(p_company) ->> 'key',
-    'stage', (v_team ->> 'stage')::integer,
-    'stages', public.company_stages_json(p_company),
-    'awareness_bps', round(pc.awareness * 10000)::integer,
-    'quality_bps', round(pc.quality * 10000)::integer,
-    'quarters_active', pc.quarters_active,
-    'estimate_low_cents', round(pc.potential_annual_cents * v_mf
-                                * exp(-v_spread * (0.3 + 0.7 * public.uniform_from_text(pc.company_id::text || ':' || pc.quarters_active || ':low'))))::bigint,
-    'estimate_high_cents', round(pc.potential_annual_cents * v_mf
-                                 * exp(v_spread * (0.3 + 0.7 * public.uniform_from_text(pc.company_id::text || ':' || pc.quarters_active || ':high'))))::bigint,
-    'marketing_cents_per_quarter', pc.marketing_cents_per_quarter,
-    'ai_workers', pc.ai_workers,
-    'ai_worker_cost_cents', public.config_bigint('startups', '{aiWorkerCostCentsPerQuarter}', 72000),
-    'ai_wage_cents_per_hour', public.config_bigint('startups', '{aiWorkerWageCentsPerHour}', 12000),
-    'ai_worker_skills', to_jsonb(pc.ai_worker_skills),
-    'max_employees', public.company_max_employees(p_company),
-    'employees', (v_team ->> 'employees')::integer,
-    'open_postings', (select count(*) from public.job_postings jp where jp.company_id = p_company and jp.status = 'open')::integer,
-    'pending_applications', (select count(*) from public.job_applications a join public.job_postings jp on jp.id = a.posting_id
-                              where jp.company_id = p_company and a.status = 'pending')::integer,
-    'founder_productivity_bps', (v_team ->> 'founder_productivity_bps')::integer,
-    'team_productivity_bps', (v_team ->> 'team_productivity_bps')::integer,
-    'capacity_cents', round((v_team ->> 'capacity_cents')::bigint * public.company_capacity_factor(pc.expansion_level))::bigint,
-    'next_quarter_at', coalesce((public.current_game_quarter()).ends_at, public.game_now()),
-    'can_upgrade', public.company_next_tier(pc.tier) is not null
-                   and coalesce(v_level, 1) >= (public.company_tier_cfg(public.company_next_tier(pc.tier)) ->> 'minLevel')::integer,
-    'listing', public.company_listing_json(p_company, pc.founder_id),
-    'can_go_public', c.phase = 'private' and public.company_open_offer(p_company) is null
-                     and coalesce(public.config_jsonb('startups', '{ipo,fromTiers}'), '["garage", "small_business", "gmbh"]'::jsonb) ? pc.tier
-                     and coalesce(v_level, 1) >= public.config_double('startups', '{ipo,minLevel}', 6),
-    'can_capital_increase', c.phase = 'listed' and public.company_open_offer(p_company) is null,
-    'upgrade_cost_cents', v_cost,
-    'last_quarter', v_last,
-    'history', v_hist,
-    'live', public.company_live_json(p_company),
-    'hours', public.company_hours_json(p_company))
-    || jsonb_build_object(
-         'banner', pc.banner,
-         -- ADR-083: price strategy, contract work, expansion
-         'price_level', pc.price_level,
-         'contract_work', pc.contract_work,
-         'expansion_level', pc.expansion_level,
-         'can_expand', public.company_can_expand(pc.tier),
-         'expansion_cost_cents', case when public.company_can_expand(pc.tier)
-                                      then public.company_expansion_cost_cents(pc.expansion_level) end,
-         'market_factor', round(v_mf::numeric, 4),
-         -- ADR-086: share of the hourly profit paid to the founder automatically
-         'founder_payout_bps', pc.founder_payout_bps,
-         -- ADR-097: the running campaign and the current prices (from the demand of the last closed hour)
-         'campaign', case when v_camp.id is not null then public.campaign_json(v_camp.id) end,
-         'campaign_costs', public.company_campaign_costs(p_company),
-         -- ADR-176: slow strengths with their reward, and a stuck hourly close
-         'strengths', public.company_strengths_json(p_company),
-         -- ADR-183: the reputation of every company and extra steps of the close that failed
-         'reputation', public.company_reputation_json(p_company),
-         'close_warnings', public.company_close_warnings_json(p_company),
-         -- ADR-203: the value of the company as Top-Unternehmen and the net worth count it
-         'worth', public.company_worth_json(p_company),
-         -- ADR-213: when the founder may withdraw again and what else holds money back
-         'withdraw', public.company_withdraw_json(p_company));
+  v_x := p_u * v_total;
+  for f in select value from jsonb_array_elements(v_forces) loop
+    v_w := public.market_force_weight(f, p_heat, p_cold);
+    if v_w > 0 then
+      v_x := v_x - v_w;
+      v_last := f;
+      if v_x < 0 then
+        return f;
+      end if;
+    end if;
+  end loop;
+  return v_last;
 end;
 $$;
 
-revoke all on function public.company_withdraw_next_at(uuid) from public, anon, authenticated;
-revoke all on function public.company_withdraw_json(uuid) from public, anon, authenticated;
+-- forceMoveBps: uniform(min, max) × (1 + severityPerHeat × heat or cold), at most maxMoveBps (positive)
+create or replace function public.market_force_move_bps(p_force jsonb, p_heat double precision, p_cold double precision,
+                                                        p_u double precision, p_cfg jsonb)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select greatest(1, least(public.cfg_num(p_cfg, '{maxMoveBps}', 4500),
+           round(((p_force ->> 'minMoveBps')::double precision
+                  + p_u * ((p_force ->> 'maxMoveBps')::double precision - (p_force ->> 'minMoveBps')::double precision))
+                 * (1 + public.cfg_num(p_cfg, '{severityPerHeat}', 0.45)
+                        * case when (p_force ->> 'direction')::integer < 0 then p_heat else p_cold end))))::integer;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- The shock: price and mood move, the fair value and the EMAs stay (the value funds pull back to the anchor)
+-- -----------------------------------------------------------------------------
+create or replace function public.market_force_shock(p_security uuid, p_move_bps integer, p_sentiment double precision,
+                                                     p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  st    public.security_sim_state;
+  v_res jsonb;
+begin
+  select * into st from public.security_sim_state where security_id = p_security for update;
+  v_res := public.event_price_shock(p_security, p_move_bps, p_now);
+  if st.security_id is not null then
+    update public.security_sim_state
+       set fair_value_e4 = st.fair_value_e4,
+           event_value_factor = st.event_value_factor,
+           ema_fast = st.ema_fast,
+           ema_slow = st.ema_slow,
+           sentiment = greatest(-1, least(1, st.sentiment + coalesce(p_sentiment, 0))),
+           updated_at = now()
+     where security_id = p_security;
+  end if;
+  return v_res;
+end;
+$$;
+comment on function public.market_force_shock(uuid, integer, double precision, timestamptz) is
+  'Internal (ADR-214): a market force moves the price (as event_price_shock) and the mood, never the fair value.';
+
+-- -----------------------------------------------------------------------------
+-- Drawing forces once a minute
+-- -----------------------------------------------------------------------------
+create or replace function public.market_forces_run(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg      jsonb := public.config_jsonb('marketForces');
+  v_now      timestamptz := coalesce(p_now, public.game_now());
+  v_lead_min double precision;
+  v_lead_max double precision;
+  v_rel      integer;
+  v_sent     double precision;
+  v_words    jsonb;
+  v_new      integer := 0;
+  v_waves    integer := 0;
+  v_force    jsonb;
+  v_move     integer;
+  v_strength smallint;
+  v_head     text;
+  v_body     text;
+  v_news     bigint;
+  v_kind     text;
+  v_mean     double precision;
+  v_names    text;
+  v_sector   text;
+  v_sec_name text;
+  v_hit      uuid[];
+  r          record;
+begin
+  if v_cfg is null or jsonb_typeof(v_cfg) <> 'object' then
+    return jsonb_build_object('skipped', 'no_config');
+  end if;
+  v_lead_min := greatest(1, public.cfg_num(v_cfg, '{leadMinMinutes}', 3));
+  v_lead_max := greatest(v_lead_min, public.cfg_num(v_cfg, '{leadMaxMinutes}', 15));
+  v_rel      := least(10000, greatest(0, public.cfg_num(v_cfg, '{reliabilityBps}', 8500)))::integer;
+  v_sent     := public.cfg_num(v_cfg, '{sentimentPerMove}', 2);
+  v_words    := coalesce(v_cfg -> 'strengthWords', '["leicht", "spürbar", "deutlich"]'::jsonb);
+
+  if to_regclass('pg_temp.market_force_heat_tmp') is not null then
+    drop table pg_temp.market_force_heat_tmp;
+  end if;
+  create temporary table market_force_heat_tmp (
+    security_id uuid primary key, name text, sector_key text, heat double precision, cold double precision
+  ) on commit drop;
+  insert into pg_temp.market_force_heat_tmp (security_id, name, sector_key, heat, cold)
+  select sec.id, sec.name, sec.sector_key, h.heat, h.cold
+    from public.securities sec
+    join public.security_quotes q on q.security_id = sec.id
+    join public.security_sim_state st on st.security_id = sec.id
+    cross join lateral public.market_force_heat(
+      q.last_price_e4, st.fair_value_e4,
+      (select c.close_e4 from public.candles c
+        where c.security_id = sec.id and c.interval = '1h'
+          and c.bucket_start <= v_now - interval '24 hours' and c.bucket_start > v_now - interval '48 hours'
+        order by c.bucket_start desc limit 1),
+      (select c.close_e4 from public.candles c
+        where c.security_id = sec.id and c.interval = '1h'
+          and c.bucket_start <= v_now - interval '7 days' and c.bucket_start > v_now - interval '8 days'
+        order by c.bucket_start desc limit 1),
+      v_cfg) h
+   where sec.kind = 'stock' and sec.status = 'listed'
+     and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null);
+
+  -- 1. single forces
+  for r in select * from pg_temp.market_force_heat_tmp loop
+    if random() < 1 - exp(-greatest(0, public.market_force_chance_per_hour(r.heat, r.cold, v_cfg)) / 60.0) then
+      v_force := public.market_force_pick(r.heat, r.cold, random(), v_cfg);
+      continue when v_force is null;
+      v_move := public.market_force_move_bps(v_force, r.heat, r.cold, random(), v_cfg);
+      v_strength := case when v_move < 800 then 1 when v_move < 1600 then 2 else 3 end;
+      v_head := replace(v_force ->> 'headline', '{name}', r.name);
+      v_body := replace(replace(v_force ->> 'body', '{name}', r.name), '{w}', v_words ->> (v_strength - 1));
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values ('market', v_head, v_body, v_strength, r.security_id, v_now) returning id into v_news;
+      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                     published_at, due_at, source, force_key, sentiment_delta)
+      values (r.security_id, v_news, (v_force ->> 'direction')::smallint, v_move, v_strength, random() * 10000 < v_rel,
+              v_head, v_body, v_now, v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))),
+              'market', v_force ->> 'key',
+              greatest(-1, least(1, (v_force ->> 'direction')::integer * v_move / 10000.0 * v_sent)));
+      v_new := v_new + 1;
+      delete from pg_temp.market_force_heat_tmp where security_id = r.security_id;
+    end if;
+  end loop;
+
+  -- 2. a wave over the hot stocks, or a relief rally for the cold ones
+  select avg(t.heat) into v_mean from pg_temp.market_force_heat_tmp t
+   where t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2);
+  v_kind := null;
+  if v_mean is not null and random() < 1 - exp(-least(public.cfg_num(v_cfg, '{waves,maxPerHour}', 1),
+                                                       public.cfg_num(v_cfg, '{waves,basePerHour}', 0.02)
+                                                       + public.cfg_num(v_cfg, '{waves,perHeatPerHour}', 0.25) * v_mean) / 60.0) then
+    v_kind := (array['market', 'sector', 'rates'])[1 + floor(random() * 3)::integer];
+  elsif exists (select 1 from pg_temp.market_force_heat_tmp t where t.cold > 0)
+        and random() < 1 - exp(-public.cfg_num(v_cfg, '{waves,reliefPerHour}', 0.02) / 60.0) then
+    v_kind := 'relief';
+  end if;
+  if v_kind = 'sector' then
+    select t.sector_key, s.name into v_sector, v_sec_name
+      from pg_temp.market_force_heat_tmp t join public.sectors s on s.key = t.sector_key
+     where t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2)
+     group by t.sector_key, s.name order by avg(t.heat) desc, count(*) desc limit 1;
+    if v_sector is null then v_kind := 'market'; end if;
+  end if;
+  if v_kind is not null then
+    select array_agg(x.security_id order by x.lvl desc), string_agg(x.name, ', ' order by x.lvl desc) into v_hit, v_names
+      from (select t.security_id, t.name, case when v_kind = 'relief' then t.cold else t.heat end as lvl
+              from pg_temp.market_force_heat_tmp t
+             where case when v_kind = 'relief' then t.cold > 0
+                        else t.heat >= public.cfg_num(v_cfg, '{waves,minHeat}', 0.2)
+                             and (v_kind <> 'sector' or t.sector_key = v_sector) end
+             order by 3 desc
+             limit greatest(1, public.cfg_num(v_cfg, '{waves,maxStocks}', 6))::integer) x;
+  end if;
+  if v_hit is not null and cardinality(v_hit) > 0 then
+    v_head := replace(v_cfg #>> array['waveTexts', v_kind, 'headline'], '{sector}', coalesce(v_sec_name, ''));
+    v_body := replace(v_cfg #>> array['waveTexts', v_kind, 'body'], '{names}', v_names);
+    insert into public.news_items (category, headline, body, importance, published_at)
+    values ('market', v_head, v_body, 2, v_now) returning id into v_news;
+    for r in select t.* from pg_temp.market_force_heat_tmp t where t.security_id = any (v_hit) loop
+      v_move := public.market_force_move_bps(
+        jsonb_build_object('direction', case when v_kind = 'relief' then 1 else -1 end, 'minMoveBps', 300, 'maxMoveBps', 1000),
+        r.heat, r.cold, random(), v_cfg);
+      v_strength := case when v_move < 800 then 1 when v_move < 1600 then 2 else 3 end;
+      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                     published_at, due_at, source, force_key, sentiment_delta)
+      values (r.security_id, v_news, case when v_kind = 'relief' then 1 else -1 end, v_move, v_strength,
+              random() * 10000 < v_rel, v_head, v_body, v_now,
+              v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))),
+              'market', 'wave:' || v_kind,
+              greatest(-1, least(1, case when v_kind = 'relief' then 1 else -1 end * v_move / 10000.0 * v_sent)));
+    end loop;
+    v_waves := 1;
+  end if;
+  return jsonb_build_object('forces', v_new, 'waves', v_waves, 'wave', v_kind);
+end;
+$$;
+comment on function public.market_forces_run(timestamptz) is
+  'Internal, every minute from stock_news_run_due (ADR-214): draws market forces against overheated or fallen stocks.';
+
+-- -----------------------------------------------------------------------------
+-- stock_news_run_due: the 1200 definition, market hints settle through market_force_shock and do not hold back the
+-- ordinary news; draws the market forces at the end
+-- -----------------------------------------------------------------------------
+create or replace function public.stock_news_run_due(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cfg      jsonb := public.config_jsonb('stockNews');
+  v_now      timestamptz := coalesce(p_now, public.game_now());
+  v_every    double precision;
+  v_lead_min double precision;
+  v_lead_max double precision;
+  v_min      integer;
+  v_max      integer;
+  v_rel      integer;
+  v_settled  integer := 0;
+  v_new      integer := 0;
+  v_forces   jsonb;
+  t          public.stock_tips;
+  s          record;
+  v_dir      smallint;
+  v_move     integer;
+  v_strength smallint;
+  v_head     text;
+  v_body     text;
+  v_news     bigint;
+  v_good     jsonb := jsonb_build_array(
+      jsonb_build_array('Rekordauftrag für {name}', '{name} gewinnt einen Großkunden. Der Auftrag dürfte den Umsatz {w} anheben.'),
+      jsonb_build_array('{name} hebt die Prognose an', 'Die Geschäfte laufen besser als geplant. Analysten erwarten einen {w} steigenden Kurs.'),
+      jsonb_build_array('Neuer Chef-Entwickler wechselt zu {name}', 'Ein bekannter Kopf aus der Branche kommt an Bord. Anleger dürften das {w} honorieren.'),
+      jsonb_build_array('{name} gewinnt Branchenpreis', 'Das Unternehmen wird für sein neues Produkt ausgezeichnet. Rückenwind für die Aktie erwartet.'),
+      jsonb_build_array('Übernahmegerüchte um {name}', 'Ein großer Konkurrent soll Interesse haben. Spekulanten könnten den Kurs {w} treiben.'),
+      jsonb_build_array('{name} startet Aktienrückkauf', 'Das Unternehmen kauft eigene Aktien zurück. Das stützt den Kurs {w}.'),
+      jsonb_build_array('Staatlicher Großauftrag für {name}', 'Ein mehrjähriger Vertrag mit der öffentlichen Hand ist unterschrieben.'),
+      jsonb_build_array('{name}: Neues Produkt ausverkauft', 'Die Nachfrage übertrifft alle Erwartungen. Händler rechnen mit einem {w} steigenden Kurs.'),
+      jsonb_build_array('Patent für {name} erteilt', 'Eine wichtige Technologie ist jetzt geschützt. Der Vorsprung dürfte sich auszahlen.'),
+      jsonb_build_array('{name} senkt die Kosten deutlich', 'Ein Sparprogramm wirkt schneller als gedacht. Die Marge steigt.'),
+      jsonb_build_array('Star-Investor steigt bei {name} ein', 'Ein bekannter Anleger hat ein großes Paket gekauft. Andere könnten folgen.'),
+      jsonb_build_array('{name} erschließt neuen Markt', 'Der Start im Ausland läuft besser als geplant.'),
+      jsonb_build_array('Kooperation: {name} und ein Branchenriese', 'Die Partnerschaft soll beiden Seiten neue Kunden bringen.'),
+      jsonb_build_array('Analysten-Upgrade: {name} jetzt Kaufempfehlung', 'Mehrere Häuser heben ihr Kursziel {w} an.'),
+      jsonb_build_array('Sonderdividende bei {name} erwartet', 'Die Kasse ist voll. Aktionäre dürfen auf eine Extra-Ausschüttung hoffen.'));
+  v_bad      jsonb := jsonb_build_array(
+      jsonb_build_array('Affäre erschüttert {name}', 'Die Chefetage von {name} steht wegen einer Affäre in der Kritik. Anleger werden nervös.'),
+      jsonb_build_array('{name} plant Kapitalerhöhung', 'Neue Aktien sollen ausgegeben werden. Das verwässert die Anteile, der Kurs dürfte {w} nachgeben.'),
+      jsonb_build_array('Rassismus-Vorwürfe gegen {name}', 'Ehemalige Mitarbeiter erheben schwere Vorwürfe. Kunden kündigen erste Verträge.'),
+      jsonb_build_array('Rückruf bei {name}', 'Ein fehlerhaftes Produkt muss zurück in die Werkstatt. Das wird teuer.'),
+      jsonb_build_array('Datenleck bei {name}', 'Kundendaten sind im Netz aufgetaucht. Die Aufsicht prüft.'),
+      jsonb_build_array('{name}-Chef tritt überraschend zurück', 'Die Gründe sind unklar. Der Markt mag keine Unsicherheit.'),
+      jsonb_build_array('Razzia bei {name}', 'Ermittler durchsuchen die Zentrale wegen des Verdachts auf Bilanztricks.'),
+      jsonb_build_array('{name} senkt die Prognose', 'Das Geschäft läuft schwächer als erwartet. Analysten rechnen mit einem {w} fallenden Kurs.'),
+      jsonb_build_array('Streik legt {name} lahm', 'Die Belegschaft legt die Arbeit nieder. Lieferungen verzögern sich.'),
+      jsonb_build_array('Großkunde springt bei {name} ab', 'Ein wichtiger Vertrag wird nicht verlängert.'),
+      jsonb_build_array('Analysten-Downgrade für {name}', 'Mehrere Häuser streichen ihre Kaufempfehlung und senken das Kursziel.'),
+      jsonb_build_array('{name} verliert Patentstreit', 'Ein Gericht gibt dem Konkurrenten recht. Lizenzzahlungen drohen.'),
+      jsonb_build_array('Umweltskandal bei {name}', 'Ein Werk soll Grenzwerte überschritten haben. Bußgelder sind wahrscheinlich.'),
+      jsonb_build_array('Lieferkette reißt bei {name}', 'Ein wichtiger Zulieferer fällt aus. Die Produktion stockt.'),
+      jsonb_build_array('Leerverkäufer wetten gegen {name}', 'Ein bekannter Fonds hält die Aktie für überbewertet.'));
+  v_pick     jsonb;
+  v_words    text[] := array['leicht', 'spürbar', 'deutlich'];
+begin
+  if v_cfg is null or jsonb_typeof(v_cfg) <> 'object' then
+    return jsonb_build_object('skipped', 'no_config');
+  end if;
+  -- same lock as the minute job: never beside a running tick
+  perform pg_advisory_xact_lock(7311001);
+  v_every    := greatest(1, public.cfg_num(v_cfg, '{everyMinutes}', 12));
+  v_lead_min := greatest(1, public.cfg_num(v_cfg, '{leadMinMinutes}', 10));
+  v_lead_max := greatest(v_lead_min, public.cfg_num(v_cfg, '{leadMaxMinutes}', 40));
+  v_min      := greatest(1, public.cfg_num(v_cfg, '{minMoveBps}', 300))::integer;
+  v_max      := greatest(v_min, public.cfg_num(v_cfg, '{maxMoveBps}', 1200)::integer);
+  v_rel      := least(10000, greatest(0, public.cfg_num(v_cfg, '{reliabilityBps}', 7500)))::integer;
+
+  -- 1. hints whose time has come
+  for t in select * from public.stock_tips x where x.applied_at is null and x.due_at <= v_now order by x.due_at for update loop
+    select sec.name, sec.status into s from public.securities sec where sec.id = t.security_id;
+    if t.comes_true and s.status = 'listed' then
+      if t.source = 'market' then
+        -- ADR-214: a market force moves the price and the mood, not the fair value
+        perform public.market_force_shock(t.security_id, t.direction * t.move_bps, t.sentiment_delta, v_now);
+      else
+        perform public.event_price_shock(t.security_id, t.direction * t.move_bps, v_now);
+      end if;
+      v_head := case when t.direction > 0 then s.name || ' legt zu: Die Erwartungen haben sich bestätigt'
+                     else s.name || ' gibt nach: Die Warnungen haben sich bestätigt' end;
+    else
+      v_head := 'Entwarnung bei ' || s.name || ': Die Meldung hat sich nicht bestätigt';
+    end if;
+    insert into public.news_items (category, headline, body, importance, security_id, published_at)
+    values ('company', v_head, null, 1, t.security_id, v_now) returning id into v_news;
+    update public.stock_tips set applied_at = v_now, result_news_id = v_news where id = t.id;
+    v_settled := v_settled + 1;
+  end loop;
+
+  -- 2. a new hint when the last ordinary one is old enough (market forces do not count, ADR-214)
+  if not exists (select 1 from public.stock_tips x
+                  where x.published_at > v_now - make_interval(secs => v_every * 60 - 5) and x.source = 'news') then
+    select sec.id, sec.name into s
+      from public.securities sec
+     where sec.kind = 'stock' and sec.status = 'listed'
+       and not exists (select 1 from public.stock_tips x where x.security_id = sec.id and x.applied_at is null)
+     order by random() limit 1;
+    if s.id is not null then
+      v_dir := case when random() < 0.5 then 1 else -1 end;
+      v_move := v_min + floor(random() * (v_max - v_min + 1))::integer;
+      v_strength := least(3, 1 + floor(3.0 * (v_move - v_min) / greatest(1, v_max - v_min + 1)))::smallint;
+      v_pick := case when v_dir > 0 then v_good -> floor(random() * jsonb_array_length(v_good))::integer
+                     else v_bad -> floor(random() * jsonb_array_length(v_bad))::integer end;
+      v_head := replace(v_pick ->> 0, '{name}', s.name);
+      v_body := replace(replace(v_pick ->> 1, '{name}', s.name), '{w}', v_words[v_strength]) || ' Sicher ist das nicht.';
+      insert into public.news_items (category, headline, body, importance, security_id, published_at)
+      values ('company', v_head, v_body, v_strength, s.id, v_now) returning id into v_news;
+      insert into public.stock_tips (security_id, news_item_id, direction, move_bps, strength, comes_true, headline, body,
+                                     published_at, due_at)
+      values (s.id, v_news, v_dir, v_move, v_strength, random() * 10000 < v_rel, v_head, v_body, v_now,
+              v_now + make_interval(secs => 60 * (v_lead_min + random() * (v_lead_max - v_lead_min))));
+      v_new := 1;
+    end if;
+  end if;
+
+  -- 3. market forces from outside (ADR-214)
+  v_forces := public.market_forces_run(v_now);
+
+  delete from public.stock_tips x
+   where x.applied_at is not null
+     and x.published_at < v_now - make_interval(hours => greatest(1, public.cfg_num(v_cfg, '{keepHours}', 24))::integer);
+  return jsonb_build_object('settled', v_settled, 'published', v_new, 'market_forces', v_forces);
+end;
+$$;
+comment on function public.stock_news_run_due(timestamptz) is
+  'Internal, cron every minute (ADR-119, ADR-214): settles due stock hints, publishes a new one when it is time, draws market forces.';
+
+revoke all on function public.market_force_heat(bigint, bigint, bigint, bigint, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_chance_per_hour(double precision, double precision, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_weight(jsonb, double precision, double precision) from public, anon, authenticated;
+revoke all on function public.market_force_pick(double precision, double precision, double precision, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_move_bps(jsonb, double precision, double precision, double precision, jsonb) from public, anon, authenticated;
+revoke all on function public.market_force_shock(uuid, integer, double precision, timestamptz) from public, anon, authenticated;
+revoke all on function public.market_forces_run(timestamptz) from public, anon, authenticated;
+revoke all on function public.stock_news_run_due(timestamptz) from public, anon, authenticated;
+grant execute on function public.market_forces_run(timestamptz) to service_role;
+grant execute on function public.stock_news_run_due(timestamptz) to service_role;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -91948,7 +92147,7 @@ insert into public.game_config (key, value, description) values
   ('time', '{"quarterHours":6,"quartersPerGameYear":4,"timezone":"Europe/Berlin","quarterBoundaryHours":[8,14,20,2],"marketOpenHour":0,"marketCloseHour":24,"tickSeconds":10,"ticksPerRunnerInvocation":12,"afterHours":{"spreadMultiplier":3,"liquidityMultiplier":0.25,"volatilityMultiplier":0.5},"candleIntervalsSeconds":[60,300,3600],"openingBonusMinutes":60,"openingBonusXpMultiplier":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "time"'),
   ('economy', '{"startingCapitalCents":1000000,"bankruptcyRestartCents":250000,"basicIncomeCentsPerHour":10000,"vaultCapHours":8,"vaultInitialHours":2,"vaultMinClaimCents":100,"bankruptcyStatusGameDays":3,"bankruptcyReputationPenalty":10}'::jsonb, 'Defaults from src/config/balance.ts, section "economy"'),
   ('vault', '{"levelBonusBps":800,"levelBonusMaxLevel":40,"deposits":{"minLevel":5,"minCents":100000,"capCentsPerLevel":2500000,"maxOpen":3,"terms":[{"days":1,"rateBps":150},{"days":3,"rateBps":500},{"days":7,"rateBps":1400}]}}'::jsonb, 'Defaults from src/config/balance.ts, section "vault"'),
-  ('trading', '{"limitOrders":false,"orderFeeCents":100,"maxOrderQuantity":1000000000,"quantityScale":1000000,"minOrderValueCents":100,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"midcap":15,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"midcap":300,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":1000,"highImpactWarnBps":500,"playerImpact":{"depthCentsPer100Bps":{"bluechip":2000000,"midcap":500000,"penny":100000},"bondDepthCentsPer100Bps":1000000,"maxHoldingsPremium":0.15,"premiumScaleDepths":20},"playerStocks":{"insiderCooldownHours":24,"dailyBandBps":10000}}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
+  ('trading', '{"limitOrders":false,"orderFeeCents":100,"maxOrderQuantity":1000000000,"quantityScale":1000000,"minOrderValueCents":100,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"midcap":15,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"midcap":300,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":1000,"highImpactWarnBps":500,"playerImpact":{"depthCentsPer100Bps":{"bluechip":2000000,"midcap":500000,"penny":100000},"bondDepthCentsPer100Bps":1000000,"maxHoldingsPremium":0.15,"premiumScaleDepths":20},"playerStocks":{"insiderCooldownHours":24,"dailyBandBps":0}}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
   ('centralBank', '{"startRateBps":300,"neutralRateBps":300,"minRateBps":50,"maxRateBps":1000,"stepBps":25,"maxStepsPerDecision":2,"targetMoneyGrowthBps":800,"toleranceBandBps":400,"decisionEveryQuarters":2,"warmupQuarters":56,"announceLeadQuarters":1,"measurementWindowQuarters":4,"activePlayerWindowDays":7}'::jsonb, 'Defaults from src/config/balance.ts, section "centralBank"'),
   ('bonds', '{"volatilityMultiplier":3,"faceValueCents":10000,"couponsPerGameYear":4,"maturities":[{"years":1,"spreadBps":-75},{"years":2,"spreadBps":-50},{"years":5,"spreadBps":-10},{"years":10,"spreadBps":25}],"minYieldBps":200,"maxYieldBps":400,"minLevel":5}'::jsonb, 'Defaults from src/config/balance.ts, section "bonds"'),
   ('sectors', '{"tech":{"baseDemandCentsPerQuarter":3000000000,"demandGrowthBpsPerGameYear":800,"demandNoise":0.08,"peRatio":28,"volatilityMultiplier":1.2,"priceExponent":1.2,"costStructure":{"referencePriceCents":5000,"unitCostCents":1180,"capacityUnitsPerSkillPoint":16.5,"fixedCostMultiplier":0.7,"qualityAdjustmentRate":0.1,"developmentIntensity":2},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.03,"cycle":0.8,"valuationRate":1.5}},"retail":{"baseDemandCentsPerQuarter":5000000000,"demandGrowthBpsPerGameYear":200,"demandNoise":0.04,"peRatio":14,"volatilityMultiplier":0.8,"priceExponent":2.5,"costStructure":{"referencePriceCents":2000,"unitCostCents":892,"capacityUnitsPerSkillPoint":47.6,"fixedCostMultiplier":1,"qualityAdjustmentRate":0.03,"developmentIntensity":0.5},"sensitivity":{"oilDemand":-0.05,"oilCost":0.1,"ratePer100Bps":-0.01,"cycle":0.5,"valuationRate":0.8}},"energy":{"baseDemandCentsPerQuarter":3600000000,"demandGrowthBpsPerGameYear":150,"demandNoise":0.06,"peRatio":11,"volatilityMultiplier":1,"priceExponent":1.5,"costStructure":{"referencePriceCents":8000,"unitCostCents":1995,"capacityUnitsPerSkillPoint":9.1,"fixedCostMultiplier":1.4,"qualityAdjustmentRate":0.03,"developmentIntensity":0.6},"sensitivity":{"oilDemand":0.8,"oilCost":0.3,"ratePer100Bps":-0.01,"cycle":0.6,"valuationRate":1}},"pharma":{"baseDemandCentsPerQuarter":2800000000,"demandGrowthBpsPerGameYear":500,"demandNoise":0.06,"peRatio":22,"volatilityMultiplier":1.4,"priceExponent":1,"costStructure":{"referencePriceCents":12000,"unitCostCents":2685,"capacityUnitsPerSkillPoint":7.7,"fixedCostMultiplier":1.2,"qualityAdjustmentRate":0.06,"developmentIntensity":1.5},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.01,"cycle":0.1,"valuationRate":1.2}},"logistics":{"baseDemandCentsPerQuarter":4200000000,"demandGrowthBpsPerGameYear":300,"demandNoise":0.06,"peRatio":15,"volatilityMultiplier":0.9,"priceExponent":2,"costStructure":{"referencePriceCents":3000,"unitCostCents":1048,"capacityUnitsPerSkillPoint":26.8,"fixedCostMultiplier":1.1,"qualityAdjustmentRate":0.04,"developmentIntensity":0.7},"sensitivity":{"oilDemand":0,"oilCost":0.5,"ratePer100Bps":-0.02,"cycle":1.2,"valuationRate":1}}}'::jsonb, 'Defaults from src/config/balance.ts, section "sectors"'),
@@ -91972,7 +92171,7 @@ insert into public.game_config (key, value, description) values
   ('skills', '{"tree":[{"key":"it_basics","branches":["it"],"tier":1,"q":1,"r":0,"requires":[]},{"key":"it_programming","branches":["it"],"tier":2,"q":2,"r":0,"requires":["it_basics"]},{"key":"it_data","branches":["it"],"tier":2,"q":3,"r":-1,"requires":["it_programming"]},{"key":"it_networks","branches":["it"],"tier":2,"q":3,"r":0,"requires":["it_programming"]},{"key":"it_web","branches":["it"],"tier":2,"q":2,"r":1,"requires":["it_programming"]},{"key":"it_architecture","branches":["it"],"tier":3,"q":4,"r":0,"requires":["it_networks"]},{"key":"it_ml","branches":["it"],"tier":3,"q":4,"r":-1,"requires":["it_data"]},{"key":"it_security","branches":["it"],"tier":3,"q":3,"r":1,"requires":["it_networks"]},{"key":"it_databases","branches":["it"],"tier":3,"q":4,"r":1,"requires":["it_architecture"]},{"key":"it_devops","branches":["it"],"tier":3,"q":5,"r":-1,"requires":["it_architecture"]},{"key":"it_mobile","branches":["it"],"tier":3,"q":5,"r":0,"requires":["it_architecture"]},{"key":"hybrid_fintech","branches":["it","finance"],"tier":4,"q":6,"r":-2,"requires":["it_devops","finance_trading"]},{"key":"it_ai","branches":["it"],"tier":4,"q":5,"r":1,"requires":["it_databases"]},{"key":"it_cloud","branches":["it"],"tier":4,"q":6,"r":0,"requires":["it_mobile"]},{"key":"it_testing","branches":["it"],"tier":4,"q":6,"r":-1,"requires":["it_devops"]},{"key":"it_ux","branches":["it"],"tier":4,"q":4,"r":2,"requires":["it_databases"]},{"key":"it_bigdata","branches":["it"],"tier":5,"q":5,"r":2,"requires":["it_ai"]},{"key":"it_crypto","branches":["it"],"tier":5,"q":7,"r":-1,"requires":["it_cloud"]},{"key":"it_embedded","branches":["it"],"tier":5,"q":6,"r":1,"requires":["it_cloud"]},{"key":"it_mastery","branches":["it"],"tier":5,"q":7,"r":0,"requires":["it_cloud"]},{"key":"it_pentest","branches":["it"],"tier":5,"q":7,"r":-2,"requires":["it_testing"]},{"key":"finance_basics","branches":["finance"],"tier":1,"q":1,"r":-1,"requires":[]},{"key":"finance_accounting","branches":["finance"],"tier":2,"q":2,"r":-2,"requires":["finance_basics"]},{"key":"finance_investment","branches":["finance"],"tier":2,"q":2,"r":-1,"requires":["finance_basics"]},{"key":"finance_banking","branches":["finance"],"tier":2,"q":3,"r":-3,"requires":["finance_accounting"]},{"key":"finance_controlling","branches":["finance"],"tier":2,"q":3,"r":-2,"requires":["finance_accounting"]},{"key":"finance_balance","branches":["finance"],"tier":3,"q":4,"r":-3,"requires":["finance_controlling"]},{"key":"finance_portfolio","branches":["finance"],"tier":3,"q":4,"r":-4,"requires":["finance_banking"]},{"key":"finance_valuation","branches":["finance"],"tier":3,"q":4,"r":-2,"requires":["finance_controlling"]},{"key":"finance_budgeting","branches":["finance"],"tier":3,"q":5,"r":-3,"requires":["finance_balance"]},{"key":"finance_tax_planning","branches":["finance"],"tier":3,"q":5,"r":-4,"requires":["finance_balance"]},{"key":"finance_trading","branches":["finance"],"tier":3,"q":5,"r":-2,"requires":["finance_valuation"]},{"key":"finance_treasury","branches":["finance"],"tier":3,"q":5,"r":-5,"requires":["finance_portfolio"]},{"key":"finance_corporate","branches":["finance"],"tier":4,"q":6,"r":-4,"requires":["finance_budgeting"]},{"key":"finance_derivatives","branches":["finance"],"tier":4,"q":6,"r":-6,"requires":["finance_treasury"]},{"key":"finance_ma","branches":["finance"],"tier":4,"q":6,"r":-3,"requires":["finance_budgeting"]},{"key":"finance_risk","branches":["finance"],"tier":4,"q":6,"r":-5,"requires":["finance_treasury"]},{"key":"finance_audit","branches":["finance"],"tier":5,"q":7,"r":-4,"requires":["finance_corporate"]},{"key":"finance_insurance","branches":["finance"],"tier":5,"q":7,"r":-7,"requires":["finance_derivatives"]},{"key":"finance_mastery","branches":["finance"],"tier":5,"q":7,"r":-5,"requires":["finance_corporate"]},{"key":"finance_quant","branches":["finance"],"tier":5,"q":7,"r":-3,"requires":["finance_ma"]},{"key":"finance_vc","branches":["finance"],"tier":5,"q":7,"r":-6,"requires":["finance_risk"]},{"key":"law_basics","branches":["law"],"tier":1,"q":1,"r":-2,"requires":[]},{"key":"law_contracts","branches":["law"],"tier":2,"q":2,"r":-3,"requires":["law_basics"]},{"key":"law_labor","branches":["law"],"tier":2,"q":1,"r":-3,"requires":["law_basics"]},{"key":"law_compliance","branches":["law"],"tier":3,"q":1,"r":-4,"requires":["law_labor"]},{"key":"law_corporate","branches":["law"],"tier":3,"q":3,"r":-4,"requires":["law_contracts"]},{"key":"law_tax","branches":["law"],"tier":2,"q":2,"r":-4,"requires":["law_contracts"]},{"key":"law_competition","branches":["law"],"tier":3,"q":1,"r":-5,"requires":["law_compliance"]},{"key":"law_intltax","branches":["law"],"tier":3,"q":3,"r":-5,"requires":["law_tax"]},{"key":"law_ip","branches":["law"],"tier":3,"q":2,"r":-5,"requires":["law_tax"]},{"key":"law_privacy","branches":["law"],"tier":3,"q":4,"r":-5,"requires":["law_corporate"]},{"key":"hybrid_business_law","branches":["law","finance"],"tier":4,"q":5,"r":-6,"requires":["law_privacy","finance_treasury"]},{"key":"law_capital","branches":["law"],"tier":4,"q":3,"r":-6,"requires":["law_intltax"]},{"key":"law_consumer","branches":["law"],"tier":4,"q":2,"r":-6,"requires":["law_competition"]},{"key":"law_crime","branches":["law"],"tier":4,"q":4,"r":-6,"requires":["law_privacy"]},{"key":"law_it","branches":["law"],"tier":4,"q":1,"r":-6,"requires":["law_competition"]},{"key":"law_environment","branches":["law"],"tier":5,"q":4,"r":-7,"requires":["law_crime"]},{"key":"law_international","branches":["law"],"tier":5,"q":2,"r":-7,"requires":["law_consumer"]},{"key":"law_litigation","branches":["law"],"tier":5,"q":1,"r":-7,"requires":["law_it"]},{"key":"law_mastery","branches":["law"],"tier":5,"q":3,"r":-7,"requires":["law_capital"]},{"key":"law_mediation","branches":["law"],"tier":5,"q":6,"r":-7,"requires":["hybrid_business_law"]},{"key":"law_medical","branches":["law"],"tier":5,"q":5,"r":-7,"requires":["law_crime"]},{"key":"management_basics","branches":["management"],"tier":1,"q":0,"r":-1,"requires":[]},{"key":"management_projects","branches":["management"],"tier":2,"q":0,"r":-2,"requires":["management_basics"]},{"key":"management_team","branches":["management"],"tier":2,"q":-1,"r":-1,"requires":["management_basics"]},{"key":"management_leadership","branches":["management"],"tier":2,"q":0,"r":-3,"requires":["management_projects"]},{"key":"management_people","branches":["management"],"tier":2,"q":-1,"r":-2,"requires":["management_team"]},{"key":"management_agile","branches":["management"],"tier":3,"q":-2,"r":-2,"requires":["management_people"]},{"key":"management_change","branches":["management"],"tier":3,"q":-1,"r":-3,"requires":["management_leadership"]},{"key":"management_recruiting","branches":["management"],"tier":3,"q":0,"r":-4,"requires":["management_leadership"]},{"key":"hybrid_people_analytics","branches":["management","it"],"tier":4,"q":0,"r":-5,"requires":["management_recruiting"]},{"key":"management_communication","branches":["management"],"tier":3,"q":-1,"r":-4,"requires":["management_change"]},{"key":"management_finance_lead","branches":["management"],"tier":3,"q":-2,"r":-3,"requires":["management_change"]},{"key":"management_operations","branches":["management"],"tier":3,"q":-3,"r":-2,"requires":["management_agile"]},{"key":"management_coaching","branches":["management"],"tier":4,"q":0,"r":-6,"requires":["hybrid_people_analytics"]},{"key":"management_innovation","branches":["management"],"tier":4,"q":-3,"r":-3,"requires":["management_operations"]},{"key":"management_organization","branches":["management"],"tier":4,"q":-1,"r":-5,"requires":["management_communication"]},{"key":"management_strategy","branches":["management"],"tier":4,"q":-2,"r":-4,"requires":["management_finance_lead"]},{"key":"management_board","branches":["management"],"tier":5,"q":0,"r":-7,"requires":["management_coaching"]},{"key":"management_culture","branches":["management"],"tier":5,"q":-4,"r":-3,"requires":["management_innovation"]},{"key":"management_international","branches":["management"],"tier":5,"q":-3,"r":-4,"requires":["management_strategy"]},{"key":"management_mastery","branches":["management"],"tier":5,"q":-2,"r":-5,"requires":["management_strategy"]},{"key":"management_risk","branches":["management"],"tier":5,"q":-1,"r":-6,"requires":["management_organization"]},{"key":"sales_basics","branches":["sales"],"tier":1,"q":-1,"r":0,"requires":[]},{"key":"sales_selling","branches":["sales"],"tier":2,"q":-2,"r":0,"requires":["sales_basics"]},{"key":"sales_marketing","branches":["sales"],"tier":2,"q":-3,"r":0,"requires":["sales_selling"]},{"key":"sales_service","branches":["sales"],"tier":2,"q":-3,"r":1,"requires":["sales_selling"]},{"key":"sales_social","branches":["sales"],"tier":2,"q":-2,"r":-1,"requires":["sales_selling"]},{"key":"sales_brand","branches":["sales"],"tier":3,"q":-4,"r":1,"requires":["sales_marketing"]},{"key":"sales_keyaccount","branches":["sales"],"tier":3,"q":-3,"r":-1,"requires":["sales_social"]},{"key":"sales_negotiation","branches":["sales"],"tier":3,"q":-4,"r":0,"requires":["sales_marketing"]},{"key":"sales_ads","branches":["sales"],"tier":3,"q":-4,"r":-1,"requires":["sales_keyaccount"]},{"key":"sales_content","branches":["sales"],"tier":3,"q":-5,"r":0,"requires":["sales_negotiation"]},{"key":"sales_seo","branches":["sales"],"tier":3,"q":-5,"r":1,"requires":["sales_brand"]},{"key":"hybrid_ecommerce","branches":["sales","logistics"],"tier":4,"q":-6,"r":2,"requires":["sales_seo","logistics_air"]},{"key":"sales_growth","branches":["sales"],"tier":4,"q":-6,"r":1,"requires":["sales_seo"]},{"key":"sales_international","branches":["sales"],"tier":4,"q":-6,"r":0,"requires":["sales_content"]},{"key":"sales_pricing","branches":["sales"],"tier":4,"q":-5,"r":-1,"requires":["sales_ads"]},{"key":"sales_retail","branches":["sales"],"tier":4,"q":-4,"r":-2,"requires":["sales_ads"]},{"key":"sales_b2b","branches":["sales"],"tier":5,"q":-7,"r":1,"requires":["sales_international"]},{"key":"sales_crm","branches":["sales"],"tier":5,"q":-6,"r":-1,"requires":["sales_pricing"]},{"key":"sales_events","branches":["sales"],"tier":5,"q":-5,"r":-2,"requires":["sales_retail"]},{"key":"sales_mastery","branches":["sales"],"tier":5,"q":-7,"r":0,"requires":["sales_international"]},{"key":"sales_pr","branches":["sales"],"tier":5,"q":-7,"r":2,"requires":["sales_growth"]},{"key":"logistics_basics","branches":["logistics"],"tier":1,"q":-1,"r":1,"requires":[]},{"key":"logistics_transport","branches":["logistics"],"tier":2,"q":-2,"r":2,"requires":["logistics_basics"]},{"key":"logistics_warehouse","branches":["logistics"],"tier":2,"q":-2,"r":1,"requires":["logistics_basics"]},{"key":"logistics_inventory","branches":["logistics"],"tier":2,"q":-3,"r":3,"requires":["logistics_transport"]},{"key":"logistics_purchasing","branches":["logistics"],"tier":2,"q":-3,"r":2,"requires":["logistics_warehouse"]},{"key":"logistics_fleet","branches":["logistics"],"tier":3,"q":-4,"r":2,"requires":["logistics_purchasing"]},{"key":"logistics_strategic","branches":["logistics"],"tier":3,"q":-4,"r":4,"requires":["logistics_inventory"]},{"key":"logistics_supplychain","branches":["logistics"],"tier":3,"q":-4,"r":3,"requires":["logistics_inventory"]},{"key":"logistics_air","branches":["logistics"],"tier":3,"q":-5,"r":2,"requires":["logistics_fleet"]},{"key":"logistics_customs","branches":["logistics"],"tier":3,"q":-5,"r":3,"requires":["logistics_supplychain"]},{"key":"logistics_distribution","branches":["logistics"],"tier":3,"q":-5,"r":4,"requires":["logistics_supplychain"]},{"key":"logistics_shipping","branches":["logistics"],"tier":3,"q":-5,"r":5,"requires":["logistics_strategic"]},{"key":"logistics_global","branches":["logistics"],"tier":4,"q":-6,"r":4,"requires":["logistics_distribution"]},{"key":"logistics_lastmile","branches":["logistics"],"tier":4,"q":-6,"r":6,"requires":["logistics_shipping"]},{"key":"logistics_quality","branches":["logistics"],"tier":4,"q":-6,"r":5,"requires":["logistics_distribution"]},{"key":"logistics_rail","branches":["logistics"],"tier":4,"q":-6,"r":3,"requires":["logistics_customs"]},{"key":"logistics_automation","branches":["logistics"],"tier":5,"q":-7,"r":7,"requires":["logistics_lastmile"]},{"key":"logistics_cold","branches":["logistics"],"tier":5,"q":-7,"r":6,"requires":["logistics_quality"]},{"key":"logistics_mastery","branches":["logistics"],"tier":5,"q":-7,"r":5,"requires":["logistics_global"]},{"key":"logistics_planning","branches":["logistics"],"tier":5,"q":-7,"r":4,"requires":["logistics_rail"]},{"key":"logistics_sustainability","branches":["logistics"],"tier":5,"q":-7,"r":3,"requires":["logistics_rail"]},{"key":"craft_basics","branches":["craft"],"tier":1,"q":-1,"r":2,"requires":[]},{"key":"craft_electrical","branches":["craft"],"tier":2,"q":-2,"r":3,"requires":["craft_basics"]},{"key":"craft_mechanics","branches":["craft"],"tier":2,"q":-1,"r":3,"requires":["craft_basics"]},{"key":"craft_automation","branches":["craft"],"tier":3,"q":-3,"r":4,"requires":["craft_electrical"]},{"key":"craft_construction","branches":["craft"],"tier":2,"q":-2,"r":4,"requires":["craft_mechanics"]},{"key":"craft_engineering","branches":["craft"],"tier":3,"q":-1,"r":4,"requires":["craft_mechanics"]},{"key":"craft_hvac","branches":["craft"],"tier":3,"q":-4,"r":5,"requires":["craft_automation"]},{"key":"craft_plumbing","branches":["craft"],"tier":3,"q":-1,"r":5,"requires":["craft_engineering"]},{"key":"craft_site","branches":["craft"],"tier":3,"q":-2,"r":5,"requires":["craft_construction"]},{"key":"craft_welding","branches":["craft"],"tier":3,"q":-3,"r":5,"requires":["craft_construction"]},{"key":"craft_carpentry","branches":["craft"],"tier":4,"q":-4,"r":6,"requires":["craft_welding"]},{"key":"craft_cnc","branches":["craft"],"tier":4,"q":-5,"r":6,"requires":["craft_hvac"]},{"key":"craft_energy","branches":["craft"],"tier":4,"q":-2,"r":6,"requires":["craft_site"]},{"key":"craft_manufacturing","branches":["craft"],"tier":4,"q":-3,"r":6,"requires":["craft_welding"]},{"key":"hybrid_industry40","branches":["craft","it"],"tier":4,"q":-1,"r":6,"requires":["craft_plumbing"]},{"key":"craft_3dprint","branches":["craft"],"tier":5,"q":-3,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_mastery","branches":["craft"],"tier":5,"q":-4,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_materials","branches":["craft"],"tier":5,"q":-6,"r":7,"requires":["craft_cnc"]},{"key":"craft_robotics","branches":["craft"],"tier":5,"q":-1,"r":7,"requires":["hybrid_industry40"]},{"key":"craft_solar","branches":["craft"],"tier":5,"q":-5,"r":7,"requires":["craft_carpentry"]},{"key":"craft_vehicles","branches":["craft"],"tier":5,"q":-2,"r":7,"requires":["craft_energy"]},{"key":"science_basics","branches":["science"],"tier":1,"q":0,"r":1,"requires":[]},{"key":"science_biology","branches":["science"],"tier":2,"q":1,"r":1,"requires":["science_basics"]},{"key":"science_chemistry","branches":["science"],"tier":2,"q":0,"r":2,"requires":["science_basics"]},{"key":"science_medicine","branches":["science"],"tier":2,"q":1,"r":2,"requires":["science_biology"]},{"key":"science_physics","branches":["science"],"tier":2,"q":0,"r":3,"requires":["science_chemistry"]},{"key":"science_biotech","branches":["science"],"tier":3,"q":0,"r":4,"requires":["science_physics"]},{"key":"science_clinical","branches":["science"],"tier":3,"q":2,"r":2,"requires":["science_medicine"]},{"key":"science_pharmacology","branches":["science"],"tier":3,"q":1,"r":3,"requires":["science_medicine"]},{"key":"hybrid_pharma_sales","branches":["science","sales"],"tier":4,"q":0,"r":5,"requires":["science_biotech"]},{"key":"science_lab","branches":["science"],"tier":3,"q":1,"r":4,"requires":["science_biotech"]},{"key":"science_microbiology","branches":["science"],"tier":3,"q":3,"r":2,"requires":["science_clinical"]},{"key":"science_statistics","branches":["science"],"tier":3,"q":2,"r":3,"requires":["science_pharmacology"]},{"key":"science_drugs","branches":["science"],"tier":4,"q":2,"r":4,"requires":["science_statistics"]},{"key":"science_genetics","branches":["science"],"tier":4,"q":1,"r":5,"requires":["science_lab"]},{"key":"science_materials","branches":["science"],"tier":4,"q":3,"r":3,"requires":["science_microbiology"]},{"key":"science_nutrition","branches":["science"],"tier":4,"q":0,"r":6,"requires":["hybrid_pharma_sales"]},{"key":"science_devices","branches":["science"],"tier":5,"q":0,"r":7,"requires":["science_nutrition"]},{"key":"science_environment","branches":["science"],"tier":5,"q":1,"r":6,"requires":["science_genetics"]},{"key":"science_mastery","branches":["science"],"tier":5,"q":2,"r":5,"requires":["science_drugs"]},{"key":"science_neuro","branches":["science"],"tier":5,"q":3,"r":4,"requires":["science_drugs"]},{"key":"science_vaccines","branches":["science"],"tier":5,"q":4,"r":3,"requires":["science_materials"]}],"costByTier":[1,2,3,4,6],"scoreByTier":[1,2,3,4,6],"freePointsPerLevel":1,"workHoursPerBranchPoint":6}'::jsonb, 'Defaults from src/config/balance.ts, section "skills"'),
   ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":1,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300},"skillPay":{"perRelevantScoreBps":300,"relevantScoreCapPerBranch":40,"perLearnedSkillBps":50,"capMultiplier":3},"rewards":{"profitShareBpsByTier":{"intern":0,"junior":0,"senior":50,"team_lead":200,"c_level":500},"maxProfitShareBps":500,"maxPostingProfitShareBps":300,"maxTotalProfitShareBps":2500,"aiDepartmentSize":50,"aiMaxShareOfWageBps":5000,"stockGrantChanceBpsByTier":{"intern":0,"junior":100,"senior":300,"team_lead":500,"c_level":800},"maxPostingStockGrantBps":500,"stockGrantValueHours":4},"clone":{"minLevel":20,"feeCents":2500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
   ('dailyRewards', '{"cycle":[{"xp":50,"cashCents":10000,"skillPoints":0},{"xp":75,"cashCents":20000,"skillPoints":0},{"xp":100,"cashCents":30000,"skillPoints":0},{"xp":125,"cashCents":0,"skillPoints":1},{"xp":150,"cashCents":50000,"skillPoints":0},{"xp":200,"cashCents":75000,"skillPoints":0},{"xp":300,"cashCents":100000,"skillPoints":1}],"freezesPerWeek":1}'::jsonb, 'Defaults from src/config/balance.ts, section "dailyRewards"'),
-  ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":360000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":10,"small_business":40,"gmbh":150,"ag":400},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25,"aiMaxPremiumBps":10000,"capitalIncreaseCooldownHours":24,"issueProceedsLockHours":72},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"logoRedrawCents":5000000,"logoRedrawCooldownHours":24,"withdrawIntervalHours":6,"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.02,"cap":{"byTier":{"garage":0.6,"small_business":0.7,"gmbh":0.8,"ag":0.9},"perStage":0.05,"perExpansionLevel":0.03,"max":1},"marketingMaxRatePerHour":0.06,"marketingHalfSaturationShare":0.01,"marketingMinHalfSaturationCents":50000,"wordOfMouthPerHour":0.008,"decayPerHour":0.004,"taskGain":0.005,"taskAiShareBps":5000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":450000,"retail":375000,"energy":375000,"pharma":450000,"logistics":375000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"aiWorkerStandbyBps":2500,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.6,0.65,0.7,0.75,0.8],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.03},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.06},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.12}},"minCostCents":20000,"flyerCapCents":200000,"flyerCapTiers":["garage"],"flyerCapBelowValueCents":100000000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
+  ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":360000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":10,"small_business":40,"gmbh":150,"ag":400},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25,"aiMaxPremiumBps":10000,"capitalIncreaseCooldownHours":24,"issueProceedsLockHours":72},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"logoRedrawCents":5000000,"logoRedrawCooldownHours":24,"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.02,"cap":{"byTier":{"garage":0.6,"small_business":0.7,"gmbh":0.8,"ag":0.9},"perStage":0.05,"perExpansionLevel":0.03,"max":1},"marketingMaxRatePerHour":0.06,"marketingHalfSaturationShare":0.01,"marketingMinHalfSaturationCents":50000,"wordOfMouthPerHour":0.008,"decayPerHour":0.004,"taskGain":0.005,"taskAiShareBps":5000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":450000,"retail":375000,"energy":375000,"pharma":450000,"logistics":375000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"aiWorkerStandbyBps":2500,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.6,0.65,0.7,0.75,0.8],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.03},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.06},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.12}},"minCostCents":20000,"flyerCapCents":200000,"flyerCapTiers":["garage"],"flyerCapBelowValueCents":100000000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
   ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"'),
   ('artworks', '{"size":32,"maxColors":16,"titleMaxLength":40,"createBaseCostCents":1500000,"createCostFactor":1.5,"auction":{"durationsHours":[1,6,24],"minIncrementBps":500,"minStartCents":10000,"feeBps":1000,"antiSnipeMinutes":2},"gallery":{"auctionsPerDay":4,"auctionHours":6,"startPriceCents":{"common":500000,"rare":2500000,"legendary":15000000}},"hot":{"likeWeight":1,"bidWeight":3,"gravity":1.5}}'::jsonb, 'Defaults from src/config/balance.ts, section "artworks"'),
   ('companyEvents', '{"chancePerDay":0.6,"minGapHours":22,"minAgeHours":6,"chanceShare":0.4,"severityWeights":[0.5,0.35,0.15],"severityScale":[1,1.7,2.5],"preDeadlineShare":0.25,"costUnit":{"minUnitCents":20000,"unitShareOfFixed":0.5},"knowHow":{"bpsPerPoint":150,"maxBonusBps":2500},"severityPenaltyBps":700,"retryCostShare":0.5,"shareShockBps":[400,900,1500],"archetypes":[{"key":"regulation","polarity":"crisis","weight":12,"effect":{"demand":-0.12,"cost":0.06},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"lobby","mitigation":1,"bonus":{"awareness":0.02},"steps":[{"key":"study","hours":3,"cost":2,"branch":"law","baseBps":9000},{"key":"alliance","hours":5,"cost":1,"branch":"sales","staff":2,"baseBps":6500},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"adapt","mitigation":0.7,"bonus":{"quality":0.03},"steps":[{"key":"retool","hours":8,"cost":4,"staff":1,"capacityHit":0.3,"baseBps":9500},{"key":"certify","hours":4,"cost":1,"branch":"science","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"special_tax","polarity":"crisis","weight":10,"effect":{"cost":0.1},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"lobby","mitigation":1,"steps":[{"key":"petition","hours":2,"cost":1,"branch":"sales","baseBps":9000},{"key":"experts","hours":5,"cost":2,"branch":"finance","baseBps":7000},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"reformulate","mitigation":0.8,"bonus":{"quality":-0.02},"steps":[{"key":"lab","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":6500},{"key":"relaunch","hours":4,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"supply_shortage","polarity":"crisis","weight":11,"effect":{"capacity":-0.25,"cost":0.05},"deadlineHours":24,"lastsHours":60,"strategies":[{"key":"new_supplier","mitigation":1,"steps":[{"key":"scout","hours":3,"cost":1,"branch":"logistics","baseBps":8500},{"key":"contract","hours":4,"cost":3,"branch":"finance","baseBps":7500}]},{"key":"stockpile","mitigation":0.8,"steps":[{"key":"buy_stock","hours":2,"cost":6,"baseBps":10000}]},{"key":"redesign","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"prototype","hours":6,"cost":2,"branch":"science","staff":1,"baseBps":6000},{"key":"switch","hours":6,"cost":2,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"quality_scandal","polarity":"crisis","weight":9,"effect":{"demand":-0.2},"deadlineHours":20,"lastsHours":72,"strategies":[{"key":"recall","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"pull_back","hours":4,"cost":4,"branch":"logistics","capacityHit":0.3,"baseBps":9500},{"key":"fix","hours":6,"cost":2,"branch":"craft","baseBps":7500}]},{"key":"pr_offensive","mitigation":0.6,"bonus":{"awareness":0.03},"steps":[{"key":"statement","hours":1,"cost":1,"branch":"management","baseBps":9000},{"key":"campaign","hours":5,"cost":3,"branch":"sales","baseBps":6500}]},{"key":"independent_test","mitigation":0.9,"steps":[{"key":"lab_test","hours":8,"cost":2,"branch":"science","baseBps":7000},{"key":"publish","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"data_breach","polarity":"crisis","weight":8,"sectors":["tech","retail","logistics"],"effect":{"demand":-0.15,"cost":0.04},"deadlineHours":18,"lastsHours":60,"strategies":[{"key":"forensics","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"analyse","hours":4,"cost":2,"branch":"it","baseBps":7500},{"key":"patch","hours":4,"cost":1,"branch":"it","staff":2,"baseBps":8000},{"key":"audit","hours":3,"cost":2,"branch":"law","baseBps":9000}]},{"key":"transparency","mitigation":0.6,"bonus":{"awareness":0.01},"steps":[{"key":"disclose","hours":2,"cost":1,"branch":"management","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tax_audit","polarity":"crisis","weight":0,"effect":{"cost":0.05,"capacity":-0.08},"deadlineHours":12,"lastsHours":36,"strategies":[{"key":"cooperate","mitigation":0.9,"steps":[{"key":"collect_files","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"auditor_meeting","hours":3,"cost":1,"branch":"management","staff":1,"baseBps":8000}]},{"key":"tax_lawyer","mitigation":1,"steps":[{"key":"hire_lawyer","hours":4,"cost":4,"branch":"law","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"price_war","polarity":"crisis","weight":10,"effect":{"demand":-0.18},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"undercut","mitigation":0.8,"steps":[{"key":"calculate","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"discount","hours":6,"cost":4,"branch":"sales","baseBps":9500}]},{"key":"innovate","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"research","hours":6,"cost":2,"branch":"science","baseBps":7000},{"key":"build","hours":6,"cost":2,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":7500},{"key":"launch","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"niche","mitigation":0.6,"steps":[{"key":"reposition","hours":4,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"strike","polarity":"crisis","weight":7,"effect":{"capacity":-0.35},"deadlineHours":16,"lastsHours":48,"strategies":[{"key":"negotiate","mitigation":1,"steps":[{"key":"listen","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"deal","hours":4,"cost":3,"branch":"management","baseBps":7000}]},{"key":"bonus","mitigation":0.8,"steps":[{"key":"pay_bonus","hours":1,"cost":5,"baseBps":10000}]},{"key":"automate","mitigation":0.7,"bonus":{"quality":-0.02},"steps":[{"key":"machines","hours":8,"cost":4,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"protest","polarity":"crisis","weight":8,"effect":{"demand":-0.1,"cost":0.03},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"green","mitigation":1,"bonus":{"awareness":0.03,"quality":0.02},"steps":[{"key":"footprint","hours":4,"cost":1,"branch":"science","baseBps":8500},{"key":"program","hours":8,"cost":4,"branch":"craft","staff":1,"baseBps":8500},{"key":"report","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"dialogue","mitigation":0.6,"steps":[{"key":"invite","hours":2,"cost":0,"branch":"management","baseBps":8500},{"key":"round_table","hours":4,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"patent_claim","polarity":"crisis","weight":6,"effect":{"demand":-0.08,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lawyers","mitigation":1,"steps":[{"key":"review","hours":4,"cost":2,"branch":"law","baseBps":8000},{"key":"court","hours":8,"cost":4,"branch":"law","baseBps":5500}]},{"key":"license","mitigation":0.7,"steps":[{"key":"pay_license","hours":2,"cost":5,"baseBps":10000}]},{"key":"workaround","mitigation":0.9,"bonus":{"quality":0.02},"steps":[{"key":"redesign","hours":8,"cost":2,"branch":"science","staff":1,"baseBps":6500},{"key":"test","hours":4,"cost":1,"branch":"craft","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"bad_review","polarity":"crisis","weight":9,"effect":{"demand":-0.14},"deadlineHours":24,"lastsHours":48,"strategies":[{"key":"improve","mitigation":1,"bonus":{"quality":0.05},"steps":[{"key":"analyse","hours":3,"cost":1,"branch":"science","baseBps":9000},{"key":"rework","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":7500},{"key":"retest","hours":3,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"counter","mitigation":0.6,"bonus":{"awareness":0.02},"steps":[{"key":"campaign","hours":4,"cost":3,"branch":"sales","baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"viral_trend","polarity":"chance","weight":10,"effect":{"demand":0.35},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"scale_up","mitigation":1,"bonus":{"awareness":0.04},"steps":[{"key":"overtime","hours":2,"cost":2,"staff":1,"baseBps":9500},{"key":"restock","hours":4,"cost":3,"branch":"logistics","baseBps":8500}]},{"key":"ride_wave","mitigation":0.6,"bonus":{"awareness":0.06},"steps":[{"key":"content","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"big_contract","polarity":"chance","weight":9,"effect":{"demand":0.25},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"pitch","mitigation":1,"steps":[{"key":"offer","hours":3,"cost":1,"branch":"sales","baseBps":8500},{"key":"negotiate","hours":4,"cost":1,"branch":"management","baseBps":6500},{"key":"deliver","hours":6,"cost":3,"staff":2,"capacityHit":0.2,"baseBps":9000}]},{"key":"quick_deal","mitigation":0.5,"steps":[{"key":"discount_offer","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"award","polarity":"chance","weight":8,"effect":{"demand":0.15},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"press_tour","mitigation":1,"bonus":{"awareness":0.06},"steps":[{"key":"interviews","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"ads","hours":4,"cost":3,"branch":"sales","baseBps":9000}]},{"key":"badge","mitigation":0.5,"steps":[{"key":"seal","hours":1,"cost":1,"baseBps":10000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"subsidy","polarity":"chance","weight":7,"effect":{"cost":-0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"apply","mitigation":1,"steps":[{"key":"forms","hours":3,"cost":0,"branch":"law","baseBps":9000},{"key":"plan","hours":5,"cost":1,"branch":"finance","baseBps":7500},{"key":"jury","hours":4,"cost":0,"branch":"management","baseBps":6000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"partnership","polarity":"chance","weight":7,"effect":{"demand":0.2,"capacity":0.1},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"join","mitigation":1,"bonus":{"awareness":0.03},"steps":[{"key":"meeting","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"integrate","hours":6,"cost":2,"branch":"it","staff":1,"baseBps":7500}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"political_decision","polarity":"crisis","weight":10,"external":true,"minWorthCents":2000000000,"risk":"political","effect":{"demand":-0.1,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lobby_campaign","mitigation":1,"bonus":{"awareness":0.01},"steps":[{"key":"think_tank","hours":4,"cost":3,"branch":"law","baseBps":8000},{"key":"coalition","hours":6,"cost":4,"branch":"sales","staff":2,"baseBps":6500},{"key":"media","hours":5,"cost":3,"branch":"management","baseBps":7000},{"key":"hearing","hours":8,"cost":6,"branch":"law","baseBps":5000}]},{"key":"comply","mitigation":0.6,"steps":[{"key":"compliance_team","hours":8,"cost":5,"branch":"law","capacityHit":0.2,"baseBps":9000},{"key":"audit","hours":4,"cost":2,"branch":"finance","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tariffs","polarity":"crisis","weight":10,"external":true,"minWorthCents":2000000000,"risk":"tariff","effect":{"demand":-0.15,"cost":0.05},"deadlineHours":30,"lastsHours":120,"strategies":[{"key":"local_production","mitigation":1,"steps":[{"key":"site_search","hours":4,"cost":3,"branch":"logistics","baseBps":8500},{"key":"build_plant","hours":10,"cost":8,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":8000}]},{"key":"lobby","mitigation":0.8,"steps":[{"key":"trade_association","hours":4,"cost":2,"branch":"sales","baseBps":8000},{"key":"negotiation","hours":6,"cost":4,"branch":"law","baseBps":6000}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"earthquake","polarity":"crisis","weight":3,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.4,"cost":0.12},"deadlineHours":18,"lastsHours":72,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tsunami","polarity":"crisis","weight":1.5,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.5,"cost":0.15},"deadlineHours":18,"lastsHours":72,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"flood","polarity":"crisis","weight":3,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.3,"cost":0.1},"deadlineHours":20,"lastsHours":60,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"wildfire","polarity":"crisis","weight":3,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.3,"cost":0.08,"demand":-0.03},"deadlineHours":20,"lastsHours":60,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"pandemic","polarity":"crisis","weight":4,"external":true,"minWorthCents":2000000000,"effect":{"capacity":-0.25,"demand":-0.1},"deadlineHours":30,"lastsHours":120,"strategies":[{"key":"remote_work","mitigation":1,"steps":[{"key":"laptops","hours":3,"cost":3,"branch":"it","baseBps":9000},{"key":"shifts","hours":5,"cost":2,"branch":"management","baseBps":8000}]},{"key":"health_program","mitigation":0.8,"steps":[{"key":"tests","hours":2,"cost":2,"branch":"science","baseBps":9000},{"key":"vaccination_drive","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"shitstorm","polarity":"crisis","weight":8,"external":true,"minWorthCents":2000000000,"risk":"image","effect":{"demand":-0.22},"deadlineHours":16,"lastsHours":72,"strategies":[{"key":"apology_tour","mitigation":1,"bonus":{"awareness":0.01},"steps":[{"key":"listen","hours":2,"cost":1,"branch":"management","baseBps":9000},{"key":"apology","hours":3,"cost":2,"branch":"management","baseBps":7500},{"key":"make_good","hours":6,"cost":4,"branch":"sales","baseBps":7500}]},{"key":"counter_campaign","mitigation":0.6,"steps":[{"key":"fact_check","hours":3,"cost":2,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"war_conflict","polarity":"crisis","weight":3,"external":true,"minWorthCents":5000000000,"risk":"war","effect":{"demand":-0.12,"capacity":-0.15,"cost":0.1},"deadlineHours":36,"lastsHours":144,"strategies":[{"key":"reroute","mitigation":1,"steps":[{"key":"risk_analysis","hours":3,"cost":2,"branch":"logistics","baseBps":9000},{"key":"new_routes","hours":8,"cost":5,"branch":"logistics","staff":1,"baseBps":7500},{"key":"secure_stock","hours":4,"cost":4,"branch":"finance","baseBps":8500}]},{"key":"withdraw","mitigation":0.6,"steps":[{"key":"exit_plan","hours":4,"cost":2,"branch":"management","baseBps":9000},{"key":"write_off","hours":2,"cost":3,"branch":"finance","baseBps":9500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"commodity_crunch","polarity":"crisis","weight":8,"external":true,"minWorthCents":2000000000,"effect":{"capacity":-0.2,"cost":0.12},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"long_term_contracts","mitigation":1,"steps":[{"key":"market_scan","hours":3,"cost":1,"branch":"logistics","baseBps":9000},{"key":"hedge","hours":4,"cost":4,"branch":"finance","baseBps":7500},{"key":"contract","hours":4,"cost":3,"branch":"law","baseBps":8000}]},{"key":"substitute","mitigation":0.8,"steps":[{"key":"research_sub","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":7000},{"key":"retool","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"cyber_attack","polarity":"crisis","weight":7,"external":true,"minWorthCents":2000000000,"insurable":true,"effect":{"capacity":-0.35,"cost":0.06},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"incident_response","mitigation":1,"steps":[{"key":"isolate","hours":2,"cost":2,"branch":"it","staff":1,"baseBps":8500},{"key":"restore","hours":5,"cost":3,"branch":"it","baseBps":7500},{"key":"harden","hours":4,"cost":3,"branch":"it","baseBps":8000}]},{"key":"backup_restore","mitigation":0.6,"steps":[{"key":"backups","hours":4,"cost":3,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"antitrust","polarity":"crisis","weight":6,"external":true,"minWorthCents":50000000000,"risk":"political","effect":{"demand":-0.08,"cost":0.15},"deadlineHours":48,"lastsHours":168,"strategies":[{"key":"fight","mitigation":1,"steps":[{"key":"top_lawyers","hours":6,"cost":6,"branch":"law","baseBps":7000},{"key":"economists","hours":6,"cost":4,"branch":"finance","baseBps":7000},{"key":"court","hours":10,"cost":8,"branch":"law","baseBps":5000}]},{"key":"cooperate","mitigation":0.8,"steps":[{"key":"disclose_files","hours":4,"cost":2,"branch":"law","baseBps":9000},{"key":"remedies","hours":8,"cost":6,"branch":"management","baseBps":7500}]},{"key":"divest","mitigation":0.7,"steps":[{"key":"sell_unit","hours":6,"cost":8,"branch":"finance","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"union_strike","polarity":"crisis","weight":6,"external":true,"minWorthCents":2000000000,"effect":{"capacity":-0.45},"deadlineHours":18,"lastsHours":48,"strategies":[{"key":"collective_bargaining","mitigation":1,"steps":[{"key":"talks","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"offer","hours":4,"cost":4,"branch":"finance","baseBps":7500},{"key":"sign","hours":2,"cost":1,"branch":"law","baseBps":9000}]},{"key":"mediation","mitigation":0.8,"steps":[{"key":"mediator","hours":6,"cost":3,"branch":"law","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"currency_crisis","polarity":"crisis","weight":4,"external":true,"minWorthCents":5000000000,"risk":"tariff","effect":{"demand":-0.1,"cost":0.08},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"hedging","mitigation":1,"steps":[{"key":"treasury_analysis","hours":3,"cost":2,"branch":"finance","baseBps":9000},{"key":"currency_hedge","hours":4,"cost":5,"branch":"finance","baseBps":7000}]},{"key":"local_pricing","mitigation":0.6,"steps":[{"key":"reprice","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"energy_shock","polarity":"crisis","weight":5,"external":true,"minWorthCents":2000000000,"effect":{"cost":0.14},"deadlineHours":24,"lastsHours":120,"strategies":[{"key":"efficiency","mitigation":1,"steps":[{"key":"energy_audit","hours":3,"cost":2,"branch":"science","baseBps":9000},{"key":"retrofit","hours":8,"cost":6,"branch":"craft","capacityHit":0.15,"baseBps":8000}]},{"key":"own_power","mitigation":0.9,"steps":[{"key":"solar_park","hours":10,"cost":8,"branch":"science","staff":2,"baseBps":7500},{"key":"grid_deal","hours":3,"cost":2,"branch":"law","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyEvents"'),
@@ -91997,6 +92196,7 @@ insert into public.game_config (key, value, description) values
   ('listed', '{"refRevenue":{"windowHours":24,"minCents":20000},"satisfaction":{"start":60,"base":50,"adjustPerHour":0.15,"green":60,"red":35,"benefitsMax":40,"wages":{"unpaidMaxLoss":25,"moodMaxLoss":10},"workload":{"overFrom":0.95,"overFull":1.5,"overMaxLoss":12,"underBelow":0.35,"underLoss":4},"crisis":{"perSeverity":4,"scandal":6,"scandals":["quality_scandal","data_breach","tax_audit"]},"layoffs":{"perHead":3,"max":15,"decayPerHour":0.08},"greedMaxLoss":10,"success":{"profitHour":3,"lossHour":-3},"effect":{"lowCapacityMaxLoss":0.3,"lowQualityMaxLoss":0.15,"highCapacityMaxGain":0.06,"highFull":90},"quits":{"everyRedHours":3,"notifyEveryHours":24,"massQuitFrom":3}},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"windowHours":24,"minProfitShareOfRevenue":0.05,"greed":{"freeRatioBps":3000,"fullRatioBps":10000,"maxLoss":35,"feedBelow":35},"reinvest":{"fullRatioBps":5000,"maxGain":12},"dividend":{"fullRatioBps":2000,"maxGain":12,"streakPerDay":1,"streakMax":6},"penalty":{"lateFee":3,"estimate":6,"enforcement":8},"scandalLoss":5,"demandMaxEffect":0.2,"priceMaxEffect":0.25},"dividends":{"perDay":1,"maxShareOfFreeCashBps":5000,"minTotalCents":10000,"historyLimit":20},"board":{"minShareBps":2000,"voteHours":12,"quorumBps":3000,"maxOpen":2,"cooldownHours":6,"maxDays":7,"earmarkMaxShareOfCashBps":8000,"payoutCapStepBps":500,"aiVote":{"reputationBelow":40,"kinds":["payout_cap","withdraw_ban","dividend"]},"kinds":["earmark","release","dividend","payout_cap","withdraw_ban","price_level","debt"],"purposes":["research","products","expansion","benefits","marketing"],"historyLimit":20},"taxes":{"rateBps":1500,"minRateBps":800,"reminderAfterHours":30,"lateFeeAfterHours":42,"estimateAfterHours":60,"lateFee":{"minCents":5000,"revenueBps":50},"estimate":{"marginBps":2500,"surchargeBps":2500},"payWithinHours":24,"latePaymentBps":500,"enforceAfterHours":48,"enforcementBps":1000,"check":{"receipts":3,"discountBps":500},"brackets":[{"fromCentsPerDay":10000000,"extraBps":200},{"fromCentsPerDay":100000000,"extraBps":500},{"fromCentsPerDay":1000000000,"extraBps":800}],"advisor":{"minWageCentsPerHour":6000,"revenueBps":150,"discountBps":800,"pivotCentsPerHour":100000,"growthPerDecade":2.4,"maxRevenueBps":3000},"auditArchetype":"tax_audit","receipts":[{"key":"customer_invoice","category":"revenue"},{"key":"online_shop_payout","category":"revenue"},{"key":"raw_material","category":"goods"},{"key":"packaging","category":"goods"},{"key":"payslip","category":"wages"},{"key":"overtime","category":"wages"},{"key":"office_rent","category":"fixed"},{"key":"electricity","category":"fixed"},{"key":"lab_equipment","category":"research"},{"key":"prototype","category":"research"},{"key":"fruit_basket","category":"benefit"},{"key":"team_dinner","category":"benefit"}],"receiptCategories":["revenue","goods","wages","fixed","research","benefit"],"historyLimit":30},"historyHours":72,"accountingPageSize":50,"items":[{"key":"r_quality_1","kind":"research","branch":"quality","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"qualityBps":300}},{"key":"r_quality_2","kind":"research","branch":"quality","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_quality_1"],"effects":{"qualityBps":500}},{"key":"r_quality_3","kind":"research","branch":"quality","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_quality_2"],"effects":{"qualityBps":800}},{"key":"r_quality_4","kind":"research","branch":"quality","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_quality_3","r_efficiency_2"],"effects":{"qualityBps":1200,"demandBps":400}},{"key":"r_efficiency_1","kind":"research","branch":"efficiency","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"marginBps":200}},{"key":"r_efficiency_2","kind":"research","branch":"efficiency","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_efficiency_1"],"effects":{"marginBps":300}},{"key":"r_efficiency_3","kind":"research","branch":"efficiency","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_efficiency_2"],"effects":{"marginBps":500}},{"key":"r_efficiency_4","kind":"research","branch":"efficiency","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_efficiency_3","r_automation_2"],"effects":{"marginBps":800,"capacityBps":500}},{"key":"r_brand_1","kind":"research","branch":"brand","tier":1,"purpose":"marketing","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"awarenessBps":200}},{"key":"r_brand_2","kind":"research","branch":"brand","tier":2,"purpose":"marketing","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_brand_1"],"effects":{"awarenessBps":300}},{"key":"r_brand_3","kind":"research","branch":"brand","tier":3,"purpose":"marketing","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_brand_2"],"effects":{"awarenessBps":500}},{"key":"r_brand_4","kind":"research","branch":"brand","tier":4,"purpose":"marketing","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_brand_3","r_quality_2"],"effects":{"awarenessBps":500,"demandBps":800}},{"key":"r_automation_1","kind":"research","branch":"automation","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":500}},{"key":"r_automation_2","kind":"research","branch":"automation","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_automation_1"],"effects":{"capacityBps":800}},{"key":"r_automation_3","kind":"research","branch":"automation","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_automation_2"],"effects":{"capacityBps":1200}},{"key":"r_automation_4","kind":"research","branch":"automation","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_automation_3","r_efficiency_2"],"effects":{"capacityBps":2000,"marginBps":300}},{"key":"r_logistics_1","kind":"research","branch":"logistics","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"capacityBps":300,"marginBps":100}},{"key":"r_logistics_2","kind":"research","branch":"logistics","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_logistics_1"],"effects":{"marketBps":500}},{"key":"r_logistics_3","kind":"research","branch":"logistics","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_logistics_2"],"effects":{"fixedCostBps":-500}},{"key":"r_logistics_4","kind":"research","branch":"logistics","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_logistics_3","r_automation_2"],"effects":{"marketBps":1000,"marginBps":200}},{"key":"r_sustainability_1","kind":"research","branch":"sustainability","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"reputation":2}},{"key":"r_sustainability_2","kind":"research","branch":"sustainability","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_sustainability_1"],"effects":{"reputation":3,"marginBps":100}},{"key":"r_sustainability_3","kind":"research","branch":"sustainability","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_sustainability_2"],"effects":{"reputation":3,"satisfaction":3}},{"key":"r_sustainability_4","kind":"research","branch":"sustainability","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_sustainability_3","r_brand_2"],"effects":{"reputation":5,"demandBps":500}},{"key":"r_finance_1","kind":"research","branch":"finance","tier":1,"purpose":"research","costHours":6,"minCostCents":100000,"hours":1,"requires":[],"effects":{"taxRateBps":-100}},{"key":"r_finance_2","kind":"research","branch":"finance","tier":2,"purpose":"research","costHours":18,"minCostCents":500000,"hours":3,"requires":["r_finance_1"],"effects":{"fixedCostBps":-300}},{"key":"r_finance_3","kind":"research","branch":"finance","tier":3,"purpose":"research","costHours":48,"minCostCents":2500000,"hours":8,"requires":["r_finance_2"],"effects":{"taxRateBps":-150}},{"key":"r_finance_4","kind":"research","branch":"finance","tier":4,"purpose":"research","costHours":120,"minCostCents":15000000,"hours":24,"requires":["r_finance_3","r_logistics_2"],"effects":{"taxRateBps":-150,"marginBps":300}},{"key":"p_second","kind":"product","purpose":"products","costHours":12,"minCostCents":300000,"hours":2,"upkeepBps":150,"effects":{"demandBps":800}},{"key":"p_budget","kind":"product","purpose":"products","costHours":16,"minCostCents":400000,"hours":3,"requires":["r_efficiency_1"],"upkeepBps":200,"effects":{"demandBps":1200,"qualityBps":-200}},{"key":"p_premium","kind":"product","purpose":"products","costHours":30,"minCostCents":1000000,"hours":6,"requires":["r_quality_2"],"upkeepBps":300,"effects":{"demandBps":1000,"qualityBps":400}},{"key":"p_subscription","kind":"product","purpose":"products","costHours":36,"minCostCents":1500000,"hours":8,"requires":["r_brand_1","p_second"],"upkeepBps":350,"effects":{"demandBps":1800}},{"key":"p_merch","kind":"product","purpose":"products","costHours":8,"minCostCents":200000,"hours":2,"requires":["r_brand_2"],"upkeepBps":100,"effects":{"demandBps":400,"awarenessBps":200}},{"key":"p_enterprise","kind":"product","purpose":"products","costHours":80,"minCostCents":6000000,"hours":16,"requires":["r_quality_3","p_premium"],"upkeepBps":500,"effects":{"demandBps":3000}},{"key":"g_south","kind":"region","purpose":"expansion","costHours":20,"minCostCents":600000,"hours":4,"upkeepBps":200,"effects":{"marketBps":1000}},{"key":"g_dach","kind":"region","purpose":"expansion","costHours":40,"minCostCents":2000000,"hours":8,"requires":["g_south"],"upkeepBps":300,"effects":{"marketBps":1500}},{"key":"g_europe","kind":"region","purpose":"expansion","costHours":80,"minCostCents":6000000,"hours":12,"requires":["g_dach","l_export"],"upkeepBps":400,"effects":{"marketBps":2500}},{"key":"g_america","kind":"region","purpose":"expansion","costHours":140,"minCostCents":15000000,"hours":24,"requires":["g_europe","r_logistics_2"],"upkeepBps":500,"effects":{"marketBps":3500}},{"key":"g_asia","kind":"region","purpose":"expansion","costHours":200,"minCostCents":30000000,"hours":36,"requires":["g_america","r_logistics_4"],"upkeepBps":600,"effects":{"marketBps":5000}},{"key":"m_machines","kind":"machine","purpose":"expansion","costHours":10,"minCostCents":300000,"hours":2,"maxLevel":5,"costGrowth":1.6,"upkeepBps":50,"effects":{"capacityBps":400}},{"key":"m_datacenter","kind":"machine","purpose":"expansion","costHours":14,"minCostCents":500000,"hours":3,"maxLevel":3,"costGrowth":1.8,"upkeepBps":60,"effects":{"marginBps":150,"capacityBps":200}},{"key":"m_showroom","kind":"machine","purpose":"marketing","costHours":12,"minCostCents":400000,"hours":3,"maxLevel":3,"costGrowth":1.7,"upkeepBps":60,"effects":{"awarenessBps":200,"demandBps":150}},{"key":"a_kleinhirn","kind":"acquisition","purpose":"expansion","costHours":90,"minCostCents":8000000,"hours":6,"requires":["r_automation_2"],"upkeepBps":200,"effects":{"capacityBps":1000,"qualityBps":300}},{"key":"a_datenkrake","kind":"acquisition","purpose":"expansion","costHours":110,"minCostCents":10000000,"hours":6,"requires":["r_brand_2"],"upkeepBps":250,"effects":{"demandBps":1500}},{"key":"a_robobutze","kind":"acquisition","purpose":"expansion","costHours":130,"minCostCents":12000000,"hours":8,"requires":["r_efficiency_3"],"upkeepBps":200,"effects":{"marginBps":600,"capacityBps":500}},{"key":"l_patent","kind":"licence","purpose":"research","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":100,"effects":{"qualityBps":500}},{"key":"l_brand","kind":"licence","purpose":"marketing","costHours":10,"minCostCents":300000,"hours":1,"upkeepBps":120,"effects":{"demandBps":600}},{"key":"l_export","kind":"licence","purpose":"expansion","costHours":15,"minCostCents":500000,"hours":2,"upkeepBps":50,"effects":{}},{"key":"b_obstkorb","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":5000,"hours":0,"upkeepPerHeadCents":40,"effects":{"satisfaction":3}},{"key":"b_kaffee","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":8000,"hours":0,"upkeepPerHeadCents":50,"effects":{"satisfaction":3}},{"key":"b_tischkicker","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":60000,"hours":0,"upkeepPerHeadCents":10,"effects":{"satisfaction":2}},{"key":"b_hundebuero","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":10000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_massagesessel","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":150000,"hours":0,"upkeepPerHeadCents":20,"effects":{"satisfaction":2}},{"key":"b_jobrad","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":20000,"hours":0,"upkeepPerHeadCents":120,"effects":{"satisfaction":3}},{"key":"b_fitness","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":30000,"hours":0,"upkeepPerHeadCents":150,"effects":{"satisfaction":4}},{"key":"b_homeoffice","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":50000,"hours":0,"upkeepPerHeadCents":100,"effects":{"satisfaction":5}},{"key":"b_weiterbildung","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":40000,"hours":0,"upkeepPerHeadCents":250,"effects":{"satisfaction":4,"qualityBps":200}},{"key":"b_feelgood","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":100000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":5}},{"key":"b_betriebsrente","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":80000,"hours":0,"upkeepPerHeadCents":400,"effects":{"satisfaction":6}},{"key":"b_kita","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":500000,"hours":0,"upkeepPerHeadCents":500,"effects":{"satisfaction":7}},{"key":"b_bonus","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":0,"hours":0,"upkeepPerHeadCents":900,"effects":{"satisfaction":8,"capacityBps":300}},{"key":"b_viertagewoche","kind":"benefit","purpose":"benefits","costHours":0,"minCostCents":200000,"hours":0,"upkeepPerHeadCents":300,"effects":{"satisfaction":10,"capacityBps":-600}},{"key":"x_pizza","kind":"action","purpose":"benefits","costHours":0,"minCostCents":5000,"costPerHeadCents":1500,"hours":0,"cooldownHours":6,"boost":3,"effects":{}},{"key":"x_teamevent","kind":"action","purpose":"benefits","costHours":0,"minCostCents":30000,"costPerHeadCents":6000,"hours":0,"cooldownHours":24,"boost":8,"effects":{}},{"key":"x_firmenfeier","kind":"action","purpose":"benefits","costHours":0,"minCostCents":100000,"costPerHeadCents":12000,"hours":0,"cooldownHours":72,"boost":12,"effects":{}},{"key":"x_sonderbonus","kind":"action","purpose":"benefits","costHours":0,"minCostCents":0,"costPerHeadCents":50000,"hours":0,"cooldownHours":48,"boost":15,"effects":{}}]}'::jsonb, 'Defaults from src/config/balance.ts, section "listed"'),
   ('world', '{"unlockWorthCents":1000000000,"aiOnMap":12,"hqTiers":[{"tier":1,"key":"office","costCents":100000000,"seats":5,"demandBps":0,"reputationPoints":1,"awarenessAdd":0.01,"satisfactionPoints":1,"prestige":1},{"tier":2,"key":"complex","costCents":400000000,"seats":15,"demandBps":100,"reputationPoints":2,"awarenessAdd":0.02,"satisfactionPoints":2,"prestige":3},{"tier":3,"key":"campus","costCents":1500000000,"seats":40,"demandBps":200,"reputationPoints":3,"awarenessAdd":0.03,"satisfactionPoints":3,"prestige":7},{"tier":4,"key":"tower","costCents":6000000000,"seats":100,"demandBps":300,"reputationPoints":4,"awarenessAdd":0.04,"satisfactionPoints":4,"prestige":15},{"tier":5,"key":"mega","costCents":25000000000,"seats":250,"demandBps":400,"reputationPoints":5,"awarenessAdd":0.05,"satisfactionPoints":5,"prestige":30}],"relocation":{"costBpsOfInvested":2000,"minCostCents":50000000,"cooldownHours":168},"effects":{"imageDemandWeightBps":5000,"minFactorBps":6000,"maxFactorBps":16000},"subsidiaries":{"unlockWorthCents":5000000000,"unlockHqTier":2,"max":4,"setupCostCents":300000000,"setupGrowthBps":16000,"hourlyCostCents":60000,"rampUpHours":336,"rampUpCostMultiplier":3,"revenueShareBps":1500,"demandBonusBps":500,"diminishingBps":6000},"imageCampaign":{"costBpsOfWorth":50,"minCostCents":20000000,"gainBps":500,"maxBonusBps":3000,"decayPerDayBps":100,"cooldownHours":12},"lobby":{"maxFeeBps":300,"feeChangeCooldownHours":24,"taxDiscountBps":1000,"politicalImpactReductionBps":3000,"minWorthCents":1000000000},"balance":{"production":0.5,"labour":0.3,"demand":1,"image":0.5,"taxBaselineBps":2500,"tax":0.2,"political":4,"tariff":3,"war":6,"disaster":120,"tolerance":400},"countries":[{"key":"de","name":"Deutschland","map":{"x":52.8,"y":20.7},"productionCostBps":11000,"labourCostBps":12500,"demandPotentialBps":10500,"imageBps":12500,"taxRateBps":3000,"politicalRisk":10,"tariffExposure":30,"disasterRisk":["flood"],"warRisk":5,"flag":["#1a1a1a","#dd0000","#ffce00"]},{"key":"us","name":"USA","map":{"x":22.8,"y":29.3},"productionCostBps":11000,"labourCostBps":12000,"demandPotentialBps":12000,"imageBps":10500,"taxRateBps":3400,"politicalRisk":35,"tariffExposure":40,"disasterRisk":["storm","wildfire"],"warRisk":10,"flag":["#b22234","#ffffff","#3c3b6e"]},{"key":"cn","name":"China","map":{"x":78.9,"y":32.1},"productionCostBps":8400,"labourCostBps":8800,"demandPotentialBps":11300,"imageBps":7600,"taxRateBps":2500,"politicalRisk":60,"tariffExposure":70,"disasterRisk":["flood","earthquake"],"warRisk":25,"flag":["#de2910","#ffde00"]},{"key":"jp","name":"Japan","map":{"x":88.3,"y":31.4},"productionCostBps":10800,"labourCostBps":11000,"demandPotentialBps":10500,"imageBps":12000,"taxRateBps":3000,"politicalRisk":10,"tariffExposure":30,"disasterRisk":["earthquake","storm"],"warRisk":10,"flag":["#ffffff","#bc002d"]},{"key":"in","name":"Indien","map":{"x":71.9,"y":41.4},"productionCostBps":8800,"labourCostBps":8000,"demandPotentialBps":10500,"imageBps":8800,"taxRateBps":2700,"politicalRisk":40,"tariffExposure":40,"disasterRisk":["flood","drought"],"warRisk":25,"flag":["#ff9933","#ffffff","#138808"]},{"key":"br","name":"Brasilien","map":{"x":35.6,"y":65.7},"productionCostBps":8800,"labourCostBps":8500,"demandPotentialBps":10200,"imageBps":9500,"taxRateBps":3400,"politicalRisk":45,"tariffExposure":40,"disasterRisk":["flood"],"warRisk":5,"flag":["#009c3b","#ffdf00","#002776"]},{"key":"gb","name":"Vereinigtes Königreich","map":{"x":49.4,"y":18.6},"productionCostBps":10600,"labourCostBps":11500,"demandPotentialBps":10200,"imageBps":11500,"taxRateBps":2500,"politicalRisk":20,"tariffExposure":45,"disasterRisk":["flood"],"warRisk":5,"flag":["#012169","#ffffff","#c8102e"]},{"key":"fr","name":"Frankreich","map":{"x":50.6,"y":23.6},"productionCostBps":10700,"labourCostBps":12000,"demandPotentialBps":10500,"imageBps":12000,"taxRateBps":2800,"politicalRisk":25,"tariffExposure":30,"disasterRisk":["flood"],"warRisk":5,"flag":["#0055a4","#ffffff","#ef4135"],"flagVertical":true},{"key":"ca","name":"Kanada","map":{"x":20.6,"y":17.1},"productionCostBps":10300,"labourCostBps":11000,"demandPotentialBps":9900,"imageBps":11500,"taxRateBps":2600,"politicalRisk":10,"tariffExposure":45,"disasterRisk":["wildfire"],"warRisk":5,"flag":["#ff0000","#ffffff","#ff0000"],"flagVertical":true},{"key":"mx","name":"Mexiko","map":{"x":21.7,"y":40.7},"productionCostBps":8500,"labourCostBps":7800,"demandPotentialBps":10000,"imageBps":9000,"taxRateBps":3000,"politicalRisk":45,"tariffExposure":45,"disasterRisk":["earthquake","storm"],"warRisk":10,"flag":["#006847","#ffffff","#ce1126"],"flagVertical":true},{"key":"kr","name":"Südkorea","map":{"x":85.6,"y":31.4},"productionCostBps":9800,"labourCostBps":10000,"demandPotentialBps":10300,"imageBps":11000,"taxRateBps":2400,"politicalRisk":15,"tariffExposure":35,"disasterRisk":["storm"],"warRisk":35,"flag":["#ffffff","#cd2e3a","#0047a0"]},{"key":"au","name":"Australien","map":{"x":87.2,"y":75},"productionCostBps":10500,"labourCostBps":10800,"demandPotentialBps":10000,"imageBps":11400,"taxRateBps":2500,"politicalRisk":10,"tariffExposure":25,"disasterRisk":["wildfire","drought"],"warRisk":5,"flag":["#00008b","#ffffff","#ff0000"]},{"key":"sg","name":"Singapur","map":{"x":78.9,"y":56.4},"productionCostBps":10600,"labourCostBps":11200,"demandPotentialBps":9800,"imageBps":11500,"taxRateBps":1700,"politicalRisk":10,"tariffExposure":35,"disasterRisk":[],"warRisk":10,"flag":["#ef3340","#ffffff"]},{"key":"ch","name":"Schweiz","map":{"x":52.2,"y":23.6},"productionCostBps":11000,"labourCostBps":12500,"demandPotentialBps":9500,"imageBps":13000,"taxRateBps":1500,"politicalRisk":5,"tariffExposure":15,"disasterRisk":[],"warRisk":5,"flag":["#ff0000","#ffffff"]},{"key":"ae","name":"Vereinigte Arabische Emirate","map":{"x":65,"y":40},"productionCostBps":9800,"labourCostBps":9800,"demandPotentialBps":9800,"imageBps":10500,"taxRateBps":900,"politicalRisk":35,"tariffExposure":40,"disasterRisk":["drought"],"warRisk":30,"flag":["#00732f","#ffffff","#000000"]},{"key":"za","name":"Südafrika","map":{"x":56.9,"y":77.9},"productionCostBps":8800,"labourCostBps":8300,"demandPotentialBps":9600,"imageBps":9500,"taxRateBps":2700,"politicalRisk":45,"tariffExposure":35,"disasterRisk":["drought"],"warRisk":10,"flag":["#007a4d","#ffb612","#de3831"]},{"key":"ng","name":"Nigeria","map":{"x":52.2,"y":50.7},"productionCostBps":7800,"labourCostBps":7000,"demandPotentialBps":10000,"imageBps":8500,"taxRateBps":3000,"politicalRisk":70,"tariffExposure":50,"disasterRisk":["flood"],"warRisk":30,"flag":["#008751","#ffffff","#008751"],"flagVertical":true},{"key":"pl","name":"Polen","map":{"x":55.3,"y":20},"productionCostBps":9000,"labourCostBps":8800,"demandPotentialBps":9500,"imageBps":10000,"taxRateBps":1900,"politicalRisk":25,"tariffExposure":30,"disasterRisk":["flood"],"warRisk":30,"flag":["#ffffff","#dc143c"]},{"key":"vn","name":"Vietnam","map":{"x":79.4,"y":45.7},"productionCostBps":7800,"labourCostBps":7200,"demandPotentialBps":9500,"imageBps":9000,"taxRateBps":2000,"politicalRisk":45,"tariffExposure":60,"disasterRisk":["storm","flood"],"warRisk":15,"flag":["#da251d","#ffff00"]},{"key":"se","name":"Schweden","map":{"x":54.4,"y":12.9},"productionCostBps":10600,"labourCostBps":12000,"demandPotentialBps":9700,"imageBps":12500,"taxRateBps":2100,"politicalRisk":5,"tariffExposure":30,"disasterRisk":[],"warRisk":10,"flag":["#006aa7","#fecc00"]},{"key":"ie","name":"Irland","map":{"x":47.8,"y":19.3},"productionCostBps":10800,"labourCostBps":11000,"demandPotentialBps":9500,"imageBps":12000,"taxRateBps":1250,"politicalRisk":10,"tariffExposure":40,"disasterRisk":[],"warRisk":5,"flag":["#169b62","#ffffff","#ff883e"],"flagVertical":true},{"key":"tr","name":"Türkei","map":{"x":59.7,"y":29.3},"productionCostBps":8600,"labourCostBps":8400,"demandPotentialBps":10000,"imageBps":9000,"taxRateBps":2500,"politicalRisk":55,"tariffExposure":45,"disasterRisk":["earthquake"],"warRisk":30,"flag":["#e30a17","#ffffff"]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "world"'),
   ('macro', '{"friction":{"worthPivotCents":3000000000,"saturationExponent":0.75,"overheadPerDecadeBps":2000,"overheadMaxBps":4500},"events":{"worthPivotCents":2000000000,"maxDecades":3,"chancePerDayPerDecade":0.2,"maxChancePerDay":0.95,"chanceShareCutPerDecade":0.08,"minChanceShare":0.15,"severityPowerPerDecade":0.6,"externalBoostPerDecade":1,"unitRevenueHours":0.25},"country":{"politicalBoost":2,"tariffBoost":2,"warBoost":3,"imageBoost":1,"disasterListed":2.5,"disasterOther":0.4,"disasterMap":{"earthquake":["earthquake","tsunami"],"flood":["flood"],"storm":["flood","tsunami"],"wildfire":["wildfire"],"drought":["wildfire"]}},"insurance":{"levels":[{"key":"none","coverage":0,"premiumBps":0},{"key":"basic","coverage":0.5,"premiumBps":40},{"key":"full","coverage":0.8,"premiumBps":110}],"changeWaitHours":12},"lobby":{"maxLevel":5,"successBpsPerLevel":350,"politicalCutPerLevel":0.12},"maxExtraCostShare":0.6}'::jsonb, 'Defaults from src/config/balance.ts, section "macro"'),
+  ('marketForces', '{"heat":{"premiumFree":0.25,"premiumScale":0.5,"gain24hFree":0.2,"gain24hScale":0.4,"gain7dFree":0.5,"gain7dScale":0.8,"gainGate":0.1,"discountFree":0.3,"discountScale":0.6,"loss24hFree":0.3,"loss24hScale":0.5,"maxHeat":4},"chance":{"basePerHour":0.012,"perHeatPerHour":0.9,"perColdPerHour":0.35,"maxPerHour":3},"leadMinMinutes":3,"leadMaxMinutes":15,"reliabilityBps":8500,"severityPerHeat":0.45,"maxMoveBps":4500,"sentimentPerMove":2,"waves":{"basePerHour":0.02,"perHeatPerHour":0.25,"maxPerHour":1,"reliefPerHour":0.02,"minHeat":0.2,"maxStocks":6},"forces":[{"key":"profit_taking","direction":-1,"when":"hot","minHeat":0,"weight":4,"minMoveBps":400,"maxMoveBps":1200,"headline":"Gewinnmitnahmen bei {name}","body":"Nach dem steilen Anstieg wollen viele Anleger ihre Gewinne sichern. Der Kurs dürfte {w} nachgeben."},{"key":"analyst_downgrade","direction":-1,"when":"hot","minHeat":0,"weight":3,"minMoveBps":300,"maxMoveBps":1000,"headline":"Analysten stufen {name} ab","body":"Nach dem Lauf halten mehrere Häuser die Aktie für ausgereizt und raten zum Verkauf."},{"key":"dilution_rumor","direction":-1,"when":"hot","minHeat":0.5,"weight":2,"minMoveBps":400,"maxMoveBps":1200,"headline":"Gerüchte über eine Kapitalerhöhung bei {name}","body":"Der hohe Kurs lädt zu neuen Aktien ein. Anleger fürchten, dass ihre Anteile {w} verwässert werden."},{"key":"short_report","direction":-1,"when":"hot","minHeat":1,"weight":3,"minMoveBps":800,"maxMoveBps":2000,"headline":"Leerverkäufer-Report: {name} sei massiv überbewertet","body":"Ein bekannter Fonds veröffentlicht eine Studie gegen {name} und wettet auf fallende Kurse."},{"key":"insider_probe","direction":-1,"when":"hot","minHeat":1,"weight":2,"minMoveBps":500,"maxMoveBps":1500,"headline":"Insider-Verdacht: Aufsicht prüft Käufe bei {name}","body":"Die Börsenaufsicht schaut sich die auffälligen Käufe der letzten Tage genauer an."},{"key":"margin_calls","direction":-1,"when":"hot","minHeat":1.5,"weight":2,"minMoveBps":600,"maxMoveBps":1800,"headline":"Margin Calls bei {name}","body":"Spekulanten auf Kredit müssen nachschießen oder verkaufen. Der Kurs dürfte {w} fallen."},{"key":"special_audit","direction":-1,"when":"hot","minHeat":1.5,"weight":2,"minMoveBps":800,"maxMoveBps":2500,"headline":"Sonderprüfung bei {name} angekündigt","body":"Wirtschaftsprüfer sollen die Bücher von {name} durchleuchten. Bis dahin halten sich Anleger zurück."},{"key":"bubble_warning","direction":-1,"when":"hot","minHeat":2,"weight":3,"minMoveBps":1000,"maxMoveBps":3000,"headline":"Blasenwarnung: {name} weit über jedem Wert","body":"Ökonomen warnen in den Nachrichten vor einer Blase bei {name}. Der Kurs dürfte {w} einbrechen."},{"key":"rotation","direction":-1,"when":"any","minHeat":0,"weight":1,"minMoveBps":200,"maxMoveBps":600,"headline":"Anleger schichten aus {name} um","body":"Große Fonds verkaufen Teile ihrer Position. Der Kurs dürfte {w} nachgeben."},{"key":"fund_entry","direction":1,"when":"any","minHeat":0,"weight":1,"minMoveBps":200,"maxMoveBps":600,"headline":"Fonds steigt bei {name} ein","body":"Ein großer Fonds baut eine Position auf. Der Kurs dürfte {w} anziehen."},{"key":"bargain_hunters","direction":1,"when":"cold","minHeat":0,"weight":3,"minMoveBps":400,"maxMoveBps":1200,"headline":"Schnäppchenjäger greifen bei {name} zu","body":"Nach dem Absturz gilt die Aktie als günstig. Käufer dürften den Kurs {w} anheben."},{"key":"buyback_rumor","direction":1,"when":"cold","minHeat":0,"weight":2,"minMoveBps":300,"maxMoveBps":900,"headline":"Gerücht: {name} kauft eigene Aktien zurück","body":"Bei diesem Kurs soll die Firma selbst zugreifen wollen. Das stützt den Kurs {w}."},{"key":"analyst_upgrade","direction":1,"when":"cold","minHeat":0,"weight":2,"minMoveBps":300,"maxMoveBps":1000,"headline":"Analysten sehen Nachholbedarf bei {name}","body":"Der Kurs liege weit unter dem Wert der Firma. Mehrere Häuser raten zum Kauf."}],"waveTexts":{"market":{"headline":"Marktkorrektur: Anleger nehmen heiße Werte vom Tisch","body":"Nach den starken Wochen sichern große Anleger Gewinne. Betroffen sind vor allem: {names}."},"sector":{"headline":"Korrektur in der Branche {sector}","body":"Die Branche gilt als heiß gelaufen. Anleger verkaufen {names}."},"rates":{"headline":"Zinssorgen belasten heiße Aktien","body":"Anleger fürchten höhere Zinsen und trennen sich von teuren Werten wie {names}."},"relief":{"headline":"Erholung: Anleger kaufen gefallene Werte","body":"Nach dem Ausverkauf greifen Anleger wieder zu, vor allem bei {names}."}},"strengthWords":["leicht","spürbar","deutlich"]}'::jsonb, 'Defaults from src/config/balance.ts, section "marketForces"'),
   ('companyAssistant', '{"claudePerHour":20,"maxTextLength":300,"briefingTasks":3,"busyTasks":2,"urgentMinutes":10,"historyTurns":8,"advice":{"briefings":2,"nextSteps":3,"minImpactCents":500,"aiIdleBelowBps":5000,"freeCapacityBps":2000,"reputationLow":45,"reputationDriverPoints":2,"runwayHours":6,"strengthsNearPoints":5}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyAssistant"'),
   ('companyHealth', '{"status":{"good":80,"ok":60,"weak":35},"qualityTarget":0.7,"momentumTargetShare":0.5,"momentumFloor":0.4,"imageCalm":0.85,"imageHitWeight":3,"teamFloor":0.4,"runwayTargetHours":48,"reserveHours":6,"minImpactCents":100,"strengths":{"gainPerHour":0.02,"decayPerHour":0.05,"marginFull":0.25,"cashHoursFull":24,"awarenessFollowPerHour":0.25,"rewards":[{"at":50,"bps":200},{"at":75,"bps":500},{"at":90,"bps":1000},{"at":98,"bps":1500}]},"reputation":{"start":50,"base":50,"adjustPerHour":0.08,"demandMaxEffect":0.2,"qualityMax":10,"qualityMaxLoss":5,"qualityNeutral":0.4,"deliveryMaxLoss":8,"premiumLowQualityLoss":6,"budgetGain":2,"wagesMaxLoss":10,"billsLoss":6,"crisisPerSeverity":3,"campaignGain":3}}'::jsonb, 'Defaults from src/config/balance.ts, section "companyHealth"'),
   ('wageMood', '{"crisisPerSeverityBps":500,"scandalBps":500,"scandals":["quality_scandal","data_breach","protest","bad_review","strike"],"shareFallFreeBps":300,"shareFallShare":0.5,"maxShareBps":2000,"minBps":6000}'::jsonb, 'Defaults from src/config/balance.ts, section "wageMood"'),

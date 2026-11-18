@@ -5453,3 +5453,71 @@ Dividenden und Einzahlungen zählen nicht. Verbot, Budgets, Ausgabesperre und of
 **Folgen.** Höchstens vier Entnahmen am Tag; wer laufend Geld will, nutzt die automatische Auszahlung. Jeder Gründer
 hat seinen eigenen Rhythmus. Tests: `src/features/company/withdraw.test.ts`, SQL `f1_withdraw_interval.sql`
 (`verify_local.sh` führt jetzt auch `f[0-9]*.sql` aus).
+
+## ADR-214: Aktien ohne Tagesgrenze, Marktkräfte von außen gegen Übertreibungen — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Aktien sollen unendlich steigen und sinken können am Tag ohne Grenze. Aber es steigt
+gerade zu schnell. Es soll mehr Ereignisse von außen geben, welche das verhindern oder verlangsamen.“
+
+**Warum es zu schnell stieg** (nachgestellt mit `scripts/stock-heat-harness.ts` auf dem echten Takt-Modell):
+
+- **Spielerkäufe ohne Gegenkraft.** Eine Spieleraktie ist ein Pennystock: 1.000 € Nettokauf heben sie um 1 %
+  (ADR-120). Kaufen Spieler weiter und jagen den Trend, hält nur der Value-Fonds dagegen; er zieht höchstens rund
+  0,075 % je Takt zurück und kommt gegen 20.000 €/h nicht an. Der Kurs lief auf das 2- bis 2,6-Fache des fairen Werts
+  und blieb dort, solange gekauft wurde. Die Halteprämie (bis 15 %) legt noch etwas drauf.
+- **Der Anker wächst mit der Firma.** Der faire Wert einer Spieleraktie ist der Firmenwert je Aktie (Kasse + 4 ×
+  Quartalsgewinn × halbes KGV, ADR-167), alle 6 Stunden neu. Am Anfang verdoppelt sich der Gewinn einer guten Firma
+  schnell; der Kurs folgt dann zu Recht. Die Reibung aus ADR-209 bremst erst ab 30 Mio. € Firmenwert.
+- **Keine Ereignisse gegen Übertreibung.** Börsen-News (ADR-119) und Live-Sendung sind zufällig und symmetrisch, sie
+  kennen keine Überhitzung. Das Tagesband (ADR-170, zuletzt +100 %/−50 %) war die einzige Bremse; es kappte einzelne
+  Tage, hielt eine Rally über Tage aber nicht auf (7 Tage im Median +252 % im Hype-Fall).
+
+**Entscheidung.** Werte in `src/config/market-forces.ts` (`game_config.marketForces`), Formeln in
+`src/lib/sim/market-forces.ts`, gespiegelt in Migration `20261204010900_stock_unbounded.sql`.
+
+- **Kein Tagesband:** `trading.playerStocks.dailyBandBps` = 0. Takt und Ausführung behandeln 0 schon als „kein Band“:
+  Spieleraktien laufen über denselben fairen Preispfad wie jede Aktie (ADR-189), keine Aktie wird mehr „zum
+  Bandpreis“ gefüllt. Der Takt-Deckel `maxTickReturnBps` (10 % je Takt aus Orderfluss) bleibt als Plausibilitätsgrenze
+  je Order; je Tag gibt es keine Grenze. Das Band bleibt als Hebel in der Konfiguration (> 0 schaltet es wieder ein).
+- **Hitze einer Aktie:** `heat = Σ max(0, ln(x) − frei) / Skala` über Kurs/fairer Wert (frei 25 %), Gewinn in 24 h
+  (frei 22 %) und in 7 Tagen (frei 65 %), höchstens 4. Gewinne zählen nur, solange der Kurs nicht deutlich unter dem
+  fairen Wert liegt (ein verdienter Anstieg ist keine Blase). `cold` misst einen Kurs weit unter Wert oder einen
+  Absturz in 24 h. Die Historie kommt aus den 1-h-Kerzen.
+- **Einzelne Kräfte** (je Minute, je Aktie ohne offenen Hinweis): Chance je Stunde 1,2 % + 90 % × heat + 35 % × cold,
+  höchstens 3. Gewichte nach Hitze: Gewinnmitnahmen, Analysten-Abstufung, Kapitalerhöhungs-Gerüchte (ab 0,5),
+  Leerverkäufer-Report und Insider-Verdacht (ab 1), Margin Calls und Sonderprüfung (ab 1,5), Blasenwarnung (ab 2);
+  bei Kälte Schnäppchenjäger, Rückkauf-Gerücht und Nachholbedarf laut Analysten; für ruhige Aktien (auch KI-Aktien)
+  Umschichtung und Fonds-Einstieg. Eine Kraft drückt eine heiße Aktie nie weiter hoch, eine kalte nie weiter runter.
+  Stärke: Spanne der Kraft × (1 + 0,45 × heat), höchstens 45 %.
+- **Wellen:** Marktkorrektur (die heißesten Aktien), Korrektur einer Branche (die heißeste) oder Zinssorgen; Chance je
+  Stunde 2 % + 25 % × mittlere Hitze, höchstens 6 Aktien. Eine Erholung hebt die kältesten (2 % je Stunde).
+- **Wie sie wirken:** Jede Kraft ist ein Börsen-Hinweis mit Vorlauf (3 bis 15 Minuten, `stock_tips.source =
+'market'`), steht in den Börsen-News und im Nachrichten-Feed (Kategorie „Markt“) und trifft zu 85 % ein. Beim
+  Eintreffen bewegt `market_force_shock` Kurs und Stimmung (Sentiment, Δ = 2 × Bewegung), **nicht** den fairen Wert:
+  Der Value-Fonds zieht danach zum Anker hin, nicht von ihm weg. Die Kräfte halten den Takt der normalen Börsen-News
+  nicht auf. Die Live-Sendung bleibt unverändert (sie wird parallel überarbeitet) und kann die Meldungen aus
+  `news_items` aufgreifen.
+
+**Gemessen** (`pnpm exec tsx scripts/stock-heat-harness.ts 14 8`, 8 Läufe über 14 Tage, Spieleraktie zu 1 € am fairen
+Wert; vorher = Band +100 %/−50 % ohne Kräfte, nachher = ohne Band mit Kräften; volle Tabelle in docs/BALANCING.md):
+
+| Szenario                                    | 7 Tage Median vorher | nachher  | Kurs/fair am Ende vorher | nachher | 24 h max nachher |
+| ------------------------------------------- | -------------------- | -------- | ------------------------ | ------- | ---------------- |
+| Hype: Firma +3 %/Quartal, Käufe + Trendjagd | +252 %               | +140 %   | 2,07                     | 1,09    | +262 %           |
+| Reiner Hype: Firma +0 %, Käufe + Trendjagd  | +32 %                | +6 %     | 2,62                     | 1,13    | +271 %           |
+| Wachstum: Firma +10 %/Quartal, Käufe + Jagd | +1.337 %             | +1.200 % | 0,99                     | 0,83    | +297 %           |
+| Ruhig: Firma +2 %/Quartal, keine Spieler    | +69 %                | +69 %    | 0,93                     | 0,93    | +33 %            |
+
+Einzelne Tage bringen jetzt +260 % und mehr (keine Grenze); eine Rally über eine Woche ist im Hype-Fall nur noch gut
+halb so stark, ein reiner Hype ohne Firmenwachstum verpufft (Kurs nahe am fairen Wert statt beim 2,6-Fachen). Eine
+ruhige Aktie merkt kaum etwas (eine Kraft je Tag). Wächst die Firma wirklich, steigt die Aktie weiter mit ihr, etwas
+langsamer.
+
+**Folgen.** Wer früh in eine heiße Aktie einsteigt, verdient weiter viel; wer spät auf eine Übertreibung aufspringt,
+riskiert Rückschläge, die vorher in den Nachrichten stehen. Verworfen: ein engeres Band (der Eigentümer will keine
+Grenze), ein stärkerer Value-Fonds für alle (macht alle Aktien träge), Kräfte, die den fairen Wert senken (der Anker
+einer Spieleraktie wird alle 6 Stunden aus den Firmenzahlen neu gesetzt, bei KI-Aktien bliebe der Abschlag für
+immer). Die Demo zeigt keine Marktkräfte. Tests: `src/lib/sim/market-forces.test.ts`, SQL `f2_stock_unbounded.sql`
+(Formeln wie in TS; eine Spieleraktie mehr als verdoppelt sich an einem Tag und fällt danach unter die Hälfte; eine
+Aktie zum Dreifachen ihres Werts zieht in zehn Stunden viele dämpfende Kräfte, eine ruhige kaum eine; eine Kraft
+bewegt Kurs und Stimmung, nicht den fairen Wert; Geld-Invariante).

@@ -7,7 +7,8 @@
  * from the player flow already pending this tick). Small orders pay half their own move as before (ADR-126). Large
  * orders cannot move the price further than one tick can (`maxMove` = `trading.maxTickReturnBps`), so beyond that
  * point every further share fills at the saturated price instead of sliding towards zero. There is no size limit:
- * any quantity fills completely. For player stocks no share fills outside the daily band (ADR-170).
+ * any quantity fills completely. A daily band (ADR-170) would stop shares outside it; it is off since ADR-214
+ * (`trading.playerStocks.dailyBandBps` = 0, band null), so every stock takes the normal fair-fill path.
  */
 
 export interface FillPlanInput {
@@ -25,7 +26,7 @@ export interface FillPlanInput {
   readonly feeCents: number;
   /** Largest move the order flow can cause (fraction × 10 000). */
   readonly maxMoveBps: number;
-  /** Daily band (player stocks) or null. */
+  /** Daily band (player stocks) or null; null since ADR-214 (no daily limit). */
   readonly bandLowE4: number | null;
   readonly bandHighE4: number | null;
   readonly minPriceE4: number;

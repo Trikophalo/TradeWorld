@@ -107,9 +107,8 @@ select public.place_order(gen_random_uuid(), :'tkr', 'buy', 'market', null, null
 reset role;
 select (select sum(x) from unnest(tests.run_ticks(:'sec', public.game_now(), 12)) x) as g1 \gset
 select last_price_e4 as p1 from public.security_quotes where security_id = :'sec' \gset
-select tests.assert(:'b1' = 'filled' and :p1::bigint > :p0::bigint and :p1::bigint <= ceil(:p0::bigint * 2.0),
-  'the founder''s buying lifts the price, but at most dailyBandBps (100 %) over the previous close ('
-  || :p0 || ' -> ' || :p1 || ')');
+select tests.assert(:'b1' = 'filled' and :p1::bigint > :p0::bigint,
+  'the founder''s buying lifts the price (no daily band since ADR-214) (' || :p0 || ' -> ' || :p1 || ')');
 
 select tests.login_as('authenticated', :f);
 select public.capital_increase(gen_random_uuid(), 25) -> 'company' -> 'listing' -> 'offer' ->> 'id' as ci \gset
@@ -137,7 +136,7 @@ select tests.assert(:'s1' = 'filled' and :w1::bigint < :w0::bigint,
   || ((:w0::bigint - :w1::bigint) / 100.0) || ' EUR');
 
 -- =============================================================================
--- D. Pushing harder: ten buys of 10.000 EUR within an hour stay inside the band
+-- D. Pushing harder: ten buys of 10.000 EUR within an hour (no daily band since ADR-214): selling again loses
 -- =============================================================================
 select last_price_e4 as p2 from public.security_quotes where security_id = :'sec' \gset
 update public.security_quotes set prev_close_e4 = last_price_e4 where security_id = :'sec';
@@ -158,8 +157,8 @@ $$;
 select last_price_e4 as p3, (select max(last_price_e4) from public.security_quotes where security_id = :'sec') as pmax
   from public.security_quotes where security_id = :'sec' \gset
 select tests.sell_down(:f, :'sec', 600000000000);
-select tests.assert(:p3::bigint <= ceil(:p2::bigint * 2.0) and tests.cash(:f) < :d0::bigint,
-  '100.000 EUR of buying in an hour: price ' || :p2 || ' -> ' || :p3 || ' (band 100 %), selling again loses '
+select tests.assert(:p3::bigint > :p2::bigint and tests.cash(:f) < :d0::bigint,
+  '100.000 EUR of buying in an hour: price ' || :p2 || ' -> ' || :p3 || ', selling again loses '
   || ((:d0::bigint - tests.cash(:f)) / 100.0) || ' EUR');
 
 -- =============================================================================

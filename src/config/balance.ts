@@ -15,6 +15,7 @@ import { NEXAMON_RULES } from "./nexamon-rules.ts";
 import { LISTED_RULES } from "./listed.ts";
 import { COUNTRIES, WORLD_RULES, type CountryConfig } from "./countries.ts";
 import { MACRO, type MacroConfig } from "./macro.ts";
+import { MARKET_FORCES, type MarketForcesConfig } from "./market-forces.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -198,7 +199,10 @@ export interface TradingConfig {
   readonly playerStocks: {
     /** The founder may not buy his own stock for this many hours after taking money out of the company. */
     readonly insiderCooldownHours: number;
-    /** The price stays within this band around the previous close (bps up; down by the same factor). */
+    /**
+     * The price stays within this band around the previous close (bps up; down by the same factor). 0 = no daily
+     * limit (ADR-214): stocks rise and fall without a limit, market forces cool overheated ones.
+     */
     readonly dailyBandBps: number;
   };
 }
@@ -985,6 +989,8 @@ export interface BalanceConfig {
   readonly world: typeof WORLD_RULES & { readonly countries: readonly CountryConfig[] };
   /** Size, risk and external events (ADR-209), values in macro.ts. */
   readonly macro: MacroConfig;
+  /** Market forces from outside against overheated stocks (ADR-214), values in market-forces.ts. */
+  readonly marketForces: MarketForcesConfig;
   /** Mira, the company assistant (ADR-138). */
   readonly companyAssistant: {
     readonly claudePerHour: number;
@@ -2002,8 +2008,9 @@ export const BALANCE = {
       maxHoldingsPremium: 0.15,
       premiumScaleDepths: 20,
     },
-    // ADR-170: no pump with money from the own company, at most +30 % / -23 % a day
-    playerStocks: { insiderCooldownHours: 24, dailyBandBps: 10_000 },
+    // ADR-170: no pump with money from the own company. ADR-214: no daily band any more (0 = off); overheated stocks
+    // draw market forces (marketForces) instead.
+    playerStocks: { insiderCooldownHours: 24, dailyBandBps: 0 },
   },
 
   // ----------------------------------------------------------- centralBank (spec 5.1)
@@ -2966,6 +2973,7 @@ export const BALANCE = {
   /** Weltkarte, Standorte, Tochterfirmen und Länder-Lobby (ADR-208). */
   world: { ...WORLD_RULES, countries: COUNTRIES },
   macro: MACRO,
+  marketForces: MARKET_FORCES,
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,

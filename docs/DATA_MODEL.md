@@ -7987,7 +7987,7 @@ halten), `nft_ai_bid_auctions(zeit)` (Gebote der Sammler, aus `nfts_run_due`, R�
 
 **Per `replace` geändert:** `place_order` (Insiderregel, `insider_cooldown` NX220), `capital_increase` (Sperre
 `capital_increase_cooldown` NX221, setzt `ai_factor`), `share_offer_ai_topup` (× `ai_factor`), `listed_withdraw_check`
-(`issue_proceeds_locked` NX222), `market_tick_at` (Tagesband für Spielerfirmen, Halteprämie ohne Gründerbestand),
+(`issue_proceeds_locked` NX222), `market_tick_at` (Tagesband für Spielerfirmen, seit ADR-214 aus; Halteprämie ohne Gründerbestand),
 `nfts_run_due` (Stundengrenzen, Tagesbudget, Sammler-Angebote laufen nach `nfts.ai.offerHours` aus, Auktionsgebote),
 `bid_artwork` (überbotener Sammler: Geld zurück an die Haushalte), `artwork_settle_auction` (Sammler gewinnt,
 `nft_after_sale` mit `buyer_ai`), `accept_auction`, `cancel_auction`, `artwork_json` (`leader` = Name des Sammlers),
@@ -8161,7 +8161,7 @@ drivers, at, history: [{hour_start, value, target}]}` (letzte 48 Stunden) und `c
 - `market_order_plan(security_id, side, quantity_e6 | null, amount_cents | null)` (intern): der Ausführungsplan einer
   Sofort-Order wie `planMarketOrder()` in `src/lib/sim/order-fill.ts`; Hilfen `order_move_integral()`,
   `market_order_avg_e4()`. Die n-te Aktie bewegt den Kurs um `min(a × n, trading.maxTickReturnBps)`, Spieleraktien
-  bleiben im Tagesband. Liefert `touch_e4`, `requested_quantity_e6`, `fill_quantity_e6`, `unfilled_quantity_e6`,
+  bleiben im Tagesband (seit ADR-214 ohne Band: `dailyBandBps` = 0). Liefert `touch_e4`, `requested_quantity_e6`, `fill_quantity_e6`, `unfilled_quantity_e6`,
   `avg_price_e4`, `last_price_e4`, `gross_cents`, `fee_cents`, `slippage_bps`, `impact_bps`, `limited_by`.
 - RPC `quote_order(p_ticker, p_side, p_quantity_e6 = null, p_amount_cents = null)` (nur lesend): der Plan (Käufe auf
   den freien Bestand begrenzt, dann `limited_by = 'supply'`) plus `ticker`, `side`, `tax_cents`,
@@ -8535,3 +8535,20 @@ extra_cost_share}`, `macro_country_factor`, `macro_weight`, `macro_company_count
 - Intern: `company_withdraw_next_at(uuid) → timestamptz` (null = jetzt erlaubt), `company_withdraw_json(uuid)`.
 - `company_state()` (also `get_my_company()` und alle Firmen-RPCs) hat `withdraw {interval_hours, last_at, next_at,
 issue_locked_cents, issue_locked_until}`.
+
+## Aktien ohne Tagesgrenze, Marktkräfte von außen (ADR-214, Migration `20261204010900_stock_unbounded.sql`)
+
+- Kein Tagesband mehr: `trading.playerStocks.dailyBandBps` ist 0. `market_tick_at` und `market_order_plan` behandeln
+  0 schon als „kein Band“ (ADR-170/189); der Takt-Deckel `maxTickReturnBps` und der faire Preispfad großer Orders
+  bleiben.
+- `stock_tips` neu: `source` (`news` | `market`, Check), `force_key` (Schlüssel aus `marketForces.forces` oder
+  `wave:market|sector|rates|relief`), `sentiment_delta` (Stimmung, die beim Eintreffen dazukommt).
+- Intern (wie `src/lib/sim/market-forces.ts`): `market_force_heat(kurs, fair, kurs_vor_24h, kurs_vor_7d, cfg) →
+(heat, cold)`, `market_force_chance_per_hour`, `market_force_weight`, `market_force_pick`, `market_force_move_bps`;
+  `market_force_shock(security, bps, sentiment, zeit)` (Kurs und Stimmung wie `event_price_shock`, fairer Wert,
+  Ereignisfaktor und EMAs bleiben); `market_forces_run(zeit) → {forces, waves, wave}` (je Minute: Kräfte je Aktie
+  ohne offenen Hinweis, eine Welle über die heißesten oder eine Erholung der kältesten; Meldung als `news_items`
+  Kategorie `market` und Hinweis in `stock_tips`). Historie aus den 1-h-Kerzen (Schluss vor 24 h bzw. 7 Tagen).
+- Neu definiert: `stock_news_run_due` (Stand 1200) – Hinweise mit `source = 'market'` laufen über
+  `market_force_shock`, zählen nicht für den Takt der normalen Börsen-News, am Ende `market_forces_run`; Rückgabe
+  zusätzlich `market_forces`. `get_stock_news` zeigt die Kräfte wie andere Hinweise (Antwort unverändert).
