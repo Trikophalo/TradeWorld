@@ -131,8 +131,11 @@ export const TALENT_TRAITS: readonly TalentTraitConfig[] = [
 export const TALENT_RULES = {
   /** Talents per Stelle in the pool. */
   perRole: 44,
-  /** Wage per hour of a tier (cents), before role and traits. */
-  wageCentsByTier: [4_000, 9_000, 20_000, 42_000, 90_000],
+  /**
+   * Wage per hour of a tier (cents), before role and traits. Steep on purpose (Nachtrag ADR-199): about x5 per tier,
+   * a Legende pays off only for very large companies (docs/BALANCING.md, scripts/talent-value.ts).
+   */
+  wageCentsByTier: [6_000, 30_000, 150_000, 800_000, 4_000_000],
   /** Effect multiplier of a tier in percent of the Junior. */
   effectPctByTier: [100, 180, 300, 450, 650],
   /** How many talents of each tier per Stelle (sums to perRole). */
@@ -156,6 +159,8 @@ export const TALENT_RULES = {
   } as Readonly<Record<TalentBenefit, number>>,
   /** The company must hold this many hours of wage (and benefits) in free cash to hire. */
   cashCoverHours: 12,
+  /** When the demand of a hired talent rises above the contract, the owner has this long to raise the wage. */
+  raiseGraceHours: 24,
   /** Caps of the summed effects (same units as baseBps). */
   capBps: {
     demand: 3_500,
@@ -173,6 +178,8 @@ export const TALENT_RULES = {
     gainBps: 250,
     /** Losses per hour for each unmet demand (x trait decayPct). */
     unpaidBps: 2_500,
+    /** The wage demand rose above the contract (new prices) and the grace period is over. */
+    underpaidBps: 1_500,
     reputationBps: 800,
     awarenessBps: 400,
     benefitBps: 600,

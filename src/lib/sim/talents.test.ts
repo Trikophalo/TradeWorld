@@ -12,6 +12,7 @@ import {
   talentPoachMinCost,
   talentSatisfactionStep,
   talentStyle,
+  talentWageFloor,
   talentsEffectBps,
   talentsHourFactors,
 } from "./talents.ts";
@@ -47,6 +48,22 @@ describe("talent pool", () => {
       expect(t.traits[0]).not.toBe(t.traits[1]);
       expect(t.benefits.length).toBeGreaterThanOrEqual(cfg.benefitsByTier[t.tier]!);
     }
+  });
+});
+
+describe("wages (Nachtrag ADR-199)", () => {
+  it("rise steeply: about x5 per tier, a Legende costs 40.000 € per hour before role and traits", () => {
+    expect(cfg.wageCentsByTier).toEqual([6_000, 30_000, 150_000, 800_000, 4_000_000]);
+    for (let tier = 1; tier < 5; tier++) {
+      expect(cfg.wageCentsByTier[tier]! / cfg.wageCentsByTier[tier - 1]!).toBeGreaterThanOrEqual(5);
+    }
+    const legends = TALENT_POOL.filter((t) => t.tier === 4).map((t) => t.wageCents);
+    expect(Math.min(...legends)).toBeGreaterThanOrEqual(2_500_000);
+  });
+  it("the floor of a hired talent is the demand, for a Mit-GF plus the premium", () => {
+    expect(talentWageFloor(150_000, false)).toBe(150_000);
+    expect(talentWageFloor(150_000, true)).toBe(195_000);
+    expect(talentWageFloor(150_050, true)).toBe(195_100);
   });
 });
 
@@ -87,6 +104,12 @@ describe("satisfaction", () => {
     expect(talentSatisfactionStep(7_000, { ...all, paid: false }, ["diva", "sporty"])).toBe(7_000 - 3_750);
     expect(talentSatisfactionStep(7_000, { ...all, paid: false }, ["loyal", "sporty"])).toBe(7_000 - 1_500);
     expect(talentSatisfactionStep(9_900, { ...all, moraleBps: 500 }, [])).toBe(10_000);
+  });
+  it("an underpaid talent (risen demand, grace over) loses satisfaction every hour", () => {
+    expect(talentSatisfactionStep(7_000, { ...all, underpaid: true }, ["sporty", "night_owl"])).toBe(
+      7_000 - cfg.satisfaction.underpaidBps,
+    );
+    expect(talentSatisfactionStep(7_000, { ...all, underpaid: false }, ["sporty", "night_owl"])).toBe(7_250);
   });
   it("warns and quits at the thresholds", () => {
     expect(talentMood(8_000)).toBe("happy");

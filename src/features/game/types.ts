@@ -2856,6 +2856,10 @@ export interface OwnTalent extends Talent {
   coCeoAutonomy: "advise" | "decide";
   coCeoBudgetCents: number;
   coCeoSpentCents: number;
+  /** Lowest wage the talent accepts now: the demand, for a Mit-GF plus the premium. */
+  wageFloorCents: number;
+  /** The demand rose above the contract (Nachtrag ADR-199): from then on satisfaction falls; null when covered. */
+  raiseDueAt: string | null;
 }
 export interface TalentSeat {
   role: string;
@@ -2917,6 +2921,8 @@ export interface GameEngine
     benefits: string[],
   ): Promise<CompanyTalentsState>;
   dismissTalent(requestId: string, key: string): Promise<CompanyTalentsState>;
+  /** New contract for an own talent: at least the demand and every demanded benefit. */
+  raiseTalent(requestId: string, key: string, wageCents: number, benefits: string[]): Promise<CompanyTalentsState>;
   appointCoCeo(
     requestId: string,
     key: string,

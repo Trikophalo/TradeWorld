@@ -369,20 +369,28 @@ const sampleTalent = (i: number, status: Talent["status"]): Talent => {
     isCoCeo: false,
   };
 };
-const sampleOwn = (i: number, satisfactionBps: number, coCeo = false): OwnTalent => ({
+const sampleOwn = (i: number, satisfactionBps: number, coCeo = false, raiseDue = false): OwnTalent => ({
   ...sampleTalent(i, "mine"),
   isCoCeo: coCeo,
-  wageCents: TALENT_POOL[i]!.wageCents,
+  // raiseDue: an old contract below the risen demand (Nachtrag ADR-199)
+  wageCents: raiseDue ? Math.round(TALENT_POOL[i]!.wageCents / 500) * 100 : TALENT_POOL[i]!.wageCents,
   benefits: [...TALENT_POOL[i]!.benefits],
-  costCents: TALENT_POOL[i]!.wageCents,
+  costCents: raiseDue ? Math.round(TALENT_POOL[i]!.wageCents / 500) * 100 : TALENT_POOL[i]!.wageCents,
   hiredAt: "2026-11-01T10:00:00Z",
   satisfactionBps,
   warned: satisfactionBps < 3_500,
   coCeoAutonomy: "decide",
   coCeoBudgetCents: 100_000,
   coCeoSpentCents: 20_000,
+  wageFloorCents: TALENT_POOL[i]!.wageCents,
+  raiseDueAt: raiseDue ? "2026-12-01T00:00:00Z" : null,
 });
-const SAMPLE_OWN = [sampleOwn(42, 8_200), sampleOwn(3 * 44 + 30, 9_000, true), sampleOwn(9 * 44 + 2, 2_800)];
+const SAMPLE_OWN = [
+  sampleOwn(42, 8_200),
+  sampleOwn(3 * 44 + 30, 9_000, true),
+  sampleOwn(9 * 44 + 2, 2_800),
+  sampleOwn(4 * 44 + 20, 6_400, false, true),
+];
 const SAMPLE_TALENTS: CompanyTalentsState = {
   facts: { reputation: 58, awarenessBps: 1_800, formRank: 2, expansionLevel: 1, freeCashCents: 4_000_000 },
   seats: BALANCE.talents.roles.map((r) => ({

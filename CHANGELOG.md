@@ -15,6 +15,11 @@ Erste, navigierbare Fassung ohne Spiellogik.
   Markt gegen Übertreibungen: Heiß gelaufene Aktien ziehen Gewinnmitnahmen, Leerverkäufer-Reports, Abstufungen,
   Sonderprüfungen, Insider-Verdacht, Margin Calls, Blasenwarnungen und Marktkorrekturen an, je heißer, desto öfter
   und härter. Abgestürzte Aktien locken Schnäppchenjäger. Alles steht vorher in den Börsen-News.
+
+- Talente sind nach oben viel teurer: Ein Junior kostet ab 60 € je Stunde, ein Profi 300 €, ein Senior 1.500 €, ein
+  Experte 8.000 € und eine Legende 40.000 € (vorher 900 €). Spitzenleute lohnen sich nur noch für sehr große Firmen.
+  Wer schon Talente hat, bekommt eine Nachricht und hat 24 Stunden, um mit „Gehalt anpassen“ mehr zu zahlen, sonst
+  sinkt ihre Zufriedenheit, bis sie kündigen.
 - Flyer für kleine Firmen: Solange deine Firma eine Garage ist oder weniger als 1 Mio. € wert, kostet die
   Flyer-Kampagne höchstens 2.000 €. So kann sich jede neue Garage ihre erste Kampagne leisten, auch mit großem Markt.
 - Firmenlogo neu zeichnen: Als Gründer zeichnest du dein Logo unter Controlling → Marke & Firma für 50.000 € aus der

@@ -1858,6 +1858,8 @@ select public.get_company_talents();
 select public.talent_counter(gen_random_uuid(), :'fx_toffer', :fx_tp_wage::bigint + 2000, (select benefit_demands from public.talents where talent_key = :'fx_tp'));
 \o :fixture_dir/talent_undo_decision.json
 select public.talent_undo_decision(gen_random_uuid(), :fx_tev);
+\o :fixture_dir/talent_raise.json
+select public.talent_raise(gen_random_uuid(), :'fx_tj', :fx_tj_wage::bigint + 1000, :'fx_tj_ben');
 \o :fixture_dir/talent_dismiss.json
 select public.talent_dismiss(gen_random_uuid(), :'fx_tj');
 \o :fixture_dir/get_company_org_talents.json

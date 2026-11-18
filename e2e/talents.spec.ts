@@ -68,6 +68,21 @@ test("Talente: find a talent for an empty Stelle, offer, hire", async ({ page },
   await expect(seat).toContainText(name);
   await expect(card.getByTestId("talents-total")).toContainText("1 von 15 Stellen besetzt");
 
+  // a new contract (Nachtrag ADR-199): at least the demand, one euro more is fine
+  await seat.click();
+  const own = page.getByTestId("talent-sheet");
+  await own.getByTestId("talent-raise").click();
+  const raise = page.getByTestId("talent-offer-sheet");
+  const raiseWage = raise.getByTestId("talent-offer-wage");
+  const current = Number(await raiseWage.inputValue());
+  await raiseWage.fill(String(current - 1));
+  await expect(raise.getByTestId("talent-offer-send")).toBeDisabled();
+  await raiseWage.fill(String(current + 1));
+  await expect(raise.getByTestId("talent-offer-checks").locator('[data-ok="false"]')).toHaveCount(0);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/talents-raise-${info.project.name}.png` });
+  await raise.getByTestId("talent-offer-send").click();
+  await expect(page.getByText(`Neuer Vertrag mit ${name}.`)).toBeVisible();
+
   // the talent leads its Stelle: in the org chart above the AI workers
   const org = page.getByTestId("org-chart");
   await org.scrollIntoViewIfNeeded();

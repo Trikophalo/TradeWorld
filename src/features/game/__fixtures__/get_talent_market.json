@@ -1,8 +1,8 @@
 {
   "facts": {
     "form_rank": 2,
-    "reputation": 49.87,
-    "awareness_bps": 2239,
+    "reputation": 52.87,
+    "awareness_bps": 2539,
     "expansion_level": 1,
     "free_cash_cents": 50000000
   },
@@ -25,7 +25,7 @@
       "min_reputation": 70,
       "benefit_demands": ["bonus", "company_car", "say"],
       "min_awareness_bps": 4500,
-      "wage_demand_cents": 100800,
+      "wage_demand_cents": 4481400,
       "poach_min_cost_cents": null
     },
     {
@@ -46,7 +46,7 @@
       "min_reputation": 75,
       "benefit_demands": ["company_car", "say", "training"],
       "min_awareness_bps": 4500,
-      "wage_demand_cents": 125000,
+      "wage_demand_cents": 5555000,
       "poach_min_cost_cents": null
     },
     {
@@ -67,7 +67,7 @@
       "min_reputation": 60,
       "benefit_demands": ["office", "homeoffice"],
       "min_awareness_bps": 2500,
-      "wage_demand_cents": 52400,
+      "wage_demand_cents": 997900,
       "poach_min_cost_cents": null
     },
     {
@@ -88,7 +88,7 @@
       "min_reputation": 55,
       "benefit_demands": ["bonus", "office"],
       "min_awareness_bps": 2500,
-      "wage_demand_cents": 54900,
+      "wage_demand_cents": 1045400,
       "poach_min_cost_cents": null
     },
     {
@@ -109,7 +109,7 @@
       "min_reputation": 75,
       "benefit_demands": ["say", "training"],
       "min_awareness_bps": 2500,
-      "wage_demand_cents": 45700,
+      "wage_demand_cents": 871200,
       "poach_min_cost_cents": null
     },
     {
@@ -130,7 +130,7 @@
       "min_reputation": 60,
       "benefit_demands": ["training", "say"],
       "min_awareness_bps": 2500,
-      "wage_demand_cents": 55300,
+      "wage_demand_cents": 1052500,
       "poach_min_cost_cents": null
     },
     {
@@ -151,7 +151,7 @@
       "min_reputation": 65,
       "benefit_demands": ["training", "company_car"],
       "min_awareness_bps": 2500,
-      "wage_demand_cents": 52600,
+      "wage_demand_cents": 1001900,
       "poach_min_cost_cents": null
     },
     {
@@ -172,7 +172,7 @@
       "min_reputation": 55,
       "benefit_demands": ["bonus", "company_car"],
       "min_awareness_bps": 2500,
-      "wage_demand_cents": 49500,
+      "wage_demand_cents": 942500,
       "poach_min_cost_cents": null
     },
     {
@@ -193,7 +193,7 @@
       "min_reputation": 50,
       "benefit_demands": ["training", "bonus"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 26900,
+      "wage_demand_cents": 202000,
       "poach_min_cost_cents": null
     },
     {
@@ -214,7 +214,7 @@
       "min_reputation": 65,
       "benefit_demands": ["say"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 24500,
+      "wage_demand_cents": 183600,
       "poach_min_cost_cents": null
     },
     {
@@ -235,7 +235,7 @@
       "min_reputation": 45,
       "benefit_demands": ["bonus"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 25200,
+      "wage_demand_cents": 188800,
       "poach_min_cost_cents": null
     },
     {
@@ -256,7 +256,7 @@
       "min_reputation": 45,
       "benefit_demands": ["homeoffice"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 20800,
+      "wage_demand_cents": 155900,
       "poach_min_cost_cents": null
     },
     {
@@ -277,7 +277,7 @@
       "min_reputation": 55,
       "benefit_demands": ["company_car"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 25000,
+      "wage_demand_cents": 187700,
       "poach_min_cost_cents": null
     },
     {
@@ -298,7 +298,7 @@
       "min_reputation": 60,
       "benefit_demands": ["say", "flextime"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 21100,
+      "wage_demand_cents": 158300,
       "poach_min_cost_cents": null
     },
     {
@@ -319,7 +319,7 @@
       "min_reputation": 45,
       "benefit_demands": ["homeoffice", "flextime"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 24200,
+      "wage_demand_cents": 181500,
       "poach_min_cost_cents": null
     },
     {
@@ -340,7 +340,7 @@
       "min_reputation": 60,
       "benefit_demands": ["homeoffice", "say"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 22400,
+      "wage_demand_cents": 167700,
       "poach_min_cost_cents": null
     },
     {
@@ -361,7 +361,7 @@
       "min_reputation": 55,
       "benefit_demands": ["training"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 24300,
+      "wage_demand_cents": 182200,
       "poach_min_cost_cents": null
     },
     {
@@ -382,7 +382,7 @@
       "min_reputation": 70,
       "benefit_demands": ["company_car", "say"],
       "min_awareness_bps": 1000,
-      "wage_demand_cents": 24800,
+      "wage_demand_cents": 186100,
       "poach_min_cost_cents": null
     },
     {
@@ -403,7 +403,7 @@
       "min_reputation": 35,
       "benefit_demands": ["homeoffice"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 11100,
+      "wage_demand_cents": 37100,
       "poach_min_cost_cents": null
     },
     {
@@ -424,7 +424,7 @@
       "min_reputation": 50,
       "benefit_demands": ["company_car", "say"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 12800,
+      "wage_demand_cents": 42800,
       "poach_min_cost_cents": null
     },
     {
@@ -445,7 +445,7 @@
       "min_reputation": 35,
       "benefit_demands": ["homeoffice"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 9400,
+      "wage_demand_cents": 31200,
       "poach_min_cost_cents": null
     },
     {
@@ -466,7 +466,7 @@
       "min_reputation": 45,
       "benefit_demands": ["office", "say"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 12100,
+      "wage_demand_cents": 40200,
       "poach_min_cost_cents": null
     },
     {
@@ -487,7 +487,7 @@
       "min_reputation": 45,
       "benefit_demands": ["company_car"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 13000,
+      "wage_demand_cents": 43300,
       "poach_min_cost_cents": null
     },
     {
@@ -508,7 +508,7 @@
       "min_reputation": 35,
       "benefit_demands": ["flextime"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 9400,
+      "wage_demand_cents": 31200,
       "poach_min_cost_cents": null
     },
     {
@@ -529,7 +529,7 @@
       "min_reputation": 35,
       "benefit_demands": ["flextime"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 9300,
+      "wage_demand_cents": 31000,
       "poach_min_cost_cents": null
     },
     {
@@ -550,7 +550,7 @@
       "min_reputation": 40,
       "benefit_demands": ["company_car"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 9700,
+      "wage_demand_cents": 32300,
       "poach_min_cost_cents": null
     },
     {
@@ -571,7 +571,7 @@
       "min_reputation": 35,
       "benefit_demands": ["bonus"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 11200,
+      "wage_demand_cents": 37400,
       "poach_min_cost_cents": null
     },
     {
@@ -592,7 +592,7 @@
       "min_reputation": 50,
       "benefit_demands": ["say"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 9700,
+      "wage_demand_cents": 32300,
       "poach_min_cost_cents": null
     },
     {
@@ -613,7 +613,7 @@
       "min_reputation": 40,
       "benefit_demands": ["bonus"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 9500,
+      "wage_demand_cents": 31500,
       "poach_min_cost_cents": null
     },
     {
@@ -634,7 +634,7 @@
       "min_reputation": 35,
       "benefit_demands": ["gym", "bonus"],
       "min_awareness_bps": 300,
-      "wage_demand_cents": 10700,
+      "wage_demand_cents": 35700,
       "poach_min_cost_cents": null
     },
     {
@@ -655,7 +655,7 @@
       "min_reputation": 0,
       "benefit_demands": ["bonus", "company_car"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 6200,
+      "wage_demand_cents": 9400,
       "poach_min_cost_cents": null
     },
     {
@@ -676,7 +676,7 @@
       "min_reputation": 0,
       "benefit_demands": ["office"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4300,
+      "wage_demand_cents": 6500,
       "poach_min_cost_cents": null
     },
     {
@@ -697,7 +697,7 @@
       "min_reputation": 0,
       "benefit_demands": ["office"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4300,
+      "wage_demand_cents": 6400,
       "poach_min_cost_cents": null
     },
     {
@@ -718,7 +718,7 @@
       "min_reputation": 0,
       "benefit_demands": [],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4400,
+      "wage_demand_cents": 6500,
       "poach_min_cost_cents": null
     },
     {
@@ -739,7 +739,7 @@
       "min_reputation": 0,
       "benefit_demands": ["say", "bonus"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4900,
+      "wage_demand_cents": 7400,
       "poach_min_cost_cents": null
     },
     {
@@ -760,7 +760,7 @@
       "min_reputation": 0,
       "benefit_demands": ["say"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 5100,
+      "wage_demand_cents": 7600,
       "poach_min_cost_cents": null
     },
     {
@@ -781,7 +781,7 @@
       "min_reputation": 0,
       "benefit_demands": ["homeoffice"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4000,
+      "wage_demand_cents": 6100,
       "poach_min_cost_cents": null
     },
     {
@@ -802,7 +802,7 @@
       "min_reputation": 0,
       "benefit_demands": ["bonus", "flextime"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4700,
+      "wage_demand_cents": 7000,
       "poach_min_cost_cents": null
     },
     {
@@ -823,7 +823,7 @@
       "min_reputation": 0,
       "benefit_demands": ["company_car"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 5100,
+      "wage_demand_cents": 7700,
       "poach_min_cost_cents": null
     },
     {
@@ -844,7 +844,7 @@
       "min_reputation": 0,
       "benefit_demands": ["bonus"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4800,
+      "wage_demand_cents": 7200,
       "poach_min_cost_cents": null
     },
     {
@@ -865,7 +865,7 @@
       "min_reputation": 0,
       "benefit_demands": ["homeoffice", "training"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 5400,
+      "wage_demand_cents": 8100,
       "poach_min_cost_cents": null
     },
     {
@@ -886,7 +886,7 @@
       "min_reputation": 0,
       "benefit_demands": ["training"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4800,
+      "wage_demand_cents": 7200,
       "poach_min_cost_cents": null
     },
     {
@@ -907,7 +907,7 @@
       "min_reputation": 0,
       "benefit_demands": ["bonus", "gym"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4600,
+      "wage_demand_cents": 6900,
       "poach_min_cost_cents": null
     },
     {
@@ -928,9 +928,9 @@
       "min_reputation": 0,
       "benefit_demands": ["gym", "say"],
       "min_awareness_bps": 0,
-      "wage_demand_cents": 4100,
+      "wage_demand_cents": 6200,
       "poach_min_cost_cents": null
     }
   ],
-  "company_id": "805a69d0-19b5-4ca3-abde-0faf5c709d38"
+  "company_id": "03b22048-0b16-4e89-bd6f-053ca88ad633"
 }

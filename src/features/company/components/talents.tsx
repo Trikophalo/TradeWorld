@@ -38,9 +38,11 @@ import {
   talentMood,
   talentOfferChecks,
   talentOfferCost,
+  talentWageFloor,
   type OfferCheckKey,
 } from "@/lib/sim/talents";
 import { playSound } from "@/lib/sound";
+import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { useCompanyRefresh } from "../hooks";
 
@@ -256,7 +258,7 @@ function FilledSeat({ talent, onOpen }: { talent: OwnTalent; onOpen: () => void 
       className={cn(
         "flex h-full w-full flex-col rounded-md border bg-surface-1 p-3 text-left transition duration-fast",
         "focus-ring hover:bg-surface-2 active:scale-[0.99]",
-        mood === "warning" ? "border-warn" : "border-line-1",
+        mood === "warning" || talent.raiseDueAt ? "border-warn" : "border-line-1",
       )}
       data-testid={`talent-seat-${talent.role}`}
       data-filled="true"
@@ -285,6 +287,11 @@ function FilledSeat({ talent, onOpen }: { talent: OwnTalent; onOpen: () => void 
         />
       </div>
       {mood === "warning" && <p className="mt-1.5 text-2xs font-medium text-warn">{t("seat.warning")}</p>}
+      {talent.raiseDueAt && (
+        <p className="mt-1.5 text-2xs font-medium text-warn" data-testid="talent-seat-raise">
+          {t("seat.raise")}
+        </p>
+      )}
       <p className="mt-auto pt-1.5 nums text-2xs text-fg-3">
         {t("seat.cost", { amount: formatMoney(talent.costCents, { whole: true }) })}
       </p>
@@ -594,7 +601,7 @@ function TalentSheet({
   const client = useQueryClient();
   const refresh = useCompanyRefresh();
   const errorText = useGameErrorText();
-  const [offer, setOffer] = useState<null | "hire" | "poach" | "coceo">(null);
+  const [offer, setOffer] = useState<null | "hire" | "poach" | "coceo" | "raise">(null);
   const [state, setState] = useState<ButtonState>("idle");
   const mine = own ? (talent as OwnTalent) : null;
   const canOffer = !own && facts !== null && (talent.status === "available" || talent.status === "employed");
@@ -689,6 +696,7 @@ function TalentSheet({
               })}
             </p>
             <Progress value={mine.satisfactionBps / 10_000} label={t("seat.satisfaction")} size="sm" />
+            {mine.raiseDueAt && <RaiseNotice talent={mine} />}
             <p className="text-2xs text-pretty text-fg-3">{t("seat.leads")}</p>
           </section>
         )}
@@ -703,6 +711,15 @@ function TalentSheet({
               data-testid="talent-make-offer"
             >
               {talent.status === "employed" ? t("detail.poach") : t("detail.offer")}
+            </Button>
+          )}
+          {mine && (
+            <Button
+              variant={mine.raiseDueAt ? "primary" : "secondary"}
+              onClick={() => setOffer("raise")}
+              data-testid="talent-raise"
+            >
+              {t("detail.renegotiate")}
             </Button>
           )}
           {mine && !mine.isCoCeo && (
@@ -732,9 +749,11 @@ function TalentSheet({
           mode={
             offer === "coceo"
               ? { kind: "coceo" }
-              : offer === "poach"
-                ? { kind: "poach", minCost: talent.poachMinCostCents ?? 0 }
-                : { kind: "hire" }
+              : offer === "raise"
+                ? { kind: "raise" }
+                : offer === "poach"
+                  ? { kind: "poach", minCost: talent.poachMinCostCents ?? 0 }
+                  : { kind: "hire" }
           }
           onClose={() => {
             setOffer(null);
@@ -750,7 +769,28 @@ type OfferMode =
   | { kind: "hire" }
   | { kind: "poach"; minCost: number }
   | { kind: "counter"; offerId: string; minCost: number }
-  | { kind: "coceo" };
+  | { kind: "coceo" }
+  | { kind: "raise" };
+
+/** The demand of an own talent rose above the contract (Nachtrag ADR-199): time left, then satisfaction falls. */
+function RaiseNotice({ talent }: { talent: OwnTalent }) {
+  const t = useTranslations("talents");
+  const now = useClock();
+  const skew = useClockSkew();
+  const due = Date.parse(talent.raiseDueAt ?? "") + skew;
+  const amount = formatMoney(talent.wageFloorCents, { whole: true });
+  return (
+    <p className="text-2xs font-medium text-pretty text-warn" data-testid="talent-raise-notice">
+      {now !== null && now >= due ? (
+        t("detail.raiseOverdue", { amount })
+      ) : (
+        <>
+          {t("detail.raiseDue", { amount })} <Countdown target={due} className="font-semibold" />
+        </>
+      )}
+    </p>
+  );
+}
 
 function OfferSheet({
   talent,
@@ -769,14 +809,17 @@ function OfferSheet({
   const errorText = useGameErrorText();
   const own = "wageCents" in talent ? talent : null;
   const coceoMin = Math.ceil((talent.wageDemandCents * (10_000 + cfg.coCeo.wageBonusBps)) / 10_000 / 100) * 100;
+  const raiseMin = own ? talentWageFloor(talent.wageDemandCents, own.isCoCeo) : talent.wageDemandCents;
   const startWage =
     mode.kind === "coceo"
       ? Math.max(coceoMin, own?.wageCents ?? 0)
-      : Math.max(talent.wageDemandCents, own?.wageCents ?? 0);
+      : mode.kind === "raise"
+        ? Math.max(raiseMin, own?.wageCents ?? 0)
+        : Math.max(talent.wageDemandCents, own?.wageCents ?? 0);
   const [wageEuro, setWageEuro] = useState(String(Math.round(startWage / 100)));
   const [benefits, setBenefits] = useState<string[]>(
-    mode.kind === "coceo"
-      ? [...new Set([...(own?.benefits ?? []), "say"])]
+    mode.kind === "coceo" || (mode.kind === "raise" && own?.isCoCeo)
+      ? [...new Set([...(own?.benefits ?? []), ...(mode.kind === "raise" ? talent.benefitDemands : []), "say"])]
       : [...new Set([...talent.benefitDemands, ...(own?.benefits ?? [])])],
   );
   const [autonomy, setAutonomy] = useState<"advise" | "decide">("advise");
@@ -790,7 +833,7 @@ function OfferSheet({
     const base = talentOfferChecks(
       {
         ...talent,
-        wageCents: mode.kind === "coceo" ? coceoMin : talent.wageDemandCents,
+        wageCents: mode.kind === "coceo" ? coceoMin : mode.kind === "raise" ? raiseMin : talent.wageDemandCents,
         benefits: talent.benefitDemands,
       },
       { wageCents, benefits },
@@ -799,11 +842,13 @@ function OfferSheet({
     const list: { key: OfferCheckKey | "poach" | "counter"; ok: boolean }[] =
       mode.kind === "counter" || mode.kind === "coceo"
         ? base.filter((c) => c.key === "wage" || c.key === "benefits" || (mode.kind === "coceo" && c.key === "cash"))
-        : base;
+        : mode.kind === "raise"
+          ? base.filter((c) => c.key === "wage" || c.key === "benefits")
+          : base;
     if (mode.kind === "poach") list.push({ key: "poach", ok: cost >= mode.minCost });
     if (mode.kind === "counter") list.push({ key: "counter", ok: cost >= mode.minCost });
     return list;
-  }, [talent, wageCents, benefits, facts, mode, cost, coceoMin]);
+  }, [talent, wageCents, benefits, facts, mode, cost, coceoMin, raiseMin]);
   const allOk = checks.every((c) => c.ok) && wageCents > 0;
 
   const toggle = (b: string, on: boolean) =>
@@ -815,6 +860,7 @@ function OfferSheet({
     try {
       let next: CompanyTalentsState;
       if (mode.kind === "counter") next = await engine.counterTalentOffer(id, mode.offerId, wageCents, benefits);
+      else if (mode.kind === "raise") next = await engine.raiseTalent(id, talent.key, wageCents, benefits);
       else if (mode.kind === "coceo")
         next = await engine.appointCoCeo(
           id,
@@ -831,6 +877,7 @@ function OfferSheet({
       void playSound("success");
       const name = talentName(talent);
       if (mode.kind === "counter") toast.success(t("offer.countered", { name }));
+      else if (mode.kind === "raise") toast.success(t("offer.raised", { name }));
       else if (mode.kind === "coceo") toast.success(t("offer.appointed", { name }));
       else if (next.result === "pending")
         toast.success(t("offer.pending"), t("offer.pendingText", { name, minutes: cfg.poach.counterMinutes }));
@@ -847,11 +894,13 @@ function OfferSheet({
   const title =
     mode.kind === "counter"
       ? t("offer.titleCounter", { name: talentName(talent) })
-      : mode.kind === "coceo"
-        ? t("offer.titleCoceo", { name: talentName(talent) })
-        : mode.kind === "poach"
-          ? t("offer.titlePoach", { name: talentName(talent) })
-          : t("offer.titleHire", { name: talentName(talent) });
+      : mode.kind === "raise"
+        ? t("offer.titleRaise", { name: talentName(talent) })
+        : mode.kind === "coceo"
+          ? t("offer.titleCoceo", { name: talentName(talent) })
+          : mode.kind === "poach"
+            ? t("offer.titlePoach", { name: talentName(talent) })
+            : t("offer.titleHire", { name: talentName(talent) });
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()} title={title}>
@@ -859,6 +908,11 @@ function OfferSheet({
         {mode.kind === "coceo" && (
           <p className="text-xs text-pretty text-fg-3">
             {t("offer.coceoNeeds", { pct: pct(cfg.coCeo.wageBonusBps, 0) })}
+          </p>
+        )}
+        {mode.kind === "raise" && (
+          <p className="text-xs text-pretty text-fg-3">
+            {t("offer.raiseNeeds", { amount: formatMoney(raiseMin, { whole: true }) })}
           </p>
         )}
         <Field
@@ -892,7 +946,9 @@ function OfferSheet({
                     checked={benefits.includes(b)}
                     onCheckedChange={(on) => toggle(b, on)}
                     label={t(k(`benefits.${b}`))}
-                    disabled={mode.kind === "coceo" && b === "say"}
+                    disabled={
+                      (mode.kind === "coceo" || (mode.kind === "raise" && Boolean(own?.isCoCeo))) && b === "say"
+                    }
                   />
                 </li>
               );
@@ -945,7 +1001,7 @@ function OfferSheet({
           onClick={() => void send()}
           data-testid="talent-offer-send"
         >
-          {t("offer.send")}
+          {mode.kind === "raise" ? t("offer.sendRaise") : t("offer.send")}
         </Button>
       </div>
     </Sheet>

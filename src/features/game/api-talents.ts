@@ -44,6 +44,8 @@ const ownTalent = talent.extend({
   coceo_autonomy: z.enum(["advise", "decide"]),
   coceo_budget_cents: z.number(),
   coceo_spent_cents: z.number(),
+  wage_floor_cents: z.number(),
+  raise_due_at: z.string().nullable(),
 });
 const bps = z.record(z.string(), z.number());
 const companySchema = z.object({
@@ -98,6 +100,7 @@ export const TALENT_RPC_SCHEMAS = {
   talent_offer: companySchema,
   talent_counter: companySchema,
   talent_dismiss: companySchema,
+  talent_raise: companySchema,
   talent_coceo_appoint: companySchema,
   talent_coceo_set: companySchema,
   talent_undo_decision: companySchema,
@@ -144,6 +147,8 @@ const toOwn = (t: z.infer<typeof ownTalent>): OwnTalent => ({
   coCeoAutonomy: t.coceo_autonomy,
   coCeoBudgetCents: t.coceo_budget_cents,
   coCeoSpentCents: t.coceo_spent_cents,
+  wageFloorCents: t.wage_floor_cents,
+  raiseDueAt: t.raise_due_at,
 });
 
 const KINDS = ["demand", "capacity", "cogs", "fixed", "quality", "awareness", "reputation", "morale"] as const;
@@ -197,6 +202,7 @@ type TalentEngine = Pick<
   | "offerTalent"
   | "counterTalentOffer"
   | "dismissTalent"
+  | "raiseTalent"
   | "appointCoCeo"
   | "setCoCeo"
   | "undoTalentDecision"
@@ -229,6 +235,15 @@ export const liveTalentEngine: TalentEngine = {
   },
   async dismissTalent(requestId, key) {
     return toCompanyTalents(await rpc("talent_dismiss", { p_request_id: requestId, p_talent_key: key }, companySchema));
+  },
+  async raiseTalent(requestId, key, wageCents, benefits) {
+    return toCompanyTalents(
+      await rpc(
+        "talent_raise",
+        { p_request_id: requestId, p_talent_key: key, p_wage_cents: wageCents, p_benefits: benefits },
+        companySchema,
+      ),
+    );
   },
   async appointCoCeo(requestId, key, wageCents, autonomy, budgetCents) {
     return toCompanyTalents(

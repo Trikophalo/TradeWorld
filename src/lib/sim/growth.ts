@@ -32,6 +32,7 @@ import {
   initialStartup,
   maxEmployees,
   startupValueCents,
+  type StartupHourInput,
   type StartupState,
   type StartupTier,
 } from "./startup.ts";
@@ -52,6 +53,8 @@ export interface GrowthOptions {
   readonly cfg?: BalanceConfig;
   /** Called after every hour (to look inside the harness). */
   readonly trace?: (hour: number, info: Readonly<Record<string, number | string>>) => void;
+  /** Called with the state and input of every hour before it closes (counterfactuals, e.g. ADR-199 talent value). */
+  readonly probe?: (hour: number, valueCents: number, state: StartupState, input: StartupHourInput) => void;
 }
 
 export interface GrowthResult {
@@ -217,24 +220,22 @@ export function runGrowth(scenario: GrowthScenario, options: GrowthOptions): Gro
         ),
       ),
     );
-    const r = closeStartupHour(
-      state,
-      {
-        sector: scenario.sector,
-        tier,
-        marketingCentsPerQuarter: marketing,
-        productivityBps: [FOUNDER_BPS, ...Array<number>(ai).fill(10_000)],
-        aiWorkers: ai,
-        stage: STAGE,
-        noise: 0,
-        playerWagesCents: 0,
-        contractWork: true,
-        expansionLevel: level,
-        event: mods,
-        taskMomentum: 1.2,
-      },
-      cfg,
-    );
+    const input: StartupHourInput = {
+      sector: scenario.sector,
+      tier,
+      marketingCentsPerQuarter: marketing,
+      productivityBps: [FOUNDER_BPS, ...Array<number>(ai).fill(10_000)],
+      aiWorkers: ai,
+      stage: STAGE,
+      noise: 0,
+      playerWagesCents: 0,
+      contractWork: true,
+      expansionLevel: level,
+      event: mods,
+      taskMomentum: 1.2,
+    };
+    options.probe?.(h, value, state, input);
+    const r = closeStartupHour(state, input, cfg);
     state = { ...state, awareness: r.awareness.next, cashCents: state.cashCents + r.profitCents };
     options.trace?.(h, {
       tier,

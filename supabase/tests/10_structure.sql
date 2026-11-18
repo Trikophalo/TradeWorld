@@ -192,7 +192,7 @@ select tests.assert(
            -- redraw the company logo (ADR-200)
            'redraw_company_logo', 'get_logo_redraw',
            -- Talente and Mit-Geschaeftsfuehrung (ADR-199)
-           'get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss',
+           'get_talent_market', 'get_company_talents', 'talent_offer', 'talent_counter', 'talent_dismiss', 'talent_raise',
            'talent_coceo_appoint', 'talent_coceo_set', 'talent_undo_decision',
            -- Weltkarte (ADR-208)
            'get_world', 'world_place_hq', 'world_upgrade_hq', 'world_relocate_hq', 'world_save_hq_style',
