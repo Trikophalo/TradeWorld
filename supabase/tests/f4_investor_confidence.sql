@@ -180,12 +180,17 @@ update public.security_quotes q set last_price_e4 = st.fair_value_e4 * 3
   from public.security_sim_state st where st.security_id = q.security_id and q.security_id = :'sec';
 update public.stock_confidence set events = '{}' where security_id = :'sec';
 select setseed(0.216);
+select set_config('tests.f4_company', :'co', true) is not null as ok \gset
+-- other listed player companies left by earlier tests may draw an incident first: wait for this company's own
 do $$
 declare
   i integer;
 begin
-  for i in 1 .. 24 loop
-    exit when public.investor_confidence_incidents_run(public.game_now() + i * interval '1 hour', 60) > 0;
+  for i in 1 .. 48 loop
+    perform public.investor_confidence_incidents_run(public.game_now() + i * interval '1 hour', 60);
+    exit when exists (select 1 from public.player_company_events ev
+                       where ev.company_id = current_setting('tests.f4_company')::uuid
+                         and coalesce((ev.definition ->> 'incident')::boolean, false));
   end loop;
 end;
 $$;
