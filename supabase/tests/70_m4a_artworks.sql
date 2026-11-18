@@ -11,6 +11,7 @@ set client_min_messages = notice;
 \set l '''07070707-0000-4000-8000-0000000000d4'''
 select tests.signup(:a, 'Anna_Pinsel') is not null and tests.signup(:b, 'Bruno_Bieter') is not null
    and tests.signup(:c, 'Carla_Kunst') is not null and tests.signup(:l, 'Lea_Neuling') is not null as ok \gset
+select tests.vault_quiet(array[:a, :b, :c, :l]::uuid[]);
 select tests.set_level(:a, 8);
 select tests.set_level(:b, 9);
 select tests.set_level(:c, 12);

@@ -1027,7 +1027,7 @@
     "live": "Live, alle 15 Sekunden",
     "news": "Schlagzeilen",
     "newsEmpty": "Noch keine Meldungen. Sobald sich Plätze verschieben, steht es hier.",
-    "explain": "Gezählt wird dein Vermögen: Bargeld plus Aktien und Anleihen zum aktuellen Verkaufskurs, später auch Firmenanteile. Die KI-Tycoons sind erfundene Personen, deren Vermögen in Aktien der KI-Firmen steckt."
+    "explain": "Gezählt wird dein ganzes Vermögen: Bargeld und Tresor, Depot zum Verkaufskurs, deine Firma mit dem Wert aus „Top-Unternehmen“, Nexamon-Karten, NFTs und dein Zuhause, minus Schulden. Die KI-Tycoons sind erfundene Personen, deren Vermögen in Aktien der KI-Firmen steckt."
   },
   "titles": {
     "rookie": "Börsenneuling",
@@ -2536,7 +2536,10 @@
       "profitShareFromSenior": "Gewinnbeteiligung gibt es erst ab Senior.",
       "stock": "Aktien-Chance zusätzlich",
       "stockTotal": "Zusammen mit dem Rang: {percent} pro Arbeitsstunde"
-    }
+    },
+    "valueMarketCap": "Börsenwert",
+    "valueEarnings": "Ertragswert",
+    "valueHint": "So zählt deine Firma in „Top-Unternehmen“ und in deinem Vermögen. {basis, select, market_cap {An der Börse: alle Aktien × letzter Kurs. Der Ertragswert ist Kasse plus Jahresgewinn × KGV, so viel wäre sie privat wert.} other {Privat: Kasse − offene Löhne + Jahresgewinn × KGV der Branche × Abschlag.}}"
   },
   "debt": {
     "title": "Schulden",
@@ -2875,20 +2878,76 @@
   },
   "ranking": {
     "forbes": "Forbes 100",
-    "forbesHint": "Die 100 reichsten echten Spieler. Ohne KI-Tycoons.",
-    "allHint": "Alle, auch die erfundenen KI-Tycoons.",
+    "forbesHint": "Die 100 reichsten echten Spieler, nach ihrem ganzen Vermögen. Ohne KI-Tycoons.",
+    "allHint": "Alle Spieler und die erfundenen KI-Tycoons in einer Liste.",
     "companies": "Top-Unternehmen",
-    "companiesHint": "Die wertvollsten Firmen nach Firmenwert.",
+    "companiesHint": "Die wertvollsten Firmen. Jede Firma mit genau dem Wert, den auch ihre Firmenseite zeigt.",
     "companyScope": "Welche Firmen",
     "companyScopePlayers": "Spielerfirmen",
     "companyScopeAll": "Mit KI-Firmen",
-    "companyHint": "Spielerfirmen nach Firmenwert, KI-Firmen nach Börsenwert",
+    "companyHint": "An der Börse nach Börsenwert, private Firmen nach Firmenwert",
     "companyEmpty": "Noch hat niemand eine Firma gegründet. Deine könnte die erste sein.",
     "companyMine": "Deine Firma steht auf Platz {rank}.",
     "yours": "Deine",
     "foundedBy": "von {name}",
     "aiCompany": "KI-Firma an der Börse",
-    "revenue": "Umsatz"
+    "revenue": "Umsatz",
+    "method": "Wie wird gerechnet?",
+    "methodForbes": "Vermögen = alles, was dir gehört, minus Schulden. Gezählt wird so:",
+    "methodAll": "Spieler zählen wie in Forbes 100. KI-Tycoons sind erfundene Personen: Bargeld plus ihre Aktien zum Geldkurs.",
+    "methodCompanies": "Eine Firma, ein Wert, überall gleich: in dieser Liste, auf der Firmenseite und im Vermögen des Gründers.",
+    "methodLines": {
+      "cash": "Bargeld: dein Konto, reserviertes Geld, der volle Betrag im Tresor und Geld für gezeichnete Aktien",
+      "depot": "Depot: Aktien, Anleihen und Coins zum Geldkurs (so viel bringt ein Verkauf)",
+      "company": "Eigene Firma: privat mit ihrem Firmenwert, an der Börse deine Aktien zum letzten Kurs",
+      "cards": "Nexamon: Karten und Slabs zum Marktwert, Black Labels mit Hype",
+      "nfts": "NFTs zum letzten Verkaufspreis, Zuhause, Möbel, Autos und Böden zum Wiederverkaufswert",
+      "deals": "Deals mit anderen Spielern: Geliehenes zählt beim Verleiher, Schulden ziehen ab",
+      "marketCap": "Börsenwert: alle Aktien × letzter Kurs",
+      "companyValue": "Firmenwert (privat): Kasse − offene Löhne + Ertragswert (Jahresgewinn × KGV der Branche × Abschlag)",
+      "snapshot": "Pfeile: Veränderung gegenüber gestern um diese Zeit"
+    },
+    "colRank": "Platz",
+    "colName": "Name",
+    "colCompany": "Firma",
+    "colWealth": "Vermögen · 24 h",
+    "colValue": "Wert · 24 h",
+    "sector": "Branche",
+    "sectorEmptyTitle": "Noch keine Firma",
+    "sectorEmpty": "In dieser Branche steht noch keine Firma in der Liste.",
+    "basis": {
+      "market_cap": "Börsenwert",
+      "company_value": "Firmenwert"
+    },
+    "source": {
+      "cash": "Bargeld",
+      "depot": "Aktien",
+      "company": "Firma",
+      "cards": "Nexamon",
+      "nfts": "NFTs",
+      "property": "Immobilien"
+    },
+    "sourceLabel": "vor allem {source}",
+    "rankMove": "{count, plural, one {# Platz} other {# Plätze}} {up, select, true {hoch} other {runter}} seit gestern",
+    "yourPlace": "Dein Platz",
+    "breakdownTitle": "So setzt sich dein Vermögen zusammen",
+    "breakdownHint": "Genau diese Summe zählt in Forbes 100, auf deiner Visitenkarte und für Missionen.",
+    "breakdownTotal": "Vermögen",
+    "breakdownLeague": "Die Wochenliga lässt den Tresor weg: Grundeinkommen ist geschenktes Geld.",
+    "breakdownCompany": "{name}: {basis} {amount}",
+    "parts": {
+      "cash": "Bargeld",
+      "depot": "Depot (Geldkurs)",
+      "company": "Eigene Firma",
+      "cards": "Nexamon-Karten",
+      "slabs": "Slabs",
+      "nfts": "NFTs",
+      "property": "Zuhause, Möbel, Autos",
+      "vault": "Tresor",
+      "escrow": "Gezeichnete Aktien",
+      "deals": "Deals",
+      "debt": "Schulden"
+    }
   },
   "banner": {
     "title": "Firmen-Banner",
@@ -5055,7 +5114,8 @@
     "news": "Neuigkeiten",
     "newsMarket": "Börse",
     "newsInside": "Aus der Firma",
-    "newsAgo": "vor {hours, plural, =0 {kurzem} one {# Stunde} other {# Stunden}}"
+    "newsAgo": "vor {hours, plural, =0 {kurzem} one {# Stunde} other {# Stunden}}",
+    "valueMarketCap": "Börsenwert"
   },
   "companyMoves": {
     "title": "Geschäftszüge",

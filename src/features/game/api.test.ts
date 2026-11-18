@@ -8,6 +8,8 @@ import { isValidBanner } from "@/lib/sim/logo";
 import { RPC_SCHEMAS } from "./api";
 import { staffValue } from "@/features/company/staff-value";
 import { toCompanyOverview } from "./api-company";
+import { toNetWorth } from "./api-toplists";
+import { wealthTotal } from "@/features/rich-list/wealth";
 
 /*
  * Contract test between database and frontend. The fixtures are real
@@ -179,5 +181,24 @@ describe("RPC contract", () => {
     expect(q.net_cents).toBeLessThanOrEqual(100_000);
     expect(q.net_cents).toBe(q.gross_cents + q.fee_cents);
     expect(q.limited_by).toBeNull();
+  });
+
+  // ADR-203: one value per company, the net worth is the sum of its parts
+  it("toplists: the company page carries the ranking value, the net worth parts sum to the total", () => {
+    const read = (name: string) => JSON.parse(readFileSync(dir + name, "utf8"));
+    const company = toCompanyOverview(RPC_SCHEMAS.get_my_company.parse(read("get_my_company.json"))).company!;
+    const ranking = RPC_SCHEMAS.get_company_ranking.parse(read("get_company_ranking.json"));
+    const mine = ranking.mine!;
+    expect(company.worth).not.toBeNull();
+    expect(mine.basis).toBe(company.worth!.basis);
+    expect(mine.value_cents).toBe(company.worth!.cents);
+    expect(company.worth!.basis).toBe("company_value");
+    expect(company.worth!.cents).toBe(company.valueCents);
+    const sector = RPC_SCHEMAS.get_company_ranking.parse(read("get_company_ranking_sector.json"));
+    expect(sector.entries.every((e) => e.sector === "tech")).toBe(true);
+    const nw = toNetWorth(RPC_SCHEMAS.get_my_net_worth.parse(read("get_my_net_worth_founder.json")));
+    expect(wealthTotal(nw.parts)).toBe(nw.totalCents);
+    expect(nw.company).not.toBeNull();
+    expect(nw.parts.company).toBe(nw.company!.cents);
   });
 });

@@ -619,6 +619,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-b86b8e76",
+        title: "Ranglisten mit klaren Regeln",
+        text: "Jede Firma hat jetzt überall denselben Wert: an der Börse den Börsenwert (Aktien × letzter Kurs), privat den Firmenwert.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-d6c80d70",
         title: "Dein Klon und bessere Jobs",
         text: "Ab Level 20 erschaffst du im Job-Tab einmalig einen Klon (25 000 €).",

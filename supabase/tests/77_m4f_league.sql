@@ -12,6 +12,7 @@ set client_min_messages = notice;
 \set d '''07707707-0000-4000-8000-0000000000d4'''
 select tests.signup(:a, 'Lia_Liga') is not null and tests.signup(:b, 'Ben_Bilanz') is not null
    and tests.signup(:c, 'Cem_Chance') is not null and tests.signup(:d, 'Dina_Weg') is not null as ok \gset
+select tests.vault_quiet(array[:a, :b, :c, :d]::uuid[]);
 update public.profiles set is_deactivated = true where id = :d;
 select tests.login_as('authenticated', :a);
 select public.send_friend_request(gen_random_uuid(), 'Ben_Bilanz') is not null as ok \gset
@@ -60,11 +61,13 @@ select tests.assert(
 -- C. Free money is inflow, not growth (vault basic income, daily reward cash)
 -- =============================================================================
 update public.vaults set accrual_started_at = public.game_now() - interval '3 hours' where player_id = :a;
-select public.player_net_worth_cents(:a) as nw0 \gset
+-- ADR-203: the league counts the net worth without the vault
+select w.total_cents - w.vault_cents as nw0 from public.player_wealth_parts(:a) w \gset
 select tests.login_as('authenticated', :a);
 select (public.claim_vault(gen_random_uuid()) ->> 'claimed_cents')::bigint as vault \gset
 select (public.claim_daily_reward(gen_random_uuid()) ->> 'cash_cents')::bigint as daily \gset
 reset role;
+select tests.vault_quiet(array[:a]::uuid[]);
 select public.league_refresh(:'s') is not null as ok \gset
 select tests.assert(
   :vault > 0 and :daily >= 0

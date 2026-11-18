@@ -84,6 +84,7 @@ select tests.assert(
 -- D. Player card and friends by tag
 -- =============================================================================
 select tests.signup(:q, 'Quirin_Such') is not null as ok \gset
+select tests.vault_quiet(array[:q]::uuid[]);
 select tests.set_level(:q, 9);
 select tag as q_tag from public.profiles where id = :q \gset
 select tests.login_as('authenticated', :m);

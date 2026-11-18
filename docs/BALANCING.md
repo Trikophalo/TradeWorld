@@ -1649,3 +1649,14 @@ Leuten, höchstens der halbe Lohn. Aktien-Chance je Stunde Junior 1 %, Senior 3 
 (Anzeigen bis +5 %), Paket 4 Stunden Lohn: Erwartung Senior + 12 % Lohn, C-Level + 32 %.
 
 > > > > > > > worktree-agent-ac7e74a95ed153787
+
+## Nachtrag: Ranglisten (ADR-203)
+
+| Wert                              | Wert | Wirkung                                                                   |
+| --------------------------------- | ---- | ------------------------------------------------------------------------- |
+| `richList.companySnapshotMinutes` | 30   | Abstand der Schnappschüsse von Top-Unternehmen (Pfeile gegenüber gestern) |
+| `richList.snapshotKeepDays`       | 8    | so lange bleiben die Firmen-Schnappschüsse                                |
+
+Bewertet wird ohne eigene Spielwerte: Börsenwert = Aktien × letzter Kurs, Firmenwert wie bisher
+(`startups.valuationPeDiscount`, `sectors.*.peRatio`), Vermögensteile mit den Werten ihrer Bereiche (Geldkurs,
+Nexamon-Marktwert, `property.*`, Tresor).

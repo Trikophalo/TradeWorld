@@ -233,6 +233,10 @@ select public.get_my_company();
 select public.get_company_ranking('players', 5);
 \o :fixture_dir/get_company_ranking_all.json
 select public.get_company_ranking('all', 5);
+\o :fixture_dir/get_company_ranking_sector.json
+select public.get_company_ranking('all', 5, 'tech');
+\o :fixture_dir/get_my_net_worth_founder.json
+select public.get_my_net_worth();
 \o :fixture_dir/upgrade_company.json
 select public.upgrade_company(gen_random_uuid());
 \o :fixture_dir/get_player_card_founder.json

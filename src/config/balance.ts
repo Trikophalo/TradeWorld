@@ -1808,6 +1808,10 @@ export interface RichListConfig {
   readonly tycoonMaxWealthCents: number;
   /** How often ranks are snapshotted and rank news are written. */
   readonly snapshotMinutes: number;
+  /** How often Top-Unternehmen is snapshotted for the change against yesterday (ADR-203). */
+  readonly companySnapshotMinutes: number;
+  /** How long company snapshots are kept. */
+  readonly snapshotKeepDays: number;
   /** Entering one of these top ranks makes the news. */
   readonly newsRanks: readonly number[];
 }
@@ -2588,6 +2592,8 @@ export const BALANCE = {
     tycoonMinWealthCents: 1_500_000, // 15.000 €
     tycoonMaxWealthCents: 40_000_000_000, // 400 Mio. €
     snapshotMinutes: 5,
+    companySnapshotMinutes: 30,
+    snapshotKeepDays: 8,
     newsRanks: [1, 3, 10, 25, 50, 100],
   },
 
