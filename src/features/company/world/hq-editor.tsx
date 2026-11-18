@@ -38,6 +38,7 @@ export function HqPreview({
         ...style,
         flag: style.flag && country ? country.flag : null,
         flagVertical: country?.flagVertical,
+        country: country?.key,
         initials: companyInitials(name),
       })}
       scale={scale}

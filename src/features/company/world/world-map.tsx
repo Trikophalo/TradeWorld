@@ -2,17 +2,19 @@
 
 import { useReducedMotionConfig } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
-import { flagArt, hqArt, companyInitials } from "@/components/pixel/hq";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { countryFlag, hqArt, companyInitials } from "@/components/pixel/hq";
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { COUNTRIES } from "@/config/countries";
 import type { WorldPlace } from "@/features/game/world-types";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import { cellOf, MAP_COLS, MAP_ROWS, worldMapArt } from "./land";
+import { cellOf, countryAt, MAP_COLS, MAP_ROWS, worldMapPixels, type MapTheme } from "./land";
 import { placesByCountry } from "./hooks";
 
-const ZOOMS = [1, 2, 3] as const;
+const ZOOMS = [1, 2, 3, 4] as const;
+/** Wheel distance (px) for one zoom step; trackpads send many small deltas. */
+const WHEEL_STEP = 60;
 
 /** The pixel art of the first place of a country: its headquarters building (or a small office). */
 export function placeArt(p: WorldPlace) {
@@ -26,14 +28,58 @@ export function placeArt(p: WorldPlace) {
     deco: p.kind === "hq" ? p.hqStyle.deco : "none",
     flag: p.kind === "hq" && p.hqStyle.flag && country ? country.flag : null,
     flagVertical: country?.flagVertical,
+    country: country?.key,
     initials: companyInitials(p.name),
   });
 }
 
+/** The theme on <html> (data-theme), read after hydration and followed when the setting changes. */
+function useMapTheme(): MapTheme {
+  const [theme, setTheme] = useState<MapTheme>("dark");
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => setTheme(root.dataset.theme === "light" ? "light" : "dark");
+    read();
+    const mo = new MutationObserver(read);
+    mo.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+  return theme;
+}
+
 /**
- * The world map (ADR-208): a pixel map with every country as a button. Countries with companies show the building of
- * the first one and a count. Drag to pan, pinch or wheel to zoom (whole steps only: pixel art scales by integers),
- * buttons for keyboard and mouse. Tapping a country calls onSelect.
+ * The painted map on one canvas of MAP_COLS × MAP_ROWS pixels, scaled up by CSS (whole numbers, pixelated). Painted
+ * once per theme and selection; no DOM per pixel.
+ */
+function MapCanvas({ width, height, selected }: { width: number; height: number; selected?: string | null }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const theme = useMapTheme();
+  useEffect(() => {
+    const ctx = ref.current?.getContext("2d");
+    if (!ctx) return;
+    const image = ctx.createImageData(MAP_COLS, MAP_ROWS);
+    image.data.set(worldMapPixels(theme, selected));
+    ctx.putImageData(image, 0, 0);
+  }, [theme, selected]);
+  return (
+    <canvas
+      ref={ref}
+      width={MAP_COLS}
+      height={MAP_ROWS}
+      aria-hidden
+      data-testid="world-map-canvas"
+      data-theme={theme}
+      className="absolute inset-0 pixelated"
+      style={{ width, height }}
+    />
+  );
+}
+
+/**
+ * The world map (ADR-208): a detailed pixel map with every country as a button. Countries with companies show the
+ * building of the first one and a count. Drag to pan, pinch or wheel to zoom (whole steps only: pixel art scales by
+ * integers), buttons for keyboard and mouse; the wheel and pinch never scroll or zoom the page. Tapping a country
+ * (marker or land) calls onSelect.
  */
 export function WorldMap({
   places,
@@ -71,7 +117,7 @@ export function WorldMap({
   }, []);
 
   // Whole pixels per map cell: fills the box at zoom 1, times the zoom step.
-  const base = Math.max(3, Math.ceil(Math.max(size.w / MAP_COLS, size.h / MAP_ROWS)));
+  const base = Math.max(2, Math.ceil(Math.max(size.w / MAP_COLS, size.h / MAP_ROWS)));
   const cell = base * zoom;
   const mapW = MAP_COLS * cell;
   const mapH = MAP_ROWS * cell;
@@ -121,6 +167,48 @@ export function WorldMap({
     return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) };
   };
 
+  // The wheel (and a trackpad pinch, which arrives as a wheel with ctrlKey) zooms the map and never scrolls or zooms
+  // the page: a native listener, because React's onWheel is passive and cannot prevent the default.
+  const zoomRef = useRef({ zoomTo, zoom });
+  useEffect(() => {
+    zoomRef.current = { zoomTo, zoom };
+  }, [zoomTo, zoom]);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let acc = 0;
+    let last = 0;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      if (e.timeStamp - last > 250) acc = 0;
+      last = e.timeStamp;
+      acc += e.ctrlKey ? dy * 4 : dy;
+      if (Math.abs(acc) < WHEEL_STEP) return;
+      const r = el.getBoundingClientRect();
+      const { zoomTo: go, zoom: z } = zoomRef.current;
+      go(z + (acc < 0 ? 1 : -1), { x: e.clientX - r.left, y: e.clientY - r.top });
+      acc = 0;
+    };
+    // Safari pinch gestures on the map do not zoom the page either
+    const stop = (e: Event) => e.preventDefault();
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("gesturestart", stop);
+    el.addEventListener("gesturechange", stop);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("gesturestart", stop);
+      el.removeEventListener("gesturechange", stop);
+    };
+  }, []);
+
+  const pick = (key: string) => {
+    // a drag that ended on a marker is not a tap
+    if ((gesture.current?.moved ?? 0) > 6) return;
+    haptic("tap");
+    onSelect(key);
+  };
+
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     pointers.current.set(e.pointerId, local(e));
     const pts = [...pointers.current.values()];
@@ -166,25 +254,21 @@ export function WorldMap({
     }
   };
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const tracked = pointers.current.has(e.pointerId);
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 0) setDragging(false);
+    // a tap on the land of a game country selects it
+    if (tracked && e.type === "pointerup" && pointers.current.size === 0 && (gesture.current?.moved ?? 99) <= 6) {
+      const p = local(e);
+      const key = countryAt(Math.floor((p.x - shown.x) / cell), Math.floor((p.y - shown.y) / cell));
+      if (key) pick(key);
+    }
     const rest = [...pointers.current.values()][0];
     if (rest && gesture.current)
       gesture.current = { ...gesture.current, x: rest.x, y: rest.y, px: shown.x, py: shown.y };
   };
-  const onWheel = (e: WheelEvent<HTMLDivElement>) => {
-    if (Math.abs(e.deltaY) < 4) return;
-    zoomTo(zoom + (e.deltaY < 0 ? 1 : -1), local(e));
-  };
 
   const byCountry = useMemo(() => placesByCountry(places), [places]);
-  const land = useMemo(() => worldMapArt(), []);
-  const pick = (key: string) => {
-    // a drag that ended on a marker is not a tap
-    if ((gesture.current?.moved ?? 0) > 6) return;
-    haptic("tap");
-    onSelect(key);
-  };
 
   return (
     <div className={cn("space-y-2", className)} id="world-map" data-testid="world-map">
@@ -193,15 +277,15 @@ export function WorldMap({
         role="group"
         aria-label={t("label")}
         className={cn(
-          "relative h-64 touch-none overflow-hidden rounded-lg bg-surface-2 ring-1 ring-line-1 select-none sm:h-80 lg:h-96",
+          "relative h-64 touch-none overflow-hidden overscroll-contain rounded-lg bg-surface-2 ring-1 ring-line-1 select-none sm:h-80 lg:h-96",
           dragging ? "cursor-grabbing" : "cursor-grab",
         )}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onWheel={onWheel}
         data-zoom={zoom}
+        data-cell={cell}
       >
         <div
           className={cn(
@@ -210,7 +294,7 @@ export function WorldMap({
           )}
           style={{ width: mapW, height: mapH, transform: `translate3d(${shown.x}px, ${shown.y}px, 0)` }}
         >
-          <PixelIcon {...land} scale={cell} className="absolute inset-0" />
+          <MapCanvas width={mapW} height={mapH} selected={selected} />
           {COUNTRIES.map((c) => {
             const list = byCountry.get(c.key) ?? [];
             const first = list[0];
@@ -243,7 +327,7 @@ export function WorldMap({
                       mine ? "ring-accent" : active ? "ring-fg-2" : "ring-line-2",
                     )}
                   >
-                    <PixelIcon {...placeArt(first)} scale={zoom >= 2 ? 2 : 1} />
+                    <PixelIcon {...placeArt(first)} scale={zoom >= 3 ? 2 : 1} />
                     {list.length > 1 && (
                       <span className="absolute -top-1.5 -right-1.5 rounded-pill bg-accent px-1 nums text-2xs leading-4 text-on-accent">
                         {list.length}
@@ -251,8 +335,11 @@ export function WorldMap({
                     )}
                   </span>
                 ) : (
-                  <span className={cn("rounded-xs p-px ring-1", active ? "ring-accent" : "ring-line-2")}>
-                    <PixelIcon {...flagArt(c.flag, c.flagVertical)} scale={zoom >= 2 ? 3 : 2} />
+                  <span
+                    className={cn("rounded-xs p-px ring-1", active ? "ring-accent" : "ring-line-2")}
+                    data-testid={`world-flag-${c.key}`}
+                  >
+                    <PixelIcon {...countryFlag(c)} scale={zoom >= 3 ? 2 : 1} />
                   </span>
                 )}
                 {(zoom >= 2 || active) && (
@@ -306,6 +393,7 @@ function MapButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
+      onPointerUp={(e) => e.stopPropagation()}
       className="grid size-9 place-items-center rounded-md bg-surface-1 font-semibold text-fg-1 shadow-1 ring-1 ring-line-2 focus-ring transition duration-fast hover:bg-surface-3 active:scale-95 disabled:opacity-40"
     >
       <span aria-hidden>{children}</span>

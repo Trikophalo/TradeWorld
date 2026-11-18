@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/toast";
 import { COUNTRIES, WORLD_RULES, type CountryConfig } from "@/config/countries";
-import { flagArt } from "@/components/pixel/hq";
+import { countryFlag } from "@/components/pixel/hq";
 import { useGameErrorText } from "@/features/game/errors";
 import { useClockSkew, useServerClock } from "@/features/game/server-clock";
 import { engine } from "@/features/game/store";
@@ -671,7 +671,7 @@ function CountryList({
                   own ? "bg-accent-soft text-accent ring-accent" : "bg-surface-2 text-fg-2 ring-line-1 hover:text-fg-1",
                 )}
               >
-                <PixelIcon {...flagArt(c.flag, c.flagVertical)} scale={2} />
+                <PixelIcon {...countryFlag(c)} scale={1} />
                 {c.name}
                 {count > 0 && <span className="nums text-2xs text-fg-3">{count}</span>}
               </button>

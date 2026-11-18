@@ -106,3 +106,57 @@ test("Standort: locked, place the headquarters, upgrade and style it", async ({ 
     }
   }
 });
+
+test("the wheel zooms the map and never scrolls the page; every country flies its own flag", async ({ page }) => {
+  await prepareRichFounder(page, "Kartenleser");
+  await page.goto("/company");
+  await page.locator('[data-tier="garage"]').getByRole("button", { name: "Gründen" }).click();
+  const sheet = page.getByRole("dialog", { name: "Firma gründen" });
+  await sheet.getByLabel("Firmenname").fill("Lupenwerk");
+  await sheet.getByLabel("Deine Idee in einem Satz").fill("Wir schauen ganz genau hin.");
+  await expect(sheet.getByText("Name ist frei")).toBeVisible();
+  await hold(page, /Gedrückt halten zum Gründen/);
+  await expect(page.getByText("Firma gegründet!")).toBeVisible();
+  await page
+    .getByTestId("company-tabs")
+    .getByRole("tab", { name: /Standort/ })
+    .click();
+
+  const map = page.getByTestId("world-map");
+  await expect(map).toBeVisible({ timeout: 15_000 });
+  const box = map.getByRole("group", { name: "Weltkarte" });
+  await expect(map.getByTestId("world-map-canvas")).toHaveAttribute("width", "540");
+  await box.scrollIntoViewIfNeeded();
+  await expect(box).toHaveAttribute("data-zoom", "1");
+  // where the map sits on screen: it moves when anything (window or app shell) scrolls
+  const top = async () => Math.round((await box.boundingBox())!.y);
+  const r = (await box.boundingBox())!;
+  const before = await top();
+  await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+  await page.mouse.wheel(0, -240);
+  await expect(box).toHaveAttribute("data-zoom", "2");
+  await page.waitForTimeout(300);
+  expect(await top()).toBe(before);
+  await page.mouse.wheel(0, 240);
+  await expect(box).toHaveAttribute("data-zoom", "1");
+  await page.waitForTimeout(300);
+  expect(await top()).toBe(before);
+  // outside the map the page still scrolls (down, or up when already at the end)
+  await page.mouse.move(r.x + r.width / 2, Math.max(2, r.y - 30));
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(300);
+  if ((await top()) === before) await page.mouse.wheel(0, -600);
+  await expect.poll(top).not.toBe(before);
+
+  // China flies its own flag, not the German one (the country list always shows the flag)
+  const flag = (key: string) =>
+    page
+      .getByTestId(`world-chip-${key}`)
+      .locator("svg path")
+      .evaluateAll((ps) => ps.map((p) => p.getAttribute("fill")));
+  const cn = await flag("cn");
+  const de = await flag("de");
+  expect(cn).toContain("#de2910");
+  expect(cn).not.toContain("#1a1a1a");
+  expect(de).toContain("#1a1a1a");
+});
