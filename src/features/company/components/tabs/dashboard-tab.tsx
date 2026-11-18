@@ -237,6 +237,7 @@ function CostTile({ kind, onOpen }: { kind: CostKind; onOpen: (kind: CostKind) =
       onGo={() => onOpen(kind)}
       testId={kind === "fixed" ? "fixed-costs" : "variable-costs"}
       label={t(kind)}
+      tone="loss"
       hint={
         !data
           ? undefined
@@ -380,6 +381,7 @@ function KpiGrid({
           go={go}
           label={t("revenueHour")}
           testId="revenue"
+          tone="gain"
           target={{ tab: "controlling", section: "profit" }}
           hint={last && delta(last.revenueCents, prev?.revenueCents)}
         >
@@ -389,6 +391,7 @@ function KpiGrid({
           go={go}
           label={t("costsHour")}
           testId="costs"
+          tone="loss"
           target={{ tab: "controlling", section: "business" }}
           hint={last && delta(costs(last), prev ? costs(prev) : undefined)}
         >
