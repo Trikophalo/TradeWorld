@@ -36,7 +36,7 @@ test("Standort: locked, place the headquarters, upgrade and style it", async ({ 
   await page.goto("/company");
   await page.locator('[data-tier="garage"]').getByRole("button", { name: "Gründen" }).click();
   const sheet = page.getByRole("dialog", { name: "Firma gründen" });
-  await sheet.getByLabel("Firmenname").fill("Globus Werke");
+  await sheet.getByLabel("Firmenname").fill("GlobusWerke");
   await sheet.getByLabel("Deine Idee in einem Satz").fill("Wir liefern in alle Länder.");
   await expect(sheet.getByText("Name ist frei")).toBeVisible();
   await hold(page, /Gedrückt halten zum Gründen/);
