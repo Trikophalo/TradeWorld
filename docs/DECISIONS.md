@@ -4777,3 +4777,31 @@ Mint-Gradings, eine reine 10 also 35 %. Die anderen Zustände bleiben unverände
 (`premiumBps.mint`, 12 %) bleibt; wer eine Mint-Karte zieht, gradet sie lieber, als sie roh an die KI zu verkaufen.
 Mehr 10er bringen mehr Slabs mit hohem Wert in Umlauf; Marktwert und KI-Käufe für Slabs (`gradePremiumBps`) bleiben
 und sind zu beobachten.
+
+## ADR-207: Titans Revenge – Diamond 30 % mehr wert, Uranium so viel weniger, dass der Erwartungswert bleibt — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer wünscht: „Im Set Titans Revenge sollen die Diamond etwas besser werden vom Wert, aber
+dafür Uranium etwas schlechter, aber so, dass der Erwartungswert gleich bleibt.“ Ein Pack (100.000 €) bringt im
+Schnitt 1/50 Diamond und 1/500 Uranium; der Erwartungswert lag bei 89.901,25 € (89,9 %, ADR-182).
+
+**Entscheidung.** Neuer Faktor je Seltenheit `TITAN_REBALANCE_FACTOR` (`src/config/nexamon/titans-draft.ts`) auf die
+Startpreise nach `TITAN_VALUE_FACTOR`: Diamond × 1,3, Uranium × u, Iron und Titanium × 1. u folgt aus den Zahlen des
+Katalogs: 0,3 × 597.375 € / 50 = (1 − u) × 22.078.125 € / 500, also u = 1 − 3 × 597.375 / 22.078.125 = 0,918828
+(auf sechs Stellen). Die Verhältnisse der Karten innerhalb einer Seltenheit bleiben; die Spannen
+(`NEXAMON_SET_PRICE_RANGE`) wachsen bzw. schrumpfen mit. Erwartungswert nachher 89.901,26 € (die Rundung auf ganze
+Euro macht 0,4 Cent).
+
+Live wirkt das über Migration `20261204009900`: einmal (Marke `nexamon_titans_rebalance_207` in `data_migrations`)
+werden Startpreis, Marktwert, Tagesreferenz und Wertgeschichte jeder Diamond-Karte × 13/10, jeder Uranium-Karte
+× 918 828/1 000 000 genommen (neue interne Funktion `nexamon_scale_card_values`). Relativ statt absolut, damit die
+bisherige Marktbewegung jeder Karte erhalten bleibt. Kopien und Slabs folgen von selbst (Kartenwert × Zustand bzw.
+Grade-Faktor). KI-Angebote werden neu bepreist; Angebote von Spielern behalten ihren Preis, weil der Besitzer ihn
+gewählt hat (er kann ihn jederzeit ändern). Verkäufe der Vergangenheit bleiben, wie sie waren. Danach wird der
+Katalog-Hash geleert, damit der nächste `nexamon_sync()` die Startpreise genau auf den Katalog legt – egal ob Sync
+oder Migration zuerst läuft.
+
+**Folgen.** Diamond-Ziehungen fühlen sich besser an (im Mittel 776.588 € statt 597.375 €), der Uranium-Jackpot ist
+im Mittel 20,3 statt 22,1 Mio. € wert. Der Erwartungswert zu Startpreisen bleibt auf den Cent; zu Marktwerten ändert
+er sich nur, wenn Diamond und Uranium sich seit dem Start unterschiedlich bewegt haben, um 3.584,25 € × (d − v)
+(BALANCING.md). Angebote von Spielern für Diamond sind nach der Umstellung eher günstig, für Uranium eher teuer; das
+regelt der Markt. Einzelwerte in `docs/BALANCING.md`.

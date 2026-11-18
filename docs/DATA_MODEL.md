@@ -8214,3 +8214,14 @@ total_cents }`: eigene rohe Kopien aus einem Pack (`source = 'pack'`), höchsten
 - `nexamon_copies.ai_owner = instantSell.vaultOwner` („NEXA-Tresor“): der Tresor des Spiels für Seltenheiten aus
   `ai.excludedRarities`; `nexamon_copies_ai_guard` lässt ihn zu, `nexamon_ai_reset()` mustert ihn nie aus.
 - Bulk (`bulk_sell_nexamon`): `quickSell.bps` jetzt 8 000 (20 % Gebühr).
+
+## Nachtrag: Titans Revenge neu gewichtet (ADR-207)
+
+- Interne Funktion `nexamon_scale_card_values(p_set, p_rarity, p_num, p_den)` → Anzahl Karten: `start_e4`, `value_e4`,
+  `day_ref_e4` und die Wertgeschichte `nexamon_value_points` aller Karten eines Sets und einer Seltenheit × `p_num` /
+  `p_den` („half even“), danach die Preise der KI-Angebote (`nexamon_ai_ask_cents` des Kopiewerts). Angebote von
+  Spielern behalten ihren Preis, `nexamon_sales` bleibt Geschichte. Kopien und Slabs haben keinen eigenen Wert
+  (Kartenwert × Zustand bzw. Grade-Faktor) und folgen sofort.
+- Migration `20261204009900_nexamon_titans_rebalance.sql` ruft sie einmal auf (Marke `data_migrations`
+  `nexamon_titans_rebalance_207`): Titans Revenge Diamond × 13/10, Uranium × 918 828/1 000 000, dann
+  `nexamon_meta.catalogue_hash = null`, damit der nächste `nexamon_sync()` die Startpreise genau auf den Katalog legt.

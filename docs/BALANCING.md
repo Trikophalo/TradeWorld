@@ -1530,7 +1530,7 @@ nachts damit rund 450–1.260 € je Stunde, höchstens 24 Aufgaben am Tag.
 | Wert                | Zahl                                                                                                         | Wo                                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
 | Pack Titans Revenge | 100.000 €, 30 Karten 15/7/4/4                                                                                | `nexamon.sets.titans_revenge`, `NEXAMON_SET_LAYOUT`          |
-| Titans-Spannen      | Iron 2.812,50–6.750 €, Titanium 33.750–84.375 €, Diamond 0,34–0,96 Mio. €, Uranium 9,6–39,4 Mio. €           | `NEXAMON_SET_PRICE_RANGE` (Entwurf × 1,125)                  |
+| Titans-Spannen      | Iron 2.812,50–6.750 €, Titanium 33.750–84.375 €, Diamond 0,44–1,24 Mio. €, Uranium 8,8–36,2 Mio. €           | `NEXAMON_SET_PRICE_RANGE` (Entwurf × 1,125, ADR-207)         |
 | Titans-Pack         | Iron als Basis; Uranium 1/500 (1), Diamond 1/50 (1), Titanium 1/5 (1–2)                                      | `packRules.titans_revenge`                                   |
 | Pack Yin Yang       | 2.000 €, 110 Karten 54/30/16/8/2                                                                             | `nexamon.sets.yin_yang`                                      |
 | Yin-Yang-Spannen    | 10× erste Spannen, ab Ultra × 1,12 (Legendary 1,0–2,0 Mio. €)                                                | `NEXAMON_SET_PRICE_RANGE`                                    |
@@ -1554,6 +1554,9 @@ um 16:00 UTC).
 
 Zum Vergleich mit derselben Rechnung: Mystic Energy 241,7 %, Super Apex 236,0 %, Cosmic Winds 187,0 % (ohne One of
 One), Prismatic Peak 166,9 %. Ohne den Faktor 1,125 läge Titans bei 79,9 %.
+
+Seit ADR-207 gilt zusätzlich `TITAN_REBALANCE_FACTOR` je Seltenheit (Diamond × 1,3, Uranium × 0,918828); der
+Erwartungswert bleibt bei 89.901 € (siehe Nachtrag ADR-207 unten).
 
 ## Nachtrag: Ruf für jede Firma (ADR-183)
 
@@ -1603,3 +1606,30 @@ Schulung 1 / 2 / 4 / 8 / 12 h. Je Stufe: Daten analysieren und Kampagnen Nachfra
 Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazität +10 %, Wareneinsatz −8 %, Fixkosten
 −10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
 von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
+
+## Nachtrag: Titans Revenge – Diamond rauf, Uranium runter (ADR-207)
+
+`TITAN_REBALANCE_FACTOR` in `src/config/nexamon/titans-draft.ts`, auf die Startpreise nach `TITAN_VALUE_FACTOR` 1,125
+(auf ganze Euro gerundet). Iron und Titanium bleiben, die Verhältnisse der Karten innerhalb einer Seltenheit auch.
+
+| Seltenheit | Je Pack |  Mittel vorher | Faktor   |  Mittel nachher | Beitrag je Pack vorher → nachher |
+| ---------- | ------: | -------------: | -------- | --------------: | -------------------------------: |
+| Diamond    |    1/50 |    597.375,– € | 1,3      |    776.587,75 € |          11.947,50 → 15.531,76 € |
+| Uranium    |   1/500 | 22.078.125,– € | 0,918828 | 20.285.999,50 € |          44.156,25 → 40.572,00 € |
+
+Rechnung: Der Diamond-Beitrag steigt um 0,3 × 597.375 € / 50 = 3.584,25 €. Damit der Erwartungswert gleich bleibt,
+muss der Uranium-Beitrag um genau so viel sinken: (1 − u) × 22.078.125 € / 500 = 3.584,25 €, also u = 1 − 3 × 597.375
+/ 22.078.125 = 0,918828025… ≈ 0,918828. Erwartungswert je Pack 89.901,25 € vorher, 89.901,26 € nachher (89,9 % von
+100.000 €, mit Zustand 87.743,62 → 87.743,63 €); die Rundung auf ganze Euro verschiebt ihn um 0,4 Cent.
+
+Einzelwerte: Diamond 606.938 / 772.200 / 539.663 / 1.187.550 € (vorher 466.875 / 594.000 / 415.125 / 913.500 €),
+Uranium 15.298.486 / 11.577.233 / 19.743.317 / 34.524.962 € (vorher 16.650.000 / 12.600.000 / 21.487.500 / 37.575.000
+€).
+
+Live: Migration `20261204009900` multipliziert einmal (Marke in `data_migrations`) Startpreis, Marktwert,
+Tagesreferenz und Wertgeschichte jeder Diamond-Karte mit 13/10 und jeder Uranium-Karte mit 918 828/1 000 000. Die
+Marktbewegung jeder Karte bleibt damit erhalten (relativ). Zu Marktwerten bleibt der Erwartungswert genau gleich,
+solange Diamond und Uranium sich im Mittel gleich bewegt haben; sonst ändert er sich um 3.584,25 € × (d − v), mit d
+und v der mittleren Bewegung seit dem Start (z. B. Diamond + 10 %, Uranium ± 0: + 358 € je Pack). KI-Angebote folgen
+dem neuen Wert, Angebote von Spielern behalten ihren Preis (der Besitzer hat ihn gewählt; ein Diamond-Angebot ist
+danach eher günstig, ein Uranium-Angebot eher teuer, beides kann der Besitzer jederzeit ändern).
