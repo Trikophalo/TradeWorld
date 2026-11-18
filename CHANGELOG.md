@@ -4,6 +4,8 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines
+  Packs bleibt gleich.
 - Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.
 - Projekt: Next.js 16, TypeScript strict, Tailwind 4, Supabase-Anbindung, Vitest, Playwright, Prettier, Husky.
 - Design: Tokens für Farben, Schrift, Radien, Motion und Ebenen in dunklem und hellem Theme mit fünf

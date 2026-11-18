@@ -942,6 +942,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Sofortverkauf nach dem Ziehen zahlt jetzt 85 % statt 90 % des Marktwerts.",
       },
+      {
+        id: "m0-fundament-64ea1384",
+        title: null,
+        text: "Titans Revenge: Diamond-Karten sind 30 % mehr wert, Uranium-Karten etwa 8 % weniger; der Erwartungswert eines Packs bleibt gleich.",
+      },
     ],
   },
 ];
