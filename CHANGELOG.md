@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Dein Klon und bessere Jobs (ADR-206):** Ab Level 20 erschaffst du im Job-Tab einmalig einen Klon (25 000 €). Er bewirbt sich bei anderen Firmen und arbeitet dort zusätzlich, auch wenn du eine eigene Firma führst; der Lohn geht auf dein Konto. Viele Skills zahlen sich jetzt richtig aus: bis zum Dreifachen des Stufenlohns statt höchstens das 1,5-Fache. Ab Senior bekommst du einen Teil vom Gewinn deines Arbeitgebers (0,5 % bis 5 %) und für gute Arbeit ab und zu Mitarbeiteraktien. Das Jobportal zeigt das alles je Stelle, Gründer können ihren Anzeigen Extras mitgeben.
+
 - **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro Stunde); die Preise steigen von 3.000 € bis rund 259.500 €.
 
 - **KI kauft auch teure Karten (ADR-195):** Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab. Bis 15 % über Wert klappt es nur manchmal, eher bei beliebten Karten; darüber nie.

@@ -82565,6 +82565,1745 @@ begin
   grant execute on function public.instant_sell_nexamon(uuid, uuid[]) to authenticated;
 end;
 $do$;
+-- ===== idempotent copy of migrations/20261204009800_clone_jobs.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 9800 · Clone with its own job, skill-scaled pay, profit share and employee shares (ADR-206)
+-- =============================================================================
+-- * Clone: from jobs.clone.minLevel (20) a player creates one clone (player_clones) for jobs.clone.feeCents, paid to
+--   the treasury. The clone holds a second job row in player_jobs (is_clone = true) with the owner's player_id: the
+--   wage goes into the owner's cash, the company counts it like any employee. One active job per player AND holder
+--   (unique index player_jobs_active_holder_uq). The clone never works at a company the owner founded, and owner and
+--   clone never work at the same company.
+-- * The existing RPCs serve both holders: the clone_* wrappers set the transaction setting nexa.acting_clone and call
+--   apply_for_job, sign_contract, quit_job, cancel_quit, request_raise and request_promotion, whose lookups of "the
+--   player's job" read job_acting_clone() (migration 9810). Without the setting everything acts on the own job.
+-- * Skill-scaled pay: job_skill_pay_bps(scores, learned skills, required) = 10 000 + perRelevantScoreBps x relevant
+--   score (each required branch counted up to relevantScoreCapPerBranch) + perLearnedSkillBps x learned skills, at
+--   most capMultiplier x 10 000 (jobs.skillPay). job_pay_ceiling() is the most an AI employer pays and the
+--   "market value" shown for player postings.
+-- * Rewards (job_rewards, jobs.rewards): from Senior a profit share of the employer's profit (rank share, plus what
+--   a player posting offers, at most maxProfitShareBps), and now and then employee shares for good work (present and
+--   the company in profit). Player companies: after every closed hour (trigger on player_company_hours), all shares
+--   together at most maxTotalProfitShareBps of the hour's profit, never more than the cash. AI companies: with every
+--   salary payout (trigger on salary_payouts), on the profit of a department of aiDepartmentSize people, at most
+--   aiMaxShareOfWageBps of the wage. Shares of a listed company come from the free float (ADR-153): the company pays
+--   the market for them, so the supply never grows; unlisted companies pay the value in cash.
+-- * Postings: job_postings.profit_share_bps / stock_grant_bps, set by the founder with set_job_posting_perks().
+-- * Errors: clone_level_too_low NX320, clone_exists NX321, clone_missing NX322, clone_own_company NX323,
+--   clone_same_company NX324.
+-- Idempotent: runs unchanged as supabase/updates/20261204009800_clone_jobs.sql.
+
+-- ---------------------------------------------------------------------------
+-- A. Error keys
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  v_def text := pg_get_functiondef('public.api_error(text)'::regprocedure);
+begin
+  if position('''clone_same_company''' in v_def) = 0 then
+    v_def := replace(v_def, $q$    else 'NX007'
+$q$, $q$    when 'clone_level_too_low'        then 'NX320'
+    when 'clone_exists'               then 'NX321'
+    when 'clone_missing'              then 'NX322'
+    when 'clone_own_company'          then 'NX323'
+    when 'clone_same_company'         then 'NX324'
+    else 'NX007'
+$q$);
+    if position('''clone_same_company''' in v_def) = 0 then
+      raise exception 'api_error() has an unexpected shape; add the clone error keys by hand';
+    end if;
+    execute v_def;
+  end if;
+end;
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- B. Notification type
+-- ---------------------------------------------------------------------------
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('job_reward', 'career', 'Mitarbeiteraktien', 'Für gute Arbeit gibt es Aktien deines Arbeitgebers.', 'notif_salary',
+        true, false, false, 147)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- C. Tables and columns
+-- ---------------------------------------------------------------------------
+create table if not exists public.player_clones (
+  player_id  uuid primary key references public.profiles (id) on delete cascade,
+  request_id uuid not null,
+  fee_cents  bigint not null check (fee_cents >= 0),
+  created_at timestamptz not null default now()
+);
+alter table public.player_clones enable row level security;
+comment on table public.player_clones is 'The one clone of a player (ADR-206). Internal: read and written by the clone RPCs.';
+
+alter table public.player_jobs add column if not exists is_clone boolean not null default false;
+alter table public.player_jobs add column if not exists profit_share_bonus_bps integer not null default 0;
+alter table public.player_jobs add column if not exists stock_grant_bonus_bps integer not null default 0;
+alter table public.job_applications add column if not exists for_clone boolean not null default false;
+alter table public.job_postings add column if not exists profit_share_bps integer not null default 0;
+alter table public.job_postings add column if not exists stock_grant_bps integer not null default 0;
+do $do$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'job_postings_perks_check') then
+    alter table public.job_postings add constraint job_postings_perks_check
+      check (profit_share_bps between 0 and 10000 and stock_grant_bps between 0 and 10000);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'player_jobs_perks_check') then
+    alter table public.player_jobs add constraint player_jobs_perks_check
+      check (profit_share_bonus_bps between 0 and 10000 and stock_grant_bonus_bps between 0 and 10000);
+  end if;
+end;
+$do$;
+-- one active job per player and holder (own job, clone job)
+create unique index if not exists player_jobs_active_holder_uq on public.player_jobs (player_id, is_clone) where status = 'active';
+drop index if exists public.player_jobs_active_uq;
+comment on column public.player_jobs.is_clone is 'The job of the player''s clone (ADR-206); the wage goes to the player.';
+
+create table if not exists public.job_rewards (
+  id                    bigint generated always as identity primary key,
+  player_job_id         uuid not null references public.player_jobs (id) on delete cascade,
+  player_id             uuid not null references public.profiles (id) on delete cascade,
+  company_id            uuid not null references public.companies (id) on delete cascade,
+  kind                  text not null check (kind in ('profit_share', 'stock_grant', 'stock_grant_cash')),
+  amount_cents          bigint not null check (amount_cents >= 0),
+  quantity_e6           bigint not null default 0 check (quantity_e6 >= 0),
+  price_e4              bigint,
+  share_bps             integer,
+  base_cents            bigint,
+  source_key            text not null unique,
+  ledger_transaction_id uuid references public.ledger_transactions (id),
+  created_at            timestamptz not null default now()
+);
+alter table public.job_rewards enable row level security;
+create index if not exists job_rewards_job_idx on public.job_rewards (player_job_id, created_at desc);
+create index if not exists job_rewards_player_idx on public.job_rewards (player_id, created_at desc);
+create index if not exists job_rewards_ledger_tx_idx on public.job_rewards (ledger_transaction_id);
+create index if not exists job_rewards_company_idx on public.job_rewards (company_id);
+comment on table public.job_rewards is 'Profit shares and employee shares of a job (ADR-206). Internal: shown through job_state().';
+
+-- ---------------------------------------------------------------------------
+-- D. Holder, names, pay and reward rates
+-- ---------------------------------------------------------------------------
+-- true inside a clone_* wrapper: the job RPCs then act on the clone's job
+create or replace function public.job_acting_clone()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(current_setting('nexa.acting_clone', true), '') = 'on';
+$$;
+
+create or replace function public.job_holder_name(p_player uuid, p_clone boolean)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when coalesce(p_clone, false) then 'Klon von ' else '' end || coalesce(p.nickname, '?')
+    from public.profiles p where p.id = p_player;
+$$;
+
+-- pay factor from skills (ADR-206): relevant branch scores (capped per branch) and all learned skills
+create or replace function public.job_skill_pay_bps(p_scores jsonb, p_skills integer, p_required jsonb)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(round(10000 * public.config_double('jobs', '{skillPay,capMultiplier}', 3))::bigint,
+               10000
+               + public.config_double('jobs', '{skillPay,perRelevantScoreBps}', 300)::bigint
+                 * coalesce((select sum(least(greatest(coalesce((p_scores ->> (r ->> 'branch'))::integer, 0), 0),
+                                              public.config_double('jobs', '{skillPay,relevantScoreCapPerBranch}', 40)::integer))
+                               from jsonb_array_elements(coalesce(p_required, '[]'::jsonb)) r), 0)
+               + public.config_double('jobs', '{skillPay,perLearnedSkillBps}', 50)::bigint * greatest(coalesce(p_skills, 0), 0)
+         )::integer;
+$$;
+
+create or replace function public.player_skill_count(p_player uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.player_skills s where s.player_id = p_player;
+$$;
+
+-- the most an AI employer pays this player for this base wage and these requirements; the player's market value
+create or replace function public.job_pay_ceiling(p_player uuid, p_base bigint, p_required jsonb)
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(coalesce(p_base, 0)::numeric
+               * public.job_skill_pay_bps(public.player_branch_scores(p_player), public.player_skill_count(p_player), p_required)
+               / 10000)::bigint;
+$$;
+
+-- profit share of a job: the rank share from Senior on, plus what the posting offered, at most maxProfitShareBps
+create or replace function public.job_profit_share_bps(p_tier text, p_bonus integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when coalesce(public.config_double('jobs', array['rewards', 'profitShareBpsByTier', p_tier], 0), 0) <= 0 then 0
+              else least(public.config_double('jobs', '{rewards,maxProfitShareBps}', 500)::integer,
+                         public.config_double('jobs', array['rewards', 'profitShareBpsByTier', p_tier], 0)::integer
+                         + greatest(coalesce(p_bonus, 0), 0)) end;
+$$;
+
+-- chance per paid hour of good work for employee shares: rank chance plus the posting's extra
+create or replace function public.job_stock_grant_bps(p_tier text, p_bonus integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(10000, greatest(0, public.config_double('jobs', array['rewards', 'stockGrantChanceBpsByTier', p_tier], 0)::integer)
+                      + greatest(coalesce(p_bonus, 0), 0));
+$$;
+
+-- totals of the rewards of a job, for job_state()
+create or replace function public.job_rewards_json(p_job uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'profit_share_cents', coalesce(sum(r.amount_cents) filter (where r.kind = 'profit_share'), 0),
+    'stock_grants', count(*) filter (where r.kind in ('stock_grant', 'stock_grant_cash')),
+    'stock_grant_cents', coalesce(sum(r.amount_cents) filter (where r.kind in ('stock_grant', 'stock_grant_cash')), 0),
+    'shares_e6', coalesce(sum(r.quantity_e6) filter (where r.kind = 'stock_grant'), 0),
+    'last', (select jsonb_build_object('kind', x.kind, 'amount_cents', x.amount_cents, 'quantity_e6', x.quantity_e6,
+                                       'created_at', x.created_at)
+               from public.job_rewards x where x.player_job_id = p_job order by x.created_at desc, x.id desc limit 1))
+    from public.job_rewards r where r.player_job_id = p_job;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- E. Employee shares
+-- ---------------------------------------------------------------------------
+-- One grant worth rewards.stockGrantValueHours x contract wage, paid by the company. Listed company: whole shares
+-- from the free float (ADR-153) at the last price, the money goes to the market (the shares' seller); never more than
+-- the free float, so the supply stays. Unlisted (or nothing free): the value in cash. Never more than the cash.
+create or replace function public.job_stock_grant(p_job uuid, p_key text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  j       public.player_jobs;
+  c       public.companies;
+  v_acc   uuid;
+  v_value bigint;
+  v_price bigint;
+  v_free  bigint;
+  v_qty   bigint := 0;
+  v_tx    uuid;
+  v_kind  text;
+begin
+  if exists (select 1 from public.job_rewards r where r.source_key = 'grant:' || p_key) then
+    return 0;
+  end if;
+  select * into j from public.player_jobs where id = p_job and status = 'active';
+  if j.id is null then
+    return 0;
+  end if;
+  select * into c from public.companies where id = j.company_id;
+  v_acc := public.company_cash_account(j.company_id);
+  v_value := round(j.salary_cents_per_hour * public.config_double('jobs', '{rewards,stockGrantValueHours}', 4))::bigint;
+  v_value := least(v_value, greatest(0, coalesce((select a.balance_cents from public.ledger_accounts a where a.id = v_acc), 0)));
+  if v_value <= 0 or v_acc is null then
+    return 0;
+  end if;
+  perform public.lock_player_accounts(j.player_id);
+  if c.security_id is not null and c.phase = 'listed' and c.shares_outstanding is not null then
+    -- buyers of the same share queue on the security (ADR-153)
+    perform 1 from public.securities s where s.id = c.security_id for update;
+    select q.last_price_e4 into v_price from public.security_quotes q where q.security_id = c.security_id;
+    if coalesce(v_price, 0) > 0 then
+      v_free := coalesce(public.security_free_float_e6(c.security_id), 0);
+      v_qty := least(floor(v_value::numeric * 100000000 / v_price / 1000000)::bigint * 1000000,
+                     (v_free / 1000000) * 1000000);
+    end if;
+  end if;
+  if v_qty > 0 then
+    v_value := public.value_cents(v_qty, v_price);
+    v_kind := 'stock_grant';
+    v_tx := public.ledger_transfer(v_acc, public.ledger_system_account('market'), v_value, 'payroll',
+                                   'Mitarbeiteraktien für ' || public.job_holder_name(j.player_id, j.is_clone),
+                                   'player_job', j.id, 'job_grant:' || p_key, j.player_id);
+    perform public.grant_position(j.player_id, c.security_id, v_qty, v_price);
+  else
+    v_kind := 'stock_grant_cash';
+    v_tx := public.ledger_transfer(v_acc, public.ledger_player_account(j.player_id, 'player_cash'), v_value, 'salary',
+                                   'Mitarbeiteraktien (Wertausgleich)', 'player_job', j.id, 'job_grant:' || p_key, j.player_id);
+    perform public.loan_withhold(j.player_id, v_value, 'job_grant:' || p_key);
+  end if;
+  insert into public.job_rewards (player_job_id, player_id, company_id, kind, amount_cents, quantity_e6, price_e4, source_key,
+                                  ledger_transaction_id)
+  values (j.id, j.player_id, j.company_id, v_kind, v_value, v_qty, v_price, 'grant:' || p_key, v_tx);
+  perform public.social_notify(j.player_id, 'job_reward', 'Mitarbeiteraktien',
+    case when v_kind = 'stock_grant'
+         then 'Für gute Arbeit bekommst du ' || (v_qty / 1000000) || ' Aktien von ' || c.name || ' im Wert von '
+              || public.format_eur(v_value) || '.'
+         else 'Für gute Arbeit zahlt ' || c.name || ' dir den Wert von Mitarbeiteraktien aus: ' || public.format_eur(v_value) || '.' end
+    || case when j.is_clone then ' (Job deines Klons)' else '' end,
+    jsonb_build_object('player_job_id', j.id, 'company', c.name, 'kind', v_kind, 'amount_cents', v_value, 'quantity_e6', v_qty),
+    '/job', 'job_reward:' || p_key);
+  return v_value;
+end;
+$$;
+
+-- deterministic roll in [0, 10 000) for a key (no random(): the same hour never rolls twice differently)
+create or replace function public.job_reward_roll(p_key text)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select (abs(hashtextextended(p_key, 0)) % 10000)::integer;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- F. Rewards after a closed hour of a player company
+-- ---------------------------------------------------------------------------
+create or replace function public.job_rewards_company_hour(p_company uuid, p_hour timestamptz, p_profit bigint)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_acc   uuid := public.company_cash_account(p_company);
+  v_fdr   uuid;
+  v_total bigint;
+  v_cap   bigint := public.config_double('jobs', '{rewards,maxTotalProfitShareBps}', 2500)::bigint;
+  v_bps   integer;
+  v_amt   bigint;
+  v_cash  bigint;
+  v_tx    uuid;
+  v_key   text;
+  v_sum   bigint := 0;
+  j       record;
+begin
+  if coalesce(p_profit, 0) <= 0 or v_acc is null then
+    return 0;
+  end if;
+  select pc.founder_id into v_fdr from public.player_companies pc where pc.company_id = p_company;
+  select coalesce(sum(public.job_profit_share_bps(pj.tier::text, pj.profit_share_bonus_bps)), 0) into v_total
+    from public.player_jobs pj where pj.company_id = p_company and pj.status = 'active' and pj.player_id is distinct from v_fdr;
+  for j in select pj.id, pj.player_id, pj.tier::text as tier, pj.profit_share_bonus_bps, pj.stock_grant_bonus_bps, pj.is_clone
+             from public.player_jobs pj
+            where pj.company_id = p_company and pj.status = 'active' and pj.player_id is distinct from v_fdr
+            order by pj.id loop
+    v_key := j.id::text || ':' || floor(extract(epoch from p_hour))::bigint::text;
+    v_bps := public.job_profit_share_bps(j.tier, j.profit_share_bonus_bps);
+    if v_bps > 0 and not exists (select 1 from public.job_rewards r where r.source_key = 'profit:' || v_key) then
+      -- all shares of the hour together at most maxTotalProfitShareBps of the profit (scaled down evenly)
+      v_amt := p_profit * v_bps * least(v_total, v_cap) / greatest(v_total, 1) / 10000;
+      select a.balance_cents into v_cash from public.ledger_accounts a where a.id = v_acc;
+      v_amt := least(v_amt, greatest(0, coalesce(v_cash, 0)));
+      if v_amt > 0 then
+        perform public.lock_player_accounts(j.player_id);
+        v_tx := public.ledger_transfer(v_acc, public.ledger_player_account(j.player_id, 'player_cash'), v_amt, 'salary',
+                                       'Gewinnbeteiligung', 'player_job', j.id, 'job_profit:' || v_key, j.player_id);
+        perform public.loan_withhold(j.player_id, v_amt, 'job_profit:' || v_key);
+        insert into public.job_rewards (player_job_id, player_id, company_id, kind, amount_cents, share_bps, base_cents,
+                                        source_key, ledger_transaction_id)
+        values (j.id, j.player_id, p_company, 'profit_share', v_amt, v_bps, p_profit, 'profit:' || v_key, v_tx);
+        v_sum := v_sum + v_amt;
+      end if;
+    end if;
+    -- good work: present the whole hour and the company in profit
+    if public.job_stock_grant_bps(j.tier, j.stock_grant_bonus_bps) > public.job_reward_roll('grant:' || v_key)
+       and public.presence_pay_bps_between(j.player_id, p_hour, 60) >= 10000 then
+      v_sum := v_sum + public.job_stock_grant(j.id, v_key);
+    end if;
+  end loop;
+  return v_sum;
+end;
+$$;
+
+create or replace function public.job_rewards_company_hour_trg()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.job_rewards_company_hour(new.company_id, new.hour_start, new.profit_cents);
+  return null;
+end;
+$$;
+
+drop trigger if exists job_rewards_company_hour on public.player_company_hours;
+create trigger job_rewards_company_hour after insert on public.player_company_hours
+  for each row execute function public.job_rewards_company_hour_trg();
+
+-- ---------------------------------------------------------------------------
+-- G. Rewards with a salary payout at an AI company
+-- ---------------------------------------------------------------------------
+-- The profit of an AI company is huge; an employee shares the profit of a department of aiDepartmentSize people:
+-- hourly profit = ttm net income / 4 / quarter hours x aiDepartmentSize / max(employees, aiDepartmentSize), and
+-- never more than aiMaxShareOfWageBps of the wage of the paid minutes.
+create or replace function public.job_rewards_ai_payout(p_payout bigint)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  sp      public.salary_payouts;
+  j       public.player_jobs;
+  c       public.companies;
+  q       public.game_quarters;
+  v_acc   uuid;
+  v_qh    double precision;
+  v_dept  double precision := public.config_double('jobs', '{rewards,aiDepartmentSize}', 50);
+  v_base  bigint;
+  v_bps   integer;
+  v_amt   bigint;
+  v_cash  bigint;
+  v_tx    uuid;
+  v_key   text;
+  v_sum   bigint := 0;
+begin
+  select * into sp from public.salary_payouts where id = p_payout;
+  if sp.id is null or sp.amount_cents <= 0 or sp.minutes_paid <= 0 then
+    return 0;
+  end if;
+  select * into j from public.player_jobs where id = sp.player_job_id;
+  select * into c from public.companies where id = j.company_id;
+  if j.id is null or not coalesce(c.is_ai, false) or coalesce(c.ttm_net_income_cents, 0) <= 0 then
+    return 0;
+  end if;
+  v_acc := public.company_cash_account(c.id);
+  v_key := j.id::text || ':p' || sp.id::text;
+  q := public.current_game_quarter();
+  v_qh := greatest(1, coalesce(extract(epoch from (q.ends_at - q.starts_at)) / 3600, 6));
+  v_base := floor(c.ttm_net_income_cents / 4.0 / v_qh * v_dept / greatest(coalesce(c.employee_count, 0)::double precision, v_dept)
+                  * sp.minutes_paid / 60.0)::bigint;
+  v_bps := public.job_profit_share_bps(j.tier::text, j.profit_share_bonus_bps);
+  if v_bps > 0 and v_base > 0 then
+    v_amt := least(v_base * v_bps / 10000,
+                   j.salary_cents_per_hour * sp.minutes_paid / 60
+                   * public.config_double('jobs', '{rewards,aiMaxShareOfWageBps}', 5000)::bigint / 10000);
+    select a.balance_cents into v_cash from public.ledger_accounts a where a.id = v_acc;
+    v_amt := least(v_amt, greatest(0, coalesce(v_cash, 0)));
+    if v_amt > 0 then
+      v_tx := public.ledger_transfer(v_acc, public.ledger_player_account(j.player_id, 'player_cash'), v_amt, 'salary',
+                                     'Gewinnbeteiligung', 'player_job', j.id, 'job_profit:' || v_key, j.player_id);
+      perform public.loan_withhold(j.player_id, v_amt, 'job_profit:' || v_key);
+      insert into public.job_rewards (player_job_id, player_id, company_id, kind, amount_cents, share_bps, base_cents,
+                                      source_key, ledger_transaction_id)
+      values (j.id, j.player_id, c.id, 'profit_share', v_amt, v_bps, v_base, 'profit:' || v_key, v_tx)
+      on conflict (source_key) do nothing;
+      v_sum := v_amt;
+    end if;
+  end if;
+  -- good work: the paid minutes fully present; the chance per hour scales with the paid minutes
+  if public.job_stock_grant_bps(j.tier::text, j.stock_grant_bonus_bps) * least(sp.minutes_paid, 60) / 60
+       > public.job_reward_roll('grant:' || v_key)
+     and sp.base_amount_cents >= j.salary_cents_per_hour * sp.minutes_paid / 60 then
+    v_sum := v_sum + public.job_stock_grant(j.id, v_key);
+  end if;
+  return v_sum;
+end;
+$$;
+
+create or replace function public.job_rewards_payout_trg()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if exists (select 1 from public.player_jobs pj join public.companies c on c.id = pj.company_id
+              where pj.id = new.player_job_id and c.is_ai) then
+    perform public.job_rewards_ai_payout(new.id);
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists job_rewards_payout on public.salary_payouts;
+create trigger job_rewards_payout after insert on public.salary_payouts
+  for each row execute function public.job_rewards_payout_trg();
+
+-- ---------------------------------------------------------------------------
+-- H. Posting perks (founders)
+-- ---------------------------------------------------------------------------
+create or replace function public.set_job_posting_perks(p_request_id uuid, p_posting_id uuid, p_profit_share_bps integer,
+                                                        p_stock_grant_bps integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  p        public.job_postings;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_profit_share_bps is null or p_stock_grant_bps is null
+     or p_profit_share_bps not between 0 and public.config_double('jobs', '{rewards,maxPostingProfitShareBps}', 300)
+     or p_stock_grant_bps not between 0 and public.config_double('jobs', '{rewards,maxPostingStockGrantBps}', 500) then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into p from public.job_postings where id = p_posting_id;
+  if p.id is null or p.is_ai then
+    perform public.api_error('job_not_found');
+  end if;
+  perform public.require_company_owner(p.company_id);
+  v_replay := public.request_begin(v_player, p_request_id, 'set_job_posting_perks');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  update public.job_postings set profit_share_bps = p_profit_share_bps, stock_grant_bps = p_stock_grant_bps
+   where id = p.id;
+  return public.request_complete(v_player, p_request_id, public.posting_json(p.id));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- I. The clone
+-- ---------------------------------------------------------------------------
+create or replace function public.clone_require()
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid := public.require_player();
+begin
+  if not exists (select 1 from public.player_clones c where c.player_id = v_player) then
+    perform public.api_error('clone_missing');
+  end if;
+  if (select p.level from public.profiles p where p.id = v_player) < public.config_double('jobs', '{clone,minLevel}', 20) then
+    perform public.api_error('clone_level_too_low');
+  end if;
+  return v_player;
+end;
+$$;
+
+create or replace function public.clone_state(p_player uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_clone public.player_clones;
+  v_job   jsonb;
+begin
+  select * into v_clone from public.player_clones where player_id = p_player;
+  if v_clone.player_id is not null then
+    perform set_config('nexa.acting_clone', 'on', true);
+    v_job := public.job_state(p_player) -> 'job';
+    perform set_config('nexa.acting_clone', '', true);
+  end if;
+  return jsonb_build_object(
+    'min_level', public.config_double('jobs', '{clone,minLevel}', 20)::integer,
+    'fee_cents', public.config_double('jobs', '{clone,feeCents}', 2500000)::bigint,
+    'level', (select p.level from public.profiles p where p.id = p_player),
+    'clone', case when v_clone.player_id is not null
+                  then jsonb_build_object('name', public.job_holder_name(p_player, true), 'created_at', v_clone.created_at) end,
+    'job', v_job);
+end;
+$$;
+
+create or replace function public.get_clone()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return public.clone_state(public.require_player());
+end;
+$$;
+
+create or replace function public.create_clone(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  v_fee    bigint := public.config_double('jobs', '{clone,feeCents}', 2500000)::bigint;
+  v_cash   bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'create_clone');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  v_cash := public.lock_player_accounts(v_player);
+  perform 1 from public.profiles p where p.id = v_player for update;
+  if (select p.level from public.profiles p where p.id = v_player) < public.config_double('jobs', '{clone,minLevel}', 20) then
+    perform public.api_error('clone_level_too_low');
+  end if;
+  if exists (select 1 from public.player_clones c where c.player_id = v_player) then
+    perform public.api_error('clone_exists');
+  end if;
+  if v_cash < v_fee then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_fee > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.ledger_system_account('treasury'),
+                                   v_fee, 'fee', 'Klon erstellt', 'profile', v_player, 'clone:' || v_player::text, v_player);
+  end if;
+  insert into public.player_clones (player_id, request_id, fee_cents) values (v_player, p_request_id, v_fee);
+  return public.request_complete(v_player, p_request_id, public.clone_state(v_player));
+end;
+$$;
+
+-- The clone versions of the job RPCs: the same rules and answers, on the clone's job.
+create or replace function public.clone_apply_for_job(p_request_id uuid, p_posting_id uuid, p_salary_wish_cents_per_hour bigint,
+                                                      p_message text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v jsonb;
+begin
+  perform public.clone_require();
+  perform set_config('nexa.acting_clone', 'on', true);
+  v := public.apply_for_job(p_request_id, p_posting_id, p_salary_wish_cents_per_hour, p_message);
+  perform set_config('nexa.acting_clone', '', true);
+  return v;
+end;
+$$;
+
+create or replace function public.clone_sign_contract(p_request_id uuid, p_application_id uuid, p_signature text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v jsonb;
+begin
+  perform public.clone_require();
+  perform set_config('nexa.acting_clone', 'on', true);
+  v := public.sign_contract(p_request_id, p_application_id, p_signature);
+  perform set_config('nexa.acting_clone', '', true);
+  return v;
+end;
+$$;
+
+create or replace function public.clone_quit_job(p_request_id uuid, p_immediate boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v jsonb;
+begin
+  -- quitting works even below the level gate (e.g. after an account reset)
+  perform public.require_player();
+  perform set_config('nexa.acting_clone', 'on', true);
+  v := public.quit_job(p_request_id, p_immediate);
+  perform set_config('nexa.acting_clone', '', true);
+  return v;
+end;
+$$;
+
+create or replace function public.clone_cancel_quit(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v jsonb;
+begin
+  perform public.clone_require();
+  perform set_config('nexa.acting_clone', 'on', true);
+  v := public.cancel_quit(p_request_id);
+  perform set_config('nexa.acting_clone', '', true);
+  return v;
+end;
+$$;
+
+create or replace function public.clone_request_raise(p_request_id uuid, p_raise_bps integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v jsonb;
+begin
+  perform public.clone_require();
+  perform set_config('nexa.acting_clone', 'on', true);
+  v := public.request_raise(p_request_id, p_raise_bps);
+  perform set_config('nexa.acting_clone', '', true);
+  return v;
+end;
+$$;
+
+create or replace function public.clone_request_promotion(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v jsonb;
+begin
+  perform public.clone_require();
+  perform set_config('nexa.acting_clone', 'on', true);
+  v := public.request_promotion(p_request_id);
+  perform set_config('nexa.acting_clone', '', true);
+  return v;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- J. Grants: only the RPCs are callable by players
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.job_holder_name(uuid, boolean)', 'public.job_skill_pay_bps(jsonb, integer, jsonb)', 'public.player_skill_count(uuid)',
+    'public.job_pay_ceiling(uuid, bigint, jsonb)', 'public.job_profit_share_bps(text, integer)',
+    'public.job_stock_grant_bps(text, integer)', 'public.job_rewards_json(uuid)', 'public.job_stock_grant(uuid, text)',
+    'public.job_rewards_company_hour(uuid, timestamptz, bigint)', 'public.job_rewards_company_hour_trg()',
+    'public.job_rewards_ai_payout(bigint)', 'public.job_rewards_payout_trg()', 'public.clone_require()',
+    'public.clone_state(uuid)', 'public.job_acting_clone()', 'public.job_reward_roll(text)'] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+  foreach f in array array[
+    'public.get_clone()', 'public.create_clone(uuid)', 'public.clone_apply_for_job(uuid, uuid, bigint, text)',
+    'public.clone_sign_contract(uuid, uuid, text)', 'public.clone_quit_job(uuid, boolean)', 'public.clone_cancel_quit(uuid)',
+    'public.clone_request_raise(uuid, integer)', 'public.clone_request_promotion(uuid)',
+    'public.set_job_posting_perks(uuid, uuid, integer, integer)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$do$;
+-- ===== idempotent copy of migrations/20261204009810_clone_jobs_rpcs.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 9810 · The job RPCs serve the clone, pay follows the skills (ADR-206)
+-- =============================================================================
+-- Latest full definitions (as of 9800) with these changes:
+-- * job_state, quit_job, cancel_quit, request_promotion, request_raise, get_employer: "the player's job" is the job of
+--   the holder job_acting_clone() names (own job by default, the clone's inside a clone_* wrapper). job_state also
+--   returns is_clone, holder_name, skill_pay_bps, profit_share_bps, stock_grant_chance_bps and rewards.
+-- * sign_contract, apply_for_job: applications and jobs carry the holder; the clone never at the founder's own company
+--   (clone_own_company), owner and clone never at the same company (clone_same_company), the founder rule of ADR-066
+--   only for the own job; a signed job takes the posting's profit share and stock grant extras.
+-- * get_job_board: skill_pay_bps, market_salary_cents_per_hour, profit_share_bps, stock_grant_chance_bps, the posting's
+--   extras, own_company, my_clone_application and has_clone; my_application is the own one.
+-- * The AI ceiling (apply_for_job, sign_contract, job_state, promotion_apply, get_job_board) is job_pay_ceiling():
+--   relevant branch scores and all learned skills (jobs.skillPay) instead of the capped match score.
+-- * company_full_time_check, player_company_team, company_task_member: the clone's job is no side job of the founder.
+-- * get_player_card: clone_job; get_company_team: is_clone; application_json: for_clone; chat_company_of,
+--   company_event_company_for, get_company_floor prefer the own job.
+-- Idempotent: runs unchanged as supabase/updates/20261204009810_clone_jobs_rpcs.sql.
+
+create or replace function public.job_state(p_player uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  j        public.player_jobs;
+  v_match  integer;
+  v_base   bigint;
+  v_max    integer;
+  v_ai     boolean;
+  v_today  date := (public.game_now() at time zone 'Europe/Berlin')::date;
+  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
+  v_factor integer;
+  v_bonus  bigint;
+  v_next   timestamptz;
+  v_open   boolean;
+begin
+  select * into j from public.player_jobs where player_id = p_player and status = 'active' and is_clone = public.job_acting_clone();
+  if j.id is null then
+    return jsonb_build_object('job', null);
+  end if;
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+  v_match := public.job_match_score(public.player_branch_scores(p_player), j.required);
+  v_max := greatest(0, public.config_double('jobs', '{raiseRequest,maxRaiseBpsPerScore}', 300)::integer * (v_match - j.raise_base_score));
+  if v_ai then
+    v_base := coalesce((public.career_tier(j.tier::text) ->> 'salaryCentsPerHour')::bigint, j.salary_cents_per_hour);
+    v_max := least(v_max, greatest(0, floor((public.job_pay_ceiling(p_player, v_base, j.required)::numeric / j.salary_cents_per_hour - 1) * 10000)::integer));
+  end if;
+  -- player companies: pay factor of the quarter x share the company could pay at the last payout
+  select pc.pay_factor_bps * j.pay_factor_bps / 10000,
+         coalesce((select sum(sp.bonus_cents) from public.salary_payouts sp join public.game_quarters gq on gq.id = pc.last_closed_quarter_id
+                    where sp.player_job_id = j.id and sp.bonus_cents > 0 and sp.period_end = gq.ends_at), 0)
+    into v_factor, v_bonus
+    from public.player_companies pc where pc.company_id = j.company_id and pc.status = 'active';
+  v_factor := coalesce(v_factor, j.pay_factor_bps);
+  -- automatic work (ADR-064): no new work tasks
+  v_next := null;
+  v_open := false;
+  return jsonb_build_object('job', jsonb_build_object(
+    'id', j.id,
+    'company', public.company_json(j.company_id),
+    'tier', j.tier,
+    'title_key', j.title_key,
+    'title', case when j.title_key is null then j.title end,
+    'required', j.required,
+    'salary_cents_per_hour', j.salary_cents_per_hour,
+    'pay_factor_bps', v_factor,
+    'effective_salary_cents_per_hour', j.salary_cents_per_hour * v_factor / 10000,
+    'last_bonus_cents', coalesce(v_bonus, 0),
+    'next_work_task_at', v_next,
+    'work_task_open', v_open,
+    'productivity_bps', public.job_productivity_bps(v_match),
+    'started_at', j.started_at,
+    'paid_hours_today', case when j.paid_day = v_today then round(j.paid_minutes_today / 60.0, 2) else 0 end,
+    'paid_hours_cap', public.player_paid_hours_cap(p_player),
+    'earned_total_cents', j.earned_total_cents,
+    'raise_available_at', case when j.raise_requested_at is null
+                                    or j.raise_requested_at + make_interval(secs => v_cool * 86400) <= now() then null
+                               else j.raise_requested_at + make_interval(secs => v_cool * 86400) end,
+    'raise_max_bps', v_max,
+    'pending_raise', case when j.pending_raise_bps is not null
+                          then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
+    'quit_cost_cents', 0,
+    'quit_now_cost_cents', round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint,
+    'notice_ends_at', j.notice_ends_at,
+    'signature', j.signature,
+    'rank_hours', round(j.rank_minutes / 60.0, 1),
+    'promotion', public.promotion_state(j.id),
+    -- ADR-103: presence and what it does to the pay
+    'presence', public.presence_json(p_player),
+    -- ADR-206: clone, skill pay, profit share, employee shares
+    'is_clone', j.is_clone,
+    'holder_name', public.job_holder_name(p_player, j.is_clone),
+    'skill_pay_bps', public.job_skill_pay_bps(public.player_branch_scores(p_player), public.player_skill_count(p_player), j.required),
+    'profit_share_bps', public.job_profit_share_bps(j.tier::text, j.profit_share_bonus_bps),
+    'stock_grant_chance_bps', public.job_stock_grant_bps(j.tier::text, j.stock_grant_bonus_bps),
+    'rewards', public.job_rewards_json(j.id)));
+end;
+$function$
+;
+
+create or replace function public.quit_job(p_request_id uuid, p_immediate boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  v_cost   bigint;
+  v_cash   bigint;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'quit_job');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform public.lock_player_accounts(v_player);
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if not coalesce(p_immediate, false) then
+    if j.notice_ends_at is null then
+      update public.player_jobs
+         set notice_ends_at = now() + make_interval(secs => public.config_double('jobs', '{quitNoticeHours}', 24) * 3600)
+       where id = j.id
+      returning * into j;
+    end if;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('notice_ends_at', j.notice_ends_at));
+  end if;
+  -- at once: jobs.quitNowCostHours x contract wage to the employer
+  perform public.accrue_job_salary(j.id);
+  select * into j from public.player_jobs where id = j.id;
+  v_cost := round(j.salary_cents_per_hour * public.config_double('jobs', '{quitNowCostHours}', 12))::bigint;
+  select a.balance_cents into v_cash from public.ledger_accounts a where a.owner_player_id = v_player and a.kind = 'player_cash';
+  if coalesce(v_cash, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.ledger_player_account(v_player, 'player_cash'), public.company_cash_account(j.company_id),
+                                   v_cost, 'transfer', 'Sofortige Kündigung', 'player_job', j.id, 'quit:' || j.id::text, v_player);
+  end if;
+  update public.player_jobs set status = 'ended', ended_at = now(), end_reason = 'quit' where id = j.id;
+  perform public.company_system_message(j.company_id,
+    public.job_holder_name(v_player, j.is_clone) || ' hat gekündigt.');
+  return public.request_complete(v_player, p_request_id, jsonb_build_object('ended', true, 'paid_cents', v_cost));
+end;
+$function$
+;
+
+create or replace function public.cancel_quit(p_request_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'cancel_quit');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if j.notice_ends_at is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  update public.player_jobs set notice_ends_at = null where id = j.id;
+  return public.request_complete(v_player, p_request_id, public.job_state(v_player));
+end;
+$function$
+;
+
+create or replace function public.request_promotion(p_request_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  c        public.companies;
+  v_state  jsonb;
+  v_next   text;
+  v_wage   bigint;
+  v_chance integer;
+  v_retry  timestamptz;
+  v_res    jsonb;
+  v_nick   text;
+  v_boss   uuid;
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'request_promotion');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  v_state := public.promotion_state(j.id);
+  if v_state ->> 'pending_since' is not null then
+    perform public.api_error('promotion_pending');
+  end if;
+  if v_state ->> 'retry_at' is not null then
+    perform public.api_error('promotion_too_soon');
+  end if;
+  if not coalesce((v_state ->> 'ready')::boolean, false) then
+    perform public.api_error('promotion_not_ready');
+  end if;
+  v_next := v_state ->> 'next_tier';
+  v_wage := (v_state ->> 'next_salary_cents_per_hour')::bigint;
+  select * into c from public.companies where id = j.company_id;
+
+  if c.is_ai then
+    v_chance := coalesce((v_state ->> 'chance_bps')::integer, 0);
+    -- promotionGranted: u x 10 000 < chance
+    if random() * 10000 < v_chance then
+      v_res := public.promotion_apply(j.id, v_wage);
+      return public.request_complete(v_player, p_request_id, jsonb_build_object(
+        'status', 'promoted', 'tier', v_res ->> 'tier', 'salary_cents_per_hour', (v_res ->> 'salary_cents_per_hour')::bigint,
+        'retry_at', null, 'chance_bps', v_chance));
+    end if;
+    v_retry := now() + make_interval(secs => public.cfg_num(public.promotion_cfg(), '{retryHours}', 24) * 3600);
+    update public.player_jobs set promotion_retry_at = v_retry where id = j.id;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object(
+      'status', 'declined', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
+      'retry_at', v_retry, 'chance_bps', v_chance));
+  end if;
+
+  -- player boss: the request waits for promote_employee / decline_promotion (founder and CEO are told)
+  update public.player_jobs set pending_promotion_at = now() where id = j.id;
+  select p.nickname into v_nick from public.profiles p where p.id = v_player;
+  for v_boss in select distinct x from unnest(array[c.founder_id, c.ceo_id]) x where x is not null and x <> v_player loop
+    perform public.social_notify(v_boss, 'promotion_request',
+      v_nick || ' bittet um Beförderung ' || public.career_tier_phrase(v_next),
+      'Die Anforderungen sind erfüllt. Neuer Lohn mindestens ' || public.format_eur(v_wage) || ' pro Stunde.',
+      jsonb_build_object('player_job_id', j.id, 'company_id', c.id, 'nickname', v_nick, 'tier', j.tier, 'next_tier', v_next,
+                         'min_salary_cents_per_hour', v_wage),
+      '/company', 'promotion_request:' || j.id::text || ':' || floor(extract(epoch from now()))::bigint::text);
+  end loop;
+  return public.request_complete(v_player, p_request_id, jsonb_build_object(
+    'status', 'pending', 'tier', j.tier, 'salary_cents_per_hour', j.salary_cents_per_hour,
+    'retry_at', null, 'chance_bps', null));
+end;
+$function$
+;
+
+create or replace function public.request_raise(p_request_id uuid, p_raise_bps integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  j        public.player_jobs;
+  v_state  jsonb;
+  v_ai     boolean;
+  v_new    bigint;
+  v_cool   double precision := public.config_double('jobs', '{raiseRequest,cooldownDays}', 7);
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_raise_bps is null or p_raise_bps < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'request_raise');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone() for update;
+  if j.id is null then
+    perform public.api_error('no_active_job');
+  end if;
+  if j.raise_requested_at is not null and j.raise_requested_at + make_interval(secs => v_cool * 86400) > now() then
+    perform public.api_error('raise_too_soon');
+  end if;
+  v_state := public.job_state(v_player) -> 'job';
+  if p_raise_bps > (v_state ->> 'raise_max_bps')::integer then
+    perform public.api_error('raise_too_high');
+  end if;
+  select c.is_ai into v_ai from public.companies c where c.id = j.company_id;
+  v_new := round(j.salary_cents_per_hour * (1 + p_raise_bps / 10000.0))::bigint;
+  if v_ai then
+    update public.player_jobs
+       set salary_cents_per_hour = v_new, raise_requested_at = now(), last_raise_at = now(),
+           raise_base_score = public.job_match_score(public.player_branch_scores(v_player), j.required),
+           pending_raise_bps = null, pending_raise_at = null
+     where id = j.id;
+    return public.request_complete(v_player, p_request_id, jsonb_build_object('status', 'accepted', 'salary_cents_per_hour', v_new));
+  end if;
+  update public.player_jobs
+     set raise_requested_at = now(), pending_raise_bps = p_raise_bps, pending_raise_at = now()
+   where id = j.id;
+  return public.request_complete(v_player, p_request_id,
+    jsonb_build_object('status', 'pending', 'salary_cents_per_hour', j.salary_cents_per_hour));
+end;
+$function$
+;
+
+create or replace function public.get_employer()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid := public.require_player();
+  j        public.player_jobs;
+  c        public.companies;
+  pc       public.player_companies;
+  v_last   jsonb;
+begin
+  select * into j from public.player_jobs where player_id = v_player and status = 'active' and is_clone = public.job_acting_clone();
+  if j.id is null then
+    return jsonb_build_object('employer', null);
+  end if;
+  select * into c from public.companies where id = j.company_id;
+  select * into pc from public.player_companies where company_id = j.company_id and status = 'active';
+  if c.is_ai then
+    select jsonb_build_object('label', 'J' || gq.game_year || ' Q' || gq.quarter, 'revenue_cents', r.revenue_cents,
+                              'profit_cents', r.net_income_cents)
+      into v_last
+      from public.company_quarter_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+     where r.company_id = c.id order by gq.ends_at desc limit 1;
+  else
+    select jsonb_build_object('label', r.label, 'revenue_cents', r.revenue_cents, 'profit_cents', r.operating_profit_cents)
+      into v_last
+      from public.player_company_reports r join public.game_quarters gq on gq.id = r.game_quarter_id
+     where r.company_id = c.id order by gq.ends_at desc limit 1;
+  end if;
+  return jsonb_build_object('employer', jsonb_build_object(
+    'company', public.company_json(c.id),
+    'kind', case when c.is_ai then 'ai' else 'player' end,
+    'product_key', case when pc.company_id is not null then public.company_product(c.id) ->> 'key' end,
+    'stage', case when pc.company_id is not null then public.company_stage(c.id) end,
+    'tier', pc.tier,
+    'founder', case when pc.company_id is not null then (select pr.nickname from public.profiles pr where pr.id = pc.founder_id) end,
+    'team_size', (select count(*) from public.player_jobs x where x.company_id = c.id and x.status = 'active')::integer
+                 + case when pc.company_id is not null then 1 else 0 end,
+    'last_quarter', v_last,
+    'pay_factor_bps', coalesce(pc.pay_factor_bps, 10000)));
+end;
+$function$
+;
+
+create or replace function public.sign_contract(p_request_id uuid, p_application_id uuid, p_signature text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  a        public.job_applications;
+  p        public.job_postings;
+  v_scores jsonb;
+begin
+  v_player := public.require_player();
+  if p_request_id is null or p_signature is null or char_length(p_signature) < 1 or char_length(p_signature) > 8000 then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'sign_contract');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  perform 1 from public.profiles pr where pr.id = v_player for update;
+  select * into a from public.job_applications where id = p_application_id and player_id = v_player for update;
+  if a.id is null then
+    perform public.api_error('application_not_found');
+  end if;
+  if a.status <> 'offered' then
+    perform public.api_error('application_not_offered');
+  end if;
+  if a.offer_expires_at <= now() then
+    perform public.api_error('offer_expired');
+  end if;
+  -- ADR-206: an application of the clone is signed by the clone and the other way round
+  if a.for_clone <> public.job_acting_clone() then
+    perform public.api_error('application_not_found');
+  end if;
+  if exists (select 1 from public.player_jobs j where j.player_id = v_player and j.status = 'active' and j.is_clone = public.job_acting_clone()) then
+    perform public.api_error('job_active_exists');
+  end if;
+  select * into p from public.job_postings where id = a.posting_id;
+  -- ADR-206: owner and clone never work at the same company; the clone never at the owner's company
+  if exists (select 1 from public.player_jobs j where j.player_id = v_player and j.status = 'active'
+                and j.company_id = p.company_id and j.is_clone <> public.job_acting_clone()) then
+    perform public.api_error('clone_same_company');
+  end if;
+  if public.job_acting_clone() then
+    if exists (select 1 from public.player_companies pc where pc.founder_id = v_player and pc.company_id = p.company_id) then
+      perform public.api_error('clone_own_company');
+    end if;
+  -- founders: a job elsewhere only while the company has fewer than fullTimeFromEmployees people (ADR-066)
+  elsif exists (select 1 from public.player_companies pc where pc.founder_id = v_player and pc.status = 'active'
+                and (pc.company_id = p.company_id
+                     or public.company_headcount(pc.company_id) >= public.config_double('startups', '{fullTimeFromEmployees}', 5))) then
+    perform public.api_error('owns_company');
+  end if;
+  -- player companies: players with an active job there + AI workers <= max employees (tier and expansion, ADR-083)
+  if exists (select 1 from public.player_companies pc where pc.company_id = p.company_id and pc.status = 'active'
+                and (select count(*) from public.player_jobs j where j.company_id = pc.company_id and j.status = 'active')
+                    + pc.ai_workers + 1 > public.company_max_employees(pc.company_id)) then
+    perform public.api_error('employee_limit');
+  end if;
+  if p.slots is not null
+     and (select count(*) from public.player_jobs j where j.posting_id = p.id and j.status = 'active') >= p.slots then
+    perform public.api_error('job_not_found');
+  end if;
+  v_scores := public.player_branch_scores(v_player);
+  insert into public.player_jobs (player_id, company_id, request_id, tier, title, title_key, required, salary_cents_per_hour,
+                                  ceiling_cents_per_hour, raise_base_score, posting_id, application_id, signature,
+                                  last_paid_at, started_at, paid_day, paid_minutes_today,
+                                  is_clone, profit_share_bonus_bps, stock_grant_bonus_bps)
+  values (v_player, p.company_id, p_request_id, p.tier, coalesce(p.title, p.title_key), p.title_key, p.required,
+          a.offer_salary_cents_per_hour,
+          case when p.is_ai then public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required) end,
+          public.job_match_score(v_scores, p.required), p.id, a.id, p_signature,
+          public.game_now(), public.game_now(), (public.game_now() at time zone 'Europe/Berlin')::date, 0,
+          public.job_acting_clone(), coalesce(p.profit_share_bps, 0), coalesce(p.stock_grant_bps, 0));
+  update public.job_applications set status = 'signed', signature = p_signature where id = a.id;
+  update public.job_applications set status = 'closed'
+   where player_id = v_player and id <> a.id and status in ('pending', 'offered') and for_clone = a.for_clone;
+  perform public.company_system_message(p.company_id,
+    public.job_holder_name(v_player, public.job_acting_clone()) || ' ist jetzt im Team.');
+  perform public.company_full_time_check(p.company_id);
+  return public.request_complete(v_player, p_request_id, public.job_state(v_player));
+end;
+$function$
+;
+
+create or replace function public.apply_for_job(p_request_id uuid, p_posting_id uuid, p_salary_wish_cents_per_hour bigint, p_message text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_replay jsonb;
+  p        public.job_postings;
+  v_tier   jsonb;
+  v_scores jsonb;
+  v_level  integer;
+  v_id     uuid := gen_random_uuid();
+  v_msg    text := nullif(btrim(coalesce(p_message, '')), '');
+begin
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'apply_for_job');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  if not public.rate_limit_hit(v_player, 'player_action',
+           greatest(1, public.config_double('abuse', '{rateLimits,actionsPerMinute}', 60))::integer, 60) then
+    perform public.api_error('rate_limited');
+  end if;
+  select * into p from public.job_postings where id = p_posting_id;
+  if p.id is null or p.status <> 'open' or (p.expires_at is not null and p.expires_at <= now()) then
+    perform public.api_error('job_not_found');
+  end if;
+  if not p.is_ai and (p_salary_wish_cents_per_hour is null or p_salary_wish_cents_per_hour < 1) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if v_msg is not null and char_length(v_msg) > public.config_double('jobs', '{applicationMessageMaxLength}', 140) then
+    perform public.api_error('invalid_argument');
+  end if;
+  if public.text_has_profanity(v_msg) then
+    perform public.api_error('name_profanity');
+  end if;
+  v_tier := public.career_tier(p.tier::text);
+  select pr.level into v_level from public.profiles pr where pr.id = v_player;
+  if v_level < coalesce((v_tier ->> 'minLevel')::integer, 1) then
+    perform public.api_error('job_level_too_low');
+  end if;
+  -- ADR-206: the clone never works at a company the player founded
+  if public.job_acting_clone() and exists (select 1 from public.player_companies pc
+                                           where pc.founder_id = v_player and pc.company_id = p.company_id) then
+    perform public.api_error('clone_own_company');
+  end if;
+  v_scores := public.player_branch_scores(v_player);
+  if not public.job_skills_ok(v_scores, p.required)
+     or exists (select 1 from unnest(p.required_skills) k
+                 where not exists (select 1 from public.player_skills s where s.player_id = v_player and s.skill_key = k)) then
+    perform public.api_error('job_skills_missing');
+  end if;
+  -- AI employers offer the personal ceiling; a wish is ignored (ADR-064)
+  if p.is_ai then
+    p_salary_wish_cents_per_hour := public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required);
+  end if;
+  perform 1 from public.profiles pr where pr.id = v_player for update;
+  if exists (select 1 from public.job_applications a
+              where a.player_id = v_player and a.posting_id = p.id and a.for_clone = public.job_acting_clone()
+                and (a.status = 'pending' or (a.status = 'offered' and a.offer_expires_at > now()))) then
+    perform public.api_error('application_exists');
+  end if;
+  if (select count(*) from public.job_applications a
+       where a.player_id = v_player and a.for_clone = public.job_acting_clone()
+         and (a.status = 'pending' or (a.status = 'offered' and a.offer_expires_at > now())))
+     >= public.config_double('jobs', '{maxOpenApplications}', 5) then
+    perform public.api_error('application_limit');
+  end if;
+
+  insert into public.job_applications (id, posting_id, player_id, request_id, salary_wish_cents_per_hour, message, status,
+                                       offer_salary_cents_per_hour, offer_expires_at, for_clone)
+  values (v_id, p.id, v_player, p_request_id, p_salary_wish_cents_per_hour, v_msg,
+          case when p.is_ai then 'offered' else 'pending' end,
+          case when p.is_ai then least(p_salary_wish_cents_per_hour,
+                                       public.job_pay_ceiling(v_player, p.salary_cents_per_hour, p.required)) end,
+          case when p.is_ai then now() + make_interval(secs => public.config_double('jobs', '{offerValidHours}', 48) * 3600) end,
+          public.job_acting_clone());
+  return public.request_complete(v_player, p_request_id, public.application_json(v_id));
+end;
+$function$
+;
+
+create or replace function public.get_job_board()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player uuid;
+  v_scores jsonb;
+  v_level  integer;
+  v_skills integer;
+  v_clone  boolean;
+begin
+  v_player := public.require_player();
+  perform public.refresh_ai_job_postings();
+  v_scores := public.player_branch_scores(v_player);
+  select p.level into v_level from public.profiles p where p.id = v_player;
+  v_skills := public.player_skill_count(v_player);
+  v_clone := exists (select 1 from public.player_clones c where c.player_id = v_player);
+  return jsonb_build_object(
+    'postings', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', p.id, 'company', public.company_json(p.company_id), 'tier', p.tier,
+               'title_key', p.title_key, 'title', p.title,
+               'min_level', coalesce((public.career_tier(p.tier::text) ->> 'minLevel')::integer, 1),
+               'required', p.required,
+               'required_skills', to_jsonb(p.required_skills),
+               'salary_cents_per_hour', p.salary_cents_per_hour,
+               'max_salary_cents_per_hour', case when p.is_ai then round(p.salary_cents_per_hour::numeric
+                                                    * public.job_skill_pay_bps(v_scores, v_skills, p.required) / 10000)::bigint end,
+               -- ADR-206: what the skills are worth for this role, profit share and chance for employee shares
+               'skill_pay_bps', public.job_skill_pay_bps(v_scores, v_skills, p.required),
+               'market_salary_cents_per_hour', round(coalesce((public.career_tier(p.tier::text) ->> 'salaryCentsPerHour')::bigint,
+                                                              p.salary_cents_per_hour)::numeric
+                                                     * public.job_skill_pay_bps(v_scores, v_skills, p.required) / 10000)::bigint,
+               'profit_share_bps', public.job_profit_share_bps(p.tier::text, p.profit_share_bps),
+               'stock_grant_chance_bps', public.job_stock_grant_bps(p.tier::text, p.stock_grant_bps),
+               'posting_profit_share_bps', p.profit_share_bps,
+               'posting_stock_grant_bps', p.stock_grant_bps,
+               'own_company', exists (select 1 from public.player_companies pc
+                                       where pc.founder_id = v_player and pc.company_id = p.company_id),
+               'my_clone_application', case when v_clone then (select jsonb_build_object('id', a.id,
+                                          'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end)
+                                    from public.job_applications a
+                                   where a.posting_id = p.id and a.player_id = v_player and a.for_clone
+                                   order by a.created_at desc limit 1) end,
+               'match_score', public.job_match_score(v_scores, p.required),
+               'eligible', v_level >= coalesce((public.career_tier(p.tier::text) ->> 'minLevel')::integer, 1)
+                           and public.job_skills_ok(v_scores, p.required)
+                           and not exists (select 1 from unnest(p.required_skills) k
+                                            where not exists (select 1 from public.player_skills s
+                                                               where s.player_id = v_player and s.skill_key = k)),
+               'slots_open', case when p.slots is null
+                                  then public.config_double('jobs', '{aiSlotsOpen}', 99)::integer  -- unlimited (AI)
+                                  else greatest(0, p.slots - (select count(*) from public.player_jobs j
+                                                               where j.posting_id = p.id and j.status = 'active'))::integer end,
+               'posted_at', p.posted_at, 'expires_at', p.expires_at,
+               'my_application', (select jsonb_build_object('id', a.id,
+                                          'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end)
+                                    from public.job_applications a
+                                   where a.posting_id = p.id and a.player_id = v_player and not a.for_clone
+                                   order by a.created_at desc limit 1))
+             order by p.is_ai, p.salary_cents_per_hour desc, p.posted_at desc, p.id)
+        from public.job_postings p
+       where p.status = 'open' and (p.expires_at is null or p.expires_at > now())), '[]'::jsonb),
+    'next_refresh_at', (public.current_game_quarter()).ends_at,
+    'has_clone', v_clone);
+end;
+$function$
+;
+
+create or replace function public.company_full_time_check(p_company uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pc    public.player_companies;
+  j     public.player_jobs;
+begin
+  select * into pc from public.player_companies where company_id = p_company and status = 'active';
+  if pc.company_id is null
+     or public.company_headcount(p_company) < public.config_double('startups', '{fullTimeFromEmployees}', 5) then
+    return false;
+  end if;
+  select * into j from public.player_jobs
+   where player_id = pc.founder_id and status = 'active' and not is_clone and notice_ends_at is null for update;
+  if j.id is null then
+    return false;
+  end if;
+  update public.player_jobs
+     set notice_ends_at = now() + make_interval(secs => public.config_double('jobs', '{quitNoticeHours}', 24) * 3600)
+   where id = j.id;
+  perform public.company_system_message(p_company,
+    'Ab ' || public.config_double('startups', '{fullTimeFromEmployees}', 5)::integer || ' Mitarbeitern arbeitet '
+    || (select pr.nickname from public.profiles pr where pr.id = pc.founder_id) || ' Vollzeit in der Firma.');
+  return true;
+end;
+$function$
+;
+
+create or replace function public.player_company_team(p_company uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pc       public.player_companies;
+  v_sector text;
+  v_list   jsonb;
+  v_req    jsonb;
+  v_fs     jsonb;
+  v_found  integer;
+  v_prod   bigint;
+  v_score  integer;
+  v_emp    integer := 0;
+  v_s      jsonb;
+  r        record;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
+    return null;
+  end if;
+  select c.sector_key into v_sector from public.companies c where c.id = p_company;
+  v_list := coalesce(public.config_jsonb('jobs', array['sectorBranches', v_sector]), '[]'::jsonb);
+  select coalesce(jsonb_agg(jsonb_build_object('branch', b, 'min_score', 0) order by o), '[]'::jsonb) into v_req
+    from jsonb_array_elements_text(v_list) with ordinality x(b, o) where o <= 2;
+  v_fs := public.player_branch_scores(pc.founder_id);
+  v_found := public.job_productivity_bps(public.job_match_score(v_fs, v_req));
+  -- founderFactor: half productivity while the founder works elsewhere (ADR-066)
+  if exists (select 1 from public.player_jobs x where x.player_id = pc.founder_id and x.status = 'active' and not x.is_clone and x.company_id <> p_company) then
+    v_found := round(v_found * public.config_double('startups', '{sideJobFounderFactor}', 0.5))::integer;
+  end if;
+  select coalesce(sum(coalesce((v_fs ->> b)::integer, 0)), 0) into v_score from jsonb_array_elements_text(v_list) b;
+  v_prod := v_found;
+  for r in select j.player_id, j.required from public.player_jobs j where j.company_id = p_company and j.status = 'active' loop
+    v_s := public.player_branch_scores(r.player_id);
+    v_prod := v_prod + public.job_productivity_bps(public.job_match_score(v_s, r.required));
+    v_score := v_score + (select coalesce(sum(coalesce((v_s ->> b)::integer, 0)), 0) from jsonb_array_elements_text(v_list) b);
+    v_emp := v_emp + 1;
+  end loop;
+  v_prod := v_prod + pc.ai_workers * 10000;
+  return jsonb_build_object(
+    'founder_productivity_bps', v_found,
+    'team_productivity_bps', v_prod,
+    'employees', v_emp,
+    'team_sector_score', v_score,
+    'stage', public.company_stage(p_company),
+    'capacity_cents', round(v_prod / 10000.0
+                            * public.config_double('startups', array['capacityCentsPerProductivity', v_sector], 250000)
+                            * (1 + public.config_double('startups', '{stages,capacityBonusPerStage}', 0.25) * public.company_stage(p_company)))::bigint);
+end;
+$function$
+;
+
+create or replace function public.get_player_card(p_nickname text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  p      public.profiles;
+  v_job  jsonb;
+  v_cjob jsonb;
+  v_pod  integer := least(3, greatest(0, public.config_double('social', '{league,podium}', 3)::integer));
+begin
+  perform public.require_player();
+  select * into p from public.profiles x where x.id = public.player_by_handle(p_nickname);
+  if p.id is null then
+    perform public.api_error('player_not_found');
+  end if;
+  select jsonb_build_object('company_name', c.name, 'title_key', j.title_key, 'title', case when j.title_key is null then j.title end,
+                            'tier', j.tier, 'since', j.started_at)
+    into v_job
+    from public.player_jobs j join public.companies c on c.id = j.company_id
+   where j.player_id = p.id and j.status = 'active' and not j.is_clone;
+  -- ADR-206: the clone's job, shown as "Klon von ..."
+  select jsonb_build_object('company_name', c.name, 'title_key', j.title_key, 'title', case when j.title_key is null then j.title end,
+                            'tier', j.tier, 'since', j.started_at)
+    into v_cjob
+    from public.player_jobs j join public.companies c on c.id = j.company_id
+   where j.player_id = p.id and j.status = 'active' and j.is_clone;
+  return jsonb_build_object(
+    'nickname',        p.nickname,
+    'tag',             p.tag,
+    'avatar_key',      p.avatar_key,
+    'level',           p.level,
+    'rank',            public.player_rich_rank(p.id),
+    'net_worth_cents', public.player_net_worth_cents(p.id),
+    'streak_days',     public.player_streak_days(p.id),
+    'skills_learned',  (select count(*) from public.player_skills s where s.player_id = p.id)::integer,
+    'branch_scores',   public.player_branch_scores(p.id),
+    'top_skills',      coalesce((select jsonb_agg(jsonb_build_object('key', x.skill_key, 'tier', x.tier) order by x.tier desc, x.learned_at)
+                                   from (select s.skill_key, s.learned_at, (public.skill_node(s.skill_key) ->> 'tier')::integer as tier
+                                           from public.player_skills s where s.player_id = p.id
+                                          order by 3 desc nulls last, s.learned_at limit 3) x), '[]'::jsonb),
+    'job',             v_job,
+    'clone_job',       v_cjob,
+    'company',         (select jsonb_build_object('name', c.name, 'ticker', c.ticker)
+                          from public.player_companies pc join public.companies c on c.id = pc.company_id
+                         where pc.founder_id = p.id and pc.status = 'active'),
+    'trophies',        (select jsonb_build_object('gold',   count(*) filter (where e.rank = 1),
+                                                  'silver', count(*) filter (where e.rank = 2),
+                                                  'bronze', count(*) filter (where e.rank = 3))
+                          from public.league_entries e join public.league_seasons ls on ls.id = e.season_id
+                         where e.player_id = p.id and ls.status = 'finished' and e.rank between 1 and v_pod),
+    'member_since',    p.created_at,
+    'accessories',     public.player_worn_accessories(p.id),
+    'trust',           public.player_trust(p.id));
+end;
+$function$
+;
+
+create or replace function public.chat_company_of(p_player uuid)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select coalesce(
+    (select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'),
+    (select j.company_id from public.player_jobs j
+       join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
+      where j.player_id = p_player and j.status = 'active' order by j.is_clone limit 1));
+$function$
+;
+
+create or replace function public.company_event_company_for(p_player uuid, p_company uuid)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select case
+    when p_company is null then coalesce(
+      (select pc.company_id from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'),
+      (select j.company_id from public.player_jobs j
+         join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
+        where j.player_id = p_player and j.status = 'active' order by j.is_clone, j.started_at desc limit 1))
+    else (select pc.company_id from public.player_companies pc
+           where pc.company_id = p_company and pc.status = 'active'
+             and (pc.founder_id = p_player
+                  or exists (select 1 from public.player_jobs j
+                              where j.company_id = p_company and j.player_id = p_player and j.status = 'active')))
+  end;
+$function$
+;
+
+create or replace function public.company_task_member(p_player uuid)
+ RETURNS TABLE(company_id uuid, is_founder boolean, tier text, job_id uuid)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select pc.company_id, true, 'c_level'::text, null::uuid
+    from public.player_companies pc where pc.founder_id = p_player and pc.status = 'active'
+  union all
+  select j.company_id, false, j.tier::text, j.id
+    from public.player_jobs j
+    join public.player_companies pc on pc.company_id = j.company_id and pc.status = 'active'
+   where j.player_id = p_player and j.status = 'active' and not j.is_clone
+  limit 1;
+$function$
+;
+
+create or replace function public.get_company_floor()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_player  uuid := public.require_player();
+  v_company uuid := public.chat_company_of(v_player);
+  v_max     integer := greatest(2, coalesce(public.config_double('startups', '{chat,floorMaxMembers}', 24), 24)::integer);
+  v_secs    integer := coalesce(public.config_double('startups', '{chat,bubbleSeconds}', 120), 120)::integer;
+  v_ai      boolean := false;
+  v_online  interval := make_interval(mins => coalesce(public.config_double('social', '{onlineMinutes}', 10), 10)::integer);
+  c         public.companies;
+  v_members jsonb;
+  v_workers integer := 0;
+begin
+  if v_company is null then
+    select j.company_id into v_company
+      from public.player_jobs j join public.companies co on co.id = j.company_id and co.is_ai
+     where j.player_id = v_player and j.status = 'active'
+     order by j.is_clone
+     limit 1;
+    v_ai := v_company is not null;
+  end if;
+  if v_company is null then
+    return jsonb_build_object('company', null, 'chat', false, 'ai_workers', 0, 'bubble_seconds', v_secs,
+                              'members', '[]'::jsonb);
+  end if;
+  select * into c from public.companies where id = v_company;
+
+  if v_ai then
+    select coalesce(jsonb_agg(public.company_floor_member_json(x.player_id, v_player, 'employee', x.title, v_company, false)
+                              order by x.ord), '[]'::jsonb)
+      into v_members
+      from (select j.player_id, j.title,
+                   row_number() over (order by (j.player_id = v_player) desc,
+                                               coalesce(p.last_active_at > public.game_now() - v_online, false) desc,
+                                               p.last_active_at desc nulls last, lower(p.nickname), j.player_id) as ord
+              from public.player_jobs j join public.profiles p on p.id = j.player_id
+             where j.company_id = v_company and j.status = 'active' and not p.is_deactivated) x
+     where x.ord <= v_max;
+  else
+    select coalesce(pc.ai_workers, 0) into v_workers from public.player_companies pc where pc.company_id = v_company;
+    select coalesce(jsonb_agg(public.company_floor_member_json(x.player_id, v_player, x.role, x.title, v_company, true)
+                              order by x.ord, x.nick, x.player_id), '[]'::jsonb)
+      into v_members
+      from (select pc.founder_id as player_id, 'founder' as role, null::text as title, 0 as ord, ''::text as nick
+              from public.player_companies pc
+             where pc.company_id = v_company and pc.status = 'active' and pc.founder_id is not null
+            union all
+            select j.player_id, 'employee', j.title, 1, lower(p.nickname)
+              from public.player_jobs j join public.profiles p on p.id = j.player_id
+             where j.company_id = v_company and j.status = 'active' and not p.is_deactivated) x;
+  end if;
+
+  return jsonb_build_object(
+    'company', jsonb_build_object('name', c.name, 'color', c.brand_color, 'kind', case when v_ai then 'ai' else 'player' end,
+                                  'logo', case when v_ai then null else public.company_logo(c.id) end),
+    'chat', not v_ai,
+    'ai_workers', v_workers,
+    'bubble_seconds', v_secs,
+    'members', v_members);
+end;
+$function$
+;
+
+create or replace function public.application_json(p_application_id uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select jsonb_build_object(
+           'id', a.id,
+           'status', case when a.status = 'offered' and a.offer_expires_at <= now() then 'expired' else a.status end,
+           'posting', public.posting_json(a.posting_id),
+           'salary_wish_cents_per_hour', a.salary_wish_cents_per_hour,
+           'offer_salary_cents_per_hour', a.offer_salary_cents_per_hour,
+           'offer_expires_at', a.offer_expires_at,
+           'message', a.message,
+           'created_at', a.created_at,
+           'updated_at', a.updated_at,
+           'for_clone', a.for_clone)
+    from public.job_applications a where a.id = p_application_id;
+$function$
+;
+
+create or replace function public.promotion_apply(p_job_id uuid, p_salary bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  j       public.player_jobs;
+  c       public.companies;
+  v_next  text;
+  v_main  text;
+  v_req   jsonb;
+  v_ai    boolean;
+  v_match integer;
+begin
+  select * into j from public.player_jobs where id = p_job_id and status = 'active' for update;
+  v_next := public.career_next_tier(j.tier::text);
+  if j.id is null or v_next is null then
+    perform public.api_error('promotion_not_ready');
+  end if;
+  if p_salary is null or p_salary < 1 then
+    perform public.api_error('invalid_argument');
+  end if;
+  select * into c from public.companies where id = j.company_id;
+  v_ai := coalesce(c.is_ai, false);
+  v_main := j.required -> 0 ->> 'branch';
+  v_req := case when v_ai and v_main is not null then public.ai_job_required(v_main, v_next) else j.required end;
+  v_match := public.job_match_score(public.player_branch_scores(j.player_id), v_req);
+  update public.player_jobs
+     set tier = v_next::public.job_tier,
+         salary_cents_per_hour = p_salary,
+         rank_minutes = 0,
+         promoted_at = now(),
+         pending_promotion_at = null,
+         promotion_retry_at = null,
+         raise_base_score = v_match,
+         pending_raise_bps = null,
+         pending_raise_at = null,
+         required = v_req,
+         title_key = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
+                          else title_key end,
+         title = case when v_ai and j.title_key is not null and v_main is not null then v_main || '_' || v_next
+                      else title end,
+         ceiling_cents_per_hour = case when v_ai
+                                       then public.job_pay_ceiling(j.player_id, coalesce((public.career_tier(v_next) ->> 'salaryCentsPerHour')::bigint,
+                                                                              p_salary), v_req)
+                                       else ceiling_cents_per_hour end
+   where id = j.id;
+  perform public.feed_post(j.player_id, 'promoted', jsonb_build_object('tier', v_next, 'company', c.name),
+                           'promoted:' || j.id::text || ':' || v_next);
+  perform public.social_notify(j.player_id, 'promotion_result', 'Befördert!',
+    'Beförderung ' || public.career_tier_phrase(v_next) || ' bei ' || c.name || '. Neuer Lohn: '
+      || public.format_eur(p_salary) || ' pro Stunde.',
+    jsonb_build_object('status', 'promoted', 'player_job_id', j.id, 'company', c.name, 'tier', v_next,
+                       'salary_cents_per_hour', p_salary),
+    '/job', 'promotion_result:' || j.id::text || ':' || v_next);
+  return jsonb_build_object('tier', v_next, 'salary_cents_per_hour', p_salary);
+end;
+$function$
+;
+
+create or replace function public.get_company_team(p_company_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  perform public.require_company_owner(p_company_id);
+  return jsonb_build_object('members', coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'player_job_id', j.id, 'nickname', pr.nickname, 'is_clone', j.is_clone, 'avatar_key', pr.avatar_key,
+             'title', coalesce(j.title, j.title_key), 'salary_cents_per_hour', j.salary_cents_per_hour,
+             'productivity_bps', public.job_productivity_bps(public.job_match_score(public.player_branch_scores(pr.id), j.required)),
+             'started_at', j.started_at,
+             'notice_ends_at', j.notice_ends_at,
+             'skills', coalesce((select jsonb_agg(s.skill_key order by s.skill_key) from public.player_skills s
+                                  where s.player_id = pr.id), '[]'::jsonb),
+             'pending_raise', case when j.pending_raise_bps is not null
+                                   then jsonb_build_object('requested_bps', j.pending_raise_bps, 'created_at', j.pending_raise_at) end,
+             'tier', j.tier,
+             'rank_hours', round(j.rank_minutes / 60.0, 1),
+             'promotion', (select jsonb_build_object('next_tier', ps -> 'next_tier', 'requirements', ps -> 'requirements',
+                                                     'ready', ps -> 'ready', 'pending_since', ps -> 'pending_since',
+                                                     'next_salary_cents_per_hour', ps -> 'next_salary_cents_per_hour')
+                             from (select public.promotion_state(j.id) as ps) x))
+             order by j.started_at, j.id)
+      from public.player_jobs j join public.profiles pr on pr.id = j.player_id
+     where j.company_id = p_company_id and j.status = 'active'), '[]'::jsonb));
+end;
+$function$
+;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -82595,7 +84334,7 @@ insert into public.game_config (key, value, description) values
   ('richList', '{"aiTycoons":120,"tycoonMinWealthCents":1500000,"tycoonMaxWealthCents":40000000000,"snapshotMinutes":5,"newsRanks":[1,3,10,25,50,100]}'::jsonb, 'Defaults from src/config/balance.ts, section "richList"'),
   ('names', '{"minLength":3,"maxLength":20,"nicknameChangeDays":60}'::jsonb, 'Defaults from src/config/balance.ts, section "names"'),
   ('skills', '{"tree":[{"key":"it_basics","branches":["it"],"tier":1,"q":1,"r":0,"requires":[]},{"key":"it_programming","branches":["it"],"tier":2,"q":2,"r":0,"requires":["it_basics"]},{"key":"it_data","branches":["it"],"tier":2,"q":3,"r":-1,"requires":["it_programming"]},{"key":"it_networks","branches":["it"],"tier":2,"q":3,"r":0,"requires":["it_programming"]},{"key":"it_web","branches":["it"],"tier":2,"q":2,"r":1,"requires":["it_programming"]},{"key":"it_architecture","branches":["it"],"tier":3,"q":4,"r":0,"requires":["it_networks"]},{"key":"it_ml","branches":["it"],"tier":3,"q":4,"r":-1,"requires":["it_data"]},{"key":"it_security","branches":["it"],"tier":3,"q":3,"r":1,"requires":["it_networks"]},{"key":"it_databases","branches":["it"],"tier":3,"q":4,"r":1,"requires":["it_architecture"]},{"key":"it_devops","branches":["it"],"tier":3,"q":5,"r":-1,"requires":["it_architecture"]},{"key":"it_mobile","branches":["it"],"tier":3,"q":5,"r":0,"requires":["it_architecture"]},{"key":"hybrid_fintech","branches":["it","finance"],"tier":4,"q":6,"r":-2,"requires":["it_devops","finance_trading"]},{"key":"it_ai","branches":["it"],"tier":4,"q":5,"r":1,"requires":["it_databases"]},{"key":"it_cloud","branches":["it"],"tier":4,"q":6,"r":0,"requires":["it_mobile"]},{"key":"it_testing","branches":["it"],"tier":4,"q":6,"r":-1,"requires":["it_devops"]},{"key":"it_ux","branches":["it"],"tier":4,"q":4,"r":2,"requires":["it_databases"]},{"key":"it_bigdata","branches":["it"],"tier":5,"q":5,"r":2,"requires":["it_ai"]},{"key":"it_crypto","branches":["it"],"tier":5,"q":7,"r":-1,"requires":["it_cloud"]},{"key":"it_embedded","branches":["it"],"tier":5,"q":6,"r":1,"requires":["it_cloud"]},{"key":"it_mastery","branches":["it"],"tier":5,"q":7,"r":0,"requires":["it_cloud"]},{"key":"it_pentest","branches":["it"],"tier":5,"q":7,"r":-2,"requires":["it_testing"]},{"key":"finance_basics","branches":["finance"],"tier":1,"q":1,"r":-1,"requires":[]},{"key":"finance_accounting","branches":["finance"],"tier":2,"q":2,"r":-2,"requires":["finance_basics"]},{"key":"finance_investment","branches":["finance"],"tier":2,"q":2,"r":-1,"requires":["finance_basics"]},{"key":"finance_banking","branches":["finance"],"tier":2,"q":3,"r":-3,"requires":["finance_accounting"]},{"key":"finance_controlling","branches":["finance"],"tier":2,"q":3,"r":-2,"requires":["finance_accounting"]},{"key":"finance_balance","branches":["finance"],"tier":3,"q":4,"r":-3,"requires":["finance_controlling"]},{"key":"finance_portfolio","branches":["finance"],"tier":3,"q":4,"r":-4,"requires":["finance_banking"]},{"key":"finance_valuation","branches":["finance"],"tier":3,"q":4,"r":-2,"requires":["finance_controlling"]},{"key":"finance_budgeting","branches":["finance"],"tier":3,"q":5,"r":-3,"requires":["finance_balance"]},{"key":"finance_tax_planning","branches":["finance"],"tier":3,"q":5,"r":-4,"requires":["finance_balance"]},{"key":"finance_trading","branches":["finance"],"tier":3,"q":5,"r":-2,"requires":["finance_valuation"]},{"key":"finance_treasury","branches":["finance"],"tier":3,"q":5,"r":-5,"requires":["finance_portfolio"]},{"key":"finance_corporate","branches":["finance"],"tier":4,"q":6,"r":-4,"requires":["finance_budgeting"]},{"key":"finance_derivatives","branches":["finance"],"tier":4,"q":6,"r":-6,"requires":["finance_treasury"]},{"key":"finance_ma","branches":["finance"],"tier":4,"q":6,"r":-3,"requires":["finance_budgeting"]},{"key":"finance_risk","branches":["finance"],"tier":4,"q":6,"r":-5,"requires":["finance_treasury"]},{"key":"finance_audit","branches":["finance"],"tier":5,"q":7,"r":-4,"requires":["finance_corporate"]},{"key":"finance_insurance","branches":["finance"],"tier":5,"q":7,"r":-7,"requires":["finance_derivatives"]},{"key":"finance_mastery","branches":["finance"],"tier":5,"q":7,"r":-5,"requires":["finance_corporate"]},{"key":"finance_quant","branches":["finance"],"tier":5,"q":7,"r":-3,"requires":["finance_ma"]},{"key":"finance_vc","branches":["finance"],"tier":5,"q":7,"r":-6,"requires":["finance_risk"]},{"key":"law_basics","branches":["law"],"tier":1,"q":1,"r":-2,"requires":[]},{"key":"law_contracts","branches":["law"],"tier":2,"q":2,"r":-3,"requires":["law_basics"]},{"key":"law_labor","branches":["law"],"tier":2,"q":1,"r":-3,"requires":["law_basics"]},{"key":"law_compliance","branches":["law"],"tier":3,"q":1,"r":-4,"requires":["law_labor"]},{"key":"law_corporate","branches":["law"],"tier":3,"q":3,"r":-4,"requires":["law_contracts"]},{"key":"law_tax","branches":["law"],"tier":2,"q":2,"r":-4,"requires":["law_contracts"]},{"key":"law_competition","branches":["law"],"tier":3,"q":1,"r":-5,"requires":["law_compliance"]},{"key":"law_intltax","branches":["law"],"tier":3,"q":3,"r":-5,"requires":["law_tax"]},{"key":"law_ip","branches":["law"],"tier":3,"q":2,"r":-5,"requires":["law_tax"]},{"key":"law_privacy","branches":["law"],"tier":3,"q":4,"r":-5,"requires":["law_corporate"]},{"key":"hybrid_business_law","branches":["law","finance"],"tier":4,"q":5,"r":-6,"requires":["law_privacy","finance_treasury"]},{"key":"law_capital","branches":["law"],"tier":4,"q":3,"r":-6,"requires":["law_intltax"]},{"key":"law_consumer","branches":["law"],"tier":4,"q":2,"r":-6,"requires":["law_competition"]},{"key":"law_crime","branches":["law"],"tier":4,"q":4,"r":-6,"requires":["law_privacy"]},{"key":"law_it","branches":["law"],"tier":4,"q":1,"r":-6,"requires":["law_competition"]},{"key":"law_environment","branches":["law"],"tier":5,"q":4,"r":-7,"requires":["law_crime"]},{"key":"law_international","branches":["law"],"tier":5,"q":2,"r":-7,"requires":["law_consumer"]},{"key":"law_litigation","branches":["law"],"tier":5,"q":1,"r":-7,"requires":["law_it"]},{"key":"law_mastery","branches":["law"],"tier":5,"q":3,"r":-7,"requires":["law_capital"]},{"key":"law_mediation","branches":["law"],"tier":5,"q":6,"r":-7,"requires":["hybrid_business_law"]},{"key":"law_medical","branches":["law"],"tier":5,"q":5,"r":-7,"requires":["law_crime"]},{"key":"management_basics","branches":["management"],"tier":1,"q":0,"r":-1,"requires":[]},{"key":"management_projects","branches":["management"],"tier":2,"q":0,"r":-2,"requires":["management_basics"]},{"key":"management_team","branches":["management"],"tier":2,"q":-1,"r":-1,"requires":["management_basics"]},{"key":"management_leadership","branches":["management"],"tier":2,"q":0,"r":-3,"requires":["management_projects"]},{"key":"management_people","branches":["management"],"tier":2,"q":-1,"r":-2,"requires":["management_team"]},{"key":"management_agile","branches":["management"],"tier":3,"q":-2,"r":-2,"requires":["management_people"]},{"key":"management_change","branches":["management"],"tier":3,"q":-1,"r":-3,"requires":["management_leadership"]},{"key":"management_recruiting","branches":["management"],"tier":3,"q":0,"r":-4,"requires":["management_leadership"]},{"key":"hybrid_people_analytics","branches":["management","it"],"tier":4,"q":0,"r":-5,"requires":["management_recruiting"]},{"key":"management_communication","branches":["management"],"tier":3,"q":-1,"r":-4,"requires":["management_change"]},{"key":"management_finance_lead","branches":["management"],"tier":3,"q":-2,"r":-3,"requires":["management_change"]},{"key":"management_operations","branches":["management"],"tier":3,"q":-3,"r":-2,"requires":["management_agile"]},{"key":"management_coaching","branches":["management"],"tier":4,"q":0,"r":-6,"requires":["hybrid_people_analytics"]},{"key":"management_innovation","branches":["management"],"tier":4,"q":-3,"r":-3,"requires":["management_operations"]},{"key":"management_organization","branches":["management"],"tier":4,"q":-1,"r":-5,"requires":["management_communication"]},{"key":"management_strategy","branches":["management"],"tier":4,"q":-2,"r":-4,"requires":["management_finance_lead"]},{"key":"management_board","branches":["management"],"tier":5,"q":0,"r":-7,"requires":["management_coaching"]},{"key":"management_culture","branches":["management"],"tier":5,"q":-4,"r":-3,"requires":["management_innovation"]},{"key":"management_international","branches":["management"],"tier":5,"q":-3,"r":-4,"requires":["management_strategy"]},{"key":"management_mastery","branches":["management"],"tier":5,"q":-2,"r":-5,"requires":["management_strategy"]},{"key":"management_risk","branches":["management"],"tier":5,"q":-1,"r":-6,"requires":["management_organization"]},{"key":"sales_basics","branches":["sales"],"tier":1,"q":-1,"r":0,"requires":[]},{"key":"sales_selling","branches":["sales"],"tier":2,"q":-2,"r":0,"requires":["sales_basics"]},{"key":"sales_marketing","branches":["sales"],"tier":2,"q":-3,"r":0,"requires":["sales_selling"]},{"key":"sales_service","branches":["sales"],"tier":2,"q":-3,"r":1,"requires":["sales_selling"]},{"key":"sales_social","branches":["sales"],"tier":2,"q":-2,"r":-1,"requires":["sales_selling"]},{"key":"sales_brand","branches":["sales"],"tier":3,"q":-4,"r":1,"requires":["sales_marketing"]},{"key":"sales_keyaccount","branches":["sales"],"tier":3,"q":-3,"r":-1,"requires":["sales_social"]},{"key":"sales_negotiation","branches":["sales"],"tier":3,"q":-4,"r":0,"requires":["sales_marketing"]},{"key":"sales_ads","branches":["sales"],"tier":3,"q":-4,"r":-1,"requires":["sales_keyaccount"]},{"key":"sales_content","branches":["sales"],"tier":3,"q":-5,"r":0,"requires":["sales_negotiation"]},{"key":"sales_seo","branches":["sales"],"tier":3,"q":-5,"r":1,"requires":["sales_brand"]},{"key":"hybrid_ecommerce","branches":["sales","logistics"],"tier":4,"q":-6,"r":2,"requires":["sales_seo","logistics_air"]},{"key":"sales_growth","branches":["sales"],"tier":4,"q":-6,"r":1,"requires":["sales_seo"]},{"key":"sales_international","branches":["sales"],"tier":4,"q":-6,"r":0,"requires":["sales_content"]},{"key":"sales_pricing","branches":["sales"],"tier":4,"q":-5,"r":-1,"requires":["sales_ads"]},{"key":"sales_retail","branches":["sales"],"tier":4,"q":-4,"r":-2,"requires":["sales_ads"]},{"key":"sales_b2b","branches":["sales"],"tier":5,"q":-7,"r":1,"requires":["sales_international"]},{"key":"sales_crm","branches":["sales"],"tier":5,"q":-6,"r":-1,"requires":["sales_pricing"]},{"key":"sales_events","branches":["sales"],"tier":5,"q":-5,"r":-2,"requires":["sales_retail"]},{"key":"sales_mastery","branches":["sales"],"tier":5,"q":-7,"r":0,"requires":["sales_international"]},{"key":"sales_pr","branches":["sales"],"tier":5,"q":-7,"r":2,"requires":["sales_growth"]},{"key":"logistics_basics","branches":["logistics"],"tier":1,"q":-1,"r":1,"requires":[]},{"key":"logistics_transport","branches":["logistics"],"tier":2,"q":-2,"r":2,"requires":["logistics_basics"]},{"key":"logistics_warehouse","branches":["logistics"],"tier":2,"q":-2,"r":1,"requires":["logistics_basics"]},{"key":"logistics_inventory","branches":["logistics"],"tier":2,"q":-3,"r":3,"requires":["logistics_transport"]},{"key":"logistics_purchasing","branches":["logistics"],"tier":2,"q":-3,"r":2,"requires":["logistics_warehouse"]},{"key":"logistics_fleet","branches":["logistics"],"tier":3,"q":-4,"r":2,"requires":["logistics_purchasing"]},{"key":"logistics_strategic","branches":["logistics"],"tier":3,"q":-4,"r":4,"requires":["logistics_inventory"]},{"key":"logistics_supplychain","branches":["logistics"],"tier":3,"q":-4,"r":3,"requires":["logistics_inventory"]},{"key":"logistics_air","branches":["logistics"],"tier":3,"q":-5,"r":2,"requires":["logistics_fleet"]},{"key":"logistics_customs","branches":["logistics"],"tier":3,"q":-5,"r":3,"requires":["logistics_supplychain"]},{"key":"logistics_distribution","branches":["logistics"],"tier":3,"q":-5,"r":4,"requires":["logistics_supplychain"]},{"key":"logistics_shipping","branches":["logistics"],"tier":3,"q":-5,"r":5,"requires":["logistics_strategic"]},{"key":"logistics_global","branches":["logistics"],"tier":4,"q":-6,"r":4,"requires":["logistics_distribution"]},{"key":"logistics_lastmile","branches":["logistics"],"tier":4,"q":-6,"r":6,"requires":["logistics_shipping"]},{"key":"logistics_quality","branches":["logistics"],"tier":4,"q":-6,"r":5,"requires":["logistics_distribution"]},{"key":"logistics_rail","branches":["logistics"],"tier":4,"q":-6,"r":3,"requires":["logistics_customs"]},{"key":"logistics_automation","branches":["logistics"],"tier":5,"q":-7,"r":7,"requires":["logistics_lastmile"]},{"key":"logistics_cold","branches":["logistics"],"tier":5,"q":-7,"r":6,"requires":["logistics_quality"]},{"key":"logistics_mastery","branches":["logistics"],"tier":5,"q":-7,"r":5,"requires":["logistics_global"]},{"key":"logistics_planning","branches":["logistics"],"tier":5,"q":-7,"r":4,"requires":["logistics_rail"]},{"key":"logistics_sustainability","branches":["logistics"],"tier":5,"q":-7,"r":3,"requires":["logistics_rail"]},{"key":"craft_basics","branches":["craft"],"tier":1,"q":-1,"r":2,"requires":[]},{"key":"craft_electrical","branches":["craft"],"tier":2,"q":-2,"r":3,"requires":["craft_basics"]},{"key":"craft_mechanics","branches":["craft"],"tier":2,"q":-1,"r":3,"requires":["craft_basics"]},{"key":"craft_automation","branches":["craft"],"tier":3,"q":-3,"r":4,"requires":["craft_electrical"]},{"key":"craft_construction","branches":["craft"],"tier":2,"q":-2,"r":4,"requires":["craft_mechanics"]},{"key":"craft_engineering","branches":["craft"],"tier":3,"q":-1,"r":4,"requires":["craft_mechanics"]},{"key":"craft_hvac","branches":["craft"],"tier":3,"q":-4,"r":5,"requires":["craft_automation"]},{"key":"craft_plumbing","branches":["craft"],"tier":3,"q":-1,"r":5,"requires":["craft_engineering"]},{"key":"craft_site","branches":["craft"],"tier":3,"q":-2,"r":5,"requires":["craft_construction"]},{"key":"craft_welding","branches":["craft"],"tier":3,"q":-3,"r":5,"requires":["craft_construction"]},{"key":"craft_carpentry","branches":["craft"],"tier":4,"q":-4,"r":6,"requires":["craft_welding"]},{"key":"craft_cnc","branches":["craft"],"tier":4,"q":-5,"r":6,"requires":["craft_hvac"]},{"key":"craft_energy","branches":["craft"],"tier":4,"q":-2,"r":6,"requires":["craft_site"]},{"key":"craft_manufacturing","branches":["craft"],"tier":4,"q":-3,"r":6,"requires":["craft_welding"]},{"key":"hybrid_industry40","branches":["craft","it"],"tier":4,"q":-1,"r":6,"requires":["craft_plumbing"]},{"key":"craft_3dprint","branches":["craft"],"tier":5,"q":-3,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_mastery","branches":["craft"],"tier":5,"q":-4,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_materials","branches":["craft"],"tier":5,"q":-6,"r":7,"requires":["craft_cnc"]},{"key":"craft_robotics","branches":["craft"],"tier":5,"q":-1,"r":7,"requires":["hybrid_industry40"]},{"key":"craft_solar","branches":["craft"],"tier":5,"q":-5,"r":7,"requires":["craft_carpentry"]},{"key":"craft_vehicles","branches":["craft"],"tier":5,"q":-2,"r":7,"requires":["craft_energy"]},{"key":"science_basics","branches":["science"],"tier":1,"q":0,"r":1,"requires":[]},{"key":"science_biology","branches":["science"],"tier":2,"q":1,"r":1,"requires":["science_basics"]},{"key":"science_chemistry","branches":["science"],"tier":2,"q":0,"r":2,"requires":["science_basics"]},{"key":"science_medicine","branches":["science"],"tier":2,"q":1,"r":2,"requires":["science_biology"]},{"key":"science_physics","branches":["science"],"tier":2,"q":0,"r":3,"requires":["science_chemistry"]},{"key":"science_biotech","branches":["science"],"tier":3,"q":0,"r":4,"requires":["science_physics"]},{"key":"science_clinical","branches":["science"],"tier":3,"q":2,"r":2,"requires":["science_medicine"]},{"key":"science_pharmacology","branches":["science"],"tier":3,"q":1,"r":3,"requires":["science_medicine"]},{"key":"hybrid_pharma_sales","branches":["science","sales"],"tier":4,"q":0,"r":5,"requires":["science_biotech"]},{"key":"science_lab","branches":["science"],"tier":3,"q":1,"r":4,"requires":["science_biotech"]},{"key":"science_microbiology","branches":["science"],"tier":3,"q":3,"r":2,"requires":["science_clinical"]},{"key":"science_statistics","branches":["science"],"tier":3,"q":2,"r":3,"requires":["science_pharmacology"]},{"key":"science_drugs","branches":["science"],"tier":4,"q":2,"r":4,"requires":["science_statistics"]},{"key":"science_genetics","branches":["science"],"tier":4,"q":1,"r":5,"requires":["science_lab"]},{"key":"science_materials","branches":["science"],"tier":4,"q":3,"r":3,"requires":["science_microbiology"]},{"key":"science_nutrition","branches":["science"],"tier":4,"q":0,"r":6,"requires":["hybrid_pharma_sales"]},{"key":"science_devices","branches":["science"],"tier":5,"q":0,"r":7,"requires":["science_nutrition"]},{"key":"science_environment","branches":["science"],"tier":5,"q":1,"r":6,"requires":["science_genetics"]},{"key":"science_mastery","branches":["science"],"tier":5,"q":2,"r":5,"requires":["science_drugs"]},{"key":"science_neuro","branches":["science"],"tier":5,"q":3,"r":4,"requires":["science_drugs"]},{"key":"science_vaccines","branches":["science"],"tier":5,"q":4,"r":3,"requires":["science_materials"]}],"costByTier":[1,2,3,4,6],"scoreByTier":[1,2,3,4,6],"freePointsPerLevel":1,"workHoursPerBranchPoint":6}'::jsonb, 'Defaults from src/config/balance.ts, section "skills"'),
-  ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":1,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
+  ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":1,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300},"skillPay":{"perRelevantScoreBps":300,"relevantScoreCapPerBranch":40,"perLearnedSkillBps":50,"capMultiplier":3},"rewards":{"profitShareBpsByTier":{"intern":0,"junior":0,"senior":50,"team_lead":200,"c_level":500},"maxProfitShareBps":500,"maxPostingProfitShareBps":300,"maxTotalProfitShareBps":2500,"aiDepartmentSize":50,"aiMaxShareOfWageBps":5000,"stockGrantChanceBpsByTier":{"intern":0,"junior":100,"senior":300,"team_lead":500,"c_level":800},"maxPostingStockGrantBps":500,"stockGrantValueHours":4},"clone":{"minLevel":20,"feeCents":2500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
   ('dailyRewards', '{"cycle":[{"xp":50,"cashCents":10000,"skillPoints":0},{"xp":75,"cashCents":20000,"skillPoints":0},{"xp":100,"cashCents":30000,"skillPoints":0},{"xp":125,"cashCents":0,"skillPoints":1},{"xp":150,"cashCents":50000,"skillPoints":0},{"xp":200,"cashCents":75000,"skillPoints":0},{"xp":300,"cashCents":100000,"skillPoints":1}],"freezesPerWeek":1}'::jsonb, 'Defaults from src/config/balance.ts, section "dailyRewards"'),
   ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":360000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":10,"small_business":40,"gmbh":150,"ag":400},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25,"aiMaxPremiumBps":10000,"capitalIncreaseCooldownHours":24,"issueProceedsLockHours":72},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.02,"cap":{"byTier":{"garage":0.6,"small_business":0.7,"gmbh":0.8,"ag":0.9},"perStage":0.05,"perExpansionLevel":0.03,"max":1},"marketingMaxRatePerHour":0.06,"marketingHalfSaturationShare":0.01,"marketingMinHalfSaturationCents":50000,"wordOfMouthPerHour":0.008,"decayPerHour":0.004,"taskGain":0.005,"taskAiShareBps":5000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":450000,"retail":375000,"energy":375000,"pharma":450000,"logistics":375000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"aiWorkerStandbyBps":2500,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.6,0.65,0.7,0.75,0.8],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.03},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.06},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.12}},"minCostCents":20000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
   ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"'),

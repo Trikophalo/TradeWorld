@@ -949,7 +949,12 @@
     "nexamon_battle_joined": "Du sitzt schon in diesem Pack Battle.",
     "news_promo_inactive": "Diese Aktion läuft gerade nicht (mehr).",
     "news_promo_claimed": "Du hast diese Aktion schon genutzt.",
-    "news_promo_no_company": "Für die Steuererklärung brauchst du eine eigene Firma."
+    "news_promo_no_company": "Für die Steuererklärung brauchst du eine eigene Firma.",
+    "clone_level_too_low": "Einen Klon kannst du ab Level 20 erschaffen.",
+    "clone_exists": "Du hast schon einen Klon. Mehr als einen gibt es nicht.",
+    "clone_missing": "Du hast noch keinen Klon. Erschaffe ihn im Job-Tab.",
+    "clone_own_company": "Dein Klon arbeitet nicht in deiner eigenen Firma. Such ihm eine Stelle bei einer anderen Firma.",
+    "clone_same_company": "Du und dein Klon arbeitet nicht in derselben Firma. Wähle eine andere Firma."
   },
   "locks": {
     "level": "Level {level}",
@@ -1865,7 +1870,19 @@
       "rules": "Gearbeitet wird 8 Stunden am Tag, von selbst. Ab einem Tag ohne Besuch gibt es 75 % Lohn, ab zwei Tagen 50 %, ab drei Tagen 25 %. Nach fünf Tagen ohne Besuch wirst du gekündigt.",
       "comeBack": "Spätestens am {date} wieder vorbeischauen."
     },
-    "payFactorWhy": "Weniger Lohn bei Krisen, Skandalen oder wenn die Aktie deines Arbeitgebers heute stark fällt. Auch wenn die Firma nicht genug verdient."
+    "payFactorWhy": "Weniger Lohn bei Krisen, Skandalen oder wenn die Aktie deines Arbeitgebers heute stark fällt. Auch wenn die Firma nicht genug verdient.",
+    "rewards": {
+      "title": "Beteiligung",
+      "skillPay": "Lohn durch Skills",
+      "factor": "×{value}",
+      "profitShare": "Gewinnbeteiligung",
+      "fromSenior": "ab Senior",
+      "stockChance": "Mitarbeiteraktien",
+      "perHour": "{percent} pro Std.",
+      "paid": "Bisher erhalten",
+      "grants": "{count, plural, one {# Mal} other {# Mal}} Aktien bekommen: {shares} Stück, {amount}",
+      "rules": "Ab Senior bekommst du einen Teil vom Gewinn deines Arbeitgebers, je Rang mehr, höchstens 5 %. Für gute Arbeit gibt es ab und zu Aktien."
+    }
   },
   "jobs": {
     "title": "Jobportal",
@@ -1943,7 +1960,33 @@
     "signedText": "Du arbeitest jetzt bei {company}. Gehalt kommt automatisch, auch wenn du offline bist.",
     "hasJobHint": "Du hast schon einen Job. Zum Unterschreiben musst du ihn erst kündigen.",
     "aiOffer": "Diese KI-Firma bietet dir {amount}/Std. Mehr zahlt sie nicht, weniger musst du nicht nehmen.",
-    "skillsRequired": "Muss können"
+    "skillsRequired": "Muss können",
+    "holderLabel": "Bewerben für",
+    "holderSelf": "Mich",
+    "holderClone": "Meinen Klon",
+    "cloneEmployed": "Job deines Klons",
+    "cloneOwnCompany": "Eigene Firma: nichts für den Klon",
+    "cloneName": "Klon von {name}",
+    "applyTitleClone": "Bewerbung für deinen Klon",
+    "applyIntroClone": "Dein Klon bewirbt sich mit deinen Skills. Lohn, Gewinnbeteiligung und Aktien gehen an dich.",
+    "signedTextClone": "Dein Klon arbeitet jetzt bei {company}. Der Lohn kommt automatisch auf dein Konto.",
+    "hasCloneJobHint": "Dein Klon hat schon einen Job. Zum Unterschreiben muss er ihn erst kündigen.",
+    "contractProfitShare": "Gewinnbeteiligung",
+    "contractProfitShareValue": "{percent} vom Gewinn der Firma, nur wenn sie Gewinn macht",
+    "contractProfitShareNone": "ab Senior",
+    "contractStock": "Mitarbeiteraktien",
+    "contractStockValue": "Chance {percent} pro Arbeitsstunde, wenn du da bist und die Firma Gewinn macht",
+    "perks": {
+      "skillPay": "Skills: +{percent} Lohn",
+      "skillPayHint": "Je mehr passende Skills und je mehr Skills insgesamt, desto mehr zahlt die Stelle. Höchstens das Dreifache.",
+      "market": "Dein Marktwert {amount}/Std.",
+      "marketHint": "So viel zahlt eine KI-Firma für diese Stufe bei deinen Skills. Ein guter Vergleich für deinen Gehaltswunsch.",
+      "profitShare": "{percent} Gewinnbeteiligung",
+      "profitShareNone": "Gewinnbeteiligung ab Senior",
+      "stock": "Aktien: {percent} pro Std.",
+      "stockHint": "Für gute Arbeit gibt es ab und zu Aktien des Arbeitgebers: Du bist da und die Firma macht Gewinn.",
+      "extra": "Extras von der Firma"
+    }
   },
   "skillTree": {
     "title": "Skills",
@@ -2073,7 +2116,8 @@
     "founderOf": "Gründer:in von {company}",
     "founderAt": "Gründer:in bei {company}",
     "trophies": "Pokale",
-    "trophiesHint": "Gold, Silber und Bronze aus der Wochenliga"
+    "trophiesHint": "Gold, Silber und Bronze aus der Wochenliga",
+    "cloneJobAt": "Klon von {name}: {title} bei {company}"
   },
   "firm": {
     "title": "Firma",
@@ -2482,7 +2526,17 @@
     "planAi": "KI-Kräfte",
     "planFree": "Freie Plätze",
     "marketingHint": "Ein Quartal sind {hours} Stunden: Jede Stunde gehen {perHour} aus der Kasse an die Werbung. Das macht dich jede Stunde etwas bekannter, doppeltes Budget bringt aber nicht doppelt so viel.",
-    "marketingInfo": "Marketing hebt die Bekanntheit in jeder abgerechneten Stunde. Ohne Budget wächst sie nur durch Mundpropaganda und geht langsam verloren. An der Obergrenze deiner Stufe verpufft jedes weitere Budget."
+    "marketingInfo": "Marketing hebt die Bekanntheit in jeder abgerechneten Stunde. Ohne Budget wächst sie nur durch Mundpropaganda und geht langsam verloren. An der Obergrenze deiner Stufe verpufft jedes weitere Budget.",
+    "cloneOf": "Klon von {name}",
+    "perks": {
+      "title": "Extras für die Stelle",
+      "hint": "Locke gute Leute mit Gewinnbeteiligung (ab Senior) und Mitarbeiteraktien. Bezahlt wird aus dem Firmengewinn und der Kasse.",
+      "profitShare": "Gewinnbeteiligung zusätzlich",
+      "profitShareTotal": "Zusammen mit dem Rang: {percent} vom Gewinn (höchstens 5 %)",
+      "profitShareFromSenior": "Gewinnbeteiligung gibt es erst ab Senior.",
+      "stock": "Aktien-Chance zusätzlich",
+      "stockTotal": "Zusammen mit dem Rang: {percent} pro Arbeitsstunde"
+    }
   },
   "debt": {
     "title": "Schulden",
@@ -2669,7 +2723,21 @@
     "noticeHint": "Bis dahin bekommst du weiter Lohn. Du kannst die Kündigung zurücknehmen.",
     "cancelNotice": "Kündigung zurücknehmen",
     "noticeCancelled": "Kündigung zurückgenommen",
-    "founderHint": "Nebenbei führst du {name} ({count} von {from} Mitarbeitern). Ab {from} arbeitest du dort Vollzeit, dann endet dieser Job nach einem Tag."
+    "founderHint": "Nebenbei führst du {name} ({count} von {from} Mitarbeitern). Ab {from} arbeitest du dort Vollzeit, dann endet dieser Job nach einem Tag.",
+    "founderClone": "Ab Level 20 kann dein Klon woanders arbeiten, während du deine Firma führst.",
+    "clone": {
+      "title": "Dein Klon",
+      "pitch": "Dein Klon arbeitet zusätzlich bei einer anderen Firma, bis zu {hours} bezahlte Stunden am Tag. Lohn, Gewinnbeteiligung und Mitarbeiteraktien gehen auf dein Konto.",
+      "rules": "Einmal pro Spieler, nie in deiner eigenen Firma und nie in derselben Firma wie du. Er richtet sich nach dir: Bleibst du lange weg, sinkt auch sein Lohn.",
+      "lockedHint": "Ab Level {level} kannst du ihn erschaffen.",
+      "create": "Klon erschaffen",
+      "fee": "Einmalig {amount}",
+      "created": "Dein Klon ist da",
+      "createdText": "Such ihm im Jobportal eine Stelle.",
+      "noJob": "Dein Klon hat noch keinen Job.",
+      "toPortal": "Job für den Klon suchen",
+      "jobOf": "Dein Klon arbeitet zusätzlich"
+    }
   },
   "events": {
     "title": "Events",

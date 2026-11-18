@@ -316,7 +316,7 @@ select tests.assert(
   (select tier = 'junior' and salary_cents_per_hour = :enext and rank_minutes = 0 and promoted_at is not null
           and promotion_retry_at is null and pending_promotion_at is null
           and title_key = 'it_junior' and title = 'it_junior' and required = '[{"branch": "it", "min_score": 2}]'::jsonb
-          and raise_base_score = 3 and ceiling_cents_per_hour = public.ai_salary_ceiling(30000, 3)
+          and raise_base_score = 3 and ceiling_cents_per_hour = public.job_pay_ceiling(:e, 30000, '[{"branch": "it", "min_score": 2}]')
      from public.player_jobs where id = :'ejob'),
   'promotion at an AI company: rank junior, new wage, hours 0, raise baseline = match score, title and requirements of the '
   || 'AI posting it_junior');

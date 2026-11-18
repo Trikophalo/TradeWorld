@@ -1,27 +1,28 @@
 {
-  "id": "2c61215c-fdce-48f6-8d89-cfc69e396e25",
+  "id": "06b78e6e-e92d-41f8-89b1-f6a24528c0c8",
   "status": "offered",
   "message": "Ich lerne schnell.",
   "posting": {
-    "id": "0e0f403e-b10e-4d8a-a7db-07be695c2824",
+    "id": "0182a70c-ac9a-47e7-9584-7130d2ebc7c3",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "833932bd-1586-776d-1f8f-f602682f7437",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Luftpost Drohnen",
+      "color": "#00B4D8",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "KLS"
+      "sector": "logistics",
+      "ticker": "DRN"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "title_key": "it_junior",
     "required_skills": []
   },
-  "created_at": "2026-11-16T23:55:04.42653+00:00",
-  "updated_at": "2026-11-16T23:55:04.42653+00:00",
-  "offer_expires_at": "2026-11-18T23:55:04.42653+00:00",
-  "salary_wish_cents_per_hour": 32700,
-  "offer_salary_cents_per_hour": 32700
+  "for_clone": false,
+  "created_at": "2026-11-18T00:23:42.14313+00:00",
+  "updated_at": "2026-11-18T00:23:42.14313+00:00",
+  "offer_expires_at": "2026-11-20T00:23:42.14313+00:00",
+  "salary_wish_cents_per_hour": 33000,
+  "offer_salary_cents_per_hour": 33000
 }

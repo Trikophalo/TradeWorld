@@ -1,21 +1,23 @@
 {
   "job": {
-    "id": "9d6f7a3a-2684-45f4-b6b5-4d35829eaea8",
+    "id": "a915512e-bc6e-43e8-a36c-1f7325ec2db7",
     "tier": "junior",
     "title": null,
     "company": {
-      "id": "42de2b6a-2c7e-257d-c79d-019ffff8313d",
+      "id": "833932bd-1586-776d-1f8f-f602682f7437",
       "logo": null,
-      "name": "KlarSoft AG",
-      "color": "#4C8DFF",
+      "name": "Luftpost Drohnen",
+      "color": "#00B4D8",
       "is_ai": true,
-      "sector": "tech",
-      "ticker": "KLS"
+      "sector": "logistics",
+      "ticker": "DRN"
     },
+    "rewards": { "last": null, "shares_e6": 0, "stock_grants": 0, "stock_grant_cents": 0, "profit_share_cents": 0 },
+    "is_clone": false,
     "presence": {
-      "fire_at": "2026-11-21T23:55:03.918495+00:00",
+      "fire_at": "2026-11-23T00:23:40.409297+00:00",
       "pay_bps": 10000,
-      "last_active_at": "2026-11-16T23:55:03.918495+00:00"
+      "last_active_at": "2026-11-18T00:23:40.409297+00:00"
     },
     "required": [{ "branch": "it", "min_score": 2 }],
     "promotion": {
@@ -36,10 +38,12 @@
     "signature": "M2 14 C6 4 10 4 14 12 S22 18 26 8",
     "title_key": "it_junior",
     "rank_hours": 1.0,
-    "started_at": "2026-11-16T23:55:04.43753+00:00",
+    "started_at": "2026-11-18T00:23:42.165005+00:00",
+    "holder_name": "Fixture_Neu",
     "pending_raise": null,
     "raise_max_bps": 0,
-    "notice_ends_at": "2026-11-17T23:55:04.481818+00:00",
+    "skill_pay_bps": 11000,
+    "notice_ends_at": "2026-11-19T00:23:42.44725+00:00",
     "paid_hours_cap": 8,
     "pay_factor_bps": 10000,
     "work_task_open": false,
@@ -47,11 +51,13 @@
     "last_bonus_cents": 0,
     "paid_hours_today": 1.0,
     "productivity_bps": 17400,
+    "profit_share_bps": 0,
     "next_work_task_at": null,
-    "earned_total_cents": 31700,
-    "raise_available_at": "2026-11-23T23:55:04.471202+00:00",
-    "quit_now_cost_cents": 391812,
-    "salary_cents_per_hour": 32651,
-    "effective_salary_cents_per_hour": 32651
+    "earned_total_cents": 32000,
+    "raise_available_at": "2026-11-25T00:23:42.370492+00:00",
+    "quit_now_cost_cents": 395520,
+    "salary_cents_per_hour": 32960,
+    "stock_grant_chance_bps": 100,
+    "effective_salary_cents_per_hour": 32960
   }
 }

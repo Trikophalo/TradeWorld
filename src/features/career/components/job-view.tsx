@@ -26,6 +26,7 @@ import { PriceChart } from "@/features/market/components/price-chart";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { useMyJob } from "../hooks";
 import { CareerLadder, PayRoutes } from "./career-ladder";
+import { CloneSection } from "./clone-card";
 import { ActiveJob } from "./my-job-card";
 import { PixelWorker } from "./pixel-worker";
 
@@ -48,16 +49,20 @@ export function JobView() {
   if (!job.data) {
     const founder = Boolean(company.data?.company);
     return (
-      <EmptyState
-        art={<PixelIcon {...UI_ICONS.briefcase} scale={4} />}
-        title={founder ? t("founder") : t("none")}
-        description={founder ? "" : t("noneText")}
-        action={
-          <Link href={founder ? "/company" : "/career/jobs"} className={buttonVariants()}>
-            {founder ? t("toCompany") : t("toPortal")}
-          </Link>
-        }
-      />
+      <div className="space-y-5">
+        <EmptyState
+          art={<PixelIcon {...UI_ICONS.briefcase} scale={4} />}
+          title={founder ? t("founder") : t("none")}
+          description={founder ? t("founderClone") : t("noneText")}
+          action={
+            <Link href={founder ? "/company" : "/career/jobs"} className={buttonVariants()}>
+              {founder ? t("toCompany") : t("toPortal")}
+            </Link>
+          }
+        />
+        {/* ADR-206: the clone works elsewhere, also for founders */}
+        <CloneSection />
+      </div>
     );
   }
 
@@ -69,6 +74,8 @@ export function JobView() {
         <OfficeScene />
         <ActiveJob job={job.data} />
         <CareerLadder job={job.data} />
+        {/* ADR-206: the clone's job, with the same controls */}
+        <CloneSection />
         {employer.data?.kind === "player" ? (
           <OrgChart companyId={employer.data.company.id} />
         ) : (
