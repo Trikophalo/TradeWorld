@@ -7,6 +7,7 @@ import { COIN, COMPANY_BUILDINGS, SECTOR_ICONS, UI_ICONS } from "@/components/pi
 import { PixelIcon } from "@/components/pixel/pixel-icon";
 import { Badge } from "@/components/ui/badge";
 import { Countdown } from "@/components/ui/countdown";
+import { Tooltip } from "@/components/ui/tooltip";
 import { LiveMoney, ShortMoney } from "@/components/ui/live-money";
 import { BALANCE } from "@/config/balance";
 import { demoCloseQuarter } from "@/features/game/demo-engine";
@@ -140,8 +141,22 @@ export function HeadquartersHero({
             <ShortMoney cents={company.cashCents} />
           )}
         </Plate>
-        <Plate icon={<PixelIcon {...UI_ICONS.markets} scale={2} />} label={t("value")}>
-          <ShortMoney cents={company.valueCents} />
+        {/* ADR-203: the value Top-Unternehmen and the net worth count (listed: market cap) */}
+        <Plate
+          icon={<PixelIcon {...UI_ICONS.markets} scale={2} />}
+          label={company.worth?.basis === "market_cap" ? t("valueMarketCap") : t("value")}
+          info={t("valueHint", { basis: company.worth?.basis ?? "company_value" })}
+          note={
+            company.worth?.basis === "market_cap" && company.worth.companyValueCents !== null ? (
+              <>
+                {t("valueEarnings")} <ShortMoney cents={company.worth.companyValueCents} />
+              </>
+            ) : undefined
+          }
+        >
+          <span data-testid="company-worth">
+            <ShortMoney cents={company.worth?.cents ?? company.valueCents} />
+          </span>
         </Plate>
         {live ? (
           <>
@@ -211,6 +226,8 @@ function Plate({
   label,
   tone,
   live,
+  info,
+  note,
   children,
 }: {
   icon: ReactNode;
@@ -218,6 +235,10 @@ function Plate({
   tone?: "gain" | "loss";
   /** Runs live between two operating hours (ADR-072). */
   live?: boolean;
+  /** How the number is computed, in a tooltip next to the label. */
+  info?: string;
+  /** A small line under the number. */
+  note?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -229,6 +250,17 @@ function Plate({
         <dt className="flex items-center gap-1.5 label-pixel text-fg-3">
           {label}
           {live && <span className="size-1.5 rounded-pill bg-gain motion-safe:animate-pulse" aria-hidden />}
+          {info && (
+            <Tooltip content={info}>
+              <button
+                type="button"
+                aria-label={info}
+                className="grid size-4 place-items-center rounded-pill bg-surface-3 font-pixel text-2xs text-fg-2 focus-ring transition-colors duration-fast hover:bg-accent-soft hover:text-accent"
+              >
+                ?
+              </button>
+            </Tooltip>
+          )}
         </dt>
         <dd
           className={cn(
@@ -238,6 +270,7 @@ function Plate({
         >
           {children}
         </dd>
+        {note && <p className="truncate text-xs text-fg-3">{note}</p>}
       </div>
     </div>
   );

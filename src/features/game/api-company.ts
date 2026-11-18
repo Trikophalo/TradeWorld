@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { SectorKey } from "@/components/pixel/art";
 import type { SkillBranch } from "@/config/skills";
 import { applicationSchema, promotionSchema, toApplication, toRequirements } from "./api-careers";
+import { toWorth, worthSchema } from "./api-toplists";
 import { rpc, toErrorKey } from "./rpc";
 import type {
   ChatMessage,
@@ -282,6 +283,8 @@ const companySchema = z.object({
   close_warnings: z
     .array(z.object({ step: z.string().nullable(), at: iso, error: z.string().nullable(), failures: num }))
     .default([]),
+  // ADR-203: the value Top-Unternehmen and the net worth count
+  worth: worthSchema.nullable().default(null),
 });
 
 const wrapped = z.object({ company: companySchema.nullable() });
@@ -621,6 +624,7 @@ function toCompany(c: z.infer<typeof companySchema>): MyCompany {
       error: w.error ?? "",
       failures: w.failures,
     })),
+    worth: c.worth ? toWorth(c.worth) : null,
     campaign: c.campaign ? toCampaign(c.campaign) : null,
     campaignCosts: c.campaign_costs,
     aiWageCentsPerHour: c.ai_wage_cents_per_hour,

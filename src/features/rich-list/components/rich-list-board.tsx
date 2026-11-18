@@ -12,14 +12,17 @@ import { SPRING } from "@/lib/motion";
 import { useRichList } from "../hooks";
 import { CompanyRankingList } from "./company-ranking";
 import { MyRankCard } from "./my-rank-card";
+import { NetWorthBreakdownCard } from "./net-worth-breakdown";
+import { RankingColumns, RankingMethod } from "./ranking-parts";
 import { RankRow } from "./rank-row";
 import { RichNews } from "./rich-news";
 
 type Board = "forbes" | "all" | "companies";
 
 /**
- * Rankings (ADR-074): "Forbes 100" (the 100 richest real players), everyone including the AI tycoons,
- * and the most valuable companies. Refreshed every few seconds.
+ * Rankings (ADR-074, ADR-203): "Forbes 100" (the 100 richest real players), everyone including the AI tycoons,
+ * and the most valuable companies. Every list says how it counts ("Wie wird gerechnet?"), shows the change since
+ * yesterday and pins your own place when it is not on the page. Refreshed every few seconds.
  */
 export function RichListBoard() {
   const t = useTranslations("richList");
@@ -46,10 +49,11 @@ export function RichListBoard() {
           name: t("youName"),
           description: null,
           netWorthCents: me.netWorthCents,
-          change24hBps: null,
-          rankChange24h: null,
+          change24hBps: me.change24hBps,
+          rankChange24h: me.rankChange24h,
           isMe: true,
           avatarKey: null,
+          source: null,
         }
       : null;
 
@@ -73,10 +77,12 @@ export function RichListBoard() {
           </span>
           <span>{t("live")}</span>
         </p>
+        <RankingMethod board={board} />
         {board === "companies" ? (
           <CompanyRankingList />
         ) : (
           <>
+            <RankingColumns name={tr("colName")} value={tr("colWealth")} />
             {!list.data && Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)}
             <ol className="space-y-1">
               <AnimatePresence initial={false}>
@@ -88,7 +94,8 @@ export function RichListBoard() {
               </AnimatePresence>
             </ol>
             {meEntry && (
-              <div className="mt-3 border-t border-line-1 pt-3">
+              <div className="mt-3 border-t border-line-1 pt-3" data-testid="rank-me-pinned">
+                <p className="mb-1 px-2 label-pixel text-fg-3">{tr("yourPlace")}</p>
                 <RankRow entry={meEntry} />
               </div>
             )}
@@ -97,6 +104,7 @@ export function RichListBoard() {
       </Card>
       <div className="space-y-5 lg:space-y-6">
         <MyRankCard />
+        <NetWorthBreakdownCard />
         <RichNews limit={10} />
         <p className="text-sm text-pretty text-fg-3">{t("explain")}</p>
       </div>

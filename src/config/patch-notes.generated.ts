@@ -618,6 +618,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Grundeinkommen stark ausbaubar",
         text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-b86b8e76",
+        title: "Ranglisten mit klaren Regeln",
+        text: "Jede Firma hat jetzt überall denselben Wert: an der Börse den Börsenwert (Aktien × letzter Kurs), privat den Firmenwert.",
+      },
     ],
   },
   {

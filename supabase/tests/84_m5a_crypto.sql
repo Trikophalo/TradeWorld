@@ -11,6 +11,7 @@ set client_min_messages = notice;
 update public.invite_codes set max_uses = max_uses + 6 where code = 'M1-TESTS';
 select tests.signup(:t, 'Krypto_Tom') is not null and tests.signup(:k, 'Krypto_Kim') is not null
    and tests.signup(:h, 'Krypto_Hal') is not null and tests.signup(:n, 'Krypto_Neu') is not null as ok \gset
+select tests.vault_quiet(array[:t, :k, :h, :n]::uuid[]);
 update public.sim_runtime set is_paused = false;
 select tests.set_level(:t, 10);
 select tests.set_level(:k, 14);

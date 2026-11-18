@@ -65,6 +65,7 @@ import {
   type CampaignKind,
   type CompanyAutopilot,
   type CompanyAwareness,
+  type CompanyWorth,
   type ChatMessage,
   type CloseCompanyResult,
   type Dissolution,
@@ -717,6 +718,22 @@ export function createCompanyEngine(host: CompanyHost) {
     );
   }
 
+  /** THE value of the company (ADR-203): listed at shares x last price, private at the company value. */
+  function worthOf(company: DemoCompanyState): CompanyWorth {
+    const fundamental = valueCents(company);
+    const l = company.listing;
+    if (l?.status === "listed" && l.lastPriceCents !== null) {
+      return {
+        cents: l.sharesTotal * l.lastPriceCents,
+        basis: "market_cap",
+        companyValueCents: fundamental,
+        priceE4: l.lastPriceCents * 100,
+        shares: l.sharesTotal,
+      };
+    }
+    return { cents: fundamental, basis: "company_value", companyValueCents: fundamental, priceE4: null, shares: null };
+  }
+
   /** Fraction of the subscription window that has passed. */
   function offerProgress(company: DemoCompanyState, at: number): number {
     const offer = company.listing!.offer!;
@@ -895,6 +912,7 @@ export function createCompanyEngine(host: CompanyHost) {
       })),
       reputation: demoReputation(company),
       closeWarnings: [],
+      worth: worthOf(company),
       founderPayoutBps: company.founderPayoutBps ?? 0,
       strengths: demoStrengths(company),
       campaign: campaignView(company),
@@ -1432,6 +1450,18 @@ export function createCompanyEngine(host: CompanyHost) {
     valueCents: () => {
       const company = host.company();
       return company ? valueCents(company) : 0;
+    },
+    /** ADR-203: the value Top-Unternehmen shows, or null without a company. */
+    worth: (): CompanyWorth | null => {
+      const company = host.company();
+      return company ? worthOf(company) : null;
+    },
+    /** ADR-203: the founder's stake in the net worth: the worth, or the own shares at the last price once listed. */
+    stakeCents: (): number => {
+      const company = host.company();
+      if (!company) return 0;
+      const w = worthOf(company);
+      return w.basis === "market_cap" ? company.listing!.founderShares * (w.priceE4! / 100) : w.cents;
     },
     fixedCostCents,
     /** The listed own company as a stock of the demo market (ADR-145), or null. */

@@ -25,7 +25,7 @@ import { useDeals } from "@/features/deals/hooks";
 import { useGameErrorText } from "@/features/game/errors";
 import { useGame, usePlayerLevel } from "@/features/game/store";
 import { useDailyRewardSheet } from "@/features/progression/components/daily-reward";
-import { useRichList } from "@/features/rich-list/hooks";
+import { useMyNetWorth, useRichList } from "@/features/rich-list/hooks";
 import { formatInteger, formatMoney } from "@/lib/format";
 import { haptic } from "@/lib/haptics";
 import { SPRING, STAGGER } from "@/lib/motion";
@@ -132,10 +132,12 @@ export function HomeHero() {
   const t = useTranslations("today");
   const th = useTranslations("home");
   const nickname = useGame((s) => s.portfolio?.nickname ?? "");
-  // Wealth includes the own company (ADR-057), like on the rich list.
-  const total = useGame((s) =>
+  // ADR-203: the same net worth as the rich list (every part); the portfolio sum only until it has loaded
+  const parts = useMyNetWorth().data;
+  const rough = useGame((s) =>
     s.portfolio ? s.portfolio.totalCents + s.portfolio.companyValueCents - s.portfolio.debtCents : undefined,
   );
+  const total = parts?.totalCents ?? rough;
   const { now, part, lineKey, done } = useToday();
   const start = BALANCE.economy.startingCapitalCents;
 

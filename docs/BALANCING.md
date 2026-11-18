@@ -1603,3 +1603,14 @@ Schulung 1 / 2 / 4 / 8 / 12 h. Je Stufe: Daten analysieren und Kampagnen Nachfra
 Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazität +10 %, Wareneinsatz −8 %, Fixkosten
 −10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
 von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
+
+## Nachtrag: Ranglisten (ADR-203)
+
+| Wert                              | Wert | Wirkung                                                                   |
+| --------------------------------- | ---- | ------------------------------------------------------------------------- |
+| `richList.companySnapshotMinutes` | 30   | Abstand der Schnappschüsse von Top-Unternehmen (Pfeile gegenüber gestern) |
+| `richList.snapshotKeepDays`       | 8    | so lange bleiben die Firmen-Schnappschüsse                                |
+
+Bewertet wird ohne eigene Spielwerte: Börsenwert = Aktien × letzter Kurs, Firmenwert wie bisher
+(`startups.valuationPeDiscount`, `sectors.*.peRatio`), Vermögensteile mit den Werten ihrer Bereiche (Geldkurs,
+Nexamon-Marktwert, `property.*`, Tresor).

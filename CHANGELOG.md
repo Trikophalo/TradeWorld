@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Ranglisten mit klaren Regeln (ADR-203):** Jede Firma hat jetzt überall denselben Wert: an der Börse den Börsenwert (Aktien × letzter Kurs), privat den Firmenwert. Die Firmenseite zeigt genau den Wert aus „Top-Unternehmen“ und daneben den Ertragswert. Forbes 100 zählt dein ganzes Vermögen: auch Nexamon-Karten und Slabs, den Tresor und gezeichnete Aktien; eine Börsenfirma zählt nicht mehr doppelt. Neu: „Wie wird gerechnet?“, Branchenfilter, Pfeile gegenüber gestern, dein Platz unten angeheftet und eine Aufstellung deines Vermögens.
+
 - **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro Stunde); die Preise steigen von 3.000 € bis rund 259.500 €.
 
 - **KI kauft auch teure Karten (ADR-195):** Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab. Bis 15 % über Wert klappt es nur manchmal, eher bei beliebten Karten; darüber nie.
