@@ -98,7 +98,9 @@
   },
   "tiers": {
     "bluechip": "Bluechip",
-    "midcap": "Mittelstand",
+    "largecap": "Large Cap",
+    "midcap": "Mid Cap",
+    "smallcap": "Small Cap",
     "penny": "Pennystock"
   },
   "home": {
@@ -1045,7 +1047,11 @@
     "world_subsidiary_locked": "Tochterfirmen gibt es ab 50 Mio. € Firmenwert oder mit einem Bürokomplex.",
     "world_subsidiary_cap": "Mehr Tochterfirmen geht nicht. Schließe eine, um ein neues Land zu öffnen.",
     "world_same_country": "In diesem Land ist deine Firma schon.",
-    "world_not_leader": "Nur der Marktführer eines Landes legt die Standortgebühr fest."
+    "world_not_leader": "Nur der Marktführer eines Landes legt die Standortgebühr fest.",
+    "office_max_level": "Du hast schon alle Büroflächen gekauft.",
+    "office_seats_max": "Deine Firma hat schon die höchste Zahl an Plätzen.",
+    "office_legal_form": "Diese Bürofläche gibt es erst mit einer größeren Rechtsform.",
+    "office_worth": "Für diese Bürofläche ist deine Firma noch nicht wertvoll genug."
   },
   "locks": {
     "level": "Level {level}",
@@ -2644,7 +2650,38 @@
     },
     "valueMarketCap": "Börsenwert",
     "valueEarnings": "Ertragswert",
-    "valueHint": "So zählt deine Firma in „Top-Unternehmen“ und in deinem Vermögen. {basis, select, market_cap {An der Börse: alle Aktien × letzter Kurs. Der Ertragswert ist Kasse plus Jahresgewinn × KGV, so viel wäre sie privat wert.} other {Privat: Kasse − offene Löhne + Jahresgewinn × KGV der Branche × Abschlag.}}"
+    "valueHint": "So zählt deine Firma in „Top-Unternehmen“ und in deinem Vermögen. {basis, select, market_cap {An der Börse: alle Aktien × letzter Kurs. Der Ertragswert ist Kasse plus Jahresgewinn × KGV, so viel wäre sie privat wert.} other {Privat: Kasse − offene Löhne + Jahresgewinn × KGV der Branche × Abschlag.}}",
+    "offices": {
+      "title": "Büroflächen",
+      "intro": "Mehr Schreibtische für dein Team, bis zu {max} Plätze. Jede Fläche kostet einmal und danach Miete je Platz.",
+      "level": "Fläche {level} von {steps}",
+      "seats": "{total} von {max} Plätzen",
+      "seatsLabel": "Plätze deiner Firma",
+      "used": "{used} belegt",
+      "sources": {
+        "tier": "Rechtsform",
+        "expansion": "Ausbau",
+        "headquarters": "Zentrale",
+        "offices": "Büroflächen"
+      },
+      "rent": "Miete {amount} je Stunde",
+      "next": "Nächste Fläche: +{seats} Plätze",
+      "button": "Fläche {n} kaufen · {amount}",
+      "needCash": "In der Firmenkasse fehlen noch {amount}.",
+      "needWorth": "Ab einem Firmenwert von {amount} (jetzt {now}).",
+      "needForm": "Diese Fläche gibt es erst als {forms}.",
+      "forms": {
+        "gmbh": "GmbH",
+        "ag": "AG"
+      },
+      "maxLevel": "Alle Flächen gekauft. Mehr Plätze bringen Ausbau und Zentrale.",
+      "seatsMax": "Deine Firma hat {max} Plätze, mehr geht nicht.",
+      "done": "Neue Bürofläche bezogen!",
+      "loadError": "Die Büroflächen konnten nicht geladen werden.",
+      "retry": "Nochmal laden",
+      "locked": "Büroflächen gibt es ab der GmbH."
+    },
+    "moreSeats": "… und {count} weitere"
   },
   "debt": {
     "title": "Schulden",
@@ -2684,7 +2721,9 @@
     "hintAi": "Hier arbeiten noch mehr Spieler. Schreiben geht nur in Spielerfirmen.",
     "aiWorkerName": "KI-Kraft",
     "aiGeneral": "Allrounder",
-    "people": "Leute im Büro"
+    "people": "Leute im Büro",
+    "moreRobots": "+{count}",
+    "moreRobotsLabel": "{count} weitere KI-Kräfte"
   },
   "workTask": {
     "title": "Arbeitsaufgabe",
@@ -12863,5 +12902,18 @@
       "sectorDown": "gemieden",
       "loadError": "Die Marktstimmung ist gerade nicht abrufbar."
     }
+  },
+  "stockTier": {
+    "title": "Aktienklasse",
+    "intro": "Je größer der Börsenwert, desto höher die Klasse: Große Orders bewegen den Kurs weniger, der Kurs schwankt ruhiger und mehr Anleger schauen hin.",
+    "badgeLabel": "Aktienklasse: {tier}",
+    "cap": "Börsenwert {amount}",
+    "next": "{tier} ab {amount}",
+    "top": "Höchste Klasse erreicht.",
+    "down": "Unter {amount} fällt die Aktie zurück.",
+    "depth": "{amount} bewegen den Kurs um 1 %",
+    "progressLabel": "Weg zur nächsten Klasse",
+    "ladderLabel": "Alle Klassen",
+    "checked": "Die Börse prüft die Klasse alle {minutes} Minuten, ein Wechsel frühestens nach {hours} Stunden."
   }
 }

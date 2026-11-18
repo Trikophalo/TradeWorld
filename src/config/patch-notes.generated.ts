@@ -1042,6 +1042,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Spieleraktien steigen nicht mehr von allein: Ihr fairer Wert kommt jetzt aus dem Gewinn der Firma, nicht mehr aus dem Geld, das sich in der Kasse…",
       },
+      {
+        id: "m0-fundament-ce37ccc9",
+        title: null,
+        text: "Mehr Platz und mehr Klasse: Unter „Wachstum & Ausbau“ kaufst du jetzt Büroflächen, bis deine Firma 1.000 Plätze hat.",
+      },
     ],
   },
 ];

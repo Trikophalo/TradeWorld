@@ -26,7 +26,7 @@ import { usePlayerCard } from "@/features/career/hooks";
 import { useGameErrorText } from "@/features/game/errors";
 import { engine, useGame } from "@/features/game/store";
 import type { CareerTier, CompanyApplication, JobRequirementInfo, MyCompany, TeamMember } from "@/features/game/types";
-import { formatBps, formatMoney, formatPercentBps } from "@/lib/format";
+import { formatBps, formatInteger, formatMoney, formatPercentBps } from "@/lib/format";
 import { fitPercent, profitShareBps, stockGrantChanceBps } from "@/lib/sim/skills";
 import { trainingFor } from "@/lib/sim/startup";
 import { OrgChart } from "./org-chart";
@@ -35,6 +35,7 @@ import { playSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { useCompanyApplications, useCompanyPostings, useCompanyRefresh, useCompanyTeam, useFloorLooks } from "../hooks";
+import { aiHireOptions, visibleRows } from "../seats";
 import { FoldBlock, SubSection } from "./firm-layout";
 
 type BranchKey = Parameters<ReturnType<typeof useTranslations<"skills.branches">>>[0];
@@ -504,10 +505,7 @@ function AiHirePanel({
             onValueChange={(v) => onCount(Number(v))}
             label={t("aiCount")}
             size="sm"
-            options={Array.from({ length: Math.min(3, freeSlots) }, (_, i) => ({
-              value: String(i + 1),
-              label: String(i + 1),
-            }))}
+            options={aiHireOptions(freeSlots).map((n) => ({ value: String(n), label: formatInteger(n) }))}
           />
         </div>
       )}
@@ -785,20 +783,22 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
                       <AiWorkerRow company={company} skill={skill} />
                     </li>
                   ))}
-                  {Array.from({ length: general }, (_, i) => (
+                  {Array.from({ length: visibleRows(general).shown }, (_, i) => (
                     <li key={`ai-general-${i}`}>
                       <AiWorkerRow company={company} skill={null} />
                     </li>
                   ))}
+                  <MoreRows count={visibleRows(general).more} />
                 </SeatGroup>
               )}
               {free > 0 && (
                 <SeatGroup title={t("planFree")} count={free} defaultOpen={free <= PLAN_OPEN_UP_TO}>
-                  {Array.from({ length: free }, (_, i) => (
+                  {Array.from({ length: visibleRows(free).shown }, (_, i) => (
                     <li key={`free-${i}`}>
                       <FreeSeat onHire={() => onHire({})} />
                     </li>
                   ))}
+                  <MoreRows count={visibleRows(free).more} />
                 </SeatGroup>
               )}
             </div>
@@ -823,6 +823,17 @@ export function TeamView({ company, onHire }: { company: MyCompany; onHire: (req
       </Section>
       <FireSheet member={firing} onClose={() => setFiring(null)} />
     </div>
+  );
+}
+
+/** Large teams (ADR-218): the rows past SEAT_ROWS_MAX in one line. */
+function MoreRows({ count }: { count: number }) {
+  const t = useTranslations("firm");
+  if (count <= 0) return null;
+  return (
+    <li className="px-1 py-2 nums text-xs text-fg-3 lg:col-span-2" data-testid="seat-more">
+      {t("moreSeats", { count: formatInteger(count) })}
+    </li>
   );
 }
 

@@ -2101,3 +2101,50 @@ Jede Stunde Rauschen auf den Gewinn (σ 0,2 bis 0,3) und ein Zufallspfad des Ges
 KI-Index am Ende (Median): vorher −3 %, nachher +1 %. Der Mittelwert über alle vier Firmen bleibt positiv, weil zwei
 von ihnen ihren Gewinn im Szenario versechsfachen; die beiden ohne starkes Gewinnwachstum laufen jetzt seitwärts
 (Median −7 % und +5 % je Woche, 59 % und 47 % der Wochen im Minus) statt +27 bis +32 % je Woche.
+
+## Nachtrag: Büroflächen bis 1.000 Plätze, Aktienklassen für Spieleraktien (ADR-218)
+
+**Plätze einer Spielerfirma** = Rechtsform (Garage 2, Kleinunternehmen 5, GmbH 20, AG 100) + 10 × Ausbaustufe
+(ADR-083) + Zentrale (ADR-208: 5 + 15 + 40 + 100 + 250 = 410) + Büroflächen, zusammen höchstens
+`startups.offices.maxTotalSeats` = **1.000**. Vorher waren 1.000 Plätze praktisch unerreichbar: eine AG mit voller
+Zentrale (510) brauchte 49 Ausbaustufen, die 49. hätte 10 Mio. € × 1,8⁴⁸ ≈ 10¹⁹ € gekostet.
+
+Büroflächen (`startups.offices`, `src/lib/sim/offices.ts`): Preis einmalig aus der freien Firmenkasse an die
+Staatskasse, danach **Miete 10 € je Büroplatz und Stunde** (Stundenabrechnung, nur aus der freien Kasse, nie als
+offene Rechnung). Firmenwert = `company_worth_cents` (börsennotiert: Börsenwert).
+
+| Fläche | Plätze | Büroplätze gesamt |       Preis |  Summe Preise | Rechtsform | Firmenwert ab | Miete gesamt je Stunde | Preis je Platz | AG + volle Zentrale |
+| -----: | -----: | ----------------: | ----------: | ------------: | ---------- | ------------: | ---------------------: | -------------: | ------------------: |
+|      1 |    +10 |                10 | 0,25 Mio. € |   0,25 Mio. € | GmbH, AG   |           0 € |                  100 € |       25.000 € |                 520 |
+|      2 |    +15 |                25 | 0,60 Mio. € |   0,85 Mio. € | GmbH, AG   |      2 Mio. € |                  250 € |       40.000 € |                 535 |
+|      3 |    +20 |                45 | 1,50 Mio. € |   2,35 Mio. € | GmbH, AG   |      5 Mio. € |                  450 € |       75.000 € |                 555 |
+|      4 |    +25 |                70 | 3,50 Mio. € |   5,85 Mio. € | AG         |     15 Mio. € |                  700 € |      140.000 € |                 580 |
+|      5 |    +30 |               100 | 8,00 Mio. € |  13,85 Mio. € | AG         |     30 Mio. € |                1.000 € |      266.667 € |                 610 |
+|      6 |    +35 |               135 |   18 Mio. € |  31,85 Mio. € | AG         |     60 Mio. € |                1.350 € |      514.286 € |                 645 |
+|      7 |    +40 |               175 |   40 Mio. € |  71,85 Mio. € | AG         |    120 Mio. € |                1.750 € |    1.000.000 € |                 685 |
+|      8 |    +50 |               225 |   80 Mio. € | 151,85 Mio. € | AG         |    250 Mio. € |                2.250 € |    1.600.000 € |                 735 |
+|      9 |    +60 |               285 |  150 Mio. € | 301,85 Mio. € | AG         |    500 Mio. € |                2.850 € |    2.500.000 € |                 795 |
+|     10 |    +70 |               355 |  250 Mio. € | 551,85 Mio. € | AG         |    900 Mio. € |                3.550 € |    3.571.429 € |                 865 |
+|     11 |    +70 |               425 |  400 Mio. € | 951,85 Mio. € | AG         |  1.500 Mio. € |                4.250 € |    5.714.286 € |                 935 |
+|     12 |    +75 |               500 |  600 Mio. € |   1,55 Mrd. € | AG         |  2.500 Mio. € |                5.000 € |    8.000.000 € |      1.000 (Deckel) |
+
+Der Weg zu 1.000 Plätzen: AG (100) + Mega-Campus (410, zusammen 330 Mio. €) + alle zwölf Flächen (1,55 Mrd. €), oder
+weniger Flächen und dafür Ausbaustufen. Jeder Platz kostet laufend weiter: Eine KI-Kraft 120 € je Stunde, ein Spieler
+sein Gehalt, ein Büroplatz 10 € Miete, ob besetzt oder nicht. 1.000 KI-Kräfte kosten 120.000 € je Stunde.
+
+**Aktienklassen** (`trading.playerStockTiers`, `src/lib/sim/stock-tier.ts`): Der Börsenwert einer Spieleraktie
+entscheidet ihre Klasse (`companies.tier`). Zum Vergleich die KI-Aktien: Pennystocks 17–45 Mio. €, Mid Caps
+250–570 Mio. €, Bluechips 3,3–6,8 Mrd. €.
+
+| Klasse     | Börsenwert ab | fällt zurück unter | 1 % Kursbewegung kostet | halber Spread | Rauschen je Takt | KI-Gewicht ab Spielerumsatz | Leerverkauf-Gebühr |
+| ---------- | ------------: | -----------------: | ----------------------: | ------------: | ---------------: | --------------------------: | -----------------: |
+| Pennystock |           0 € |                  – |                 1.000 € |        60 bps |           45 bps |                    50.000 € |               10 % |
+| Small Cap  |     50 Mio. € |          40 Mio. € |                 2.500 € |        30 bps |           26 bps |                   120.000 € |              5,5 % |
+| Mid Cap    |    200 Mio. € |         160 Mio. € |                 5.000 € |        15 bps |           15 bps |                   250.000 € |                3 % |
+| Large Cap  |  1.000 Mio. € |         800 Mio. € |                10.000 € |         9 bps |           10 bps |                   500.000 € |              1,8 % |
+| Bluechip   |  3.000 Mio. € |       2.400 Mio. € |                20.000 € |         5 bps |            6 bps |                 1.000.000 € |                1 % |
+
+Prüfung alle 10 Minuten; aufwärts gleich bis zur höchsten erreichten Klasse, abwärts eine Klasse je Prüfung erst unter
+80 % der eigenen Schwelle; zwischen zwei Wechseln mindestens 6 Stunden. Gemessen im SQL-Test `f6_seats_and_tiers.sql`:
+ein Kauf über 2.000 € bewegt eine Spieleraktie als Pennystock um 198 bps, als Small Cap 80, Mid Cap 40, Large Cap 20,
+Bluechip 10 bps.

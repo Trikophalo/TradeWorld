@@ -1,0 +1,11 @@
+{
+  "next": { "n": 1, "seats": 10, "tiers": ["gmbh", "ag"], "cost_cents": 25000000, "min_worth_cents": 0 },
+  "tier": "gmbh",
+  "block": "cash",
+  "level": 0,
+  "seats": { "max": 1000, "tier": 20, "used": 0, "total": 30, "offices": 0, "expansion": 10, "headquarters": 0 },
+  "steps": 12,
+  "worth_cents": 6000000,
+  "free_cash_cents": 6000000,
+  "rent_cents_per_hour": 0
+}

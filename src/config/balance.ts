@@ -45,7 +45,11 @@ import { UPGRADES, type UpgradesConfig } from "./upgrades.ts";
  */
 
 export type SectorId = "tech" | "retail" | "energy" | "pharma" | "logistics";
-export type SizeClass = "bluechip" | "midcap" | "penny";
+/**
+ * Size class of a stock, largest first. AI companies use bluechip, midcap and penny; listed player companies climb the
+ * whole ladder by market cap (ADR-218, `trading.playerStockTiers`).
+ */
+export type SizeClass = "bluechip" | "largecap" | "midcap" | "smallcap" | "penny";
 export type CompanyTierId = "small_business" | "gmbh" | "ag" | "listed";
 /** Market segment a company sells in. Every company tier has exactly one segment. */
 export type SegmentId = "local" | "regional" | "national" | "international";
@@ -206,6 +210,25 @@ export interface TradingConfig {
      * limit (ADR-214): stocks rise and fall without a limit, market forces cool overheated ones.
      */
     readonly dailyBandBps: number;
+  };
+  /**
+   * Stock tiers of listed player companies (ADR-218): the tier (companies.tier) follows the market cap. A stock climbs
+   * to the highest rung whose `minMarketCapCents` it reaches and falls back only below `downBps` of its own rung's
+   * threshold (hysteresis); between two changes at least `minHoursBetweenChanges` pass. The tier sets the order impact
+   * depth, spread, noise and AI interest of the stock (the Record<SizeClass> values above and in aiInvestors).
+   */
+  readonly playerStockTiers: {
+    /** Rungs from the bottom (penny, threshold 0) to the top. `label` is the name in news and notifications. */
+    readonly ladder: readonly {
+      readonly tier: SizeClass;
+      readonly minMarketCapCents: number;
+      readonly label: string;
+    }[];
+    /** Falls back one rung once the market cap is below this share (bps) of the own rung's threshold. */
+    readonly downBps: number;
+    readonly minHoursBetweenChanges: number;
+    /** How often the server checks (cron, minutes). */
+    readonly checkEveryMinutes: number;
   };
 }
 
@@ -1517,6 +1540,23 @@ export interface StartupsConfig {
     readonly fixedCostPerLevel: number;
   };
   /**
+   * Büroflächen (ADR-218): a separate paid line of seats beside the legal form (maxEmployees), the expansion levels
+   * and the headquarters (ADR-208). Step n needs a legal form from `tiers` and a company value (company_worth_cents)
+   * of at least `minWorthCents`, costs `costCents` from the free company cash (to the treasury) and brings `seats`.
+   * Every bought office seat costs `rentCentsPerSeatPerHour` in the hourly close (from the free cash). All seats
+   * together are capped at `maxTotalSeats`.
+   */
+  readonly offices: {
+    readonly maxTotalSeats: number;
+    readonly rentCentsPerSeatPerHour: number;
+    readonly steps: readonly {
+      readonly seats: number;
+      readonly costCents: number;
+      readonly minWorthCents: number;
+      readonly tiers: readonly ("gmbh" | "ag")[];
+    }[];
+  };
+  /**
    * Price strategy (ADR-083): price per unit, how many customers buy, and how fast word of mouth spreads.
    */
   readonly pricing: Readonly<
@@ -1970,7 +2010,7 @@ export const BALANCE = {
     capitalGainsTaxBps: 2500,
     incomeTaxOnCouponsAndDividendsBps: 2500,
     spread: {
-      halfSpreadBps: { bluechip: 5, midcap: 15, penny: 60 },
+      halfSpreadBps: { bluechip: 5, largecap: 9, midcap: 15, smallcap: 30, penny: 60 },
       sentimentWideningBps: 20,
       minHalfSpreadE4: 1,
     },
@@ -1988,7 +2028,7 @@ export const BALANCE = {
       sizeJitter: 0.2,
     },
     financingSpreadBps: 400,
-    borrowFeeBps: { bluechip: 100, midcap: 300, penny: 1000 },
+    borrowFeeBps: { bluechip: 100, largecap: 180, midcap: 300, smallcap: 550, penny: 1000 },
     leverageTiers: [
       { level: 1, maxLeverage: 1 },
       { level: 12, maxLeverage: 2 },
@@ -2008,7 +2048,13 @@ export const BALANCE = {
     playerImpact: {
       // Active players move prices strongly (ADR-120): 10.000 € net buying moves a penny stock by 10 %,
       // a mid cap by 2 %, a blue chip by 0.5 %.
-      depthCentsPer100Bps: { bluechip: 2_000_000, midcap: 500_000, penny: 100_000 },
+      depthCentsPer100Bps: {
+        bluechip: 2_000_000,
+        largecap: 1_000_000,
+        midcap: 500_000,
+        smallcap: 250_000,
+        penny: 100_000,
+      },
       bondDepthCentsPer100Bps: 1_000_000,
       // Small on purpose (ADR-126): a premium the own holding creates must not pay for the own round trip.
       maxHoldingsPremium: 0.15,
@@ -2017,6 +2063,19 @@ export const BALANCE = {
     // ADR-170: no pump with money from the own company. ADR-214: no daily band any more (0 = off); overheated stocks
     // draw market forces (marketForces) instead.
     playerStocks: { insiderCooldownHours: 24, dailyBandBps: 0 },
+    // ADR-218: AI stocks for scale: penny 17-45 Mio. €, mid caps 250-570 Mio. €, blue chips 3.3-6.8 Mrd. €.
+    playerStockTiers: {
+      ladder: [
+        { tier: "penny", minMarketCapCents: 0, label: "Pennystock" },
+        { tier: "smallcap", minMarketCapCents: 5_000_000_000, label: "Small Cap" },
+        { tier: "midcap", minMarketCapCents: 20_000_000_000, label: "Mid Cap" },
+        { tier: "largecap", minMarketCapCents: 100_000_000_000, label: "Large Cap" },
+        { tier: "bluechip", minMarketCapCents: 300_000_000_000, label: "Bluechip" },
+      ],
+      downBps: 8_000,
+      minHoursBetweenChanges: 6,
+      checkEveryMinutes: 10,
+    },
   },
 
   // ----------------------------------------------------------- centralBank (spec 5.1)
@@ -2552,7 +2611,7 @@ export const BALANCE = {
 
   // ---------------------------------------------------------- aiInvestors (spec 5.3)
   aiInvestors: {
-    tickNoiseBps: { bluechip: 6, midcap: 15, penny: 45 },
+    tickNoiseBps: { bluechip: 6, largecap: 10, midcap: 15, smallcap: 26, penny: 45 },
     // ADR-056: markets move much faster and stronger than in real life (was 0.2).
     tickNoiseScale: 0.45,
     emaFastAlpha: 0.15,
@@ -2562,7 +2621,13 @@ export const BALANCE = {
     playerWeight: {
       activityHalfLifeHours: 6,
       // Player volume (within about a quarter) at which players and AI weigh the same.
-      referenceActivityCents: { bluechip: 100_000_000, midcap: 25_000_000, penny: 5_000_000 },
+      referenceActivityCents: {
+        bluechip: 100_000_000,
+        largecap: 50_000_000,
+        midcap: 25_000_000,
+        smallcap: 12_000_000,
+        penny: 5_000_000,
+      },
       minAiWeight: 0.15,
     },
     archetypes: {
@@ -2627,7 +2692,7 @@ export const BALANCE = {
     pharmaTrial: {
       probabilityPerQuarter: 0.12,
       announceLeadQuarters: 2,
-      successProbability: { bluechip: 0.6, midcap: 0.5, penny: 0.4 },
+      successProbability: { bluechip: 0.6, largecap: 0.55, midcap: 0.5, smallcap: 0.45, penny: 0.4 },
       minMove: 0.5,
       maxMove: 0.7,
     },
@@ -2803,6 +2868,25 @@ export const BALANCE = {
       capacityBonusPerLevel: 0.1,
       marketBonusPerLevel: 0.5,
       fixedCostPerLevel: 0.25,
+    },
+    // ADR-218: 12 steps, 500 seats, 1,55 Mrd. € in total; AG 100 + headquarters 410 + offices reach the 1.000 seats.
+    offices: {
+      maxTotalSeats: 1_000,
+      rentCentsPerSeatPerHour: 1_000,
+      steps: [
+        { seats: 10, costCents: 25_000_000, minWorthCents: 0, tiers: ["gmbh", "ag"] },
+        { seats: 15, costCents: 60_000_000, minWorthCents: 200_000_000, tiers: ["gmbh", "ag"] },
+        { seats: 20, costCents: 150_000_000, minWorthCents: 500_000_000, tiers: ["gmbh", "ag"] },
+        { seats: 25, costCents: 350_000_000, minWorthCents: 1_500_000_000, tiers: ["ag"] },
+        { seats: 30, costCents: 800_000_000, minWorthCents: 3_000_000_000, tiers: ["ag"] },
+        { seats: 35, costCents: 1_800_000_000, minWorthCents: 6_000_000_000, tiers: ["ag"] },
+        { seats: 40, costCents: 4_000_000_000, minWorthCents: 12_000_000_000, tiers: ["ag"] },
+        { seats: 50, costCents: 8_000_000_000, minWorthCents: 25_000_000_000, tiers: ["ag"] },
+        { seats: 60, costCents: 15_000_000_000, minWorthCents: 50_000_000_000, tiers: ["ag"] },
+        { seats: 70, costCents: 25_000_000_000, minWorthCents: 90_000_000_000, tiers: ["ag"] },
+        { seats: 70, costCents: 40_000_000_000, minWorthCents: 150_000_000_000, tiers: ["ag"] },
+        { seats: 75, costCents: 60_000_000_000, minWorthCents: 250_000_000_000, tiers: ["ag"] },
+      ],
     },
     pricing: {
       budget: { price: 0.8, demand: 1.35, awareness: 1.5 },

@@ -8,6 +8,7 @@ import type { MyCompany } from "@/features/game/types";
 import { cn } from "@/lib/utils";
 import { companyProgress } from "../progress";
 import { GrowthPath } from "./growth-path";
+import { OfficesCard } from "./offices";
 import { ExpansionCard } from "./profit";
 
 /** How many endless levels after the current one the path shows ahead. */
@@ -88,6 +89,9 @@ export function GrowthAndExpansion({
         </div>
         <div>
           <ExpansionCard company={company} />
+        </div>
+        <div className="border-t border-line-1 pt-4 lg:col-span-2">
+          <OfficesCard />
         </div>
       </div>
     </Card>

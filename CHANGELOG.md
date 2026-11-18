@@ -4,6 +4,14 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Mehr Platz und mehr Klasse: Unter „Wachstum & Ausbau“ kaufst du jetzt Büroflächen, bis deine Firma 1.000 Plätze
+  hat. Jede Fläche kostet mehr als die letzte (von 250.000 € bis 600 Mio. €), braucht ab Fläche 4 eine AG und einen
+  passenden Firmenwert, und jeder Büroplatz kostet Miete. Große Teams stellst du in größeren Schritten ein. Und deine
+  Aktie bleibt nicht mehr für immer ein Pennystock: Mit dem Börsenwert steigt sie zum Small Cap, Mid Cap, Large Cap
+  und Bluechip auf. Je höher die Klasse, desto weniger bewegen große Orders den Kurs und desto ruhiger schwankt er.
+  Du bekommst eine Mitteilung, die Börse meldet den Aufstieg, und Aktienseite und Firma zeigen den Weg zur nächsten
+  Klasse.
+
 - Spieleraktien steigen nicht mehr von allein: Ihr fairer Wert kommt jetzt aus dem Gewinn der Firma, nicht mehr aus
   dem Geld, das sich in der Kasse stapelt. Die Anleger zahlen ein KGV, das mit der Wachstumserwartung, der
   Marktstimmung und den Zyklen der Branche schwankt: Wächst der Gewinn, steigt die Aktie, lässt das Wachstum nach oder

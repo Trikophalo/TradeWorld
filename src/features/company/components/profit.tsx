@@ -60,7 +60,7 @@ function useCompanyWrite() {
   };
 }
 
-function useCompanyAction() {
+export function useCompanyAction() {
   const errorText = useGameErrorText();
   const refresh = useCompanyRefresh();
   return async (action: () => Promise<unknown>, done: string, failTitle: string) => {

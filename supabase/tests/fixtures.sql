@@ -556,6 +556,16 @@ select public.set_founder_payout(gen_random_uuid(), 2500);
 select public.company_deposit(gen_random_uuid(), 10000000) is not null as ok \gset
 \o :fixture_dir/expand_company.json
 select public.expand_company(gen_random_uuid());
+-- ADR-218: Büroflächen, first blocked by the cash, then bought
+\o :fixture_dir/get_company_offices.json
+select public.get_company_offices();
+\o
+reset role;
+select tests.fund(:fx_g, 30000000, 'fixture:m4c:g2');
+select tests.login_as('authenticated', :fx_g) is null as ok \gset
+select public.company_deposit(gen_random_uuid(), 25000000) is not null as ok \gset
+\o :fixture_dir/buy_company_office.json
+select public.buy_company_office(gen_random_uuid());
 \o
 reset role;
 select company_id as fx_gco from public.player_companies where founder_id = :fx_g \gset

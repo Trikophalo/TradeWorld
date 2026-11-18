@@ -11,6 +11,7 @@ import { formatPrice } from "@/lib/format";
 import { brandColor } from "../brand";
 import { CompanyLogo } from "./company-logo";
 import { StockFiguresLine } from "./stock-figures";
+import { StockTierBadge } from "./stock-tier";
 
 const format = (value: number) => formatPrice(Math.round(value));
 
@@ -48,6 +49,9 @@ export function SecurityRow({ ticker, shared = true }: { ticker: string; shared?
             <Badge tone="accent" className="shrink-0" data-testid="player-badge">
               {tm("playerBadge")}
             </Badge>
+          )}
+          {security.companyKind === "player" && security.sizeClass && (
+            <StockTierBadge tier={security.sizeClass} className="hidden min-[360px]:inline-flex" />
           )}
         </span>
         <span className="label-pixel text-fg-3">

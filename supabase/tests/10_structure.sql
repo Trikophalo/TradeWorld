@@ -202,7 +202,9 @@ select tests.assert(
            -- fixed and variable costs of the last hour (ADR-208, Nachtrag)
            'get_company_hour_costs',
            -- investor confidence and market mood (ADR-216)
-           'get_stock_confidence', 'get_market_mood']
+           'get_stock_confidence', 'get_market_mood',
+           -- Büroflächen (ADR-218)
+           'get_company_offices', 'buy_company_office']
   and array['are_friends', 'can_read_ledger_transaction', 'current_game_quarter', 'game_day', 'game_now',
             'has_unlock', 'is_admin', 'is_company_insider', 'owns_ledger_account']
       <@ (select coalesce(array_agg(p.proname::text), '{}')

@@ -28,6 +28,7 @@ import { OrderBook } from "./order-book";
 import { OrderSheet, type OrderSide } from "./order-sheet";
 import { PriceChart } from "./price-chart";
 import { StockFiguresCard } from "./stock-figures";
+import { StockTierBadge, StockTierCard } from "./stock-tier";
 
 const format = (value: number) => formatPrice(Math.round(value));
 const RANGE_OPTIONS = CHART_RANGES.map((value) => ({ value, label: value }));
@@ -143,6 +144,7 @@ export function StockDetail({ ticker }: { ticker: string }) {
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge>{ticker}</Badge>
             {security?.companyKind === "player" && <Badge tone="info">{t("playerBadge")}</Badge>}
+            {security?.kind === "stock" && security.sizeClass && <StockTierBadge tier={security.sizeClass} />}
             {security?.companyId && (
               <Link
                 href={`/companies/${encodeURIComponent(security.companyId)}`}
@@ -226,6 +228,12 @@ export function StockDetail({ ticker }: { ticker: string }) {
               </p>
             )}
           </Card>
+
+          {security?.kind === "stock" && security.companyKind === "player" && (
+            <Reveal feature="stockTier">
+              <StockTierCard ticker={ticker} />
+            </Reveal>
+          )}
 
           {security?.kind === "stock" && (
             <Reveal feature="stockConfidence">

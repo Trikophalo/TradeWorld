@@ -96157,6 +96157,665 @@ begin
   end if;
 end;
 $do$;
+-- ===== idempotent copy of migrations/20261204011300_stock_tier_enum.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 011300 · Enum values for the stock tiers of player companies (ADR-218)
+-- =============================================================================
+-- Listed player companies climb penny → smallcap → midcap → largecap → bluechip by market cap
+-- (20261204011320_player_stock_tiers.sql). A new enum value cannot be used in the transaction that adds it (SQLSTATE
+-- 55P04), so the values get their own file; later files use them only inside PL/pgSQL bodies (as text, cast at run
+-- time). Every lookup keyed by companies.tier (impact depth, spread, noise, AI interest) reads game_config, which
+-- carries the new keys. Order of the enum: largest first.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+alter type public.company_tier add value if not exists 'largecap' after 'bluechip';
+alter type public.company_tier add value if not exists 'smallcap' after 'midcap';
+-- ===== idempotent copy of migrations/20261204011310_company_offices.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 011310 · Büroflächen: up to 1.000 seats, paid step by step (ADR-218)
+-- =============================================================================
+-- The owner: "Man soll mehr Plätze für Mitarbeiter haben. Bis zu 1000. Aber das kostet zu upgraden."
+--
+-- Seats of a player company were legal form (garage 2 … AG 100) + 10 × expansion level (ADR-083/191, × 1,8 in price
+-- per level) + the headquarters (ADR-208, 410 at the Mega-Campus). The expansion level is priced for market and
+-- capacity, so 1.000 seats were out of reach (an AG with the full headquarters needed 49 levels, the 49th costing
+-- 10^19 €). New: a separate line "Büroflächen" (startups.offices, src/lib/sim/offices.ts) with 12 steps and 500 seats,
+-- exponential prices (0,25 Mio. € … 600 Mio. €, 1,55 Mrd. € in all), gated by legal form (steps 1–3 from the GmbH,
+-- 4–12 AG) and company value (company_worth_cents, 2 Mio. € … 2,5 Mrd. €). All seats together are capped at
+-- maxTotalSeats = 1.000. Every bought office seat costs rent in the hourly close (10 € per seat and hour, from the
+-- free cash like the subsidiaries), so empty seats are not free.
+--
+-- Changed (latest full definitions copied):
+--   company_max_employees   from 20261204010010_world_map.sql, + office seats, capped at maxTotalSeats
+--   company_seats_sync      from 20261204007350_company_growth_path.sql, + office_level (trigger column list too)
+--   company_seats_guard     unchanged (it calls company_max_employees)
+--   company_growth_path     from 20261204007350_company_growth_path.sql, + office level and seats
+--   world_hour_costs        from 20261204010010_world_map.sql, + the office rent first (for every player company,
+--                           placed or not; listed_hour_costs calls it for every player company inside its own guard)
+-- New: office_level, company_office_step, company_office_seats, company_offices_json, get_company_offices(),
+--      buy_company_office(request_id).
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. State
+-- ---------------------------------------------------------------------------
+alter table public.player_companies add column if not exists office_level integer not null default 0;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'player_companies_office_level_check') then
+    alter table public.player_companies add constraint player_companies_office_level_check check (office_level >= 0);
+  end if;
+end;
+$$;
+comment on column public.player_companies.office_level is 'Bought Büroflächen steps (ADR-218, startups.offices.steps).';
+
+-- ---------------------------------------------------------------------------
+-- B. Rules (src/lib/sim/offices.ts)
+-- ---------------------------------------------------------------------------
+-- step n (1-based) of startups.offices.steps, null past the last one
+create or replace function public.company_office_step(p_n integer)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when p_n >= 1 then public.config_jsonb('startups', '{offices,steps}') -> (p_n - 1) end;
+$$;
+
+-- office seats after `level` bought steps (officeSeats)
+create or replace function public.company_office_seats(p_level integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum((s ->> 'seats')::integer), 0)::integer
+    from jsonb_array_elements(coalesce(public.config_jsonb('startups', '{offices,steps}'), '[]'::jsonb))
+         with ordinality x(s, n)
+   where x.n <= greatest(0, coalesce(p_level, 0));
+$$;
+
+-- places: tier + expansion (ADR-083/191) + the seats of the headquarters (ADR-208) + offices (ADR-218), capped
+-- (latest definition from 20261204010010_world_map.sql)
+create or replace function public.company_max_employees(p_company uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select least(public.config_double('startups', '{offices,maxTotalSeats}', 1000)::integer,
+               coalesce((public.company_tier_cfg(pc.tier) ->> 'maxEmployees')::integer, 0)
+               + public.config_double('startups', '{expansion,employeesPerLevel}', 10)::integer * pc.expansion_level
+               + coalesce((select sum((public.world_hq_tier_cfg(t.n) ->> 'seats')::integer)
+                             from public.company_locations l, generate_series(1, l.hq_tier) t(n)
+                            where l.company_id = p_company), 0)::integer
+               + public.company_office_seats(pc.office_level))
+    from public.player_companies pc where pc.company_id = p_company;
+$$;
+comment on function public.company_max_employees(uuid) is
+  'Places for players and AI workers (maxEmployees of the tier + employeesPerLevel × expansion level, ADR-083, + the '
+  'seats of every headquarters tier reached, ADR-208, + the Büroflächen, ADR-218), at most offices.maxTotalSeats.';
+
+-- a new legal form, expansion level or office step updates the places (latest definition from 7350)
+create or replace function public.company_seats_sync()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.tier is distinct from old.tier or new.expansion_level is distinct from old.expansion_level
+     or new.office_level is distinct from old.office_level then
+    update public.companies set max_employees = public.company_max_employees(new.company_id) where id = new.company_id;
+  end if;
+  return new;
+end;
+$$;
+comment on function public.company_seats_sync() is
+  'Trigger (ADR-191, ADR-218): a new legal form, expansion level or office step updates the places of the company.';
+
+drop trigger if exists company_seats_sync on public.player_companies;
+create trigger company_seats_sync
+  after update of tier, expansion_level, office_level on public.player_companies
+  for each row execute function public.company_seats_sync();
+
+-- The whole path (latest definition from 7350) plus the office line.
+create or replace function public.company_growth_path(p_company uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'stage', s.stage,
+           'stages', s.total,
+           'expansion_level', pc.expansion_level,
+           'step', s.stage + pc.expansion_level,
+           'next', case when s.stage < s.total then jsonb_build_object('kind', 'stage', 'n', s.stage + 1)
+                        else jsonb_build_object('kind', 'level', 'n', pc.expansion_level + 1) end,
+           'can_expand', public.company_can_expand(pc.tier),
+           'next_cost_cents', case when public.company_can_expand(pc.tier)
+                                   then public.company_expansion_cost_cents(pc.expansion_level) end,
+           'max_employees', public.company_max_employees(pc.company_id),
+           'office_level', pc.office_level,
+           'office_seats', public.company_office_seats(pc.office_level))
+    from public.player_companies pc
+    cross join lateral (
+      select public.company_stage(pc.company_id) as stage,
+             jsonb_array_length(coalesce(public.company_product(pc.company_id) -> 'stages', '[]'::jsonb)) as total) s
+   where pc.company_id = p_company;
+$$;
+comment on function public.company_growth_path(uuid) is
+  'Wachstum & Ausbau as one path (ADR-191): stage, stages, expansion level, step = stage + level, next, next cost, places; '
+  'office level and seats (ADR-218).';
+
+-- ---------------------------------------------------------------------------
+-- C. Read model for the card "Büroflächen"
+-- ---------------------------------------------------------------------------
+create or replace function public.company_offices_json(p_company uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  pc       public.player_companies;
+  v_steps  jsonb := coalesce(public.config_jsonb('startups', '{offices,steps}'), '[]'::jsonb);
+  v_next   jsonb;
+  v_max    integer := public.config_double('startups', '{offices,maxTotalSeats}', 1000)::integer;
+  v_seats  integer;
+  v_worth  bigint;
+  v_free   bigint;
+  v_hq     integer;
+  v_block  text;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  if pc.company_id is null then
+    return null;
+  end if;
+  v_next := public.company_office_step(pc.office_level + 1);
+  v_seats := public.company_max_employees(p_company);
+  v_worth := coalesce(public.company_worth_cents(p_company), 0);
+  select coalesce(a.balance_cents, 0) - pc.unpaid_cents into v_free
+    from public.ledger_accounts a where a.owner_company_id = p_company and a.kind = 'company_cash';
+  v_free := coalesce(v_free, 0);
+  select coalesce(sum((public.world_hq_tier_cfg(t.n) ->> 'seats')::integer), 0)::integer into v_hq
+    from public.company_locations l, generate_series(1, l.hq_tier) t(n) where l.company_id = p_company;
+  -- officeBlock: all bought, cap reached, legal form, company value, free cash
+  v_block := case when v_next is null then 'max_level'
+                  when v_seats >= v_max then 'seats_max'
+                  when not coalesce(v_next -> 'tiers', '[]'::jsonb) ? pc.tier then 'legal_form'
+                  when v_worth < (v_next ->> 'minWorthCents')::bigint then 'worth'
+                  when v_free < (v_next ->> 'costCents')::bigint then 'cash' end;
+  return jsonb_build_object(
+    'level', pc.office_level,
+    'steps', jsonb_array_length(v_steps),
+    'tier', pc.tier,
+    'seats', jsonb_build_object(
+      'tier', coalesce((public.company_tier_cfg(pc.tier) ->> 'maxEmployees')::integer, 0),
+      'expansion', public.config_double('startups', '{expansion,employeesPerLevel}', 10)::integer * pc.expansion_level,
+      'headquarters', coalesce(v_hq, 0),
+      'offices', public.company_office_seats(pc.office_level),
+      'total', v_seats,
+      'max', v_max,
+      'used', public.company_headcount(p_company)),
+    'rent_cents_per_hour', public.company_office_seats(pc.office_level)::bigint
+                           * public.config_double('startups', '{offices,rentCentsPerSeatPerHour}', 1000)::bigint,
+    'worth_cents', v_worth,
+    'free_cash_cents', v_free,
+    'next', case when v_next is not null then jsonb_build_object(
+              'n', pc.office_level + 1,
+              'seats', (v_next ->> 'seats')::integer,
+              'cost_cents', (v_next ->> 'costCents')::bigint,
+              'min_worth_cents', (v_next ->> 'minWorthCents')::bigint,
+              'tiers', coalesce(v_next -> 'tiers', '[]'::jsonb)) end,
+    'block', v_block);
+end;
+$$;
+comment on function public.company_offices_json(uuid) is
+  'Büroflächen of a player company (ADR-218): level, seats by source, rent, next step and why it is blocked.';
+
+create or replace function public.get_company_offices()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  return public.company_offices_json(public.require_own_company());
+end;
+$$;
+comment on function public.get_company_offices() is 'RPC (founder): the Büroflächen of the own company (ADR-218).';
+
+-- ---------------------------------------------------------------------------
+-- D. Buying the next step
+-- ---------------------------------------------------------------------------
+create or replace function public.buy_company_office(p_request_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_company uuid;
+  v_player  uuid;
+  v_replay  jsonb;
+  pc        public.player_companies;
+  v_step    jsonb;
+  v_cost    bigint;
+  v_free    bigint;
+  v_n       integer;
+begin
+  v_company := public.require_own_company();
+  v_player := public.require_player();
+  if p_request_id is null then
+    perform public.api_error('invalid_argument');
+  end if;
+  v_replay := public.request_begin(v_player, p_request_id, 'buy_company_office');
+  if v_replay is not null then
+    return v_replay;
+  end if;
+  select * into pc from public.player_companies where company_id = v_company for update;
+  v_n := pc.office_level + 1;
+  v_step := public.company_office_step(v_n);
+  if v_step is null then
+    perform public.api_error('office_max_level');
+  end if;
+  if public.company_max_employees(v_company) >= public.config_double('startups', '{offices,maxTotalSeats}', 1000)::integer then
+    perform public.api_error('office_seats_max');
+  end if;
+  if not coalesce(v_step -> 'tiers', '[]'::jsonb) ? pc.tier then
+    perform public.api_error('office_legal_form');
+  end if;
+  if coalesce(public.company_worth_cents(v_company), 0) < (v_step ->> 'minWorthCents')::bigint then
+    perform public.api_error('office_worth');
+  end if;
+  v_cost := (v_step ->> 'costCents')::bigint;
+  -- free cash: open bills come first (as expand_company)
+  select a.balance_cents - pc.unpaid_cents into v_free
+    from public.ledger_accounts a where a.owner_company_id = v_company and a.kind = 'company_cash' for update;
+  if coalesce(v_free, 0) < v_cost then
+    perform public.api_error('insufficient_funds');
+  end if;
+  if v_cost > 0 then
+    perform public.ledger_transfer(public.company_cash_account(v_company), public.ledger_system_account('treasury'), v_cost,
+                                   'company_costs', 'Büroflächen: Stufe ' || v_n, 'company', v_company,
+                                   'office:' || v_company::text || ':' || v_n, v_player, jsonb_build_object('cat', 'office'));
+  end if;
+  update public.player_companies set office_level = v_n where company_id = v_company;  -- company_seats_sync
+  perform public.company_system_message(v_company, 'Büroflächen Stufe ' || v_n || ' für ' || public.format_eur(v_cost)
+                                                   || ': ' || (v_step ->> 'seats') || ' Plätze mehr.');
+  return public.request_complete(v_player, p_request_id,
+                                 jsonb_build_object('offices', public.company_offices_json(v_company)));
+end;
+$$;
+comment on function public.buy_company_office(uuid) is
+  'RPC (founder, ADR-218): buys the next Büroflächen step from the free company cash (to the treasury). Errors '
+  'office_max_level, office_seats_max, office_legal_form, office_worth, insufficient_funds.';
+
+-- ---------------------------------------------------------------------------
+-- E. Rent in the hourly close: world_hour_costs (latest definition from 20261204010010_world_map.sql) books the rent
+--    of the office seats first, for every player company; then subsidiaries and the Standortgebühr as before.
+-- ---------------------------------------------------------------------------
+create or replace function public.world_hour_costs(p_company uuid, p_hour_start timestamptz, p_key text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  l       public.company_locations;
+  pc      public.player_companies;
+  lb      public.country_lobby;
+  v_acc   uuid;
+  v_left  bigint;
+  v_subs  bigint := 0;
+  v_pay   bigint;
+  v_rev   bigint;
+  v_fee   bigint := 0;
+  v_lead  uuid;
+  v_name  text;
+  v_rent  bigint := 0;
+  s       record;
+begin
+  select * into pc from public.player_companies where company_id = p_company;
+  -- ADR-218: rent of the office seats, from the free cash only (never a bill)
+  if coalesce(pc.office_level, 0) > 0 then
+    v_acc := public.company_cash_account(p_company);
+    select greatest(0, a.balance_cents) into v_left from public.ledger_accounts a where a.id = v_acc for update;
+    v_rent := least(public.company_office_seats(pc.office_level)::bigint
+                    * public.config_double('startups', '{offices,rentCentsPerSeatPerHour}', 1000)::bigint,
+                    coalesce(v_left, 0));
+    if v_rent > 0 then
+      perform public.ledger_transfer(v_acc, public.ledger_system_account('households'), v_rent, 'company_costs',
+                                     'Büroflächen: Miete', 'company', p_company, p_key || ':office:rent',
+                                     pc.founder_id, jsonb_build_object('cat', 'office'));
+    end if;
+  end if;
+  select * into l from public.company_locations where company_id = p_company for update;
+  if l.company_id is null then
+    return v_rent;
+  end if;
+  v_acc := public.company_cash_account(p_company);
+  select greatest(0, a.balance_cents) into v_left from public.ledger_accounts a where a.id = v_acc;
+  v_left := coalesce(v_left, 0);
+  -- subsidiaries: what the cash allows, never a bill
+  for s in select x.opened_at from public.company_subsidiaries x where x.company_id = p_company loop
+    v_subs := v_subs + public.world_subsidiary_hourly_cost(extract(epoch from (p_hour_start - s.opened_at)) / 3600.0);
+  end loop;
+  v_pay := least(v_subs, v_left);
+  if v_pay > 0 then
+    perform public.ledger_transfer(v_acc, public.ledger_system_account('households'), v_pay, 'company_costs',
+                                   'Tochterfirmen: laufende Kosten', 'company', p_company, p_key || ':world:subs',
+                                   pc.founder_id, jsonb_build_object('cat', 'world'));
+    v_left := v_left - v_pay;
+  end if;
+  -- Standortgebühr: the leader of the HQ country (another company, still leading) takes its share of the own revenue
+  v_lead := public.country_market_leader(l.country_key);
+  select * into lb from public.country_lobby where country_key = l.country_key;
+  if v_lead is not null and v_lead <> p_company and lb.leader_company_id = v_lead and lb.fee_bps > 0 then
+    select coalesce(sum(e.amount_cents), 0) into v_rev
+      from public.ledger_transactions t join public.ledger_entries e on e.transaction_id = t.id and e.account_id = v_acc
+     where t.idempotency_key = p_key || ':revenue';
+    v_fee := least(floor(greatest(0, v_rev) * least(lb.fee_bps, public.cfg_num(public.world_cfg(), '{lobby,maxFeeBps}', 300)) / 10000.0)::bigint,
+                   v_left);
+    if v_fee > 0 then
+      v_name := coalesce(public.country_cfg(l.country_key) ->> 'name', l.country_key);
+      perform public.ledger_transfer(v_acc, public.company_cash_account(v_lead), v_fee, 'company_costs',
+                                     'Standortgebühr ' || v_name, 'company', p_company, p_key || ':world:fee',
+                                     pc.founder_id, jsonb_build_object('cat', 'world', 'leader', v_lead));
+      update public.company_locations set fees_paid_cents = fees_paid_cents + v_fee where company_id = p_company;
+      update public.company_locations set fees_received_cents = fees_received_cents + v_fee where company_id = v_lead;
+      update public.country_lobby set collected_cents = collected_cents + v_fee, updated_at = now()
+       where country_key = l.country_key;
+    end if;
+  end if;
+  return v_rent + v_pay + v_fee;
+end;
+$$;
+comment on function public.world_hour_costs(uuid, timestamptz, text) is
+  'Hourly close (ADR-208, ADR-218): rent of the office seats, running costs of the subsidiaries and the Standortgebühr '
+  'to the market leader, all from the free cash only; returns the sum (counted as fixed costs of the hour).';
+
+-- ---------------------------------------------------------------------------
+-- F. Grants
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.company_office_step(integer)', 'public.company_office_seats(integer)', 'public.company_max_employees(uuid)',
+    'public.company_seats_sync()', 'public.company_growth_path(uuid)', 'public.company_offices_json(uuid)',
+    'public.world_hour_costs(uuid, timestamptz, text)', 'public.get_company_offices()', 'public.buy_company_office(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+  grant execute on function public.company_growth_path(uuid) to service_role;
+  grant execute on function public.company_offices_json(uuid) to service_role;
+  grant execute on function public.get_company_offices() to authenticated, service_role;
+  grant execute on function public.buy_company_office(uuid) to authenticated, service_role;
+end;
+$$;
+-- ===== idempotent copy of migrations/20261204011320_player_stock_tiers.sql =====
+-- (the migration itself is written idempotently; keep both files identical below this line)
+-- =============================================================================
+-- NEXA · 011320 · Player stocks climb out of the penny stock class (ADR-218)
+-- =============================================================================
+-- The owner: "Und man soll auch höher kommen als nur eine Pennystock-Aktie."
+--
+-- Every player stock was listed as 'penny' (ipo_escrow) and stayed there for good: the deepest slippage
+-- (playerImpact.depthCentsPer100Bps.penny: 1.000 € move the price 1 %), the widest spread and the strongest noise, even
+-- for a company worth billions. Now companies.tier of a listed player company follows its market cap
+-- (company_worth_cents, ADR-203) on the ladder trading.playerStockTiers (src/lib/sim/stock-tier.ts):
+--   penny (0) → smallcap (50 Mio. €) → midcap (200 Mio. €) → largecap (1 Mrd. €) → bluechip (3 Mrd. €)
+-- Up to the highest rung reached; down one rung only below 80 % of the own threshold (hysteresis); at least 6 hours
+-- between two changes. player_stock_tiers_run() checks every 10 minutes (cron nexa-player-stock-tiers), writes the new
+-- tier, posts stock news (Mr. Doodle reads news_items) and notifies the founder ('stock_tier').
+--
+-- Every lookup keyed by companies.tier reads the new keys from game_config (impact depth in market_order_plan and the
+-- tick, half spread, tick noise, AI weight, borrow fee), so no market function is rewritten.
+--
+-- NULL tier made explicit: the order plan and the tick read a missing tier as 'midcap'. A trigger now gives every
+-- player company with a security an explicit tier ('penny' until the first check), and existing rows are repaired.
+-- New enum values (011300) are used only inside PL/pgSQL bodies, cast from text at run time.
+-- Idempotent (identical copy in supabase/updates/).
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A. State
+-- ---------------------------------------------------------------------------
+create table if not exists public.player_stock_tiers (
+  company_id        uuid primary key references public.companies (id) on delete cascade,
+  tier              text not null,
+  changed_at        timestamptz,
+  checked_at        timestamptz not null default now(),
+  market_cap_cents  bigint not null default 0,
+  peak_tier         text not null
+);
+alter table public.player_stock_tiers enable row level security;
+revoke all on public.player_stock_tiers from public, anon, authenticated;
+comment on table public.player_stock_tiers is
+  'Stock tier of each listed player company (ADR-218): last change (hysteresis clock), last check, highest tier. Internal.';
+
+insert into public.notification_types (key, category, title, description, icon_key, default_in_app, default_push, is_mandatory,
+                                       sort_order)
+values ('stock_tier', 'company', 'Aktienklasse', 'Deine Aktie steigt in eine höhere Klasse auf oder fällt zurück.',
+        'notif_company', true, true, false, 216)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- B. No player stock without an explicit tier
+-- ---------------------------------------------------------------------------
+create or replace function public.company_player_tier_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not new.is_ai and new.security_id is not null and new.tier is null then
+    new.tier := 'penny';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.company_player_tier_guard() is
+  'Trigger (ADR-218): a player company with a security always has an explicit stock tier (penny until the first check).';
+
+drop trigger if exists company_player_tier_guard on public.companies;
+create trigger company_player_tier_guard
+  before insert or update of tier, security_id on public.companies
+  for each row execute function public.company_player_tier_guard();
+
+update public.companies set tier = 'penny' where not is_ai and security_id is not null and tier is null;
+
+-- ---------------------------------------------------------------------------
+-- C. Rules (src/lib/sim/stock-tier.ts)
+-- ---------------------------------------------------------------------------
+create or replace function public.player_stock_tier_cfg()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(public.config_jsonb('trading', '{playerStockTiers}'),
+                  '{"ladder": [{"tier": "penny", "minMarketCapCents": 0, "label": "Pennystock"}], "downBps": 8000,
+                    "minHoursBetweenChanges": 6, "checkEveryMinutes": 10}'::jsonb);
+$$;
+
+-- nextStockTier: up to the highest rung reached, down one rung below downBps of the own threshold, nothing within
+-- minHoursBetweenChanges of the last change (null hours = never changed). An unknown tier counts as the bottom rung.
+create or replace function public.player_stock_tier_next(p_current text, p_cap numeric, p_hours double precision, p_cfg jsonb)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_ladder jsonb := coalesce(p_cfg -> 'ladder', '[]'::jsonb);
+  v_n      integer := jsonb_array_length(coalesce(p_cfg -> 'ladder', '[]'::jsonb));
+  v_rung   integer;
+  v_up     integer;
+begin
+  if v_n = 0 then
+    return coalesce(p_current, 'penny');
+  end if;
+  select (x.n - 1)::integer into v_rung from jsonb_array_elements(v_ladder) with ordinality x(r, n) where x.r ->> 'tier' = p_current;
+  v_rung := coalesce(v_rung, 0);
+  if p_current is not null and p_hours is not null
+     and p_hours < coalesce((p_cfg ->> 'minHoursBetweenChanges')::double precision, 6) then
+    return v_ladder -> v_rung ->> 'tier';
+  end if;
+  v_up := v_rung;
+  while v_up + 1 < v_n and coalesce(p_cap, 0) >= (v_ladder -> (v_up + 1) ->> 'minMarketCapCents')::numeric loop
+    v_up := v_up + 1;
+  end loop;
+  if v_up > v_rung then
+    return v_ladder -> v_up ->> 'tier';
+  end if;
+  if v_rung > 0 and coalesce(p_cap, 0) < (v_ladder -> v_rung ->> 'minMarketCapCents')::numeric
+                                         * coalesce((p_cfg ->> 'downBps')::numeric, 8000) / 10000 then
+    return v_ladder -> (v_rung - 1) ->> 'tier';
+  end if;
+  return v_ladder -> v_rung ->> 'tier';
+end;
+$$;
+comment on function public.player_stock_tier_next(text, numeric, double precision, jsonb) is
+  'nextStockTier (ADR-218): the stock tier after a check, with hysteresis and the minimum time between changes.';
+
+create or replace function public.player_stock_tier_rung(p_tier text, p_cfg jsonb)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce((select (x.n - 1)::integer from jsonb_array_elements(coalesce(p_cfg -> 'ladder', '[]'::jsonb))
+                                                  with ordinality x(r, n) where x.r ->> 'tier' = p_tier), 0);
+$$;
+
+create or replace function public.player_stock_tier_label(p_tier text, p_cfg jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce((select x.r ->> 'label' from jsonb_array_elements(coalesce(p_cfg -> 'ladder', '[]'::jsonb)) x(r)
+                    where x.r ->> 'tier' = p_tier), p_tier);
+$$;
+
+-- ---------------------------------------------------------------------------
+-- D. The periodic check
+-- ---------------------------------------------------------------------------
+create or replace function public.player_stock_tiers_run(p_now timestamptz default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now     timestamptz := coalesce(p_now, now());
+  v_cfg     jsonb := public.player_stock_tier_cfg();
+  r         record;
+  v_cap     bigint;
+  v_hours   double precision;
+  v_next    text;
+  v_up      boolean;
+  v_label   text;
+  v_head    text;
+  v_body    text;
+  v_checked integer := 0;
+  v_changed integer := 0;
+begin
+  for r in select c.id, c.name, c.tier::text as tier, c.security_id, c.sector_key, pc.founder_id,
+                  st.changed_at, st.peak_tier
+             from public.companies c
+             join public.player_companies pc on pc.company_id = c.id
+             left join public.player_stock_tiers st on st.company_id = c.id
+            where not c.is_ai and c.phase = 'listed' and c.security_id is not null
+            order by c.id
+  loop
+    v_checked := v_checked + 1;
+    v_cap := greatest(0, coalesce(public.company_worth_cents(r.id), 0));
+    v_hours := case when r.changed_at is null then null else extract(epoch from (v_now - r.changed_at)) / 3600.0 end;
+    v_next := public.player_stock_tier_next(r.tier, v_cap, v_hours, v_cfg);
+    insert into public.player_stock_tiers (company_id, tier, changed_at, checked_at, market_cap_cents, peak_tier)
+    values (r.id, coalesce(r.tier, v_next), null, v_now, v_cap, coalesce(r.tier, v_next))
+    on conflict (company_id) do update set checked_at = excluded.checked_at, market_cap_cents = excluded.market_cap_cents;
+    continue when v_next is not distinct from r.tier;
+
+    v_up := public.player_stock_tier_rung(v_next, v_cfg) > public.player_stock_tier_rung(r.tier, v_cfg);
+    update public.companies set tier = v_next::public.company_tier, updated_at = now() where id = r.id;
+    update public.player_stock_tiers
+       set tier = v_next, changed_at = v_now,
+           peak_tier = case when public.player_stock_tier_rung(v_next, v_cfg) > public.player_stock_tier_rung(peak_tier, v_cfg)
+                            then v_next else peak_tier end
+     where company_id = r.id;
+    v_changed := v_changed + 1;
+
+    v_label := public.player_stock_tier_label(v_next, v_cfg);
+    if v_up then
+      v_head := r.name || ' steigt in den ' || v_label || ' auf';
+      v_body := 'Börsenwert ' || public.format_eur(v_cap) || ': Die Aktie spielt jetzt in einer höheren Klasse. '
+                || 'Große Orders bewegen den Kurs weniger, mehr Anleger schauen hin.';
+    else
+      v_head := r.name || ' fällt zurück in den ' || v_label;
+      v_body := 'Börsenwert ' || public.format_eur(v_cap) || ': Die Aktie verliert ihre Klasse. '
+                || 'Orders bewegen den Kurs wieder stärker.';
+    end if;
+    -- stock news (Mr. Doodle reads news_items)
+    insert into public.news_items (category, headline, body, importance, security_id, company_id, sector_key, published_at)
+    values ('market', v_head, v_body, case when v_up then 2 else 1 end, r.security_id, r.id, r.sector_key, v_now);
+    perform public.social_notify(r.founder_id, 'stock_tier', v_head, v_body,
+                                 jsonb_build_object('company_id', r.id, 'tier', v_next, 'up', v_up, 'market_cap_cents', v_cap),
+                                 '/company', 'stock_tier:' || r.id::text || ':' || v_next || ':' || to_char(v_now, 'YYYYMMDDHH24MI'));
+    perform public.company_system_message(r.id, v_head || '.');
+  end loop;
+  return jsonb_build_object('checked', v_checked, 'changed', v_changed);
+end;
+$$;
+comment on function public.player_stock_tiers_run(timestamptz) is
+  'Internal, cron every 10 minutes (ADR-218): stock tier of every listed player company from its market cap, with '
+  'hysteresis; on a change: companies.tier, stock news and a note to the founder.';
+
+-- ---------------------------------------------------------------------------
+-- E. Grants and the cron job
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.company_player_tier_guard()', 'public.player_stock_tier_cfg()',
+    'public.player_stock_tier_next(text, numeric, double precision, jsonb)', 'public.player_stock_tier_rung(text, jsonb)',
+    'public.player_stock_tier_label(text, jsonb)', 'public.player_stock_tiers_run(timestamptz)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', f);
+  end loop;
+  grant execute on function public.player_stock_tiers_run(timestamptz) to service_role;
+  grant execute on function public.player_stock_tier_next(text, numeric, double precision, jsonb) to service_role;
+end;
+$$;
+
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'nexa-player-stock-tiers';
+    perform cron.schedule('nexa-player-stock-tiers', '*/10 * * * *', 'select public.player_stock_tiers_run()');
+  end if;
+end;
+$$;
 
 -- ===== game_config (current values, overwriting older ones) =====
 -- GENERATED by scripts/gen-config-seed.ts from src/config/balance.ts. Do not edit by hand.
@@ -96166,7 +96825,7 @@ insert into public.game_config (key, value, description) values
   ('time', '{"quarterHours":6,"quartersPerGameYear":4,"timezone":"Europe/Berlin","quarterBoundaryHours":[8,14,20,2],"marketOpenHour":0,"marketCloseHour":24,"tickSeconds":10,"ticksPerRunnerInvocation":12,"afterHours":{"spreadMultiplier":3,"liquidityMultiplier":0.25,"volatilityMultiplier":0.5},"candleIntervalsSeconds":[60,300,3600],"openingBonusMinutes":60,"openingBonusXpMultiplier":1.5}'::jsonb, 'Defaults from src/config/balance.ts, section "time"'),
   ('economy', '{"startingCapitalCents":1000000,"bankruptcyRestartCents":250000,"basicIncomeCentsPerHour":10000,"vaultCapHours":8,"vaultInitialHours":2,"vaultMinClaimCents":100,"bankruptcyStatusGameDays":3,"bankruptcyReputationPenalty":10}'::jsonb, 'Defaults from src/config/balance.ts, section "economy"'),
   ('vault', '{"levelBonusBps":800,"levelBonusMaxLevel":40,"deposits":{"minLevel":5,"minCents":100000,"capCentsPerLevel":2500000,"maxOpen":3,"terms":[{"days":1,"rateBps":150},{"days":3,"rateBps":500},{"days":7,"rateBps":1400}]}}'::jsonb, 'Defaults from src/config/balance.ts, section "vault"'),
-  ('trading', '{"limitOrders":false,"orderFeeCents":100,"maxOrderQuantity":1000000000,"quantityScale":1000000,"minOrderValueCents":100,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"midcap":15,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"midcap":300,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":1000,"highImpactWarnBps":500,"playerImpact":{"depthCentsPer100Bps":{"bluechip":2000000,"midcap":500000,"penny":100000},"bondDepthCentsPer100Bps":1000000,"maxHoldingsPremium":0.15,"premiumScaleDepths":20},"playerStocks":{"insiderCooldownHours":24,"dailyBandBps":0}}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
+  ('trading', '{"limitOrders":false,"orderFeeCents":100,"maxOrderQuantity":1000000000,"quantityScale":1000000,"minOrderValueCents":100,"capitalGainsTaxBps":2500,"incomeTaxOnCouponsAndDividendsBps":2500,"spread":{"halfSpreadBps":{"bluechip":5,"largecap":9,"midcap":15,"smallcap":30,"penny":60},"sentimentWideningBps":20,"minHalfSpreadE4":1},"priceImpact":{"impactBpsPerDepth":100,"depthFreeFloatFraction":0.002,"exponent":1,"immediateShare":0.5,"marketMakerHedgeShare":0.5,"maxImpactBpsPerOrder":1500},"orderBook":{"levelsPerSide":10,"levelStepBps":10,"sizeJitter":0.2},"financingSpreadBps":400,"borrowFeeBps":{"bluechip":100,"largecap":180,"midcap":300,"smallcap":550,"penny":1000},"leverageTiers":[{"level":1,"maxLeverage":1},{"level":12,"maxLeverage":2},{"level":18,"maxLeverage":5},{"level":30,"maxLeverage":10}],"shortSellingMinLevel":8,"maintenanceMarginBps":500,"marginCallWarningMarginBps":750,"liquidationFeeBps":50,"washTradeWindowSeconds":300,"minPriceE4":1,"maxTickReturnBps":1000,"highImpactWarnBps":500,"playerImpact":{"depthCentsPer100Bps":{"bluechip":2000000,"largecap":1000000,"midcap":500000,"smallcap":250000,"penny":100000},"bondDepthCentsPer100Bps":1000000,"maxHoldingsPremium":0.15,"premiumScaleDepths":20},"playerStocks":{"insiderCooldownHours":24,"dailyBandBps":0},"playerStockTiers":{"ladder":[{"tier":"penny","minMarketCapCents":0,"label":"Pennystock"},{"tier":"smallcap","minMarketCapCents":5000000000,"label":"Small Cap"},{"tier":"midcap","minMarketCapCents":20000000000,"label":"Mid Cap"},{"tier":"largecap","minMarketCapCents":100000000000,"label":"Large Cap"},{"tier":"bluechip","minMarketCapCents":300000000000,"label":"Bluechip"}],"downBps":8000,"minHoursBetweenChanges":6,"checkEveryMinutes":10}}'::jsonb, 'Defaults from src/config/balance.ts, section "trading"'),
   ('centralBank', '{"startRateBps":300,"neutralRateBps":300,"minRateBps":50,"maxRateBps":1000,"stepBps":25,"maxStepsPerDecision":2,"targetMoneyGrowthBps":800,"toleranceBandBps":400,"decisionEveryQuarters":2,"warmupQuarters":56,"announceLeadQuarters":1,"measurementWindowQuarters":4,"activePlayerWindowDays":7}'::jsonb, 'Defaults from src/config/balance.ts, section "centralBank"'),
   ('bonds', '{"volatilityMultiplier":3,"faceValueCents":10000,"couponsPerGameYear":4,"maturities":[{"years":1,"spreadBps":-75},{"years":2,"spreadBps":-50},{"years":5,"spreadBps":-10},{"years":10,"spreadBps":25}],"minYieldBps":200,"maxYieldBps":400,"minLevel":5}'::jsonb, 'Defaults from src/config/balance.ts, section "bonds"'),
   ('sectors', '{"tech":{"baseDemandCentsPerQuarter":3000000000,"demandGrowthBpsPerGameYear":800,"demandNoise":0.08,"peRatio":28,"volatilityMultiplier":1.2,"priceExponent":1.2,"costStructure":{"referencePriceCents":5000,"unitCostCents":1180,"capacityUnitsPerSkillPoint":16.5,"fixedCostMultiplier":0.7,"qualityAdjustmentRate":0.1,"developmentIntensity":2},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.03,"cycle":0.8,"valuationRate":1.5}},"retail":{"baseDemandCentsPerQuarter":5000000000,"demandGrowthBpsPerGameYear":200,"demandNoise":0.04,"peRatio":14,"volatilityMultiplier":0.8,"priceExponent":2.5,"costStructure":{"referencePriceCents":2000,"unitCostCents":892,"capacityUnitsPerSkillPoint":47.6,"fixedCostMultiplier":1,"qualityAdjustmentRate":0.03,"developmentIntensity":0.5},"sensitivity":{"oilDemand":-0.05,"oilCost":0.1,"ratePer100Bps":-0.01,"cycle":0.5,"valuationRate":0.8}},"energy":{"baseDemandCentsPerQuarter":3600000000,"demandGrowthBpsPerGameYear":150,"demandNoise":0.06,"peRatio":11,"volatilityMultiplier":1,"priceExponent":1.5,"costStructure":{"referencePriceCents":8000,"unitCostCents":1995,"capacityUnitsPerSkillPoint":9.1,"fixedCostMultiplier":1.4,"qualityAdjustmentRate":0.03,"developmentIntensity":0.6},"sensitivity":{"oilDemand":0.8,"oilCost":0.3,"ratePer100Bps":-0.01,"cycle":0.6,"valuationRate":1}},"pharma":{"baseDemandCentsPerQuarter":2800000000,"demandGrowthBpsPerGameYear":500,"demandNoise":0.06,"peRatio":22,"volatilityMultiplier":1.4,"priceExponent":1,"costStructure":{"referencePriceCents":12000,"unitCostCents":2685,"capacityUnitsPerSkillPoint":7.7,"fixedCostMultiplier":1.2,"qualityAdjustmentRate":0.06,"developmentIntensity":1.5},"sensitivity":{"oilDemand":0,"oilCost":0,"ratePer100Bps":-0.01,"cycle":0.1,"valuationRate":1.2}},"logistics":{"baseDemandCentsPerQuarter":4200000000,"demandGrowthBpsPerGameYear":300,"demandNoise":0.06,"peRatio":15,"volatilityMultiplier":0.9,"priceExponent":2,"costStructure":{"referencePriceCents":3000,"unitCostCents":1048,"capacityUnitsPerSkillPoint":26.8,"fixedCostMultiplier":1.1,"qualityAdjustmentRate":0.04,"developmentIntensity":0.7},"sensitivity":{"oilDemand":0,"oilCost":0.5,"ratePer100Bps":-0.02,"cycle":1.2,"valuationRate":1}}}'::jsonb, 'Defaults from src/config/balance.ts, section "sectors"'),
@@ -96178,9 +96837,9 @@ insert into public.game_config (key, value, description) values
   ('careers', '{"tiers":[{"id":"intern","minLevel":2,"salaryCentsPerHour":15000,"stockOptions":false},{"id":"junior","minLevel":5,"salaryCentsPerHour":30000,"stockOptions":false},{"id":"senior","minLevel":12,"salaryCentsPerHour":70000,"stockOptions":false},{"id":"team_lead","minLevel":20,"salaryCentsPerHour":130000,"stockOptions":false},{"id":"c_level","minLevel":25,"salaryCentsPerHour":250000,"stockOptions":true}],"paidHoursPerDayCap":8,"inactivity":{"steps":[{"afterHours":24,"payBps":7500},{"afterHours":48,"payBps":5000},{"afterHours":72,"payBps":2500}],"fireAfterHours":120},"playerCompanyExperienceMultiplier":2,"promotion":{"hoursByTier":{"junior":12,"senior":36,"team_lead":72,"c_level":120},"rankHoursPerRealHour":24,"managementFrom":["team_lead","c_level"],"baseChanceBps":4000,"chancePerExtraScoreBps":800,"maxChanceBps":9000,"retryHours":24,"raiseBps":1500,"requestValidHours":72},"workTask":{"intervalHours":3,"bonusSalaryHours":1,"expiresHours":3,"fastAnswerSeconds":45}}'::jsonb, 'Defaults from src/config/balance.ts, section "careers"'),
   ('progression', '{"firstLevelXp":100,"xpBase":200,"xpExponent":1.5,"maxLevel":10000,"prestige":{"fromLevel":50,"titleEveryLevels":10},"missionTargetScalePerLevel":0.2,"missionTargetScaleMax":5,"missionXpScalePerLevel":0.18,"missionXpScaleMax":8,"missionCountScalePerLevel":0.04,"missionCountScaleMax":3,"missionResetsPerDay":1,"missionSkipsPerDay":1,"missionDraw":{"recentDraws":{"quick":12,"daily":9,"weekly":6},"cooldownHours":{"quick":48,"daily":96,"weekly":504},"featureWeightBps":15000,"newFeatureLevels":5,"newFeatureWeightBps":25000},"missionAfford":{"buyShareBps":5000,"volumeShareBps":{"quick":5000,"daily":10000,"weekly":30000},"profitShareBps":{"quick":100,"daily":200,"weekly":1000},"minBuyTargetCents":2000,"minProfitTargetCents":500,"minCashCents":1000,"weeklyCountShareBps":5000,"aiWageHours":6},"xpMultiplier":2,"xpSources":{"trade":{"xp":10,"maxTradesPerDay":30,"minOrderValueCents":10000},"profitableClose":{"profitCentsPerXp":10000,"maxXpPerTrade":500},"workHour":{"xp":40,"playerCompanyMultiplier":1.5,"maxHoursPerDay":8},"workTask":{"minXp":50,"maxXp":150},"dailyMission":{"minXp":200,"maxXp":400,"perDay":3},"quickMission":{"minXp":20,"maxXp":60,"active":3},"weeklyMission":{"minXp":600,"maxXp":1200,"perWeek":3},"milestoneMission":{"minXp":100,"maxXp":2000,"visible":3},"dailyLogin":{"xp":50,"streakBonusPerDay":10,"streakBonusCap":200,"streakFreezesPerWeek":1},"profitableCompanyQuarter":{"xp":500},"successfulIpo":{"xp":5000},"achievement":{"minXp":100,"maxXp":10000},"tutorial":{"xp":50}},"unlocks":[{"level":1,"key":"market_orders"},{"level":1,"key":"basic_income"},{"level":2,"key":"first_job"},{"level":3,"key":"watchlist"},{"level":4,"key":"artworks"},{"level":5,"key":"stop_loss"},{"level":5,"key":"bonds"},{"level":5,"key":"junior_jobs"},{"level":6,"key":"found_garage"},{"level":6,"key":"deals"},{"level":7,"key":"analyst_reports"},{"level":8,"key":"property"},{"level":8,"key":"short_selling"},{"level":9,"key":"ipo"},{"level":10,"key":"found_small_business"},{"level":10,"key":"crypto"},{"level":10,"key":"nexamon"},{"level":12,"key":"leverage_2x"},{"level":12,"key":"senior_jobs"},{"level":14,"key":"crypto_create"},{"level":15,"key":"small_loan"},{"level":15,"key":"business_angel"},{"level":15,"key":"found_gmbh"},{"level":18,"key":"leverage_5x"},{"level":18,"key":"expand_small_business"},{"level":20,"key":"loans_250k"},{"level":20,"key":"team_lead_jobs"},{"level":25,"key":"c_level_jobs"},{"level":30,"key":"leverage_10x"},{"level":30,"key":"options"},{"level":35,"key":"takeovers"},{"level":35,"key":"hostile_takeovers"},{"level":40,"key":"holding"},{"level":50,"key":"title_market_legend"},{"level":50,"key":"golden_profile_frame"},{"level":50,"key":"hall_of_fame"}]}'::jsonb, 'Defaults from src/config/balance.ts, section "progression"'),
   ('valuation', '{"growthWeight":1,"growthFactorMin":0.6,"growthFactorMax":1.8,"macroSensitivityPer100Bps":0.04,"macroFactorMin":0.6,"macroFactorMax":1.3,"bookValueFloorShare":0.5,"lossMakerRevenueElasticity":0.5,"analystTargetNoise":0.08,"analystWrongProbability":0.25}'::jsonb, 'Defaults from src/config/balance.ts, section "valuation"'),
-  ('aiInvestors', '{"tickNoiseBps":{"bluechip":6,"midcap":15,"penny":45},"tickNoiseScale":0.45,"emaFastAlpha":0.15,"emaSlowAlpha":0.0165,"sentimentDecayPerTick":0.0019,"baselineVolumeDepthFraction":0.02,"playerWeight":{"activityHalfLifeHours":6,"referenceActivityCents":{"bluechip":100000000,"midcap":25000000,"penny":5000000},"minAiWeight":0.15},"archetypes":{"market_maker":{"capitalShare":0.05,"reactionSpeed":0.005,"params":{}},"value_fund":{"capitalShare":0.3,"reactionSpeed":0.0005,"params":{"gapScale":0.5,"deadBand":0.01}},"momentum_trader":{"capitalShare":0.1,"reactionSpeed":0.0002,"params":{"trendScale":0.02}},"pension_fund":{"capitalShare":0.2,"reactionSpeed":0.002,"params":{"rateSensitivityPer100Bps":-0.05,"yieldTiltPer100Bps":0.03,"minWeight":0.2,"maxWeight":1.8}},"index_fund":{"capitalShare":0.04,"reactionSpeed":0.005,"params":{}},"retail_herd":{"capitalShare":0.1,"reactionSpeed":0.002,"params":{"chaseGain":0.1,"trendScale":0.02}}}}'::jsonb, 'Defaults from src/config/balance.ts, section "aiInvestors"'),
+  ('aiInvestors', '{"tickNoiseBps":{"bluechip":6,"largecap":10,"midcap":15,"smallcap":26,"penny":45},"tickNoiseScale":0.45,"emaFastAlpha":0.15,"emaSlowAlpha":0.0165,"sentimentDecayPerTick":0.0019,"baselineVolumeDepthFraction":0.02,"playerWeight":{"activityHalfLifeHours":6,"referenceActivityCents":{"bluechip":100000000,"largecap":50000000,"midcap":25000000,"smallcap":12000000,"penny":5000000},"minAiWeight":0.15},"archetypes":{"market_maker":{"capitalShare":0.05,"reactionSpeed":0.005,"params":{}},"value_fund":{"capitalShare":0.3,"reactionSpeed":0.0005,"params":{"gapScale":0.5,"deadBand":0.01}},"momentum_trader":{"capitalShare":0.1,"reactionSpeed":0.0002,"params":{"trendScale":0.02}},"pension_fund":{"capitalShare":0.2,"reactionSpeed":0.002,"params":{"rateSensitivityPer100Bps":-0.05,"yieldTiltPer100Bps":0.03,"minWeight":0.2,"maxWeight":1.8}},"index_fund":{"capitalShare":0.04,"reactionSpeed":0.005,"params":{}},"retail_herd":{"capitalShare":0.1,"reactionSpeed":0.002,"params":{"chaseGain":0.1,"trendScale":0.02}}}}'::jsonb, 'Defaults from src/config/balance.ts, section "aiInvestors"'),
   ('index', '{"size":30,"baseLevel":1000,"reviewEveryQuarters":4,"minListedQuarters":1,"entryBuffer":3}'::jsonb, 'Defaults from src/config/balance.ts, section "index"'),
-  ('events', '{"pharmaTrial":{"probabilityPerQuarter":0.12,"announceLeadQuarters":2,"successProbability":{"bluechip":0.6,"midcap":0.5,"penny":0.4},"minMove":0.5,"maxMove":0.7},"oilReport":{"everyQuarters":2,"changeStdDev":0.06,"meanReversion":0.25,"minIndex":0.4,"maxIndex":2.5},"businessCycle":{"noiseStdDev":0.01,"meanReversion":0.1,"minIndex":0.8,"maxIndex":1.2},"earnings":{"sentimentPerSurprise":3,"maxSentimentShock":0.9},"macro":{"sectorCrisis":{"probabilityPerQuarter":0.03,"magnitude":-0.15,"durationQuarters":3,"sentimentShock":-0.5},"commodityShock":{"probabilityPerQuarter":0.04,"magnitude":0.25,"durationQuarters":1,"sentimentShock":0.3},"recession":{"probabilityPerQuarter":0.03,"magnitude":-0.08,"durationQuarters":4,"sentimentShock":-0.4},"techBoom":{"probabilityPerQuarter":0.03,"magnitude":0.2,"durationQuarters":4,"sentimentShock":0.5}},"rateDecisionSentimentPer25Bps":-0.1,"schedule":{"horizonHours":24,"earningsTopCompanies":3,"recentHours":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "events"'),
+  ('events', '{"pharmaTrial":{"probabilityPerQuarter":0.12,"announceLeadQuarters":2,"successProbability":{"bluechip":0.6,"largecap":0.55,"midcap":0.5,"smallcap":0.45,"penny":0.4},"minMove":0.5,"maxMove":0.7},"oilReport":{"everyQuarters":2,"changeStdDev":0.06,"meanReversion":0.25,"minIndex":0.4,"maxIndex":2.5},"businessCycle":{"noiseStdDev":0.01,"meanReversion":0.1,"minIndex":0.8,"maxIndex":1.2},"earnings":{"sentimentPerSurprise":3,"maxSentimentShock":0.9},"macro":{"sectorCrisis":{"probabilityPerQuarter":0.03,"magnitude":-0.15,"durationQuarters":3,"sentimentShock":-0.5},"commodityShock":{"probabilityPerQuarter":0.04,"magnitude":0.25,"durationQuarters":1,"sentimentShock":0.3},"recession":{"probabilityPerQuarter":0.03,"magnitude":-0.08,"durationQuarters":4,"sentimentShock":-0.4},"techBoom":{"probabilityPerQuarter":0.03,"magnitude":0.2,"durationQuarters":4,"sentimentShock":0.5}},"rateDecisionSentimentPer25Bps":-0.1,"schedule":{"horizonHours":24,"earningsTopCompanies":3,"recentHours":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "events"'),
   ('lifestyle', '{"items":[{"key":"rolex","priceCents":2500000,"upkeepBpsPerGameYear":50,"reputationBonus":0},{"key":"porsche","priceCents":15000000,"upkeepBpsPerGameYear":100,"reputationBonus":0},{"key":"penthouse","priceCents":150000000,"upkeepBpsPerGameYear":100,"reputationBonus":5},{"key":"private_jet","priceCents":2000000000,"upkeepBpsPerGameYear":150,"reputationBonus":0},{"key":"private_island","priceCents":10000000000,"upkeepBpsPerGameYear":200,"reputationBonus":0}],"resaleValueBps":5000}'::jsonb, 'Defaults from src/config/balance.ts, section "lifestyle"'),
   ('randomEvents', '{"maxPerPlayerPerDay":1,"inheritance":{"probabilityPerDay":0.04,"amountCents":500000},"taxAudit":{"probabilityPerDay":0.04,"cashBps":300},"headhunter":{"probabilityPerDay":0.03,"salaryRaiseBps":3000},"golfClubTip":{"probabilityPerDay":0.06,"accuracy":0.6}}'::jsonb, 'Defaults from src/config/balance.ts, section "randomEvents"'),
   ('abuse', '{"rateLimits":{"ordersPerMinute":20,"ordersPerDay":500,"actionsPerMinute":60},"newAccountIpo":{"accountAgeDays":7,"minLevel":5,"maxAllocationBps":500,"maxInvestmentCents":500000},"suspicious":{"mutualTradeShare":0.5,"offMarketValueCents":1000000,"offMarketDeviationBps":1000}}'::jsonb, 'Defaults from src/config/balance.ts, section "abuse"'),
@@ -96190,7 +96849,7 @@ insert into public.game_config (key, value, description) values
   ('skills', '{"tree":[{"key":"it_basics","branches":["it"],"tier":1,"q":1,"r":0,"requires":[]},{"key":"it_programming","branches":["it"],"tier":2,"q":2,"r":0,"requires":["it_basics"]},{"key":"it_data","branches":["it"],"tier":2,"q":3,"r":-1,"requires":["it_programming"]},{"key":"it_networks","branches":["it"],"tier":2,"q":3,"r":0,"requires":["it_programming"]},{"key":"it_web","branches":["it"],"tier":2,"q":2,"r":1,"requires":["it_programming"]},{"key":"it_architecture","branches":["it"],"tier":3,"q":4,"r":0,"requires":["it_networks"]},{"key":"it_ml","branches":["it"],"tier":3,"q":4,"r":-1,"requires":["it_data"]},{"key":"it_security","branches":["it"],"tier":3,"q":3,"r":1,"requires":["it_networks"]},{"key":"it_databases","branches":["it"],"tier":3,"q":4,"r":1,"requires":["it_architecture"]},{"key":"it_devops","branches":["it"],"tier":3,"q":5,"r":-1,"requires":["it_architecture"]},{"key":"it_mobile","branches":["it"],"tier":3,"q":5,"r":0,"requires":["it_architecture"]},{"key":"hybrid_fintech","branches":["it","finance"],"tier":4,"q":6,"r":-2,"requires":["it_devops","finance_trading"]},{"key":"it_ai","branches":["it"],"tier":4,"q":5,"r":1,"requires":["it_databases"]},{"key":"it_cloud","branches":["it"],"tier":4,"q":6,"r":0,"requires":["it_mobile"]},{"key":"it_testing","branches":["it"],"tier":4,"q":6,"r":-1,"requires":["it_devops"]},{"key":"it_ux","branches":["it"],"tier":4,"q":4,"r":2,"requires":["it_databases"]},{"key":"it_bigdata","branches":["it"],"tier":5,"q":5,"r":2,"requires":["it_ai"]},{"key":"it_crypto","branches":["it"],"tier":5,"q":7,"r":-1,"requires":["it_cloud"]},{"key":"it_embedded","branches":["it"],"tier":5,"q":6,"r":1,"requires":["it_cloud"]},{"key":"it_mastery","branches":["it"],"tier":5,"q":7,"r":0,"requires":["it_cloud"]},{"key":"it_pentest","branches":["it"],"tier":5,"q":7,"r":-2,"requires":["it_testing"]},{"key":"finance_basics","branches":["finance"],"tier":1,"q":1,"r":-1,"requires":[]},{"key":"finance_accounting","branches":["finance"],"tier":2,"q":2,"r":-2,"requires":["finance_basics"]},{"key":"finance_investment","branches":["finance"],"tier":2,"q":2,"r":-1,"requires":["finance_basics"]},{"key":"finance_banking","branches":["finance"],"tier":2,"q":3,"r":-3,"requires":["finance_accounting"]},{"key":"finance_controlling","branches":["finance"],"tier":2,"q":3,"r":-2,"requires":["finance_accounting"]},{"key":"finance_balance","branches":["finance"],"tier":3,"q":4,"r":-3,"requires":["finance_controlling"]},{"key":"finance_portfolio","branches":["finance"],"tier":3,"q":4,"r":-4,"requires":["finance_banking"]},{"key":"finance_valuation","branches":["finance"],"tier":3,"q":4,"r":-2,"requires":["finance_controlling"]},{"key":"finance_budgeting","branches":["finance"],"tier":3,"q":5,"r":-3,"requires":["finance_balance"]},{"key":"finance_tax_planning","branches":["finance"],"tier":3,"q":5,"r":-4,"requires":["finance_balance"]},{"key":"finance_trading","branches":["finance"],"tier":3,"q":5,"r":-2,"requires":["finance_valuation"]},{"key":"finance_treasury","branches":["finance"],"tier":3,"q":5,"r":-5,"requires":["finance_portfolio"]},{"key":"finance_corporate","branches":["finance"],"tier":4,"q":6,"r":-4,"requires":["finance_budgeting"]},{"key":"finance_derivatives","branches":["finance"],"tier":4,"q":6,"r":-6,"requires":["finance_treasury"]},{"key":"finance_ma","branches":["finance"],"tier":4,"q":6,"r":-3,"requires":["finance_budgeting"]},{"key":"finance_risk","branches":["finance"],"tier":4,"q":6,"r":-5,"requires":["finance_treasury"]},{"key":"finance_audit","branches":["finance"],"tier":5,"q":7,"r":-4,"requires":["finance_corporate"]},{"key":"finance_insurance","branches":["finance"],"tier":5,"q":7,"r":-7,"requires":["finance_derivatives"]},{"key":"finance_mastery","branches":["finance"],"tier":5,"q":7,"r":-5,"requires":["finance_corporate"]},{"key":"finance_quant","branches":["finance"],"tier":5,"q":7,"r":-3,"requires":["finance_ma"]},{"key":"finance_vc","branches":["finance"],"tier":5,"q":7,"r":-6,"requires":["finance_risk"]},{"key":"law_basics","branches":["law"],"tier":1,"q":1,"r":-2,"requires":[]},{"key":"law_contracts","branches":["law"],"tier":2,"q":2,"r":-3,"requires":["law_basics"]},{"key":"law_labor","branches":["law"],"tier":2,"q":1,"r":-3,"requires":["law_basics"]},{"key":"law_compliance","branches":["law"],"tier":3,"q":1,"r":-4,"requires":["law_labor"]},{"key":"law_corporate","branches":["law"],"tier":3,"q":3,"r":-4,"requires":["law_contracts"]},{"key":"law_tax","branches":["law"],"tier":2,"q":2,"r":-4,"requires":["law_contracts"]},{"key":"law_competition","branches":["law"],"tier":3,"q":1,"r":-5,"requires":["law_compliance"]},{"key":"law_intltax","branches":["law"],"tier":3,"q":3,"r":-5,"requires":["law_tax"]},{"key":"law_ip","branches":["law"],"tier":3,"q":2,"r":-5,"requires":["law_tax"]},{"key":"law_privacy","branches":["law"],"tier":3,"q":4,"r":-5,"requires":["law_corporate"]},{"key":"hybrid_business_law","branches":["law","finance"],"tier":4,"q":5,"r":-6,"requires":["law_privacy","finance_treasury"]},{"key":"law_capital","branches":["law"],"tier":4,"q":3,"r":-6,"requires":["law_intltax"]},{"key":"law_consumer","branches":["law"],"tier":4,"q":2,"r":-6,"requires":["law_competition"]},{"key":"law_crime","branches":["law"],"tier":4,"q":4,"r":-6,"requires":["law_privacy"]},{"key":"law_it","branches":["law"],"tier":4,"q":1,"r":-6,"requires":["law_competition"]},{"key":"law_environment","branches":["law"],"tier":5,"q":4,"r":-7,"requires":["law_crime"]},{"key":"law_international","branches":["law"],"tier":5,"q":2,"r":-7,"requires":["law_consumer"]},{"key":"law_litigation","branches":["law"],"tier":5,"q":1,"r":-7,"requires":["law_it"]},{"key":"law_mastery","branches":["law"],"tier":5,"q":3,"r":-7,"requires":["law_capital"]},{"key":"law_mediation","branches":["law"],"tier":5,"q":6,"r":-7,"requires":["hybrid_business_law"]},{"key":"law_medical","branches":["law"],"tier":5,"q":5,"r":-7,"requires":["law_crime"]},{"key":"management_basics","branches":["management"],"tier":1,"q":0,"r":-1,"requires":[]},{"key":"management_projects","branches":["management"],"tier":2,"q":0,"r":-2,"requires":["management_basics"]},{"key":"management_team","branches":["management"],"tier":2,"q":-1,"r":-1,"requires":["management_basics"]},{"key":"management_leadership","branches":["management"],"tier":2,"q":0,"r":-3,"requires":["management_projects"]},{"key":"management_people","branches":["management"],"tier":2,"q":-1,"r":-2,"requires":["management_team"]},{"key":"management_agile","branches":["management"],"tier":3,"q":-2,"r":-2,"requires":["management_people"]},{"key":"management_change","branches":["management"],"tier":3,"q":-1,"r":-3,"requires":["management_leadership"]},{"key":"management_recruiting","branches":["management"],"tier":3,"q":0,"r":-4,"requires":["management_leadership"]},{"key":"hybrid_people_analytics","branches":["management","it"],"tier":4,"q":0,"r":-5,"requires":["management_recruiting"]},{"key":"management_communication","branches":["management"],"tier":3,"q":-1,"r":-4,"requires":["management_change"]},{"key":"management_finance_lead","branches":["management"],"tier":3,"q":-2,"r":-3,"requires":["management_change"]},{"key":"management_operations","branches":["management"],"tier":3,"q":-3,"r":-2,"requires":["management_agile"]},{"key":"management_coaching","branches":["management"],"tier":4,"q":0,"r":-6,"requires":["hybrid_people_analytics"]},{"key":"management_innovation","branches":["management"],"tier":4,"q":-3,"r":-3,"requires":["management_operations"]},{"key":"management_organization","branches":["management"],"tier":4,"q":-1,"r":-5,"requires":["management_communication"]},{"key":"management_strategy","branches":["management"],"tier":4,"q":-2,"r":-4,"requires":["management_finance_lead"]},{"key":"management_board","branches":["management"],"tier":5,"q":0,"r":-7,"requires":["management_coaching"]},{"key":"management_culture","branches":["management"],"tier":5,"q":-4,"r":-3,"requires":["management_innovation"]},{"key":"management_international","branches":["management"],"tier":5,"q":-3,"r":-4,"requires":["management_strategy"]},{"key":"management_mastery","branches":["management"],"tier":5,"q":-2,"r":-5,"requires":["management_strategy"]},{"key":"management_risk","branches":["management"],"tier":5,"q":-1,"r":-6,"requires":["management_organization"]},{"key":"sales_basics","branches":["sales"],"tier":1,"q":-1,"r":0,"requires":[]},{"key":"sales_selling","branches":["sales"],"tier":2,"q":-2,"r":0,"requires":["sales_basics"]},{"key":"sales_marketing","branches":["sales"],"tier":2,"q":-3,"r":0,"requires":["sales_selling"]},{"key":"sales_service","branches":["sales"],"tier":2,"q":-3,"r":1,"requires":["sales_selling"]},{"key":"sales_social","branches":["sales"],"tier":2,"q":-2,"r":-1,"requires":["sales_selling"]},{"key":"sales_brand","branches":["sales"],"tier":3,"q":-4,"r":1,"requires":["sales_marketing"]},{"key":"sales_keyaccount","branches":["sales"],"tier":3,"q":-3,"r":-1,"requires":["sales_social"]},{"key":"sales_negotiation","branches":["sales"],"tier":3,"q":-4,"r":0,"requires":["sales_marketing"]},{"key":"sales_ads","branches":["sales"],"tier":3,"q":-4,"r":-1,"requires":["sales_keyaccount"]},{"key":"sales_content","branches":["sales"],"tier":3,"q":-5,"r":0,"requires":["sales_negotiation"]},{"key":"sales_seo","branches":["sales"],"tier":3,"q":-5,"r":1,"requires":["sales_brand"]},{"key":"hybrid_ecommerce","branches":["sales","logistics"],"tier":4,"q":-6,"r":2,"requires":["sales_seo","logistics_air"]},{"key":"sales_growth","branches":["sales"],"tier":4,"q":-6,"r":1,"requires":["sales_seo"]},{"key":"sales_international","branches":["sales"],"tier":4,"q":-6,"r":0,"requires":["sales_content"]},{"key":"sales_pricing","branches":["sales"],"tier":4,"q":-5,"r":-1,"requires":["sales_ads"]},{"key":"sales_retail","branches":["sales"],"tier":4,"q":-4,"r":-2,"requires":["sales_ads"]},{"key":"sales_b2b","branches":["sales"],"tier":5,"q":-7,"r":1,"requires":["sales_international"]},{"key":"sales_crm","branches":["sales"],"tier":5,"q":-6,"r":-1,"requires":["sales_pricing"]},{"key":"sales_events","branches":["sales"],"tier":5,"q":-5,"r":-2,"requires":["sales_retail"]},{"key":"sales_mastery","branches":["sales"],"tier":5,"q":-7,"r":0,"requires":["sales_international"]},{"key":"sales_pr","branches":["sales"],"tier":5,"q":-7,"r":2,"requires":["sales_growth"]},{"key":"logistics_basics","branches":["logistics"],"tier":1,"q":-1,"r":1,"requires":[]},{"key":"logistics_transport","branches":["logistics"],"tier":2,"q":-2,"r":2,"requires":["logistics_basics"]},{"key":"logistics_warehouse","branches":["logistics"],"tier":2,"q":-2,"r":1,"requires":["logistics_basics"]},{"key":"logistics_inventory","branches":["logistics"],"tier":2,"q":-3,"r":3,"requires":["logistics_transport"]},{"key":"logistics_purchasing","branches":["logistics"],"tier":2,"q":-3,"r":2,"requires":["logistics_warehouse"]},{"key":"logistics_fleet","branches":["logistics"],"tier":3,"q":-4,"r":2,"requires":["logistics_purchasing"]},{"key":"logistics_strategic","branches":["logistics"],"tier":3,"q":-4,"r":4,"requires":["logistics_inventory"]},{"key":"logistics_supplychain","branches":["logistics"],"tier":3,"q":-4,"r":3,"requires":["logistics_inventory"]},{"key":"logistics_air","branches":["logistics"],"tier":3,"q":-5,"r":2,"requires":["logistics_fleet"]},{"key":"logistics_customs","branches":["logistics"],"tier":3,"q":-5,"r":3,"requires":["logistics_supplychain"]},{"key":"logistics_distribution","branches":["logistics"],"tier":3,"q":-5,"r":4,"requires":["logistics_supplychain"]},{"key":"logistics_shipping","branches":["logistics"],"tier":3,"q":-5,"r":5,"requires":["logistics_strategic"]},{"key":"logistics_global","branches":["logistics"],"tier":4,"q":-6,"r":4,"requires":["logistics_distribution"]},{"key":"logistics_lastmile","branches":["logistics"],"tier":4,"q":-6,"r":6,"requires":["logistics_shipping"]},{"key":"logistics_quality","branches":["logistics"],"tier":4,"q":-6,"r":5,"requires":["logistics_distribution"]},{"key":"logistics_rail","branches":["logistics"],"tier":4,"q":-6,"r":3,"requires":["logistics_customs"]},{"key":"logistics_automation","branches":["logistics"],"tier":5,"q":-7,"r":7,"requires":["logistics_lastmile"]},{"key":"logistics_cold","branches":["logistics"],"tier":5,"q":-7,"r":6,"requires":["logistics_quality"]},{"key":"logistics_mastery","branches":["logistics"],"tier":5,"q":-7,"r":5,"requires":["logistics_global"]},{"key":"logistics_planning","branches":["logistics"],"tier":5,"q":-7,"r":4,"requires":["logistics_rail"]},{"key":"logistics_sustainability","branches":["logistics"],"tier":5,"q":-7,"r":3,"requires":["logistics_rail"]},{"key":"craft_basics","branches":["craft"],"tier":1,"q":-1,"r":2,"requires":[]},{"key":"craft_electrical","branches":["craft"],"tier":2,"q":-2,"r":3,"requires":["craft_basics"]},{"key":"craft_mechanics","branches":["craft"],"tier":2,"q":-1,"r":3,"requires":["craft_basics"]},{"key":"craft_automation","branches":["craft"],"tier":3,"q":-3,"r":4,"requires":["craft_electrical"]},{"key":"craft_construction","branches":["craft"],"tier":2,"q":-2,"r":4,"requires":["craft_mechanics"]},{"key":"craft_engineering","branches":["craft"],"tier":3,"q":-1,"r":4,"requires":["craft_mechanics"]},{"key":"craft_hvac","branches":["craft"],"tier":3,"q":-4,"r":5,"requires":["craft_automation"]},{"key":"craft_plumbing","branches":["craft"],"tier":3,"q":-1,"r":5,"requires":["craft_engineering"]},{"key":"craft_site","branches":["craft"],"tier":3,"q":-2,"r":5,"requires":["craft_construction"]},{"key":"craft_welding","branches":["craft"],"tier":3,"q":-3,"r":5,"requires":["craft_construction"]},{"key":"craft_carpentry","branches":["craft"],"tier":4,"q":-4,"r":6,"requires":["craft_welding"]},{"key":"craft_cnc","branches":["craft"],"tier":4,"q":-5,"r":6,"requires":["craft_hvac"]},{"key":"craft_energy","branches":["craft"],"tier":4,"q":-2,"r":6,"requires":["craft_site"]},{"key":"craft_manufacturing","branches":["craft"],"tier":4,"q":-3,"r":6,"requires":["craft_welding"]},{"key":"hybrid_industry40","branches":["craft","it"],"tier":4,"q":-1,"r":6,"requires":["craft_plumbing"]},{"key":"craft_3dprint","branches":["craft"],"tier":5,"q":-3,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_mastery","branches":["craft"],"tier":5,"q":-4,"r":7,"requires":["craft_manufacturing"]},{"key":"craft_materials","branches":["craft"],"tier":5,"q":-6,"r":7,"requires":["craft_cnc"]},{"key":"craft_robotics","branches":["craft"],"tier":5,"q":-1,"r":7,"requires":["hybrid_industry40"]},{"key":"craft_solar","branches":["craft"],"tier":5,"q":-5,"r":7,"requires":["craft_carpentry"]},{"key":"craft_vehicles","branches":["craft"],"tier":5,"q":-2,"r":7,"requires":["craft_energy"]},{"key":"science_basics","branches":["science"],"tier":1,"q":0,"r":1,"requires":[]},{"key":"science_biology","branches":["science"],"tier":2,"q":1,"r":1,"requires":["science_basics"]},{"key":"science_chemistry","branches":["science"],"tier":2,"q":0,"r":2,"requires":["science_basics"]},{"key":"science_medicine","branches":["science"],"tier":2,"q":1,"r":2,"requires":["science_biology"]},{"key":"science_physics","branches":["science"],"tier":2,"q":0,"r":3,"requires":["science_chemistry"]},{"key":"science_biotech","branches":["science"],"tier":3,"q":0,"r":4,"requires":["science_physics"]},{"key":"science_clinical","branches":["science"],"tier":3,"q":2,"r":2,"requires":["science_medicine"]},{"key":"science_pharmacology","branches":["science"],"tier":3,"q":1,"r":3,"requires":["science_medicine"]},{"key":"hybrid_pharma_sales","branches":["science","sales"],"tier":4,"q":0,"r":5,"requires":["science_biotech"]},{"key":"science_lab","branches":["science"],"tier":3,"q":1,"r":4,"requires":["science_biotech"]},{"key":"science_microbiology","branches":["science"],"tier":3,"q":3,"r":2,"requires":["science_clinical"]},{"key":"science_statistics","branches":["science"],"tier":3,"q":2,"r":3,"requires":["science_pharmacology"]},{"key":"science_drugs","branches":["science"],"tier":4,"q":2,"r":4,"requires":["science_statistics"]},{"key":"science_genetics","branches":["science"],"tier":4,"q":1,"r":5,"requires":["science_lab"]},{"key":"science_materials","branches":["science"],"tier":4,"q":3,"r":3,"requires":["science_microbiology"]},{"key":"science_nutrition","branches":["science"],"tier":4,"q":0,"r":6,"requires":["hybrid_pharma_sales"]},{"key":"science_devices","branches":["science"],"tier":5,"q":0,"r":7,"requires":["science_nutrition"]},{"key":"science_environment","branches":["science"],"tier":5,"q":1,"r":6,"requires":["science_genetics"]},{"key":"science_mastery","branches":["science"],"tier":5,"q":2,"r":5,"requires":["science_drugs"]},{"key":"science_neuro","branches":["science"],"tier":5,"q":3,"r":4,"requires":["science_drugs"]},{"key":"science_vaccines","branches":["science"],"tier":5,"q":4,"r":3,"requires":["science_materials"]}],"costByTier":[1,2,3,4,6],"scoreByTier":[1,2,3,4,6],"freePointsPerLevel":1,"workHoursPerBranchPoint":6}'::jsonb, 'Defaults from src/config/balance.ts, section "skills"'),
   ('jobs', '{"playerBaseProductivity":1.5,"productivityPerSkillScore":0.08,"maxProductivity":4,"aiSalaryPerScoreBps":300,"aiSalaryCapMultiplier":1.5,"salaryUnitHours":12,"maxOpenApplications":5,"applicationMessageMaxLength":140,"offerValidHours":48,"aiPostingsPerCompany":2,"aiSlotsOpen":99,"quitNoticeHours":1,"quitNowCostHours":12,"tierMinScore":{"intern":0,"junior":2,"senior":6,"team_lead":12,"c_level":20},"sectorBranches":{"tech":["it","finance","sales","management"],"retail":["sales","logistics","finance","management"],"energy":["craft","science","law","management"],"pharma":["science","law","sales","management"],"logistics":["logistics","craft","it","management"]},"profitLinkedPay":{"minFactor":0.5,"bonusShareOfProfit":0.2,"maxBonusFactor":1},"raiseRequest":{"cooldownDays":7,"maxRaiseBpsPerScore":300},"skillPay":{"perRelevantScoreBps":300,"relevantScoreCapPerBranch":40,"perLearnedSkillBps":50,"capMultiplier":3},"rewards":{"profitShareBpsByTier":{"intern":0,"junior":0,"senior":50,"team_lead":200,"c_level":500},"maxProfitShareBps":500,"maxPostingProfitShareBps":300,"maxTotalProfitShareBps":2500,"aiDepartmentSize":50,"aiMaxShareOfWageBps":5000,"stockGrantChanceBpsByTier":{"intern":0,"junior":100,"senior":300,"team_lead":500,"c_level":800},"maxPostingStockGrantBps":500,"stockGrantValueHours":4},"clone":{"minLevel":20,"feeCents":2500000}}'::jsonb, 'Defaults from src/config/balance.ts, section "jobs"'),
   ('dailyRewards', '{"cycle":[{"xp":50,"cashCents":10000,"skillPoints":0},{"xp":75,"cashCents":20000,"skillPoints":0},{"xp":100,"cashCents":30000,"skillPoints":0},{"xp":125,"cashCents":0,"skillPoints":1},{"xp":150,"cashCents":50000,"skillPoints":0},{"xp":200,"cashCents":75000,"skillPoints":0},{"xp":300,"cashCents":100000,"skillPoints":1}],"freezesPerWeek":1}'::jsonb, 'Defaults from src/config/balance.ts, section "dailyRewards"'),
-  ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":360000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":10,"small_business":40,"gmbh":150,"ag":400},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25,"aiMaxPremiumBps":10000,"capitalIncreaseCooldownHours":24,"issueProceedsLockHours":72},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"logoRedrawCents":5000000,"logoRedrawCooldownHours":24,"withdrawIntervalHours":6,"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.02,"cap":{"byTier":{"garage":0.6,"small_business":0.7,"gmbh":0.8,"ag":0.9},"perStage":0.05,"perExpansionLevel":0.03,"max":1},"marketingMaxRatePerHour":0.06,"marketingHalfSaturationShare":0.01,"marketingMinHalfSaturationCents":50000,"wordOfMouthPerHour":0.008,"decayPerHour":0.004,"taskGain":0.005,"taskAiShareBps":5000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":450000,"retail":375000,"energy":375000,"pharma":450000,"logistics":375000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"aiWorkerStandbyBps":2500,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.6,0.65,0.7,0.75,0.8],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.03},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.06},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.12}},"minCostCents":20000,"flyerCapCents":200000,"flyerCapTiers":["garage"],"flyerCapBelowValueCents":100000000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
+  ('startups', '{"garage":{"minLevel":6,"foundingCostCents":250000,"fixedCostCentsPerQuarter":15000,"maxEmployees":2},"upgradeCreditShare":1,"gmbh":{"minLevel":15,"foundingCostCents":6000000,"fixedCostCentsPerQuarter":360000,"maxEmployees":20},"ag":{"fixedCostCentsPerQuarter":1000000,"maxEmployees":100},"marketFactorByTier":{"garage":10,"small_business":40,"gmbh":150,"ag":400},"foundingAwareness":{"garage":0.03,"small_business":0.08,"gmbh":0.2},"expansion":{"fromTiers":["gmbh","ag"],"baseCostCents":10000000,"costGrowth":1.8,"employeesPerLevel":10,"capacityBonusPerLevel":0.1,"marketBonusPerLevel":0.5,"fixedCostPerLevel":0.25},"offices":{"maxTotalSeats":1000,"rentCentsPerSeatPerHour":1000,"steps":[{"seats":10,"costCents":25000000,"minWorthCents":0,"tiers":["gmbh","ag"]},{"seats":15,"costCents":60000000,"minWorthCents":200000000,"tiers":["gmbh","ag"]},{"seats":20,"costCents":150000000,"minWorthCents":500000000,"tiers":["gmbh","ag"]},{"seats":25,"costCents":350000000,"minWorthCents":1500000000,"tiers":["ag"]},{"seats":30,"costCents":800000000,"minWorthCents":3000000000,"tiers":["ag"]},{"seats":35,"costCents":1800000000,"minWorthCents":6000000000,"tiers":["ag"]},{"seats":40,"costCents":4000000000,"minWorthCents":12000000000,"tiers":["ag"]},{"seats":50,"costCents":8000000000,"minWorthCents":25000000000,"tiers":["ag"]},{"seats":60,"costCents":15000000000,"minWorthCents":50000000000,"tiers":["ag"]},{"seats":70,"costCents":25000000000,"minWorthCents":90000000000,"tiers":["ag"]},{"seats":70,"costCents":40000000000,"minWorthCents":150000000000,"tiers":["ag"]},{"seats":75,"costCents":60000000000,"minWorthCents":250000000000,"tiers":["ag"]}]},"pricing":{"budget":{"price":0.8,"demand":1.35,"awareness":1.5},"normal":{"price":1,"demand":1,"awareness":1},"premium":{"price":1.3,"demand":0.75,"awareness":0.7},"premiumMinQuality":0.5,"premiumLowQualityDemand":0.5},"contractWork":{"shareOfFreeCapacity":0.25,"grossMargin":0.3},"founderPayout":{"stepBps":500,"maxBps":10000},"ipo":{"minLevel":9,"fromTiers":["garage","small_business","gmbh"],"sharesTotal":1000000,"minSharePercent":10,"maxSharePercent":49,"minIssuePriceCents":100,"subscriptionMinutes":60,"minFillBps":10000,"demoPlayersShare":0.35,"quickAmountsCents":[10000,100000,1000000],"aiTakeBase":0.6,"aiTakePerQuality":0.4,"aiPace":3,"capitalIncreaseDiscount":0.9,"capitalIncreaseMaxPercent":25,"aiMaxPremiumBps":10000,"capitalIncreaseCooldownHours":24,"issueProceedsLockHours":72},"sideJobFounderFactor":0.5,"aiQualityPenalty":0.3,"fullTimeFromEmployees":5,"logo":{"size":16,"maxColors":16,"reportsToHide":3},"logoRedrawCents":5000000,"logoRedrawCooldownHours":24,"withdrawIntervalHours":6,"banner":{"width":48,"height":12,"maxColors":16},"potential":{"minAnnualCents":100000,"maxAnnualCents":200000000000,"paretoAlpha":0.57},"awareness":{"initial":0.03,"min":0.02,"cap":{"byTier":{"garage":0.6,"small_business":0.7,"gmbh":0.8,"ag":0.9},"perStage":0.05,"perExpansionLevel":0.03,"max":1},"marketingMaxRatePerHour":0.06,"marketingHalfSaturationShare":0.01,"marketingMinHalfSaturationCents":50000,"wordOfMouthPerHour":0.008,"decayPerHour":0.004,"taskGain":0.005,"taskAiShareBps":5000},"quality":{"base":0.25,"halfSaturationScore":20,"adjustPerQuarter":0.35},"demandNoise":0.1,"capacityCentsPerProductivity":{"tech":450000,"retail":375000,"energy":375000,"pharma":450000,"logistics":375000},"grossMargin":{"tech":0.75,"retail":0.35,"energy":0.45,"pharma":0.65,"logistics":0.35},"aiWorkerCostCentsPerQuarter":72000,"aiWorkerWageCentsPerHour":12000,"aiWorkerStandbyBps":2500,"valuationPeDiscount":0.5,"estimate":{"initialSpread":2.3,"decayPerQuarter":0.85},"insolvency":{"graceQuarters":4,"loanWithholdingBps":5000,"foundingLockoutDays":3},"products":{"tech":[{"key":"security_software","stages":[["it_networks"],["it_security","it_programming"],["law_privacy","it_architecture"],["it_crypto","it_pentest"]]},{"key":"mobile_app","stages":[["it_programming"],["it_mobile","sales_social"],["it_ux","sales_growth"],["it_cloud","management_strategy"]]},{"key":"cloud_platform","stages":[["it_networks"],["it_databases","it_devops"],["it_cloud","sales_keyaccount"],["finance_controlling","management_operations"]]},{"key":"legal_tech","stages":[["law_contracts"],["law_corporate","it_programming"],["law_privacy","it_web"],["law_it","sales_growth"]]},{"key":"fintech","stages":[["finance_accounting"],["finance_banking","it_mobile"],["finance_portfolio","law_compliance"],["finance_risk","it_security"]]}],"retail":[{"key":"online_shop","stages":[["it_web"],["sales_marketing","logistics_warehouse"],["hybrid_ecommerce","sales_seo"],["logistics_automation","management_operations"]]},{"key":"fashion","stages":[["sales_marketing"],["sales_brand","logistics_purchasing"],["sales_ads","sales_retail"],["sales_international","finance_controlling"]]},{"key":"delicatessen","stages":[["logistics_purchasing"],["sales_service","logistics_distribution"],["sales_retail","science_nutrition"],["logistics_cold","law_consumer"]]},{"key":"franchise","stages":[["management_team"],["management_people","sales_selling"],["management_operations","finance_controlling"],["management_strategy","law_contracts"]]}],"energy":[{"key":"solar","stages":[["craft_electrical"],["sales_selling","craft_site"],["craft_energy","management_projects"],["craft_solar","law_environment"]]},{"key":"grid_service","stages":[["craft_electrical"],["craft_site","craft_automation"],["craft_energy","law_compliance"],["logistics_planning","management_operations"]]},{"key":"energy_storage","stages":[["science_physics"],["craft_engineering","finance_investment"],["science_materials","craft_manufacturing"],["law_ip","sales_international"]]},{"key":"energy_trading","stages":[["finance_investment"],["finance_accounting","craft_electrical"],["finance_trading","law_compliance"],["finance_risk","management_strategy"]]}],"pharma":[{"key":"generics","stages":[["science_chemistry"],["science_lab","science_pharmacology"],["logistics_quality","hybrid_pharma_sales"],["law_ip","finance_controlling"]]},{"key":"biotech","stages":[["science_biology"],["science_biotech","science_statistics"],["science_clinical","science_genetics"],["law_medical","finance_vc"]]},{"key":"medtech","stages":[["science_medicine"],["craft_engineering","science_lab"],["science_drugs","law_compliance"],["science_devices","it_embedded"]]},{"key":"regulatory","stages":[["law_contracts"],["law_compliance","science_pharmacology"],["law_ip","science_clinical"],["law_medical","finance_controlling"]]}],"logistics":[{"key":"courier","stages":[["logistics_transport"],["logistics_fleet","it_mobile"],["logistics_lastmile","management_operations"],["logistics_planning","logistics_sustainability"]]},{"key":"warehouse","stages":[["logistics_warehouse"],["logistics_inventory","it_databases"],["logistics_supplychain","management_agile"],["logistics_automation","craft_robotics"]]},{"key":"freight","stages":[["logistics_transport"],["logistics_customs","logistics_shipping"],["logistics_global","sales_international"],["logistics_strategic","finance_risk"]]},{"key":"moving","stages":[["management_projects"],["logistics_transport","management_team"],["logistics_distribution","sales_service"],["management_operations","logistics_planning"]]}]},"stages":{"awarenessCaps":[0.6,0.65,0.7,0.75,0.8],"qualityBonusPerStage":0.05,"capacityBonusPerStage":0.25},"training":{"costCentsByTier":[200000,500000,1200000,2500000,5000000],"wageRaiseBpsByTier":[300,500,800,1200,2000],"fromEmployees":5},"campaigns":{"kinds":{"flyer":{"hours":24,"costHours":2,"demandBps":2500,"awareness":0.03},"online":{"hours":48,"costHours":6,"demandBps":4000,"awareness":0.06},"tv":{"hours":72,"costHours":18,"demandBps":7000,"awareness":0.12}},"minCostCents":20000,"flyerCapCents":200000,"flyerCapTiers":["garage"],"flyerCapBelowValueCents":100000000,"luckMin":0.4,"luckMax":1.6,"qualityWeight":0.5,"weakBelow":0.8,"strongFrom":1.2},"chat":{"maxMessageLength":300,"historyLimit":100,"maxMessagesPerMinute":10,"bubbleSeconds":120,"floorMaxMembers":24}}'::jsonb, 'Defaults from src/config/balance.ts, section "startups"'),
   ('avatars', '{"defaultKey":"rookie","portraits":[{"key":"rookie","level":1},{"key":"trader","level":1},{"key":"analyst","level":1},{"key":"coder","level":1},{"key":"builder","level":1},{"key":"seller","level":1},{"key":"lawyer","level":1},{"key":"scientist","level":1},{"key":"trucker","level":1},{"key":"punk","level":3},{"key":"gamer","level":5},{"key":"chef","level":5},{"key":"pilot","level":8},{"key":"founder","level":10},{"key":"banker","level":15},{"key":"astronaut","level":20},{"key":"magnate","level":25},{"key":"royal","level":35},{"key":"legend","level":50},{"key":"finn_fan","level":1}]}'::jsonb, 'Defaults from src/config/balance.ts, section "avatars"'),
   ('artworks', '{"size":32,"maxColors":16,"titleMaxLength":40,"createBaseCostCents":1500000,"createCostFactor":1.5,"auction":{"durationsHours":[1,6,24],"minIncrementBps":500,"minStartCents":10000,"feeBps":1000,"antiSnipeMinutes":2},"gallery":{"auctionsPerDay":4,"auctionHours":6,"startPriceCents":{"common":500000,"rare":2500000,"legendary":15000000}},"hot":{"likeWeight":1,"bidWeight":3,"gravity":1.5}}'::jsonb, 'Defaults from src/config/balance.ts, section "artworks"'),
   ('companyEvents', '{"chancePerDay":0.6,"minGapHours":22,"minAgeHours":6,"chanceShare":0.4,"severityWeights":[0.5,0.35,0.15],"severityScale":[1,1.7,2.5],"preDeadlineShare":0.25,"costUnit":{"minUnitCents":20000,"unitShareOfFixed":0.5},"knowHow":{"bpsPerPoint":150,"maxBonusBps":2500},"severityPenaltyBps":700,"retryCostShare":0.5,"shareShockBps":[400,900,1500],"archetypes":[{"key":"regulation","polarity":"crisis","weight":12,"effect":{"demand":-0.12,"cost":0.06},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"lobby","mitigation":1,"bonus":{"awareness":0.02},"steps":[{"key":"study","hours":3,"cost":2,"branch":"law","baseBps":9000},{"key":"alliance","hours":5,"cost":1,"branch":"sales","staff":2,"baseBps":6500},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"adapt","mitigation":0.7,"bonus":{"quality":0.03},"steps":[{"key":"retool","hours":8,"cost":4,"staff":1,"capacityHit":0.3,"baseBps":9500},{"key":"certify","hours":4,"cost":1,"branch":"science","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"special_tax","polarity":"crisis","weight":10,"effect":{"cost":0.1},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"lobby","mitigation":1,"steps":[{"key":"petition","hours":2,"cost":1,"branch":"sales","baseBps":9000},{"key":"experts","hours":5,"cost":2,"branch":"finance","baseBps":7000},{"key":"hearing","hours":6,"cost":3,"branch":"law","baseBps":5500}]},{"key":"reformulate","mitigation":0.8,"bonus":{"quality":-0.02},"steps":[{"key":"lab","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":6500},{"key":"relaunch","hours":4,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"supply_shortage","polarity":"crisis","weight":11,"effect":{"capacity":-0.25,"cost":0.05},"deadlineHours":24,"lastsHours":60,"strategies":[{"key":"new_supplier","mitigation":1,"steps":[{"key":"scout","hours":3,"cost":1,"branch":"logistics","baseBps":8500},{"key":"contract","hours":4,"cost":3,"branch":"finance","baseBps":7500}]},{"key":"stockpile","mitigation":0.8,"steps":[{"key":"buy_stock","hours":2,"cost":6,"baseBps":10000}]},{"key":"redesign","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"prototype","hours":6,"cost":2,"branch":"science","staff":1,"baseBps":6000},{"key":"switch","hours":6,"cost":2,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"quality_scandal","polarity":"crisis","weight":9,"effect":{"demand":-0.2},"deadlineHours":20,"lastsHours":72,"strategies":[{"key":"recall","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"pull_back","hours":4,"cost":4,"branch":"logistics","capacityHit":0.3,"baseBps":9500},{"key":"fix","hours":6,"cost":2,"branch":"craft","baseBps":7500}]},{"key":"pr_offensive","mitigation":0.6,"bonus":{"awareness":0.03},"steps":[{"key":"statement","hours":1,"cost":1,"branch":"management","baseBps":9000},{"key":"campaign","hours":5,"cost":3,"branch":"sales","baseBps":6500}]},{"key":"independent_test","mitigation":0.9,"steps":[{"key":"lab_test","hours":8,"cost":2,"branch":"science","baseBps":7000},{"key":"publish","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"data_breach","polarity":"crisis","weight":8,"sectors":["tech","retail","logistics"],"effect":{"demand":-0.15,"cost":0.04},"deadlineHours":18,"lastsHours":60,"strategies":[{"key":"forensics","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"analyse","hours":4,"cost":2,"branch":"it","baseBps":7500},{"key":"patch","hours":4,"cost":1,"branch":"it","staff":2,"baseBps":8000},{"key":"audit","hours":3,"cost":2,"branch":"law","baseBps":9000}]},{"key":"transparency","mitigation":0.6,"bonus":{"awareness":0.01},"steps":[{"key":"disclose","hours":2,"cost":1,"branch":"management","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tax_audit","polarity":"crisis","weight":0,"effect":{"cost":0.05,"capacity":-0.08},"deadlineHours":12,"lastsHours":36,"strategies":[{"key":"cooperate","mitigation":0.9,"steps":[{"key":"collect_files","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"auditor_meeting","hours":3,"cost":1,"branch":"management","staff":1,"baseBps":8000}]},{"key":"tax_lawyer","mitigation":1,"steps":[{"key":"hire_lawyer","hours":4,"cost":4,"branch":"law","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"price_war","polarity":"crisis","weight":10,"effect":{"demand":-0.18},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"undercut","mitigation":0.8,"steps":[{"key":"calculate","hours":2,"cost":1,"branch":"finance","baseBps":9000},{"key":"discount","hours":6,"cost":4,"branch":"sales","baseBps":9500}]},{"key":"innovate","mitigation":1,"bonus":{"quality":0.04},"steps":[{"key":"research","hours":6,"cost":2,"branch":"science","baseBps":7000},{"key":"build","hours":6,"cost":2,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":7500},{"key":"launch","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"niche","mitigation":0.6,"steps":[{"key":"reposition","hours":4,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"strike","polarity":"crisis","weight":7,"effect":{"capacity":-0.35},"deadlineHours":16,"lastsHours":48,"strategies":[{"key":"negotiate","mitigation":1,"steps":[{"key":"listen","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"deal","hours":4,"cost":3,"branch":"management","baseBps":7000}]},{"key":"bonus","mitigation":0.8,"steps":[{"key":"pay_bonus","hours":1,"cost":5,"baseBps":10000}]},{"key":"automate","mitigation":0.7,"bonus":{"quality":-0.02},"steps":[{"key":"machines","hours":8,"cost":4,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"protest","polarity":"crisis","weight":8,"effect":{"demand":-0.1,"cost":0.03},"deadlineHours":30,"lastsHours":72,"strategies":[{"key":"green","mitigation":1,"bonus":{"awareness":0.03,"quality":0.02},"steps":[{"key":"footprint","hours":4,"cost":1,"branch":"science","baseBps":8500},{"key":"program","hours":8,"cost":4,"branch":"craft","staff":1,"baseBps":8500},{"key":"report","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"dialogue","mitigation":0.6,"steps":[{"key":"invite","hours":2,"cost":0,"branch":"management","baseBps":8500},{"key":"round_table","hours":4,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"patent_claim","polarity":"crisis","weight":6,"effect":{"demand":-0.08,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lawyers","mitigation":1,"steps":[{"key":"review","hours":4,"cost":2,"branch":"law","baseBps":8000},{"key":"court","hours":8,"cost":4,"branch":"law","baseBps":5500}]},{"key":"license","mitigation":0.7,"steps":[{"key":"pay_license","hours":2,"cost":5,"baseBps":10000}]},{"key":"workaround","mitigation":0.9,"bonus":{"quality":0.02},"steps":[{"key":"redesign","hours":8,"cost":2,"branch":"science","staff":1,"baseBps":6500},{"key":"test","hours":4,"cost":1,"branch":"craft","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"bad_review","polarity":"crisis","weight":9,"effect":{"demand":-0.14},"deadlineHours":24,"lastsHours":48,"strategies":[{"key":"improve","mitigation":1,"bonus":{"quality":0.05},"steps":[{"key":"analyse","hours":3,"cost":1,"branch":"science","baseBps":9000},{"key":"rework","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":7500},{"key":"retest","hours":3,"cost":1,"branch":"sales","baseBps":7000}]},{"key":"counter","mitigation":0.6,"bonus":{"awareness":0.02},"steps":[{"key":"campaign","hours":4,"cost":3,"branch":"sales","baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"viral_trend","polarity":"chance","weight":10,"effect":{"demand":0.35},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"scale_up","mitigation":1,"bonus":{"awareness":0.04},"steps":[{"key":"overtime","hours":2,"cost":2,"staff":1,"baseBps":9500},{"key":"restock","hours":4,"cost":3,"branch":"logistics","baseBps":8500}]},{"key":"ride_wave","mitigation":0.6,"bonus":{"awareness":0.06},"steps":[{"key":"content","hours":3,"cost":1,"branch":"sales","baseBps":8000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"big_contract","polarity":"chance","weight":9,"effect":{"demand":0.25},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"pitch","mitigation":1,"steps":[{"key":"offer","hours":3,"cost":1,"branch":"sales","baseBps":8500},{"key":"negotiate","hours":4,"cost":1,"branch":"management","baseBps":6500},{"key":"deliver","hours":6,"cost":3,"staff":2,"capacityHit":0.2,"baseBps":9000}]},{"key":"quick_deal","mitigation":0.5,"steps":[{"key":"discount_offer","hours":2,"cost":1,"branch":"sales","baseBps":9000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"award","polarity":"chance","weight":8,"effect":{"demand":0.15},"deadlineHours":24,"lastsHours":72,"strategies":[{"key":"press_tour","mitigation":1,"bonus":{"awareness":0.06},"steps":[{"key":"interviews","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"ads","hours":4,"cost":3,"branch":"sales","baseBps":9000}]},{"key":"badge","mitigation":0.5,"steps":[{"key":"seal","hours":1,"cost":1,"baseBps":10000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"subsidy","polarity":"chance","weight":7,"effect":{"cost":-0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"apply","mitigation":1,"steps":[{"key":"forms","hours":3,"cost":0,"branch":"law","baseBps":9000},{"key":"plan","hours":5,"cost":1,"branch":"finance","baseBps":7500},{"key":"jury","hours":4,"cost":0,"branch":"management","baseBps":6000}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"partnership","polarity":"chance","weight":7,"effect":{"demand":0.2,"capacity":0.1},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"join","mitigation":1,"bonus":{"awareness":0.03},"steps":[{"key":"meeting","hours":2,"cost":0,"branch":"management","baseBps":9000},{"key":"integrate","hours":6,"cost":2,"branch":"it","staff":1,"baseBps":7500}]},{"key":"pass","mitigation":0,"steps":[]}]},{"key":"political_decision","polarity":"crisis","weight":10,"external":true,"minWorthCents":2000000000,"risk":"political","effect":{"demand":-0.1,"cost":0.08},"deadlineHours":36,"lastsHours":96,"strategies":[{"key":"lobby_campaign","mitigation":1,"bonus":{"awareness":0.01},"steps":[{"key":"think_tank","hours":4,"cost":3,"branch":"law","baseBps":8000},{"key":"coalition","hours":6,"cost":4,"branch":"sales","staff":2,"baseBps":6500},{"key":"media","hours":5,"cost":3,"branch":"management","baseBps":7000},{"key":"hearing","hours":8,"cost":6,"branch":"law","baseBps":5000}]},{"key":"comply","mitigation":0.6,"steps":[{"key":"compliance_team","hours":8,"cost":5,"branch":"law","capacityHit":0.2,"baseBps":9000},{"key":"audit","hours":4,"cost":2,"branch":"finance","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tariffs","polarity":"crisis","weight":10,"external":true,"minWorthCents":2000000000,"risk":"tariff","effect":{"demand":-0.15,"cost":0.05},"deadlineHours":30,"lastsHours":120,"strategies":[{"key":"local_production","mitigation":1,"steps":[{"key":"site_search","hours":4,"cost":3,"branch":"logistics","baseBps":8500},{"key":"build_plant","hours":10,"cost":8,"branch":"craft","staff":2,"capacityHit":0.2,"baseBps":8000}]},{"key":"lobby","mitigation":0.8,"steps":[{"key":"trade_association","hours":4,"cost":2,"branch":"sales","baseBps":8000},{"key":"negotiation","hours":6,"cost":4,"branch":"law","baseBps":6000}]},{"key":"pass_on","mitigation":0.5,"steps":[{"key":"price_talk","hours":3,"cost":1,"branch":"sales","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"earthquake","polarity":"crisis","weight":3,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.4,"cost":0.12},"deadlineHours":18,"lastsHours":72,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"tsunami","polarity":"crisis","weight":1.5,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.5,"cost":0.15},"deadlineHours":18,"lastsHours":72,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"flood","polarity":"crisis","weight":3,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.3,"cost":0.1},"deadlineHours":20,"lastsHours":60,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"wildfire","polarity":"crisis","weight":3,"external":true,"minWorthCents":2000000000,"risk":"disaster","insurable":true,"effect":{"capacity":-0.3,"cost":0.08,"demand":-0.03},"deadlineHours":20,"lastsHours":60,"strategies":[{"key":"rebuild","mitigation":1,"steps":[{"key":"assess","hours":2,"cost":1,"branch":"craft","baseBps":9000},{"key":"repair","hours":8,"cost":6,"branch":"craft","staff":2,"baseBps":8000},{"key":"reopen","hours":3,"cost":2,"branch":"logistics","baseBps":8500}]},{"key":"backup_site","mitigation":0.7,"steps":[{"key":"rent_site","hours":4,"cost":5,"branch":"logistics","baseBps":9000},{"key":"move","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"pandemic","polarity":"crisis","weight":4,"external":true,"minWorthCents":2000000000,"effect":{"capacity":-0.25,"demand":-0.1},"deadlineHours":30,"lastsHours":120,"strategies":[{"key":"remote_work","mitigation":1,"steps":[{"key":"laptops","hours":3,"cost":3,"branch":"it","baseBps":9000},{"key":"shifts","hours":5,"cost":2,"branch":"management","baseBps":8000}]},{"key":"health_program","mitigation":0.8,"steps":[{"key":"tests","hours":2,"cost":2,"branch":"science","baseBps":9000},{"key":"vaccination_drive","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":7500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"shitstorm","polarity":"crisis","weight":8,"external":true,"minWorthCents":2000000000,"risk":"image","effect":{"demand":-0.22},"deadlineHours":16,"lastsHours":72,"strategies":[{"key":"apology_tour","mitigation":1,"bonus":{"awareness":0.01},"steps":[{"key":"listen","hours":2,"cost":1,"branch":"management","baseBps":9000},{"key":"apology","hours":3,"cost":2,"branch":"management","baseBps":7500},{"key":"make_good","hours":6,"cost":4,"branch":"sales","baseBps":7500}]},{"key":"counter_campaign","mitigation":0.6,"steps":[{"key":"fact_check","hours":3,"cost":2,"branch":"sales","baseBps":7000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"war_conflict","polarity":"crisis","weight":3,"external":true,"minWorthCents":5000000000,"risk":"war","effect":{"demand":-0.12,"capacity":-0.15,"cost":0.1},"deadlineHours":36,"lastsHours":144,"strategies":[{"key":"reroute","mitigation":1,"steps":[{"key":"risk_analysis","hours":3,"cost":2,"branch":"logistics","baseBps":9000},{"key":"new_routes","hours":8,"cost":5,"branch":"logistics","staff":1,"baseBps":7500},{"key":"secure_stock","hours":4,"cost":4,"branch":"finance","baseBps":8500}]},{"key":"withdraw","mitigation":0.6,"steps":[{"key":"exit_plan","hours":4,"cost":2,"branch":"management","baseBps":9000},{"key":"write_off","hours":2,"cost":3,"branch":"finance","baseBps":9500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"commodity_crunch","polarity":"crisis","weight":8,"external":true,"minWorthCents":2000000000,"effect":{"capacity":-0.2,"cost":0.12},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"long_term_contracts","mitigation":1,"steps":[{"key":"market_scan","hours":3,"cost":1,"branch":"logistics","baseBps":9000},{"key":"hedge","hours":4,"cost":4,"branch":"finance","baseBps":7500},{"key":"contract","hours":4,"cost":3,"branch":"law","baseBps":8000}]},{"key":"substitute","mitigation":0.8,"steps":[{"key":"research_sub","hours":6,"cost":3,"branch":"science","staff":1,"baseBps":7000},{"key":"retool","hours":6,"cost":3,"branch":"craft","capacityHit":0.2,"baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"cyber_attack","polarity":"crisis","weight":7,"external":true,"minWorthCents":2000000000,"insurable":true,"effect":{"capacity":-0.35,"cost":0.06},"deadlineHours":12,"lastsHours":48,"strategies":[{"key":"incident_response","mitigation":1,"steps":[{"key":"isolate","hours":2,"cost":2,"branch":"it","staff":1,"baseBps":8500},{"key":"restore","hours":5,"cost":3,"branch":"it","baseBps":7500},{"key":"harden","hours":4,"cost":3,"branch":"it","baseBps":8000}]},{"key":"backup_restore","mitigation":0.6,"steps":[{"key":"backups","hours":4,"cost":3,"branch":"it","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"antitrust","polarity":"crisis","weight":6,"external":true,"minWorthCents":50000000000,"risk":"political","effect":{"demand":-0.08,"cost":0.15},"deadlineHours":48,"lastsHours":168,"strategies":[{"key":"fight","mitigation":1,"steps":[{"key":"top_lawyers","hours":6,"cost":6,"branch":"law","baseBps":7000},{"key":"economists","hours":6,"cost":4,"branch":"finance","baseBps":7000},{"key":"court","hours":10,"cost":8,"branch":"law","baseBps":5000}]},{"key":"cooperate","mitigation":0.8,"steps":[{"key":"disclose_files","hours":4,"cost":2,"branch":"law","baseBps":9000},{"key":"remedies","hours":8,"cost":6,"branch":"management","baseBps":7500}]},{"key":"divest","mitigation":0.7,"steps":[{"key":"sell_unit","hours":6,"cost":8,"branch":"finance","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"union_strike","polarity":"crisis","weight":6,"external":true,"minWorthCents":2000000000,"effect":{"capacity":-0.45},"deadlineHours":18,"lastsHours":48,"strategies":[{"key":"collective_bargaining","mitigation":1,"steps":[{"key":"talks","hours":3,"cost":1,"branch":"management","baseBps":8500},{"key":"offer","hours":4,"cost":4,"branch":"finance","baseBps":7500},{"key":"sign","hours":2,"cost":1,"branch":"law","baseBps":9000}]},{"key":"mediation","mitigation":0.8,"steps":[{"key":"mediator","hours":6,"cost":3,"branch":"law","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"currency_crisis","polarity":"crisis","weight":4,"external":true,"minWorthCents":5000000000,"risk":"tariff","effect":{"demand":-0.1,"cost":0.08},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"hedging","mitigation":1,"steps":[{"key":"treasury_analysis","hours":3,"cost":2,"branch":"finance","baseBps":9000},{"key":"currency_hedge","hours":4,"cost":5,"branch":"finance","baseBps":7000}]},{"key":"local_pricing","mitigation":0.6,"steps":[{"key":"reprice","hours":3,"cost":2,"branch":"sales","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"energy_shock","polarity":"crisis","weight":5,"external":true,"minWorthCents":2000000000,"effect":{"cost":0.14},"deadlineHours":24,"lastsHours":120,"strategies":[{"key":"efficiency","mitigation":1,"steps":[{"key":"energy_audit","hours":3,"cost":2,"branch":"science","baseBps":9000},{"key":"retrofit","hours":8,"cost":6,"branch":"craft","capacityHit":0.15,"baseBps":8000}]},{"key":"own_power","mitigation":0.9,"steps":[{"key":"solar_park","hours":10,"cost":8,"branch":"science","staff":2,"baseBps":7500},{"key":"grid_deal","hours":3,"cost":2,"branch":"law","baseBps":8500}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_accounting","polarity":"crisis","weight":0,"incident":true,"effect":{"demand":-0.12,"cost":0.1},"deadlineHours":36,"lastsHours":120,"strategies":[{"key":"full_audit","mitigation":1,"steps":[{"key":"special_audit","hours":6,"cost":4,"branch":"finance","baseBps":7500},{"key":"board_inquiry","hours":8,"cost":3,"branch":"law","staff":1,"baseBps":6500},{"key":"restate_books","hours":6,"cost":5,"branch":"finance","capacityHit":0.15,"baseBps":7000},{"key":"new_cfo","hours":4,"cost":4,"branch":"management","baseBps":8000}]},{"key":"settle_regulator","mitigation":0.6,"steps":[{"key":"lawyers","hours":4,"cost":3,"branch":"law","baseBps":8000},{"key":"fine_deal","hours":6,"cost":6,"branch":"law","baseBps":6500}]},{"key":"cover_up","mitigation":0.2,"steps":[{"key":"shred","hours":2,"cost":1,"branch":"finance","baseBps":5000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_recall","polarity":"crisis","weight":0,"incident":true,"insurable":true,"effect":{"demand":-0.2,"cost":0.08},"deadlineHours":30,"lastsHours":120,"strategies":[{"key":"full_recall","mitigation":1,"bonus":{"quality":0.02},"steps":[{"key":"stop_sales","hours":2,"cost":2,"branch":"logistics","baseBps":9000},{"key":"recall_wave","hours":8,"cost":6,"branch":"logistics","staff":2,"capacityHit":0.2,"baseBps":7000},{"key":"lawsuits","hours":6,"cost":4,"branch":"law","baseBps":6500},{"key":"class_action","hours":8,"cost":5,"branch":"law","baseBps":6000}]},{"key":"quiet_fix","mitigation":0.5,"steps":[{"key":"fix_batch","hours":6,"cost":3,"branch":"craft","staff":1,"baseBps":7500},{"key":"goodwill","hours":3,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"deny","mitigation":0.15,"steps":[{"key":"statement","hours":1,"cost":0,"branch":"sales","baseBps":5000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_data_leak","polarity":"crisis","weight":0,"incident":true,"insurable":true,"effect":{"demand":-0.15,"cost":0.06},"deadlineHours":30,"lastsHours":96,"strategies":[{"key":"forensics","mitigation":1,"steps":[{"key":"close_hole","hours":4,"cost":3,"branch":"it","staff":1,"baseBps":7500},{"key":"inform_customers","hours":3,"cost":2,"branch":"sales","baseBps":8500},{"key":"authority_hearing","hours":8,"cost":4,"branch":"law","baseBps":6500},{"key":"fine_appeal","hours":6,"cost":4,"branch":"law","baseBps":6000}]},{"key":"lobby_authority","mitigation":0.7,"steps":[{"key":"close_hole","hours":4,"cost":3,"branch":"it","staff":1,"baseBps":7500},{"key":"lobby_talks","hours":6,"cost":5,"branch":"management","baseBps":6000}]},{"key":"cover_up","mitigation":0.2,"steps":[{"key":"delete_logs","hours":1,"cost":1,"branch":"it","baseBps":5000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_ceo_scandal","polarity":"crisis","weight":0,"incident":true,"effect":{"demand":-0.18},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"clean_sweep","mitigation":1,"steps":[{"key":"independent_probe","hours":6,"cost":3,"branch":"law","baseBps":7500},{"key":"interim_ceo","hours":4,"cost":4,"branch":"management","staff":1,"baseBps":7000},{"key":"trust_campaign","hours":6,"cost":4,"branch":"sales","baseBps":7000}]},{"key":"apology","mitigation":0.5,"steps":[{"key":"press_conference","hours":2,"cost":1,"branch":"management","baseBps":7500},{"key":"donation","hours":3,"cost":3,"branch":"sales","baseBps":8500}]},{"key":"ignore","mitigation":0.1,"steps":[{"key":"no_comment","hours":1,"cost":0,"branch":"management","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_supplier_bankrupt","polarity":"crisis","weight":0,"incident":true,"insurable":true,"effect":{"capacity":-0.35,"cost":0.1},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"new_suppliers","mitigation":1,"steps":[{"key":"emergency_stock","hours":3,"cost":4,"branch":"logistics","baseBps":8500},{"key":"supplier_search","hours":6,"cost":3,"branch":"logistics","staff":1,"baseBps":7000},{"key":"qualify_parts","hours":8,"cost":4,"branch":"craft","capacityHit":0.15,"baseBps":6500}]},{"key":"buy_supplier","mitigation":0.9,"steps":[{"key":"due_diligence","hours":4,"cost":2,"branch":"finance","baseBps":8000},{"key":"takeover","hours":8,"cost":9,"branch":"law","baseBps":6000}]},{"key":"ignore","mitigation":0.1,"steps":[{"key":"no_comment","hours":1,"cost":0,"branch":"management","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_patent_suit","polarity":"crisis","weight":0,"incident":true,"effect":{"demand":-0.1,"cost":0.12},"deadlineHours":36,"lastsHours":144,"strategies":[{"key":"fight","mitigation":1,"steps":[{"key":"prior_art","hours":6,"cost":3,"branch":"science","baseBps":7000},{"key":"injunction","hours":6,"cost":4,"branch":"law","baseBps":6000},{"key":"trial","hours":10,"cost":6,"branch":"law","staff":1,"baseBps":5500}]},{"key":"license","mitigation":0.6,"steps":[{"key":"license_talks","hours":4,"cost":5,"branch":"law","baseBps":8500}]},{"key":"redesign","mitigation":0.8,"steps":[{"key":"workaround","hours":8,"cost":4,"branch":"science","staff":1,"capacityHit":0.2,"baseBps":7000},{"key":"relaunch","hours":4,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"ignore","mitigation":0.1,"steps":[{"key":"no_comment","hours":1,"cost":0,"branch":"management","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_rating_downgrade","polarity":"crisis","weight":0,"incident":true,"effect":{"cost":0.12},"deadlineHours":30,"lastsHours":120,"strategies":[{"key":"restore_rating","mitigation":1,"steps":[{"key":"cut_debt","hours":6,"cost":6,"branch":"finance","baseBps":7500},{"key":"rating_meeting","hours":4,"cost":2,"branch":"finance","baseBps":6500},{"key":"investor_day","hours":4,"cost":3,"branch":"management","staff":1,"baseBps":7500}]},{"key":"cost_program","mitigation":0.6,"steps":[{"key":"savings","hours":8,"cost":2,"branch":"management","capacityHit":0.2,"baseBps":8000}]},{"key":"ignore","mitigation":0.1,"steps":[{"key":"no_comment","hours":1,"cost":0,"branch":"management","baseBps":9000}]},{"key":"accept","mitigation":0,"steps":[]}]},{"key":"incident_key_customer","polarity":"crisis","weight":0,"incident":true,"effect":{"demand":-0.3},"deadlineHours":24,"lastsHours":96,"strategies":[{"key":"win_back","mitigation":1,"steps":[{"key":"crisis_meeting","hours":2,"cost":1,"branch":"sales","baseBps":8000},{"key":"new_offer","hours":6,"cost":4,"branch":"sales","staff":1,"baseBps":6500},{"key":"service_upgrade","hours":6,"cost":3,"branch":"craft","capacityHit":0.1,"baseBps":7000}]},{"key":"new_customers","mitigation":0.7,"steps":[{"key":"sales_push","hours":6,"cost":3,"branch":"sales","staff":1,"baseBps":7500},{"key":"trade_fair","hours":6,"cost":3,"branch":"sales","baseBps":7500}]},{"key":"price_war","mitigation":0.3,"steps":[{"key":"dump_prices","hours":2,"cost":2,"branch":"sales","baseBps":8000}]},{"key":"accept","mitigation":0,"steps":[]}]}]}'::jsonb, 'Defaults from src/config/balance.ts, section "companyEvents"'),

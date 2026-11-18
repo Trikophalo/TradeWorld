@@ -32,6 +32,7 @@ import { HistoryCard, QuarterReceipt } from "../company-parts";
 import { ChartLink, DashLink, FirmSection, SectionNav, useWhere, type NavItem } from "../firm-layout";
 import { HealthPanel, type AskMira } from "../health-panel";
 import { StockConfidenceCard } from "@/features/market/components/confidence";
+import { StockTierCard } from "@/features/market/components/stock-tier";
 import { PulseCard } from "../pulse-card";
 import { reputationOf, ReputationCard } from "../reputation-card";
 import { CloseErrorNote } from "../strengths-card";
@@ -126,6 +127,11 @@ export function DashboardTab({
         {company.listing?.status === "listed" && company.listing.ticker && (
           <Reveal feature="stockConfidence">
             <StockConfidenceCard ticker={company.listing.ticker} variant="company" />
+          </Reveal>
+        )}
+        {company.listing?.status === "listed" && company.listing.ticker && (
+          <Reveal feature="stockTier">
+            <StockTierCard ticker={company.listing.ticker} />
           </Reveal>
         )}
         {showMood && (

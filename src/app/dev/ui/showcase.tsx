@@ -61,6 +61,9 @@ import { CompanySkillsCard } from "@/features/company/components/company-skills"
 import { LogoRedraw } from "@/features/company/components/logo-redraw";
 import { TalentsCard } from "@/features/company/components/talents";
 import { WorldShowcase } from "@/features/company/world/world-showcase";
+import { OfficesView } from "@/features/company/components/offices";
+import { StockTierBadge, StockTierView } from "@/features/market/components/stock-tier";
+import type { CompanyOffices } from "@/features/game/types";
 import { RisksCard } from "@/features/company/components/risks-card";
 import { demoRisks } from "@/features/game/demo/risks";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
@@ -889,6 +892,19 @@ const SAMPLE_VAULT = {
   capHours: 28,
 };
 
+/** Büroflächen of an AG with the full headquarters, step 5 next (ADR-218). */
+const SHOWCASE_OFFICES: CompanyOffices = {
+  level: 4,
+  steps: 12,
+  tier: "ag",
+  seats: { tier: 100, expansion: 30, headquarters: 410, offices: 70, total: 610, max: 1000, used: 488 },
+  rentCentsPerHour: 70_000,
+  worthCents: 4_200_000_000,
+  freeCashCents: 1_100_000_000,
+  next: { n: 5, seats: 30, costCents: 800_000_000, minWorthCents: 3_000_000_000, tiers: ["ag"] },
+  block: null,
+};
+
 export function Showcase() {
   const t = useTranslations("showcase");
   const settings = useSettings();
@@ -1016,6 +1032,21 @@ export function Showcase() {
               { key: "withdraw", points: -4 },
             ]}
           />
+        </Card>
+      </Section>
+
+      <Section id="seats-tiers" title="Büroflächen und Aktienklassen (ADR-218)" className="grid gap-4 lg:grid-cols-2">
+        <OfficesView offices={SHOWCASE_OFFICES} onBuy={() => Promise.resolve(true)} />
+        <OfficesView
+          offices={{ ...SHOWCASE_OFFICES, block: "worth", worthCents: 900_000_000 }}
+          onBuy={() => Promise.resolve(false)}
+        />
+        <StockTierView tier="smallcap" marketCapCents={12_500_000_000} />
+        <StockTierView tier="bluechip" marketCapCents={420_000_000_000} />
+        <Card className="flex flex-wrap gap-2">
+          {(["penny", "smallcap", "midcap", "largecap", "bluechip"] as const).map((tier) => (
+            <StockTierBadge key={tier} tier={tier} />
+          ))}
         </Card>
       </Section>
 

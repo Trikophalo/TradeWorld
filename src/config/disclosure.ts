@@ -17,6 +17,8 @@ export const DISCLOSURE = {
   stockFigures: 2,
   /** Investor confidence on the stock page and the market mood on the overview (ADR-216): after the tutorial. */
   stockConfidence: 2,
+  /** Stock tier and the way up for player stocks (ADR-218): with the confidence. */
+  stockTier: 2,
   marketMood: 2,
   portfolioHistory: 2,
   profileCareer: 2,

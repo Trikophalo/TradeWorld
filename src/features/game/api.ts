@@ -20,6 +20,7 @@ import { NEWS_SHOW_RPC_SCHEMAS, liveNewsShowEngine } from "./api-news-show";
 import { NEWS_PROMO_RPC_SCHEMAS, liveNewsPromoEngine } from "./api-news-promos";
 import { TOPLIST_RPC_SCHEMAS, liveToplistEngine } from "./api-toplists";
 import { CONFIDENCE_RPC_SCHEMAS, liveConfidenceEngine } from "./api-confidence";
+import { OFFICE_RPC_SCHEMAS, liveOfficeEngine } from "./api-offices";
 import { MACRO_RPC_SCHEMAS, liveMacroEngine } from "./api-macro";
 import { COMPANY_SKILLS_RPC_SCHEMAS, liveCompanySkillsEngine } from "./api-company-skills";
 import { VAULT_RPC_SCHEMAS, liveVaultEngine } from "./api-vault";
@@ -64,7 +65,7 @@ const securitySchema = z.object({
   name: z.string(),
   kind: z.enum(["stock", "bond", "crypto"]),
   sector_key: z.string().nullable(),
-  size_class: z.enum(["bluechip", "midcap", "penny"]).nullable(),
+  size_class: z.enum(["bluechip", "largecap", "midcap", "smallcap", "penny"]).nullable(),
   last_price_e4: num,
   bid_e4: num,
   ask_e4: num,
@@ -526,6 +527,7 @@ export const RPC_SCHEMAS = {
   ...TOPLIST_RPC_SCHEMAS,
   ...MACRO_RPC_SCHEMAS,
   ...CONFIDENCE_RPC_SCHEMAS,
+  ...OFFICE_RPC_SCHEMAS,
   ...COMPANY_SKILLS_RPC_SCHEMAS,
   ...VAULT_RPC_SCHEMAS,
   ...TALENT_RPC_SCHEMAS,
@@ -574,6 +576,7 @@ export const liveEngine: GameEngine = {
   ...liveToplistEngine,
   ...liveMacroEngine,
   ...liveConfidenceEngine,
+  ...liveOfficeEngine,
   ...liveCompanySkillsEngine,
   ...liveVaultEngine,
   ...liveTalentEngine,

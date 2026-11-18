@@ -134,8 +134,16 @@ export function fixedCostCents(tier: StartupTier, cfg: BalanceConfig = BALANCE, 
   return Math.round(base * (1 + cfg.startups.expansion.fixedCostPerLevel * level(expansionLevel)));
 }
 
-/** Places for players and AI workers; every expansion level adds more (ADR-083). */
-export function maxEmployees(tier: StartupTier, cfg: BalanceConfig = BALANCE, expansionLevel = 0): number {
+/**
+ * Places for players and AI workers; every expansion level adds more (ADR-083). `extraSeats` are the seats of the
+ * headquarters and the Büroflächen (ADR-208/218); all together at most startups.offices.maxTotalSeats.
+ */
+export function maxEmployees(
+  tier: StartupTier,
+  cfg: BalanceConfig = BALANCE,
+  expansionLevel = 0,
+  extraSeats = 0,
+): number {
   const base =
     tier === "garage"
       ? cfg.startups.garage.maxEmployees
@@ -144,7 +152,10 @@ export function maxEmployees(tier: StartupTier, cfg: BalanceConfig = BALANCE, ex
         : tier === "ag"
           ? cfg.startups.ag.maxEmployees
           : (cfg.company.tiers.find((t) => t.id === "small_business")?.maxEmployees ?? 0);
-  return base + cfg.startups.expansion.employeesPerLevel * level(expansionLevel);
+  return Math.min(
+    cfg.startups.offices.maxTotalSeats,
+    base + cfg.startups.expansion.employeesPerLevel * level(expansionLevel) + Math.max(0, extraSeats),
+  );
 }
 
 // ------------------------------------------------------------------ growth without limit (ADR-083)

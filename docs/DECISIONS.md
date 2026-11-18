@@ -5824,3 +5824,66 @@ Wert hätte sich beim Update vervielfacht), ein Größenabschlag aufs KGV (die R
 großer Firmen schon). Tests: `src/lib/sim/player-valuation.test.ts`, SQL `f5_player_stock_drift.sql` (Formeln wie in
 TS, erster Lauf ohne Sprung, gehortete Kasse hebt den Wert kaum, Kapitalerhöhung zählt, Quartalsabschluss wird
 ignoriert, Krisen-Schock bleibt und läuft aus, Bärenmarkt senkt den Wert, Rechte, Geld-Invariante).
+
+## ADR-218: Büroflächen bis 1.000 Plätze, Spieleraktien steigen in höhere Klassen auf — `Entscheidung (Eigentümer)`
+
+**Kontext.** Der Eigentümer: „Man soll mehr Plätze für Mitarbeiter haben. Bis zu 1000. Aber das kostet zu upgraden.
+Und man soll auch höher kommen als nur eine Pennystock-Aktie.“
+
+**Ausgangslage.**
+
+- Plätze einer Spielerfirma waren Rechtsform (AG 100) + 10 × Ausbaustufe (ADR-083/191) + Zentrale (ADR-208, bis 410).
+  Die Ausbaustufe ist für Markt und Kapazität bepreist (× 1,8 je Stufe); eine AG mit voller Zentrale hätte für 1.000
+  Plätze 49 Stufen gebraucht, die letzte für rund 10¹⁹ €.
+- Jede Spieleraktie ging als `penny` an die Börse (`ipo_escrow`) und blieb es für immer: 1.000 € bewegten den Kurs um
+  1 % (`playerImpact.depthCentsPer100Bps.penny`), dazu der breiteste Spread und das stärkste Rauschen, auch bei einer
+  Firma mit Milliarden-Börsenwert. Wo `companies.tier` fehlte, lasen Orderplan und Takt ihn als `midcap`.
+
+**Entscheidung.**
+
+- **Büroflächen** als eigene, bezahlte Linie neben Rechtsform, Ausbau und Zentrale (`startups.offices`,
+  `src/lib/sim/offices.ts`, Migration 011310): 12 Flächen mit zusammen 500 Plätzen, Preise exponentiell von 0,25 Mio. €
+  bis 600 Mio. € (1,55 Mrd. € insgesamt, Preis je Platz steigt von 25.000 € auf 8 Mio. €). Flächen 1–3 ab der GmbH,
+  4–12 nur als AG; jede Fläche verlangt einen Firmenwert (`company_worth_cents`) von 0 bis 2,5 Mrd. €. Alle Plätze
+  zusammen sind auf 1.000 gedeckelt. Kauf aus der freien Kasse (offene Rechnungen zuerst) an die Staatskasse,
+  `buy_company_office(request_id)` mit Wiederholungsschutz; Fehler `office_max_level`, `office_seats_max`,
+  `office_legal_form`, `office_worth`, `insufficient_funds`. Jeder Büroplatz kostet 10 € Miete je Stunde (über
+  `world_hour_costs` in der Stundenabrechnung, nur aus der freien Kasse, nie als offene Rechnung, wie die Tochterfirmen).
+  Kein Gratisgeld: Platz kostet einmalig, jeder Platz kostet laufend Miete, jede Kraft darauf ihren Lohn.
+- **Platzzahl überall gleich:** `company_max_employees` (letzte Fassung aus 10010) zählt die Büroflächen mit und
+  deckelt; `company_seats_sync` (aus 7350) feuert auch bei `office_level`; `company_seats_guard` hält die Kopie
+  `companies.max_employees` wie bisher gleich. Einstellen, Bewerbungen, Klon und KI-Kräfte prüfen schon gegen
+  `company_max_employees`; `hire_ai_workers` nimmt bis 1.000 auf einmal. Die Oberfläche bietet für große Firmen
+  größere Schritte (1, 5, 10 … bis alle freien Plätze), zeigt in Listen höchstens 24 Zeilen je Gruppe (Rest als „… und
+  N weitere“) und im Büro höchstens 40 Roboter (Rest als „+N“). Die Karte „Büroflächen“ steht in „Wachstum & Ausbau“:
+  Plätze nach Herkunft auf einem Balken bis 1.000, Miete, nächste Fläche mit Preis und dem Grund, warum sie noch
+  gesperrt ist.
+- **Aktienklassen** (`trading.playerStockTiers`, `src/lib/sim/stock-tier.ts`, Migrationen 011300/011320): Pennystock →
+  Small Cap (50 Mio. € Börsenwert) → Mid Cap (200 Mio. €) → Large Cap (1 Mrd. €) → Bluechip (3 Mrd. €). Zwei neue Werte
+  im Enum `company_tier` (eigene Migration, da ein neuer Enum-Wert nicht in derselben Transaktion benutzt werden darf).
+  `player_stock_tiers_run()` prüft alle 10 Minuten (Cron `nexa-player-stock-tiers`): aufwärts bis zur höchsten
+  erreichten Klasse, abwärts eine Klasse je Prüfung erst unter 80 % der eigenen Schwelle (Hysterese), zwischen zwei
+  Wechseln mindestens 6 Stunden. Ein Wechsel schreibt `companies.tier`, eine Börsenmeldung („… steigt in den Mid Cap
+  auf“, Mr. Doodle liest `news_items`), eine Mitteilung an den Gründer (Typ `stock_tier`) und eine Zeile in den
+  Firmenchat. `player_stock_tiers` merkt sich letzten Wechsel, letzte Prüfung und höchste Klasse.
+- **Was die Klasse bewirkt:** Alle Werte, die schon nach `companies.tier` nachschlagen, bekommen Einträge für die neuen
+  Klassen (Orderplan und Takt: Spielertiefe 1.000 / 2.500 / 5.000 / 10.000 / 20.000 € je 1 %; halber Spread 60 bis
+  5 bps; Rauschen je Takt 45 bis 6 bps, also ruhigerer Kurs; KI-Gewicht ab mehr Spielerumsatz, also mehr KI-Interesse;
+  Leerverkaufsgebühr 10 % bis 1 %). Keine Marktfunktion wird umgeschrieben. Indexaufnahme bleibt unverändert (Spieleraktien
+  stehen weiter nicht im NEXA-Index), der Hebel einer Spieleraktie auch.
+- **NULL ausdrücklich:** Ein Trigger gibt jeder Spielerfirma mit Wertpapier eine Klasse (`penny`, bis zur ersten
+  Prüfung); bestehende Zeilen werden repariert.
+- **Oberfläche:** Abzeichen der Klasse in der Börsenliste (Spieleraktien) und im Kopf der Aktienseite; Karte
+  „Aktienklasse“ auf der Aktienseite und im Firmen-Dashboard mit allen Klassen, Börsenwert, Fortschritt zur nächsten
+  Klasse, Rückfall-Linie und wie viel 1 % Kursbewegung kostet. Die Mid Caps heißen in der Anzeige jetzt „Mid Cap“ statt
+  „Mittelstand“, passend zur Leiter.
+
+**Folgen.** 1.000 Plätze sind ein Langzeitziel für die größten Firmen (AG, Mega-Campus, alle Flächen: rund
+1,9 Mrd. € plus 5.000 € Miete je Stunde). Eine erfolgreiche Spieleraktie wird mit dem Börsenwert liquider: große Orders
+zahlen weniger Kursauswirkung, der Kurs schwankt ruhiger. Rund um eine Schwelle pendelt die Klasse nicht (Hysterese und
+Wartezeit). Verworfen: die Ausbaustufe billiger machen (sie bringt auch Markt und Kapazität), die Klasse nach Firmenwert
+statt Börsenwert (für börsennotierte Firmen ist beides gleich, ADR-203), die Klasse jede Minute (zu unruhig). Tests:
+`src/lib/sim/offices.test.ts`, `src/lib/sim/stock-tier.test.ts`, `src/features/company/seats.test.ts`, SQL
+`f6_seats_and_tiers.sql` (Flächen mit echten Preisen bis 1.000 Plätze, Gates, Deckel, 1.000 KI-Kräfte, Miete,
+Klassen hoch und runter mit Hysterese und Wartezeit, Meldung und Mitteilung, Kursauswirkung je Klasse,
+Geld-Invariante).

@@ -58,6 +58,7 @@ import {
   reputationTargetAll,
 } from "@/lib/sim/company-reputation";
 import { DEMO_COMPANIES } from "@/lib/demo/market";
+import { nextOfficeStep, officeBlock, officeRentCentsPerHour, officeSeats } from "@/lib/sim/offices";
 import { dissolve, isInsolvent } from "@/lib/sim/insolvency";
 import { hasForbiddenSymbol, isValidBanner, isValidLogo, type CompanyLogoData } from "@/lib/sim/logo";
 import {
@@ -66,6 +67,7 @@ import {
   type CompanyAutopilot,
   type CompanyAwareness,
   type CompanyWorth,
+  type CompanyOffices,
   type ChatMessage,
   type CloseCompanyResult,
   type Dissolution,
@@ -204,6 +206,8 @@ export interface DemoCompanyState {
   priceLevel?: PriceLevel;
   contractWork?: boolean;
   expansionLevel?: number;
+  /** Bought Büroflächen steps (ADR-218), default 0. */
+  officeLevel?: number;
   /** Automatic CEO payout share (ADR-086), default 0. */
   founderPayoutBps?: number;
   /** Last manual withdrawal (ADR-213, epoch ms); the next one is withdrawIntervalHours later. */
@@ -942,7 +946,7 @@ export function createCompanyEngine(host: CompanyHost) {
       canExpand: canExpand(company.tier),
       expansionCostCents: canExpand(company.tier) ? expansionCostCents(level) : null,
       marketFactor,
-      maxEmployees: maxEmployees(company.tier, BALANCE, level),
+      maxEmployees: seatsOf(company),
       employees: 0,
       openPostings: company.postings.filter((p) => p.status === "open").length,
       pendingApplications: 0,
@@ -987,6 +991,48 @@ export function createCompanyEngine(host: CompanyHost) {
     };
   }
 
+  /** Seats: legal form, expansion and Büroflächen (ADR-218), capped. */
+  function seatsOf(company: DemoCompanyState): number {
+    return maxEmployees(company.tier, BALANCE, company.expansionLevel ?? 0, officeSeats(company.officeLevel ?? 0));
+  }
+
+  function officesOf(company: DemoCompanyState): CompanyOffices {
+    const level = company.officeLevel ?? 0;
+    const step = nextOfficeStep(level);
+    const total = seatsOf(company);
+    const worthCents = valueCents(company);
+    const freeCashCents = company.cashCents - company.unpaidCents;
+    const tierSeats = maxEmployees(company.tier, BALANCE, 0);
+    const expansion = BALANCE.startups.expansion.employeesPerLevel * (company.expansionLevel ?? 0);
+    return {
+      level,
+      steps: BALANCE.startups.offices.steps.length,
+      tier: company.tier,
+      seats: {
+        tier: tierSeats,
+        expansion,
+        headquarters: 0,
+        offices: officeSeats(level),
+        total,
+        max: BALANCE.startups.offices.maxTotalSeats,
+        used: company.aiWorkers,
+      },
+      rentCentsPerHour: officeRentCentsPerHour(level),
+      worthCents,
+      freeCashCents,
+      next: step
+        ? {
+            n: level + 1,
+            seats: step.seats,
+            costCents: step.costCents,
+            minWorthCents: step.minWorthCents,
+            tiers: step.tiers,
+          }
+        : null,
+      block: officeBlock({ level, tier: company.tier, worthCents, freeCashCents, seats: total }),
+    };
+  }
+
   const mutate = (requestId: string, run: (company: DemoCompanyState) => void): Promise<MyCompany> =>
     Promise.resolve().then(() =>
       host.idempotent(requestId, () => {
@@ -1014,6 +1060,8 @@ export function createCompanyEngine(host: CompanyHost) {
     | "upgradeCompany"
     | "setCompanyStrategy"
     | "expandCompany"
+    | "companyOffices"
+    | "buyCompanyOffice"
     | "setFounderPayout"
     | "startCampaign"
     | "companyOrg"
@@ -1165,16 +1213,14 @@ export function createCompanyEngine(host: CompanyHost) {
     setAiWorkers: (requestId, count) =>
       mutate(requestId, (company) => {
         if (!Number.isInteger(count) || count < 0) throw new GameError("invalid_argument");
-        if (count > maxEmployees(company.tier, BALANCE, company.expansionLevel ?? 0))
-          throw new GameError("employee_limit");
+        if (count > seatsOf(company)) throw new GameError("employee_limit");
         setAiCount(company, count);
       }),
 
     hireAiWorkers: (requestId, count, skill) =>
       mutate(requestId, (company) => {
         if (!Number.isInteger(count) || count < 1) throw new GameError("invalid_argument");
-        if (company.aiWorkers + count > maxEmployees(company.tier, BALANCE, company.expansionLevel ?? 0))
-          throw new GameError("employee_limit");
+        if (company.aiWorkers + count > seatsOf(company)) throw new GameError("employee_limit");
         if (skill) {
           const all = productOf(company.sector, productKeyOf(company)).stages.flat();
           if (count !== 1 || !all.includes(skill)) throw new GameError("invalid_argument");
@@ -1284,6 +1330,27 @@ export function createCompanyEngine(host: CompanyHost) {
         company.expansionLevel = (company.expansionLevel ?? 0) + 1;
         system(company, `Ausbaustufe ${company.expansionLevel} erreicht: mehr Markt, mehr Plätze, mehr Kapazität.`);
       }),
+
+    async companyOffices() {
+      catchUp();
+      return officesOf(own());
+    },
+
+    buyCompanyOffice: (requestId) =>
+      Promise.resolve().then(() =>
+        host.idempotent(requestId, () => {
+          catchUp();
+          const company = own();
+          const offices = officesOf(company);
+          const block = offices.block;
+          if (block === "cash") throw new GameError("insufficient_funds");
+          if (block) throw new GameError(`office_${block}`);
+          company.cashCents -= offices.next!.costCents;
+          company.officeLevel = offices.level + 1;
+          system(company, `Büroflächen Stufe ${company.officeLevel}: ${offices.next!.seats} Plätze mehr.`);
+          return officesOf(company);
+        }),
+      ),
 
     upgradeCompany: (requestId) =>
       mutate(requestId, (company) => {

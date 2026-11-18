@@ -14,6 +14,16 @@ export function useMyCompany() {
   });
 }
 
+/** Büroflächen of the own company (ADR-218); refreshed with everything under ["company"]. */
+export function useCompanyOffices(enabled = true) {
+  return useQuery({
+    queryKey: ["company", "offices"],
+    queryFn: () => engine.companyOffices(),
+    enabled,
+    staleTime: 10_000,
+  });
+}
+
 export function useCompanyPostings(enabled: boolean) {
   return useQuery({ queryKey: ["company", "postings"], queryFn: () => engine.companyPostings(), enabled });
 }

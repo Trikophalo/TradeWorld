@@ -21,7 +21,7 @@ import type { TaskGame } from "@/config/company-tasks";
 import type { CompanyLogoData } from "@/lib/sim/logo";
 
 export type SecurityKind = "stock" | "bond" | "crypto";
-export type SizeClass = "bluechip" | "midcap" | "penny";
+export type SizeClass = "bluechip" | "largecap" | "midcap" | "smallcap" | "penny";
 export type Session = "regular" | "after_hours";
 export type OrderSide = "buy" | "sell";
 export type OrderType = "market" | "limit";
@@ -2506,6 +2506,10 @@ export const GAME_ERROR_KEYS = [
   "world_subsidiary_cap",
   "world_same_country",
   "world_not_leader",
+  "office_max_level",
+  "office_seats_max",
+  "office_legal_form",
+  "office_worth",
   "skill_points_insufficient",
   "demands_not_met",
   "offer_too_low",
@@ -2937,6 +2941,33 @@ export interface TalentMarketState {
   talents: Talent[];
 }
 
+/** Büroflächen (ADR-218): seats by source, rent, the next step and why it is blocked. */
+export interface CompanyOffices {
+  readonly level: number;
+  readonly steps: number;
+  readonly tier: string;
+  readonly seats: {
+    readonly tier: number;
+    readonly expansion: number;
+    readonly headquarters: number;
+    readonly offices: number;
+    readonly total: number;
+    readonly max: number;
+    readonly used: number;
+  };
+  readonly rentCentsPerHour: number;
+  readonly worthCents: number;
+  readonly freeCashCents: number;
+  readonly next: {
+    readonly n: number;
+    readonly seats: number;
+    readonly costCents: number;
+    readonly minWorthCents: number;
+    readonly tiers: readonly string[];
+  } | null;
+  readonly block: "max_level" | "seats_max" | "legal_form" | "worth" | "cash" | null;
+}
+
 export interface GameEngine
   extends BattleEngine, NexamonEngine, NexamonSealedEngine, PackBattleEngine, ListedEngine, WorldEngine {
   /** The own CEO interview: an open request or the latest result (ADR-173). */
@@ -3190,6 +3221,9 @@ export interface GameEngine
   setFounderPayout(requestId: string, bps: number): Promise<MyCompany>;
   /** Next expansion level, paid from the company's cash (ADR-083). */
   expandCompany(requestId: string): Promise<MyCompany>;
+  /** Büroflächen of the own company and buying the next step (ADR-218). */
+  companyOffices(): Promise<CompanyOffices>;
+  buyCompanyOffice(requestId: string): Promise<CompanyOffices>;
   /** Friends (ADR-084). */
   friends(): Promise<Friends>;
   sendFriendRequest(requestId: string, nickname: string): Promise<Friends>;

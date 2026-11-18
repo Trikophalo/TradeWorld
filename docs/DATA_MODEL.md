@@ -8650,3 +8650,35 @@ laggards[…]}` mit `MOOD = {mood, phase, phase_started_at, trend, history[], se
   `service_role`). Schreibt `security_sim_state.fair_value_e4` aller börsennotierten Spielerfirmen; keine Funktion wird
   umgeschrieben.
 - Diagnose für den Betrieb (nur lesend): `supabase/tools/player-stocks-check.sql`.
+
+## Büroflächen und Aktienklassen (ADR-218, Migrationen `20261204011300` bis `20261204011320`)
+
+- `player_companies.office_level` `integer`, `0` (≥ 0): gekaufte Büroflächen (`startups.offices.steps`).
+- `company_max_employees(company)` = Plätze der Rechtsform + `employeesPerLevel` × Ausbaustufe + Zentrale +
+  `company_office_seats(office_level)`, höchstens `startups.offices.maxTotalSeats` (1.000). `company_seats_sync` feuert
+  jetzt auch nach `office_level`; `companies.max_employees` bleibt die abgeleitete Kopie.
+- `company_growth_path(company)` liefert zusätzlich `office_level` und `office_seats`.
+- `world_hour_costs` bucht vorne die Miete der Büroplätze (`Büroflächen: Miete`, Schlüssel `<stunde>:office:rent`, an
+  die Haushalte, nur aus der freien Kasse) für jede Spielerfirma; Rückgabe zählt als Fixkosten der Stunde.
+- Enum `company_tier`: neu `largecap` und `smallcap` (Reihenfolge `bluechip, largecap, midcap, smallcap, penny`).
+  Alle Werte unter `trading.spread.halfSpreadBps`, `trading.borrowFeeBps`, `trading.playerImpact.depthCentsPer100Bps`,
+  `aiInvestors.tickNoiseBps`, `aiInvestors.playerWeight.referenceActivityCents` und
+  `events.pharmaTrial.successProbability` haben Einträge für alle fünf Klassen.
+- `player_stock_tiers` (intern, RLS ohne Policy): `company_id` (PK), `tier`, `changed_at` (letzter Wechsel, Uhr der
+  Hysterese), `checked_at`, `market_cap_cents`, `peak_tier`.
+- Trigger `company_player_tier_guard` (vor Insert/Update von `tier`, `security_id` auf `companies`): Spielerfirma mit
+  Wertpapier hat nie `tier = null` (`penny` bis zur ersten Prüfung).
+- Interne Funktionen: `company_office_step(n)`, `company_office_seats(level)`, `company_offices_json(company)`,
+  `player_stock_tier_cfg()`, `player_stock_tier_next(tier, cap, hours, cfg)` (= `nextStockTier`),
+  `player_stock_tier_rung`, `player_stock_tier_label`, `player_stock_tiers_run(p_now)` (Cron `nexa-player-stock-tiers`
+  alle 10 Minuten, nur `service_role`; schreibt `companies.tier`, `news_items` Kategorie `market` und die Mitteilung
+  `stock_tier`).
+- Mitteilungstyp `stock_tier` (Kategorie `company`, in der App und Push an).
+
+### RPCs
+
+- `get_company_offices()` (Gründer) → `OFFICES = {level, steps, tier, seats{tier, expansion, headquarters, offices,
+total, max, used}, rent_cents_per_hour, worth_cents, free_cash_cents, next{n, seats, cost_cents, min_worth_cents,
+tiers[]} | null, block}` mit `block` ∈ `max_level`, `seats_max`, `legal_form`, `worth`, `cash` oder `null`.
+- `buy_company_office(p_request_id uuid)` (Gründer) → `{offices: OFFICES}`; Fehler `office_max_level`,
+  `office_seats_max`, `office_legal_form`, `office_worth`, `insufficient_funds`. Idempotent über `request_id`.

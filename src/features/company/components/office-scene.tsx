@@ -25,6 +25,8 @@ import { useCompanyFloor } from "../hooks";
 import { FloorBubble } from "./floor-bubble";
 
 const MAX = BALANCE.startups.chat.maxMessageLength;
+/** Large teams (ADR-218, up to 1.000 seats): robots drawn before the rest is one "+N" tile. */
+const ROBOTS_SHOWN = 40;
 
 interface Robot {
   key: string;
@@ -140,11 +142,24 @@ export function OfficeScene({ company, onTeam }: { company?: MyCompany; onTeam?:
               </li>
             );
           })}
-          {robots.map((r) => (
+          {robots.slice(0, ROBOTS_SHOWN).map((r) => (
             <li key={r.key} className="w-20 min-w-0 sm:w-[104px]">
               <RobotFigure color={color} logo={logo} robot={r} />
             </li>
           ))}
+          {robots.length > ROBOTS_SHOWN && (
+            <li className="w-20 min-w-0 sm:w-[104px]" data-testid="office-more-robots">
+              <span
+                className="flex w-full flex-col items-center justify-end gap-1.5 text-fg-3"
+                aria-label={t("moreRobotsLabel", { count: robots.length - ROBOTS_SHOWN })}
+              >
+                <span className="grid h-12 w-12 place-items-center rounded-md border border-line-2 bg-surface-2 nums text-sm font-semibold text-fg-1">
+                  {t("moreRobots", { count: robots.length - ROBOTS_SHOWN })}
+                </span>
+                <span className="text-2xs">{t("aiGeneral")}</span>
+              </span>
+            </li>
+          )}
           {Array.from({ length: Math.min(free, 6) }, (_, i) => (
             <li key={`free-${i}`} className="w-20 min-w-0 sm:w-[104px]">
               <button
