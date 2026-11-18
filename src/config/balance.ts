@@ -12,6 +12,7 @@ import { ACCESSORY_RULES } from "./accessories.ts";
 import { BATTLE_RULES } from "./battles.ts";
 import { NEXAMON_RULES } from "./nexamon-rules.ts";
 import { LISTED_RULES } from "./listed.ts";
+import { COUNTRIES, WORLD_RULES } from "./countries.ts";
 import { CRYPTO, type CryptoConfig } from "./crypto.ts";
 import { DEALS, TRUST, type DealsConfig, type TrustConfig } from "./deals.ts";
 import { SKILL_NODES, type SkillBranch, type SkillNodeConfig } from "./skills.ts";
@@ -2849,6 +2850,8 @@ export const BALANCE = {
   battles: BATTLE_RULES,
   nexamon: NEXAMON_RULES,
   listed: LISTED_RULES,
+  /** Weltkarte, Standorte, Tochterfirmen und Länder-Lobby (ADR-208). */
+  world: { ...WORLD_RULES, countries: COUNTRIES },
   /** Mira, the company assistant (ADR-138): Claude answers per player and hour, length of a message. */
   companyAssistant: {
     claudePerHour: 20,
