@@ -634,6 +634,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-768c3410",
+        title: "Größe hat ihren Preis",
+        text: "Bis etwa 30 Mio. € Firmenwert wächst deine Firma wie bisher.",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-5a68dc15",
         title: "Talente und 15 Stellen",
         text: "Deine Firma hat jetzt 15 Stellen von Vertrieb bis Betriebsarzt.",

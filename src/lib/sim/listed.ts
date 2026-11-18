@@ -397,6 +397,8 @@ export function booksTax(
   lossCarryCents: number,
   rateBps: number,
   discountBps: number,
+  /** ADR-209: length of the period; with it the progressive brackets apply. */
+  periodHours?: number,
 ): BooksResult {
   const profit = revenueCents - costsCents;
   const carry = Math.max(0, lossCarryCents);
@@ -412,7 +414,8 @@ export function booksTax(
   }
   const used = Math.min(carry, profit);
   const taxable = profit - used;
-  const gross = Math.floor((taxable * rateBps) / 10_000);
+  const gross =
+    periodHours === undefined ? Math.floor((taxable * rateBps) / 10_000) : progressiveTaxCents(taxable, rateBps, periodHours);
   const discount = Math.floor((gross * clamp(discountBps, 0, 10_000)) / 10_000);
   return {
     profitCents: profit,
@@ -430,10 +433,15 @@ export function estimateTax(
   costsCents: number,
   rateBps: number,
   cfg: ListedRules = RULES,
+  /** ADR-209: length of the period; with it the progressive brackets apply. */
+  periodHours?: number,
 ): { taxableCents: number; taxCents: number; surchargeCents: number } {
   const e = cfg.taxes.estimate;
   const taxable = Math.max(revenueCents - costsCents, Math.floor((revenueCents * e.marginBps) / 10_000), 0);
-  const tax = Math.floor((taxable * rateBps) / 10_000);
+  const tax =
+    periodHours === undefined
+      ? Math.floor((taxable * rateBps) / 10_000)
+      : progressiveTaxCents(taxable, rateBps, periodHours, cfg);
   return { taxableCents: taxable, taxCents: tax, surchargeCents: Math.floor((tax * e.surchargeBps) / 10_000) };
 }
 
@@ -475,10 +483,35 @@ export function pickReceipts(uniforms: readonly number[], cfg: ListedRules = RUL
   return picked;
 }
 
+/**
+ * Rate of the tax advisor on the reference revenue in bps (ADR-209): flat up to the pivot, then × growthPerDecade for
+ * every tenfold revenue (exponential in the order of magnitude), at most maxRevenueBps.
+ */
+export function advisorRateBps(refCents: number, cfg: ListedRules = RULES): number {
+  const a = cfg.taxes.advisor;
+  if (!(refCents > a.pivotCentsPerHour)) return a.revenueBps;
+  return Math.min(a.maxRevenueBps, a.revenueBps * Math.pow(a.growthPerDecade, Math.log10(refCents / a.pivotCentsPerHour)));
+}
+
 /** Hourly wage of the tax advisor. */
 export function advisorWageCents(refCents: number, cfg: ListedRules = RULES): number {
   const a = cfg.taxes.advisor;
-  return Math.max(a.minWageCentsPerHour, Math.round((refCents * a.revenueBps) / 10_000));
+  return Math.max(a.minWageCentsPerHour, Math.round((Math.max(0, refCents) * advisorRateBps(refCents, cfg)) / 10_000));
+}
+
+/**
+ * Corporate tax with the progressive brackets (ADR-209): rate on everything, plus extraBps on the part above each
+ * bracket's threshold; thresholds are per day and scaled to the period's hours. Rounded down.
+ */
+export function progressiveTaxCents(taxableCents: number, rateBps: number, periodHours: number, cfg: ListedRules = RULES) {
+  const taxable = Math.max(0, Math.floor(taxableCents));
+  const days = Math.max(1, periodHours) / 24;
+  let tax = taxable * rateBps;
+  for (const b of cfg.taxes.brackets) {
+    const from = b.fromCentsPerDay * days;
+    if (taxable > from) tax += (taxable - from) * b.extraBps;
+  }
+  return Math.floor(tax / 10_000);
 }
 
 /** Surcharge on an unpaid tax: once after the deadline, more when the tax office collects by force. */

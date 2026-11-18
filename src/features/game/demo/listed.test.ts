@@ -260,7 +260,7 @@ describe("demo: listed companies (ADR-167)", () => {
     expect(after.taxes.periods[0]!.closedBy).toBe("advisor");
     expect(after.taxes.periods[0]!.status).toBe("paid");
     expect(after.taxes.dueCents).toBe(0);
-    expect(after.upkeep.advisor).toBe(4_000);
+    expect(after.upkeep.advisor).toBe(BALANCE.listed.taxes.advisor.minWageCentsPerHour);
   });
 
   it("the board: earmarked money cannot be withdrawn, caps and bans are binding", async () => {

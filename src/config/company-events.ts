@@ -35,10 +35,27 @@ export interface CompanyEventStrategy {
   readonly steps: readonly CompanyEventStep[];
 }
 
+/** Where an external event's country risk comes from (ADR-209, country_cfg of the headquarters). */
+export type ExternalRisk = "political" | "tariff" | "disaster" | "war" | "image";
+
 export interface CompanyEventArchetype {
   readonly key: string;
   readonly polarity: CompanyEventPolarity;
   readonly weight: number;
+  /**
+   * External event "von außen" (ADR-209): only for companies worth at least minWorthCents; it weighs more the bigger
+   * the company and the riskier its country.
+   */
+  readonly external?: boolean;
+  readonly minWorthCents?: number;
+  /** Country risk that scales the weight. */
+  readonly risk?: ExternalRisk;
+  /** Insurance takes its coverage of the effect (disasters, cyber attacks). */
+  readonly insurable?: boolean;
+  /** Snapshot when an event starts (never in the catalog): share of the effect the insurance takes. */
+  readonly insuredShare?: number;
+  /** Snapshot: market leaders of their country feel political events less (ADR-208 world.lobby). */
+  readonly leaderShare?: number;
   /** Only for these sectors; all when omitted. */
   readonly sectors?: readonly EventSector[];
   /**
@@ -82,6 +99,408 @@ export interface CompanyEventsConfig {
 
 const accept: CompanyEventStrategy = { key: "accept", mitigation: 0, steps: [] };
 const pass: CompanyEventStrategy = { key: "pass", mitigation: 0, steps: [] };
+
+const MIO = 100_000_000;
+
+/** Rebuild after a disaster, or move to a backup site; the same two ways for every kind of disaster. */
+const disasterStrategies: readonly CompanyEventStrategy[] = [
+  {
+    key: "rebuild",
+    mitigation: 1,
+    steps: [
+      { key: "assess", hours: 2, cost: 1, branch: "craft", baseBps: 9_000 },
+      { key: "repair", hours: 8, cost: 6, branch: "craft", staff: 2, baseBps: 8_000 },
+      { key: "reopen", hours: 3, cost: 2, branch: "logistics", baseBps: 8_500 },
+    ],
+  },
+  {
+    key: "backup_site",
+    mitigation: 0.7,
+    steps: [
+      { key: "rent_site", hours: 4, cost: 5, branch: "logistics", baseBps: 9_000 },
+      { key: "move", hours: 6, cost: 3, branch: "logistics", staff: 1, baseBps: 8_000 },
+    ],
+  },
+  accept,
+];
+
+/**
+ * External events "von außen" (ADR-209): only for big companies (minWorthCents), more and worse the bigger the company
+ * (macro.events), weighted by the country risk of the headquarters (macro.country). All are crises; every one can be
+ * answered with real work or sat out.
+ */
+const EXTERNAL_ARCHETYPES: readonly CompanyEventArchetype[] = [
+  {
+    key: "political_decision",
+    polarity: "crisis",
+    weight: 10,
+    external: true,
+    minWorthCents: 20 * MIO,
+    risk: "political",
+    effect: { demand: -0.1, cost: 0.08 },
+    deadlineHours: 36,
+    lastsHours: 96,
+    strategies: [
+      {
+        key: "lobby_campaign",
+        mitigation: 1,
+        bonus: { awareness: 0.01 },
+        steps: [
+          { key: "think_tank", hours: 4, cost: 3, branch: "law", baseBps: 8_000 },
+          { key: "coalition", hours: 6, cost: 4, branch: "sales", staff: 2, baseBps: 6_500 },
+          { key: "media", hours: 5, cost: 3, branch: "management", baseBps: 7_000 },
+          { key: "hearing", hours: 8, cost: 6, branch: "law", baseBps: 5_000 },
+        ],
+      },
+      {
+        key: "comply",
+        mitigation: 0.6,
+        steps: [
+          { key: "compliance_team", hours: 8, cost: 5, branch: "law", capacityHit: 0.2, baseBps: 9_000 },
+          { key: "audit", hours: 4, cost: 2, branch: "finance", baseBps: 8_500 },
+        ],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "tariffs",
+    polarity: "crisis",
+    weight: 10,
+    external: true,
+    minWorthCents: 20 * MIO,
+    risk: "tariff",
+    effect: { demand: -0.15, cost: 0.05 },
+    deadlineHours: 30,
+    lastsHours: 120,
+    strategies: [
+      {
+        key: "local_production",
+        mitigation: 1,
+        steps: [
+          { key: "site_search", hours: 4, cost: 3, branch: "logistics", baseBps: 8_500 },
+          { key: "build_plant", hours: 10, cost: 8, branch: "craft", staff: 2, capacityHit: 0.2, baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "lobby",
+        mitigation: 0.8,
+        steps: [
+          { key: "trade_association", hours: 4, cost: 2, branch: "sales", baseBps: 8_000 },
+          { key: "negotiation", hours: 6, cost: 4, branch: "law", baseBps: 6_000 },
+        ],
+      },
+      { key: "pass_on", mitigation: 0.5, steps: [{ key: "price_talk", hours: 3, cost: 1, branch: "sales", baseBps: 8_500 }] },
+      accept,
+    ],
+  },
+  {
+    key: "earthquake",
+    polarity: "crisis",
+    weight: 3,
+    external: true,
+    minWorthCents: 20 * MIO,
+    risk: "disaster",
+    insurable: true,
+    effect: { capacity: -0.4, cost: 0.12 },
+    deadlineHours: 18,
+    lastsHours: 72,
+    strategies: disasterStrategies,
+  },
+  {
+    key: "tsunami",
+    polarity: "crisis",
+    weight: 1.5,
+    external: true,
+    minWorthCents: 20 * MIO,
+    risk: "disaster",
+    insurable: true,
+    effect: { capacity: -0.5, cost: 0.15 },
+    deadlineHours: 18,
+    lastsHours: 72,
+    strategies: disasterStrategies,
+  },
+  {
+    key: "flood",
+    polarity: "crisis",
+    weight: 3,
+    external: true,
+    minWorthCents: 20 * MIO,
+    risk: "disaster",
+    insurable: true,
+    effect: { capacity: -0.3, cost: 0.1 },
+    deadlineHours: 20,
+    lastsHours: 60,
+    strategies: disasterStrategies,
+  },
+  {
+    key: "wildfire",
+    polarity: "crisis",
+    weight: 3,
+    external: true,
+    minWorthCents: 20 * MIO,
+    risk: "disaster",
+    insurable: true,
+    effect: { capacity: -0.3, cost: 0.08, demand: -0.03 },
+    deadlineHours: 20,
+    lastsHours: 60,
+    strategies: disasterStrategies,
+  },
+  {
+    key: "pandemic",
+    polarity: "crisis",
+    weight: 4,
+    external: true,
+    minWorthCents: 20 * MIO,
+    effect: { capacity: -0.25, demand: -0.1 },
+    deadlineHours: 30,
+    lastsHours: 120,
+    strategies: [
+      {
+        key: "remote_work",
+        mitigation: 1,
+        steps: [
+          { key: "laptops", hours: 3, cost: 3, branch: "it", baseBps: 9_000 },
+          { key: "shifts", hours: 5, cost: 2, branch: "management", baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "health_program",
+        mitigation: 0.8,
+        steps: [
+          { key: "tests", hours: 2, cost: 2, branch: "science", baseBps: 9_000 },
+          { key: "vaccination_drive", hours: 6, cost: 3, branch: "science", staff: 1, baseBps: 7_500 },
+        ],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "shitstorm",
+    polarity: "crisis",
+    weight: 8,
+    external: true,
+    minWorthCents: 20 * MIO,
+    risk: "image",
+    effect: { demand: -0.22 },
+    deadlineHours: 16,
+    lastsHours: 72,
+    strategies: [
+      {
+        key: "apology_tour",
+        mitigation: 1,
+        bonus: { awareness: 0.01 },
+        steps: [
+          { key: "listen", hours: 2, cost: 1, branch: "management", baseBps: 9_000 },
+          { key: "apology", hours: 3, cost: 2, branch: "management", baseBps: 7_500 },
+          { key: "make_good", hours: 6, cost: 4, branch: "sales", baseBps: 7_500 },
+        ],
+      },
+      {
+        key: "counter_campaign",
+        mitigation: 0.6,
+        steps: [{ key: "fact_check", hours: 3, cost: 2, branch: "sales", baseBps: 7_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "war_conflict",
+    polarity: "crisis",
+    weight: 3,
+    external: true,
+    minWorthCents: 50 * MIO,
+    risk: "war",
+    effect: { demand: -0.12, capacity: -0.15, cost: 0.1 },
+    deadlineHours: 36,
+    lastsHours: 144,
+    strategies: [
+      {
+        key: "reroute",
+        mitigation: 1,
+        steps: [
+          { key: "risk_analysis", hours: 3, cost: 2, branch: "logistics", baseBps: 9_000 },
+          { key: "new_routes", hours: 8, cost: 5, branch: "logistics", staff: 1, baseBps: 7_500 },
+          { key: "secure_stock", hours: 4, cost: 4, branch: "finance", baseBps: 8_500 },
+        ],
+      },
+      {
+        key: "withdraw",
+        mitigation: 0.6,
+        steps: [
+          { key: "exit_plan", hours: 4, cost: 2, branch: "management", baseBps: 9_000 },
+          { key: "write_off", hours: 2, cost: 3, branch: "finance", baseBps: 9_500 },
+        ],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "commodity_crunch",
+    polarity: "crisis",
+    weight: 8,
+    external: true,
+    minWorthCents: 20 * MIO,
+    effect: { capacity: -0.2, cost: 0.12 },
+    deadlineHours: 24,
+    lastsHours: 96,
+    strategies: [
+      {
+        key: "long_term_contracts",
+        mitigation: 1,
+        steps: [
+          { key: "market_scan", hours: 3, cost: 1, branch: "logistics", baseBps: 9_000 },
+          { key: "hedge", hours: 4, cost: 4, branch: "finance", baseBps: 7_500 },
+          { key: "contract", hours: 4, cost: 3, branch: "law", baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "substitute",
+        mitigation: 0.8,
+        steps: [
+          { key: "research_sub", hours: 6, cost: 3, branch: "science", staff: 1, baseBps: 7_000 },
+          { key: "retool", hours: 6, cost: 3, branch: "craft", capacityHit: 0.2, baseBps: 8_500 },
+        ],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "cyber_attack",
+    polarity: "crisis",
+    weight: 7,
+    external: true,
+    minWorthCents: 20 * MIO,
+    insurable: true,
+    effect: { capacity: -0.35, cost: 0.06 },
+    deadlineHours: 12,
+    lastsHours: 48,
+    strategies: [
+      {
+        key: "incident_response",
+        mitigation: 1,
+        steps: [
+          { key: "isolate", hours: 2, cost: 2, branch: "it", staff: 1, baseBps: 8_500 },
+          { key: "restore", hours: 5, cost: 3, branch: "it", baseBps: 7_500 },
+          { key: "harden", hours: 4, cost: 3, branch: "it", baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "backup_restore",
+        mitigation: 0.6,
+        steps: [{ key: "backups", hours: 4, cost: 3, branch: "it", baseBps: 8_000 }],
+      },
+      accept,
+    ],
+  },
+  {
+    key: "antitrust",
+    polarity: "crisis",
+    weight: 6,
+    external: true,
+    minWorthCents: 500 * MIO,
+    risk: "political",
+    effect: { demand: -0.08, cost: 0.15 },
+    deadlineHours: 48,
+    lastsHours: 168,
+    strategies: [
+      {
+        key: "fight",
+        mitigation: 1,
+        steps: [
+          { key: "top_lawyers", hours: 6, cost: 6, branch: "law", baseBps: 7_000 },
+          { key: "economists", hours: 6, cost: 4, branch: "finance", baseBps: 7_000 },
+          { key: "court", hours: 10, cost: 8, branch: "law", baseBps: 5_000 },
+        ],
+      },
+      {
+        key: "cooperate",
+        mitigation: 0.8,
+        steps: [
+          { key: "disclose_files", hours: 4, cost: 2, branch: "law", baseBps: 9_000 },
+          { key: "remedies", hours: 8, cost: 6, branch: "management", baseBps: 7_500 },
+        ],
+      },
+      { key: "divest", mitigation: 0.7, steps: [{ key: "sell_unit", hours: 6, cost: 8, branch: "finance", baseBps: 9_000 }] },
+      accept,
+    ],
+  },
+  {
+    key: "union_strike",
+    polarity: "crisis",
+    weight: 6,
+    external: true,
+    minWorthCents: 20 * MIO,
+    effect: { capacity: -0.45 },
+    deadlineHours: 18,
+    lastsHours: 48,
+    strategies: [
+      {
+        key: "collective_bargaining",
+        mitigation: 1,
+        steps: [
+          { key: "talks", hours: 3, cost: 1, branch: "management", baseBps: 8_500 },
+          { key: "offer", hours: 4, cost: 4, branch: "finance", baseBps: 7_500 },
+          { key: "sign", hours: 2, cost: 1, branch: "law", baseBps: 9_000 },
+        ],
+      },
+      { key: "mediation", mitigation: 0.8, steps: [{ key: "mediator", hours: 6, cost: 3, branch: "law", baseBps: 8_000 }] },
+      accept,
+    ],
+  },
+  {
+    key: "currency_crisis",
+    polarity: "crisis",
+    weight: 4,
+    external: true,
+    minWorthCents: 50 * MIO,
+    risk: "tariff",
+    effect: { demand: -0.1, cost: 0.08 },
+    deadlineHours: 30,
+    lastsHours: 96,
+    strategies: [
+      {
+        key: "hedging",
+        mitigation: 1,
+        steps: [
+          { key: "treasury_analysis", hours: 3, cost: 2, branch: "finance", baseBps: 9_000 },
+          { key: "currency_hedge", hours: 4, cost: 5, branch: "finance", baseBps: 7_000 },
+        ],
+      },
+      { key: "local_pricing", mitigation: 0.6, steps: [{ key: "reprice", hours: 3, cost: 2, branch: "sales", baseBps: 8_500 }] },
+      accept,
+    ],
+  },
+  {
+    key: "energy_shock",
+    polarity: "crisis",
+    weight: 5,
+    external: true,
+    minWorthCents: 20 * MIO,
+    effect: { cost: 0.14 },
+    deadlineHours: 24,
+    lastsHours: 120,
+    strategies: [
+      {
+        key: "efficiency",
+        mitigation: 1,
+        steps: [
+          { key: "energy_audit", hours: 3, cost: 2, branch: "science", baseBps: 9_000 },
+          { key: "retrofit", hours: 8, cost: 6, branch: "craft", capacityHit: 0.15, baseBps: 8_000 },
+        ],
+      },
+      {
+        key: "own_power",
+        mitigation: 0.9,
+        steps: [
+          { key: "solar_park", hours: 10, cost: 8, branch: "science", staff: 2, baseBps: 7_500 },
+          { key: "grid_deal", hours: 3, cost: 2, branch: "law", baseBps: 8_500 },
+        ],
+      },
+      accept,
+    ],
+  },
+];
 
 export const COMPANY_EVENTS: CompanyEventsConfig = {
   chancePerDay: 0.6,
@@ -539,5 +958,6 @@ export const COMPANY_EVENTS: CompanyEventsConfig = {
         pass,
       ],
     },
+    ...EXTERNAL_ARCHETYPES,
   ],
 };

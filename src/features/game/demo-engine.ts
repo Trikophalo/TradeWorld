@@ -90,6 +90,7 @@ import {
   type DemoListedStock,
 } from "./demo/company";
 import { demoTycoons } from "./demo/tycoons";
+import { demoRisks, demoSetInsurance } from "./demo/risks";
 import { wealthSource, wealthTotal } from "@/features/rich-list/wealth";
 import {
   GameError,
@@ -1486,6 +1487,13 @@ const companyEvents = createCompanyEventsEngine({
 export function demoTriggerCompanyEvent(archetype?: string): void {
   companyEvents.triggerNow(archetype);
 }
+/** Demo (ADR-209): an event from outside that a founder alone can answer, whatever the size. */
+export function demoTriggerExternalEvent(): void {
+  const pool = BALANCE.companyEvents.archetypes.filter(
+    (a) => a.external && (a.strategies.find((s) => s.steps.length > 0)?.steps ?? []).every((s) => (s.staff ?? 0) <= 1),
+  );
+  companyEvents.triggerNow(pool[Math.floor(Math.random() * pool.length)]?.key);
+}
 export function demoFinishEventStep(): void {
   companyEvents.finishStepNow();
 }
@@ -2683,6 +2691,23 @@ export const demoEngine: GameEngine = {
       entries: entries.slice(0, limit),
       mine: entries.find((e) => e.isMine) ?? null,
     };
+  },
+
+  companyRisks: async () => {
+    const mine = (await company.engine.myCompany()).company;
+    if (!mine) throw new GameError("company_not_found");
+    return demoRisks(mine.id, company.worth()?.cents ?? 0, mine.live?.revenuePerHourCents ?? 0);
+  },
+
+  setCompanyInsurance: async (_requestId, level) => {
+    try {
+      demoSetInsurance(level);
+    } catch {
+      throw new GameError("invalid_argument");
+    }
+    const mine = (await company.engine.myCompany()).company;
+    if (!mine) throw new GameError("company_not_found");
+    return demoRisks(mine.id, company.worth()?.cents ?? 0, mine.live?.revenuePerHourCents ?? 0);
   },
 
   myNetWorth: async () => {

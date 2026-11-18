@@ -60,6 +60,8 @@ import { CompanyMovesCard } from "@/features/company/components/company-moves";
 import { CompanySkillsCard } from "@/features/company/components/company-skills";
 import { TalentsCard } from "@/features/company/components/talents";
 import { WorldShowcase } from "@/features/company/world/world-showcase";
+import { RisksCard } from "@/features/company/components/risks-card";
+import { demoRisks } from "@/features/game/demo/risks";
 import { HealthCompact, HealthPanel } from "@/features/company/components/health-panel";
 import { FirmSection, InfoTip, SectionNav, SubSection } from "@/features/company/components/firm-layout";
 import { ReputationCard } from "@/features/company/components/reputation-card";
@@ -313,6 +315,9 @@ function NewsPromoShowcase() {
 }
 
 /** Fertigkeiten (ADR-194): one learned, one in training, one locked, one at the maximum. */
+/** ADR-209: a group worth 1.5 Mrd. EUR, 20 000 EUR revenue an hour. */
+const SAMPLE_RISKS = demoRisks("sample", 150_000_000_000, 2_000_000, 0);
+
 const SAMPLE_COMPANY_SKILLS: CompanySkillsState = {
   freeCashCents: 1_200_000,
   skills: BALANCE.companySkills.skills.map((s, i) => {
@@ -1436,6 +1441,7 @@ export function Showcase() {
         <CompanySkillsCard preview={SAMPLE_COMPANY_SKILLS} />
         <TalentsCard preview={SAMPLE_TALENTS} previewMarket={SAMPLE_TALENT_MARKET} />
         <WorldShowcase />
+        <RisksCard preview={SAMPLE_RISKS} />
         <NewsPromoShowcase />
         <ShowcaseSection />
         <UpgradeCard upgradeKey="vault" level={2} />

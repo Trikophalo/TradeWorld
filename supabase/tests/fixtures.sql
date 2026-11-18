@@ -237,6 +237,11 @@ select public.get_company_ranking('all', 5);
 select public.get_company_ranking('all', 5, 'tech');
 \o :fixture_dir/get_my_net_worth_founder.json
 select public.get_my_net_worth();
+-- ADR-209: risks of the own company and its insurance
+\o :fixture_dir/get_company_risks.json
+select public.get_company_risks();
+\o :fixture_dir/set_company_insurance.json
+select public.set_company_insurance(gen_random_uuid(), 1);
 \o :fixture_dir/upgrade_company.json
 select public.upgrade_company(gen_random_uuid());
 \o :fixture_dir/get_player_card_founder.json
