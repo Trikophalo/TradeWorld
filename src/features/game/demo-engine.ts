@@ -23,6 +23,7 @@ import {
   upgradeEffects,
   xpWithUpgrades,
 } from "@/lib/sim/upgrades";
+import { vaultLevelFactorBps, vaultRateCentsPerHour } from "@/lib/sim/vault";
 import type { UpgradeXpSource } from "@/config/upgrades";
 import {
   levelFromTotalXp,
@@ -60,6 +61,7 @@ import { demoCoworkerMembers, demoCoworkers, type DemoCoworker } from "./demo/fl
 import { createStockNewsEngine } from "./demo/stock-news";
 import { createCompanyMovesEngine, type DemoMoveRun } from "./demo/company-moves";
 import { createCompanySkillsEngine, type DemoCompanySkills } from "./demo/company-skills";
+import { createVaultDepositsEngine, initialVaultDeposits, type DemoVaultDepositsState } from "./demo/vault-deposits";
 import { createInterviewEngine, type DemoInterviewState } from "./demo/interviews";
 import { createCompanyTasksEngine, type DemoTasksState } from "./demo/company-tasks";
 import { createPitchesEngine, type DemoPitch } from "./demo/pitches";
@@ -150,6 +152,8 @@ interface PlayerState {
   companyMoves?: DemoMoveRun[];
   /** Fertigkeiten of the demo company (ADR-194). */
   companySkills?: DemoCompanySkills;
+  /** Festgeld in the vault (ADR-201). */
+  vaultDeposits?: DemoVaultDepositsState;
   companyTasks?: DemoTasksState;
   /** NEXA Nachrichten (ADR-150). */
   newsShow?: DemoNewsShowState;
@@ -911,10 +915,16 @@ function demoCandles(ticker: string, interval: CandleInterval, limit: number): C
 
 // ------------------------------------------------------------------ portfolio and wealth
 
-/** Vault size and basic income with the upgrades (ADR-093). */
+/** Vault size and income with the upgrades (ADR-093) and the level bonus (ADR-201). */
 function vaultTerms() {
   const levels = p().upgrades ?? {};
-  return { capHours: upgradeEffects(levels).vaultCapHours, rate: basicIncomeCentsPerHour(levels) };
+  const incomeRate = basicIncomeCentsPerHour(levels);
+  return {
+    capHours: upgradeEffects(levels).vaultCapHours,
+    incomeRate,
+    levelFactorBps: vaultLevelFactorBps(level()),
+    rate: vaultRateCentsPerHour(incomeRate, level()),
+  };
 }
 
 /** Market value (bid) of the open stock and bond positions. */
@@ -964,6 +974,9 @@ function portfolioNow(): Portfolio {
       lastClaimedAt: new Date(pl.vaultClaimedAt).toISOString(),
       fullAt: new Date(pl.vaultClaimedAt + vt.capHours * HOUR).toISOString(),
       serverTime: new Date(now).toISOString(),
+      incomeCentsPerHour: vt.incomeRate,
+      levelFactorBps: vt.levelFactorBps,
+      capHours: vt.capHours,
     },
     positions,
     openOrders: pl.orders.map((order) => ({
@@ -1689,6 +1702,23 @@ const companyMoves = createCompanyMovesEngine({
   random: () => Math.random(),
 });
 
+const vaultDeposits = createVaultDepositsEngine({
+  level,
+  cashCents: () => p().cashCents,
+  reserve: (cents) => {
+    p().cashCents -= cents;
+    p().reservedCents += cents;
+  },
+  income: (cents) => income(cents),
+  state: () => p().vaultDeposits ?? initialVaultDeposits(),
+  setState: (next) => {
+    p().vaultDeposits = next;
+    persist();
+  },
+  idempotent,
+  now: () => Date.now(),
+});
+
 const companySkills = createCompanySkillsEngine({
   company: () => p().company ?? null,
   addCompanyCash: (cents) => {
@@ -1996,6 +2026,7 @@ export const demoEngine: GameEngine = {
   ...protests,
   ...companyMoves,
   ...companySkills,
+  ...vaultDeposits,
   ...companyTasks,
   ...pitches,
   // AI companies of the demo (ADR-125): facts from the start values, no players work there.

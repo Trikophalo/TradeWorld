@@ -47,6 +47,8 @@ und einzelne Testläufe der Simulation, nicht das Zusammenspiel mit echten Spiel
 | Wiedereinstieg nach Bankrott | 2 500 €, Status „Pleitegeier“ 3 Tage, Reputation −10 |
 | Grundeinkommen               | 100 € pro Stunde                                     |
 | Tresor                       | fasst 8 Stunden = 800 €                              |
+| Tresor: Level-Bonus          | +8 % Grundeinkommen je Level über 1, bis Level 40    |
+| Festgeld im Tresor           | ab Level 5, 25.000 € je Level, 1,5 / 5 / 14 %        |
 
 ### 1.3 Handel (`trading`)
 
@@ -1603,3 +1605,32 @@ Schulung 1 / 2 / 4 / 8 / 12 h. Je Stufe: Daten analysieren und Kampagnen Nachfra
 Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazität +10 %, Wareneinsatz −8 %, Fixkosten
 −10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
 von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
+
+## Nachtrag: Der Tresor wächst mit dem Spieler, Festgeld (ADR-201)
+
+Werte in `BALANCE.vault`, Formeln in `src/lib/sim/vault.ts`.
+
+- **Level-Bonus:** Tresor-Rate = Grundeinkommen mit Verbesserungen × (1 + 8 % × (min(Level, 40) − 1)), einmal „half
+  even“ gerundet, danach der Staatskassen-Faktor. Level 5 ×1,32, Level 15 ×2,12, Level 30 ×3,32, Level 40 ×4,12.
+- **Festgeld:** 1 Tag 1,5 %, 3 Tage 5 %, 7 Tage 14 % (2 % am Tag), höchstens 25.000 € × Level in allen offenen Anlagen,
+  höchstens drei, ab 1.000 €. Zinsen = Betrag × Satz × Staatskassen-Faktor, „half even“, aus der Staatskasse. Vorzeitig
+  ohne Zinsen. Zum Vergleich: Depot im Erwartungswert etwa 7 % am Tag, mit Risiko.
+
+Tresor je Tag, vorher und nachher (alle Verbesserungen, die das Level erlaubt; zwei Leerungen = 24 Stunden; volle
+Staatskasse; ohne Nexamon-Bonus):
+
+| Level | Grundeinkommen | Tresor | Zinsen | vorher je Tag | nachher je Tag | Festgeld höchstens | Festgeld je Tag (7 Tage) | Tresor gesamt je Tag |
+| ----- | -------------- | ------ | ------ | ------------- | -------------- | ------------------ | ------------------------ | -------------------- |
+| 5     | 200 €/h        | 14 h   | +5 %   | 5.040 €       | 6.653 €        | 125.000 €          | bis 2.500 €              | bis 9.153 €          |
+| 15    | 450 €/h        | 28 h   | +20 %  | 12.960 €      | 27.475 €       | 375.000 €          | bis 7.500 €              | bis 34.975 €         |
+| 30    | 700 €/h        | 36 h   | +20 %  | 20.160 €      | 66.931 €       | 750.000 €          | bis 15.000 €             | bis 81.931 €         |
+
+Ohne Verbesserungen (8 Stunden, 16 Stunden am Tag): Level 5 2.112 €, Level 15 3.392 €, Level 30 5.312 € (vorher immer
+1.600 €).
+
+Einordnung: Auf Level 25 verdient ein Spieler laut Abschnitt 2.2 84.000 bis 182.000 € am Tag (Job 30.000 €). Der voll
+ausgebaute Tresor ist auf Level 30 damit eine der großen Einnahmequellen (etwa ein Drittel), nicht mehr 1 bis 2 %;
+ohne Verbesserungen bleibt er ein Sicherheitsnetz. Für die Staatskasse: vier Spieler auf Level 30 mit allem zusammen
+höchstens rund 330.000 € am Tag (0,13 % des Ziels von 250 Mio. €), der Faktor dämpft, wenn sie sich leert.
+Beobachten: Anteil der Tresor-Auszahlungen an den Quellen je Level, Füllstand der Staatskasse, Anteil des Festgelds am
+Bargeld später Spieler.

@@ -8214,3 +8214,26 @@ total_cents }`: eigene rohe Kopien aus einem Pack (`source = 'pack'`), höchsten
 - `nexamon_copies.ai_owner = instantSell.vaultOwner` („NEXA-Tresor“): der Tresor des Spiels für Seltenheiten aus
   `ai.excludedRarities`; `nexamon_copies_ai_guard` lässt ihn zu, `nexamon_ai_reset()` mustert ihn nie aus.
 - Bulk (`bulk_sell_nexamon`): `quickSell.bps` jetzt 8 000 (20 % Gebühr).
+
+## Tresor mit Level-Bonus und Festgeld (ADR-201, Migration `20261204009300_vault_level_deposits.sql`)
+
+- `vault_status(player)` (also `get_my_portfolio.vault`): `rate_cents_per_hour` = `base_rate_cents_per_hour` ×
+  `factor_bps`; `base_rate_cents_per_hour` = `income_cents_per_hour` (Grundeinkommen mit Verbesserungen) ×
+  `level_factor_bps` („half even“). Neu: `income_cents_per_hour`, `level`, `level_factor_bps`, `cap_hours`.
+  Intern `vault_level_factor_bps(level)`.
+- `vault_deposits (id, player_id, request_id, amount_cents, term_days, rate_bps, created_at, matures_at, status
+open|paid|broken|void, closed_at, interest_cents)`, eindeutig `(player_id, request_id)`. RLS: lesen nur die eigenen;
+  schreiben nur über RPC. Trigger `vault_deposits_on_reset` auf `player_private.account_reset_at`: offene Anlagen
+  werden `void`.
+- Intern: `vault_deposit_interest_cents(amount, rate_bps, factor_bps)`, `vault_deposits_json(player)`.
+
+| RPC                                                             | Antwort                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_vault_deposits()`                                          | `{ level, min_level, min_cents, cap_cents, max_open, factor_bps, server_time, terms: [{ days, rate_bps }], open_cents, earned_cents, deposits: [{ id, amount_cents, term_days, rate_bps, created_at, matures_at, matured, interest_cents }] }` |
+| `open_vault_deposit(p_request_id, p_amount_cents, p_term_days)` | wie oben plus `deposit_id`, `cash_cents`; idempotent. Fehler `locked` (unter `minLevel`), `invalid_argument` (Laufzeit), `deposit_too_small`, `deposit_limit` (Deckel oder Anzahl), `insufficient_funds`, `rate_limited`                       |
+| `close_vault_deposit(p_request_id, p_deposit_id)`               | wie oben plus `closed: { id, amount_cents, interest_cents, matured }`, `cash_cents`; idempotent. Fällig: Betrag und Zinsen, sonst nur der Betrag. Fehler `deposit_not_found`                                                                   |
+
+Ledger: `transfer` „Festgeld im Tresor angelegt“ von `player_cash` an `player_reserve` (Schlüssel
+`vault_deposit:<id>:open`) und zurück („Festgeld aus dem Tresor zurück“ bzw. „… vorzeitig aufgelöst“,
+`vault_deposit:<id>:close`); Zinsen `vault_claim` „Festgeld-Zinsen“ aus der Staatskasse (`state_pay_partial`,
+`vault_deposit:<id>:interest`), danach `loan_withhold`. `player_reserve` hält damit offene Orders und Festgeld.

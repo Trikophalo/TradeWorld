@@ -41,6 +41,7 @@ describe("BALANCE", () => {
     const sections: (keyof BalanceConfig)[] = [
       "time",
       "economy",
+      "vault",
       "trading",
       "centralBank",
       "bonds",

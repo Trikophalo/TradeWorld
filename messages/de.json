@@ -143,7 +143,7 @@
   },
   "vault": {
     "title": "Tresor",
-    "subtitle": "Grundeinkommen {rate} pro Stunde",
+    "subtitle": "{rate} pro Stunde · voll {cap}",
     "full": "Voll",
     "fullHint": "Der Tresor ist voll. Alles darüber verfällt.",
     "fillsIn": "Voll in",
@@ -174,7 +174,76 @@
       "homeTenant": "Zur Miete bei {owner} · Wohnwert {wohnwert}",
       "homeNone": "Mit einem Zuhause oder zur Miete: jede Stunde Geld und XP."
     },
-    "upgrade": "Tresor vergrößern"
+    "upgrade": "Tresor vergrößern",
+    "yield": {
+      "title": "Das bringt dein Tresor",
+      "income": "Grundeinkommen",
+      "incomeDetail": "100 € je Stunde plus Verbesserungen",
+      "level": "Level-Bonus",
+      "levelDetail": "Level {level}: +{percent} je Level über 1",
+      "levelMax": "Level {level}: höchster Bonus erreicht",
+      "treasury": "Staatskasse knapp",
+      "treasuryDetail": "Das Grundeinkommen sinkt, solange die Staatskasse leer ist.",
+      "rate": "Im Tresor",
+      "perHour": "{amount}/Std.",
+      "factor": "× {factor}",
+      "full": "Voller Tresor ({hours} Std.)",
+      "interest": "Tresorzinsen +{percent} bei jedem Leeren",
+      "perDay": "Am Tag, wenn du rechtzeitig leerst",
+      "perDayHint": "24 Stunden Grundeinkommen samt Tresorzinsen. Wer seltener leert, als der Tresor fasst, verschenkt den Rest."
+    },
+    "boost": {
+      "title": "So bringt er mehr",
+      "level": "Nächstes Level",
+      "levelText": "+{percent} Level-Bonus",
+      "income": "Grundeinkommen verbessern",
+      "vault": "Tresor vergrößern",
+      "vaultXl": "Panzertresor",
+      "interest": "Tresorzinsen",
+      "deposits": "Festgeld anlegen",
+      "depositsText": "bis {amount} sicher verzinsen",
+      "depositsLocked": "ab Level {level}",
+      "perHourMore": "+{amount}/Std.",
+      "hoursMore": "+{hours} Std. Platz",
+      "percentMore": "+{percent} je Leerung",
+      "fromLevel": "ab Level {level}",
+      "maxed": "Alles ausgebaut",
+      "maxedText": "Dein Tresor ist voll ausgebaut. Mehr bringen jetzt Level und Festgeld."
+    },
+    "deposits": {
+      "title": "Festgeld im Tresor",
+      "intro": "Leg Geld für 1, 3 oder 7 Tage fest an. Es bleibt dein Geld und zählt zum Vermögen, und am Ende gibt es Zinsen aus der Staatskasse. Vorzeitig auflösen geht, dann ohne Zinsen.",
+      "locked": "Festgeld gibt es ab Level {level}.",
+      "room": "Noch {free} von {cap} frei",
+      "earned": "Bisher verdient: {amount}",
+      "amount": "Betrag in Euro",
+      "amountHint": "Mindestens {min}, höchstens {max}",
+      "term": "Laufzeit",
+      "termOption": "{days, plural, one {# Tag} other {# Tage}} · +{percent}",
+      "preview": "Nach {days, plural, one {# Tag} other {# Tagen}}: {total} (+{interest})",
+      "submit": "Festgeld anlegen",
+      "opened": "Festgeld angelegt",
+      "openedText": "{amount} liegen für {days, plural, one {# Tag} other {# Tage}} im Tresor.",
+      "openFailed": "Festgeld nicht angelegt",
+      "open": "Laufende Anlagen",
+      "emptyTitle": "Noch kein Festgeld",
+      "emptyText": "Geld, das du gerade nicht brauchst, bringt hier sicher Zinsen.",
+      "row": "{days, plural, one {# Tag} other {# Tage}} · +{percent}",
+      "maturesIn": "fällig in {time}",
+      "matured": "fällig",
+      "interest": "+{amount} Zinsen",
+      "collect": "Abholen",
+      "break": "Auflösen",
+      "breakHint": "Vorzeitig: nur der Betrag, keine Zinsen",
+      "collected": "Festgeld abgeholt",
+      "collectedText": "{amount} plus {interest} Zinsen sind auf deinem Konto.",
+      "broken": "Festgeld aufgelöst",
+      "brokenText": "{amount} sind zurück auf deinem Konto, ohne Zinsen.",
+      "closeFailed": "Nicht geklappt",
+      "full": "Alle {max} Anlagen belegt",
+      "max": "Max",
+      "treasuryLow": "Die Staatskasse ist knapp: Zinsen fallen kleiner aus."
+    }
   },
   "portfolio": {
     "title": "Portfolio",
@@ -555,7 +624,7 @@
     "vault": {
       "title": "Grundeinkommen und Tresor",
       "summary": "{rate} pro Stunde, höchstens {hours} Stunden",
-      "text": "Du bekommst {rate} pro Stunde, auch wenn du offline bist. Das Geld sammelt sich im Tresor, der höchstens {hours} Stunden fasst. Was darüber hinausgeht, verfällt.",
+      "text": "Du bekommst {rate} pro Stunde, auch wenn du offline bist. Das Geld sammelt sich im Tresor, der höchstens {hours} Stunden fasst. Was darüber hinausgeht, verfällt. Mit jedem Level wächst das Grundeinkommen im Tresor um {bonus} (bis Level {maxLevel}), ab Level {depositLevel} kannst du dort Geld als Festgeld für Zinsen anlegen.",
       "example": "Nach einer Nacht ist der Tresor voll: Du holst {cap} ab. Wer zweimal am Tag leert, verschenkt trotzdem einen Teil.",
       "where": "Auf der Startseite im Tresor, mit Countdown bis er voll ist."
     },
@@ -949,7 +1018,10 @@
     "nexamon_battle_joined": "Du sitzt schon in diesem Pack Battle.",
     "news_promo_inactive": "Diese Aktion läuft gerade nicht (mehr).",
     "news_promo_claimed": "Du hast diese Aktion schon genutzt.",
-    "news_promo_no_company": "Für die Steuererklärung brauchst du eine eigene Firma."
+    "news_promo_no_company": "Für die Steuererklärung brauchst du eine eigene Firma.",
+    "deposit_too_small": "Festgeld beginnt bei 1.000 €.",
+    "deposit_limit": "Mehr Festgeld passt gerade nicht in deinen Tresor: Grenze oder Zahl der Anlagen erreicht.",
+    "deposit_not_found": "Dieses Festgeld gibt es nicht (mehr)."
   },
   "locks": {
     "level": "Level {level}",
@@ -3873,7 +3945,6 @@
     "failed": "Nicht gekauft",
     "cashLabel": "Dein Geld",
     "moneyNote": "Das Geld geht an die Staatskasse, aus der alle ihr Grundeinkommen bekommen.",
-    "groupCount": "{bought} von {total} Stufen",
     "groups": {
       "vault": "Tresor und Einkommen",
       "work": "Job und Karriere",
@@ -3889,7 +3960,7 @@
       },
       "income": {
         "name": "Grundeinkommen",
-        "text": "Ein bisschen mehr Grundeinkommen jede Stunde. Klein, aber es läuft immer.",
+        "text": "Mehr Grundeinkommen jede Stunde: +50 % je Stufe. Es läuft immer, auch offline.",
         "value": "{amount} pro Stunde"
       },
       "study": {
@@ -4042,7 +4113,12 @@
         "text": "Du weißt, wie man Leute bewegt: Deine Kampagnen gegen Firmen wirken öfter.",
         "value": "+{percent} Wirkung"
       }
-    }
+    },
+    "groupSummary": "{bought}/{total} gekauft",
+    "groupNext": "nächste ab {price}",
+    "groupNextLevel": "nächste ab Level {level}",
+    "groupMaxed": "alles gekauft",
+    "groupBuyable": "{count} jetzt kaufbar"
   },
   "ladder": {
     "title": "Karriereleiter",

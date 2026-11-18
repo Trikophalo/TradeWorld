@@ -113,6 +113,8 @@ Noch offen: Deploy auf Vercel, Test der Anmeldung gegen ein echtes Supabase-Proj
 
 ## Startseite, Währung zur Wahl, Freundescode
 
+- **Der Tresor wächst mit dir (ADR-201):** Das Grundeinkommen im Tresor steigt mit jedem Level um 8 % (bis Level 40, dann das 4,12-Fache), ab Level 5 gibt es Festgeld: Geld für 1, 3 oder 7 Tage anlegen, bis 25.000 € je Level, mit 1,5 %, 5 % oder 14 % Zinsen aus der Staatskasse. Der geöffnete Tresor zeigt Schritt für Schritt, was er bringt und womit er mehr bringt. Die Gruppen der Verbesserungen lassen sich auf- und zuklappen und zeigen zugeklappt, wie viel gekauft ist und was die nächste Stufe kostet.
+
 - **Grundeinkommen stark ausbaubar (ADR-197):** Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro Stunde); die Preise steigen von 3.000 € bis rund 259.500 €.
 
 - **KI kauft auch teure Karten (ADR-195):** Bietest du eine Nexamon-Karte zum Marktwert oder darunter an, kauft die KI sie innerhalb weniger Minuten, auch für 1,5 Mio. € und auch als Slab. Bis 15 % über Wert klappt es nur manchmal, eher bei beliebten Karten; darüber nie.

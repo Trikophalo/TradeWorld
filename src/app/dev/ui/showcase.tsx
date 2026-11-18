@@ -46,6 +46,7 @@ import { PokeButton } from "@/features/friends/components/poke";
 import { FigureCard } from "@/features/wardrobe/components/figure-card";
 import { CareerLadder, PayRoutes } from "@/features/career/components/career-ladder";
 import { UpgradeCard } from "@/features/upgrades/components/upgrade-shop";
+import { VaultDeposits, VaultYield } from "@/features/progression/components/vault-details";
 import { CRYPTO } from "@/config/crypto";
 import { StatBars } from "@/features/crypto/components/coin-detail";
 import { CoinLogo } from "@/features/crypto/components/coin-logo";
@@ -699,6 +700,20 @@ function Demo({ label, children, className }: { label: string; children: ReactNo
   );
 }
 
+/** The open vault of a level 15 player with half the income upgrades (ADR-201). */
+const SAMPLE_VAULT = {
+  accruedCents: 1_200_000,
+  capCents: 2_671_200,
+  rateCentsPerHour: 95_400,
+  factorBps: 10_000,
+  lastClaimedAt: null,
+  fullAt: "2026-11-18T08:00:00.000Z",
+  serverTime: "2026-11-17T20:00:00.000Z",
+  incomeCentsPerHour: 45_000,
+  levelFactorBps: 21_200,
+  capHours: 28,
+};
+
 export function Showcase() {
   const t = useTranslations("showcase");
   const settings = useSettings();
@@ -1271,6 +1286,10 @@ export function Showcase() {
         <UpgradeCard upgradeKey="rhetoric" level={0} />
         <UpgradeCard upgradeKey="vault_interest" level={1} />
         <UpgradeCard upgradeKey="ai_turbo" level={0} />
+        <Card padding="lg" className="space-y-4">
+          <VaultYield vault={SAMPLE_VAULT} level={15} />
+          <VaultDeposits />
+        </Card>
         <Demo label="Krypto: Pixel-Coins der Markt-Coins (ADR-101)" className="flex-wrap justify-start gap-3">
           {CRYPTO.coins.map((c) => (
             <CoinLogo key={c.ticker} coin={{ ...c, logo: null }} scale={3} />

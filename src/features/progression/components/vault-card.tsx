@@ -26,6 +26,8 @@ import { DURATION, EASE, SPRING } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { useClock } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { Reveal } from "./reveal";
+import { VaultDeposits, VaultYield } from "./vault-details";
 
 const format = (value: number) => formatMoney(Math.round(value));
 const RATE = BALANCE.economy.basicIncomeCentsPerHour;
@@ -48,7 +50,8 @@ interface Source {
  * The vault (ADR-086): a heavy pixel door that swings open. Inside lie gold bars and coins by how full it is, and
  * every income source flows in as a live stream: basic income, job, the automatic CEO payout and, from the property
  * level, the living bonus (ADR-161). Emptying it sends
- * the coins to the cash balance in the top bar; the server books the amount (`claim_vault`).
+ * the coins to the cash balance in the top bar; the server books the amount (`claim_vault`). Opened, it also shows
+ * what it yields step by step, what would raise it and, from level 5, the Festgeld (ADR-201).
  */
 export function VaultCard() {
   const t = useTranslations("vault");
@@ -175,7 +178,10 @@ export function VaultCard() {
           <h2 className="label-pixel text-fg-2">{t("title")}</h2>
           <NumberTicker value={amount} format={format} className="mt-0.5 text-2xl font-semibold text-fg-1" />
           <p className="truncate text-sm text-fg-3">
-            {t("subtitle", { rate: formatMoney(vault?.rateCentsPerHour ?? RATE, { whole: true }) })}
+            {t("subtitle", {
+              rate: formatMoney(vault?.rateCentsPerHour ?? RATE, { whole: true }),
+              cap: formatMoney(cap, { whole: true }),
+            })}
             {vault && vault.factorBps < 10_000 && ` · ${t("treasuryLow")}`}
           </p>
 
@@ -249,6 +255,16 @@ export function VaultCard() {
               ))}
             </ul>
             <p className="text-xs text-pretty text-fg-3">{t("sourcesHint")}</p>
+            {vault && (
+              <div className="border-t border-line-1 pt-3">
+                <VaultYield vault={vault} level={level} />
+              </div>
+            )}
+            <Reveal feature="vaultDeposits">
+              <div className="border-t border-line-1 pt-3">
+                <VaultDeposits />
+              </div>
+            </Reveal>
           </motion.section>
         )}
       </AnimatePresence>

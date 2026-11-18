@@ -618,6 +618,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: "Grundeinkommen stark ausbaubar",
         text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
       },
+      {
+        id: "startseite-waehrung-zur-wahl-freundescode-5be3075d",
+        title: "Der Tresor wächst mit dir",
+        text: "Das Grundeinkommen im Tresor steigt mit jedem Level um 8 % (bis Level 40, dann das 4,12-Fache), ab Level 5 gibt es Festgeld: Geld für 1, 3 oder 7…",
+      },
     ],
   },
   {
