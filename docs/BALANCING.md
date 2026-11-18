@@ -1611,8 +1611,6 @@ Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazitä
 −10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
 von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
 
-<<<<<<< HEAD
-
 ## Nachtrag: Titans Revenge – Diamond rauf, Uranium runter (ADR-207)
 
 `TITAN_REBALANCE_FACTOR` in `src/config/nexamon/titans-draft.ts`, auf die Startpreise nach `TITAN_VALUE_FACTOR` 1,125
@@ -1639,7 +1637,6 @@ solange Diamond und Uranium sich im Mittel gleich bewegt haben; sonst ändert er
 und v der mittleren Bewegung seit dem Start (z. B. Diamond + 10 %, Uranium ± 0: + 358 € je Pack). KI-Angebote folgen
 dem neuen Wert, Angebote von Spielern behalten ihren Preis (der Besitzer hat ihn gewählt; ein Diamond-Angebot ist
 danach eher günstig, ein Uranium-Angebot eher teuer, beides kann der Besitzer jederzeit ändern).
-=======
 
 ## Klon, Lohn nach Skills, Beteiligungen (ADR-206)
 
