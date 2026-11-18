@@ -816,7 +816,9 @@ select tests.login_as('authenticated', :fx_da);
 select public.found_company(gen_random_uuid(), 'Fixture Lieferwerk', 'Teile auf Abruf', 'tech', '#3355aa', 'garage') is not null as ok \gset
 select company_id as fx_dco from public.player_companies where founder_id = :fx_da and status = 'active' \gset
 -- pin the hidden niche (a Pareto draw): the flyer price follows its demand, a heavy-tail draw made it unaffordable
+reset role;
 update public.player_companies set potential_annual_cents = 3000000 where company_id = :'fx_dco';
+select tests.login_as('authenticated', :fx_da);
 \o :fixture_dir/start_campaign.json
 select public.start_campaign(gen_random_uuid(), :'fx_dco', 'flyer');
 \o :fixture_dir/get_my_company_campaign.json
