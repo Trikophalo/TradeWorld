@@ -8236,3 +8236,57 @@ total_cents }`: eigene rohe Kopien aus einem Pack (`source = 'pack'`), höchsten
 - Migration `20261204009900_nexamon_titans_rebalance.sql` ruft sie einmal auf (Marke `data_migrations`
   `nexamon_titans_rebalance_207`): Titans Revenge Diamond × 13/10, Uranium × 918 828/1 000 000, dann
   `nexamon_meta.catalogue_hash = null`, damit der nächste `nexamon_sync()` die Startpreise genau auf den Katalog legt.
+
+## Klon, Lohn nach Skills, Gewinnbeteiligung und Mitarbeiteraktien (ADR-206, Migrationen 9800 und 9810)
+
+- **`player_clones`** (intern): `player_id` (PK), `request_id`, `fee_cents`, `created_at`. Ein Klon je Spieler.
+- **`player_jobs`**: neu `is_clone` (Job des Klons, `player_id` = Besitzer), `profit_share_bonus_bps` und
+  `stock_grant_bonus_bps` (Extras der Anzeige beim Unterschreiben). Eindeutig: ein aktiver Job je (`player_id`,
+  `is_clone`) (`player_jobs_active_holder_uq` ersetzt `player_jobs_active_uq`).
+- **`job_applications.for_clone`**: Bewerbung des Klons. Je Halter eine Bewerbung je Stelle, je Halter höchstens
+  `jobs.maxOpenApplications` offene.
+- **`job_postings`**: neu `profit_share_bps` (0 bis `rewards.maxPostingProfitShareBps`) und `stock_grant_bps`
+  (0 bis `rewards.maxPostingStockGrantBps`), gesetzt mit `set_job_posting_perks`.
+- **`job_rewards`** (intern, Anzeige über `job_state().rewards`): `player_job_id`, `player_id`, `company_id`, `kind`
+  (`profit_share`, `stock_grant`, `stock_grant_cash`), `amount_cents`, `quantity_e6`, `price_e4`, `share_bps`,
+  `base_cents`, `source_key` (eindeutig: `profit:<job>:<stunde>`, `profit:<job>:p<lohnzahlung>`, `grant:…`),
+  `ledger_transaction_id`.
+- **Trigger**: `job_rewards_company_hour` (nach jeder Zeile in `player_company_hours`: Beteiligungen und Aktien-Wurf
+  der Mitarbeiter einer Spielerfirma), `job_rewards_payout` (nach jeder Zeile in `salary_payouts` bei KI-Firmen).
+- **Buchungen**: Klon `fee` Spieler → Staatskasse; Gewinnbeteiligung `salary` Firmenkasse → Spieler; Mitarbeiteraktien
+  `payroll` Firmenkasse → Markt (Aktien aus dem freien Bestand über `grant_position`) oder `salary` Firmenkasse → Spieler
+  (Wertausgleich). Alle mit `loan_withhold` wie der Lohn.
+
+### RPCs
+
+| RPC                                                                          | Antwort                                                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `get_clone()`                                                                | `{min_level, fee_cents, level, clone: {name, created_at} \| null, job}` (`job` wie `get_my_job().job`) |
+| `create_clone(request)`                                                      | wie `get_clone()`; Fehler `clone_level_too_low`, `clone_exists`, `insufficient_funds`                  |
+| `clone_apply_for_job(request, posting, wish, message)`                       | wie `apply_for_job`; `clone_missing`, `clone_own_company`                                              |
+| `clone_sign_contract(request, application, signature)`                       | wie `sign_contract`; `clone_same_company`, `clone_own_company`                                         |
+| `clone_quit_job(request, immediate)`, `clone_cancel_quit(request)`           | wie `quit_job` / `cancel_quit`                                                                         |
+| `clone_request_raise(request, bps)`, `clone_request_promotion(request)`      | wie `request_raise` / `request_promotion`                                                              |
+| `set_job_posting_perks(request, posting, profit_share_bps, stock_grant_bps)` | `posting_json` (nur Gründer der Firma)                                                                 |
+
+Erweiterte Antworten: `get_job_board` je Stelle `skill_pay_bps`, `market_salary_cents_per_hour`, `profit_share_bps`,
+`stock_grant_chance_bps`, `posting_profit_share_bps`, `posting_stock_grant_bps`, `own_company`, `my_clone_application`
+und oben `has_clone`; `get_my_job().job` zusätzlich `is_clone`, `holder_name`, `skill_pay_bps`, `profit_share_bps`,
+`stock_grant_chance_bps`, `rewards {profit_share_cents, stock_grants, stock_grant_cents, shares_e6, last}`;
+`application_json.for_clone`; `get_player_card.clone_job`; `get_company_team` je Mitglied `is_clone`.
+
+### Formeln
+
+- **Lohn-Faktor** (`job_skill_pay_bps`) = min(`skillPay.capMultiplier` × 10 000, 10 000 + `perRelevantScoreBps` ×
+  Σ min(Score des geforderten Bereichs, `relevantScoreCapPerBranch`) + `perLearnedSkillBps` × gelernte Skills).
+  **KI-Lohndecke** (`job_pay_ceiling`) = Grundlohn × Faktor; ersetzt die Formel oben (`ai_salary_ceiling` bleibt
+  für alte Aufrufer bestehen).
+- **Beteiligung** (`job_profit_share_bps`) = 0 unter Senior, sonst min(`maxProfitShareBps`, Rang-Satz + Extra der Anzeige).
+- **Spielerfirma, Stunde mit Gewinn G**: je Job G × Satz × min(Σ Sätze, `maxTotalProfitShareBps`) / Σ Sätze / 10 000,
+  abgerundet, höchstens die Kasse.
+- **KI-Firma, Lohnzahlung über m Minuten**: Basis = `ttm_net_income_cents` / 4 / Quartalsstunden ×
+  `aiDepartmentSize` / max(Mitarbeiter, `aiDepartmentSize`) × m / 60; Beteiligung = min(Basis × Satz / 10 000,
+  Lohn × m / 60 × `aiMaxShareOfWageBps` / 10 000).
+- **Aktien-Wurf**: `job_stock_grant_bps(Rang, Extra)` (bei KI-Lohnzahlungen × min(m, 60) / 60) > `job_reward_roll(key)`
+  (Hash 0 … 9 999), nur bei voller Anwesenheit und Gewinn. Paket = `stockGrantValueHours` × Vertragslohn; Stückzahl
+  = ganze Aktien, höchstens der freie Bestand (`security_free_float_e6`).

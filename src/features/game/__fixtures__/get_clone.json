@@ -1,0 +1,67 @@
+{
+  "job": {
+    "id": "0295fcee-70b6-495e-b1cf-506cfdf4eec9",
+    "tier": "intern",
+    "title": null,
+    "company": {
+      "id": "c76af3f2-dc09-a8cc-b107-a7c326ad5b09",
+      "logo": null,
+      "name": "Glanz & Gloria",
+      "color": "#D4AF37",
+      "is_ai": true,
+      "sector": "retail",
+      "ticker": "LUX"
+    },
+    "rewards": { "last": null, "shares_e6": 0, "stock_grants": 0, "stock_grant_cents": 0, "profit_share_cents": 0 },
+    "is_clone": true,
+    "presence": {
+      "fire_at": "2026-11-23T00:23:59.77626+00:00",
+      "pay_bps": 10000,
+      "last_active_at": "2026-11-18T00:23:59.77626+00:00"
+    },
+    "required": [{ "branch": "sales", "min_score": 0 }],
+    "promotion": {
+      "boss": "ai",
+      "ready": false,
+      "retry_at": null,
+      "next_tier": "junior",
+      "chance_bps": 0,
+      "main_branch": "sales",
+      "requirements": [
+        { "key": "level", "met": true, "have": 20, "need": 5, "branch": null },
+        { "key": "branch", "met": false, "have": 0, "need": 2, "branch": "sales" },
+        { "key": "hours", "met": false, "have": 0, "need": 12, "branch": null }
+      ],
+      "pending_since": null,
+      "next_salary_cents_per_hour": 30000
+    },
+    "signature": "M1 1",
+    "title_key": "sales_intern",
+    "rank_hours": 0.0,
+    "started_at": "2026-11-18T00:23:59.848069+00:00",
+    "holder_name": "Klon von Fixture_Klon",
+    "pending_raise": null,
+    "raise_max_bps": 0,
+    "skill_pay_bps": 10000,
+    "notice_ends_at": null,
+    "paid_hours_cap": 8,
+    "pay_factor_bps": 10000,
+    "work_task_open": false,
+    "quit_cost_cents": 0,
+    "last_bonus_cents": 0,
+    "paid_hours_today": 0.0,
+    "productivity_bps": 15000,
+    "profit_share_bps": 0,
+    "next_work_task_at": null,
+    "earned_total_cents": 0,
+    "raise_available_at": null,
+    "quit_now_cost_cents": 180000,
+    "salary_cents_per_hour": 15000,
+    "stock_grant_chance_bps": 0,
+    "effective_salary_cents_per_hour": 15000
+  },
+  "clone": { "name": "Klon von Fixture_Klon", "created_at": "2026-11-18T00:23:59.80448+00:00" },
+  "level": 20,
+  "fee_cents": 2500000,
+  "min_level": 20
+}

@@ -768,12 +768,32 @@ export interface JobPosting {
   myApplication: { id: string; status: ApplicationStatus } | null;
   /** Concrete skills the employer asks for (ADR-062). */
   requiredSkills: string[];
+  /** Pay factor from my skills for this role in bps (ADR-206); 10 000 = ×1. */
+  skillPayBps: number;
+  /** What my skills are worth in this rank (tier wage × skill factor, ADR-206). */
+  marketSalaryCentsPerHour: number;
+  /** Profit share of the job from Senior on, with the posting's extra (ADR-206). */
+  profitShareBps: number;
+  /** Chance per paid hour of good work for employee shares (ADR-206). */
+  stockGrantChanceBps: number;
+  /** Extras a founder offers on top (ADR-206). */
+  postingProfitShareBps: number;
+  postingStockGrantBps: number;
+  /** A posting of my own company: my clone cannot take it (ADR-206). */
+  ownCompany: boolean;
+  /** The clone's application for this posting (ADR-206). */
+  myCloneApplication: { id: string; status: ApplicationStatus } | null;
 }
 
 export interface JobBoard {
   postings: JobPosting[];
   nextRefreshAt: string | null;
+  /** I have a clone that can apply too (ADR-206). */
+  hasClone: boolean;
 }
+
+/** Who a job action is for (ADR-206): me or my clone. */
+export type JobHolder = "self" | "clone";
 
 export type ApplicationStatus =
   "pending" | "offered" | "rejected" | "declined" | "withdrawn" | "expired" | "signed" | "closed";
@@ -788,6 +808,8 @@ export interface JobApplication {
   message: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Application of the clone (ADR-206). */
+  forClone: boolean;
 }
 
 export interface ApplyInput {
@@ -795,6 +817,8 @@ export interface ApplyInput {
   postingId: string;
   salaryWishCentsPerHour: number;
   message: string;
+  /** Apply for the clone (ADR-206). */
+  forClone?: boolean;
 }
 
 export interface MyJob {
@@ -831,6 +855,34 @@ export interface MyJob {
   promotion: PromotionState | null;
   /** Presence (ADR-103): pay share now and when the job ends without a visit; null on servers before M4k. */
   presence: { lastActiveAt: string; payBps: number; fireAt: string } | null;
+  /** The clone's job (ADR-206). */
+  isClone: boolean;
+  /** "Kl_Anna" or "Klon von Kl_Anna". */
+  holderName: string;
+  /** Pay factor from the skills in bps (ADR-206). */
+  skillPayBps: number;
+  /** Profit share of the employer's profit in bps (ADR-206), 0 below Senior. */
+  profitShareBps: number;
+  /** Chance per paid hour of good work for employee shares (ADR-206). */
+  stockGrantChanceBps: number;
+  /** What the job paid besides the wage (ADR-206). */
+  rewards: JobRewards;
+}
+
+export interface JobRewards {
+  profitShareCents: number;
+  stockGrants: number;
+  stockGrantCents: number;
+  sharesE6: number;
+}
+
+/** The clone (ADR-206): from level 20 once, then a second job at another company. */
+export interface CloneState {
+  minLevel: number;
+  feeCents: number;
+  level: number;
+  clone: { name: string; createdAt: string } | null;
+  job: MyJob | null;
 }
 
 // ------------------------------------------------------------------ promotions (ADR-094)
@@ -1156,6 +1208,14 @@ export interface PlayerCard {
   branchScores: Record<SkillBranch, number>;
   topSkills: { key: string; tier: number }[];
   job: { companyName: string; titleKey: string | null; title: string | null; tier: CareerTier; since: string } | null;
+  /** The clone's job, shown as "Klon von …" (ADR-206). */
+  cloneJob: {
+    companyName: string;
+    titleKey: string | null;
+    title: string | null;
+    tier: CareerTier;
+    since: string;
+  } | null;
   company: { name: string; ticker: string | null } | null;
   memberSince: string;
   /** Trust from kept and broken deals (ADR-098); null on servers before M4j. */
@@ -2107,6 +2167,9 @@ export interface CreatePostingInput {
   salaryCentsPerHour: number;
   slots: number;
   requiredSkills: string[];
+  /** Extras on top (ADR-206): profit share from Senior on and the chance for employee shares, in bps. */
+  profitShareBps?: number;
+  stockGrantBps?: number;
 }
 
 export interface Applicant {
@@ -2126,6 +2189,8 @@ export interface CompanyApplication extends JobApplication {
 export interface TeamMember {
   playerJobId: string;
   nickname: string;
+  /** The clone of the player (ADR-206): shown as "Klon von …". */
+  isClone: boolean;
   avatarKey: string;
   title: string;
   salaryCentsPerHour: number;
@@ -2220,6 +2285,11 @@ export const GAME_ERROR_KEYS = [
   "company_not_found",
   "company_level_too_low",
   "owns_company",
+  "clone_level_too_low",
+  "clone_exists",
+  "clone_missing",
+  "clone_own_company",
+  "clone_same_company",
   "employee_limit",
   "company_upgrade_unavailable",
   "founding_locked",
@@ -2647,20 +2717,25 @@ export interface GameEngine extends BattleEngine, NexamonEngine, NexamonSealedEn
   applications(): Promise<JobApplication[]>;
   counterOffer(requestId: string, applicationId: string, salaryWishCentsPerHour: number): Promise<JobApplication>;
   withdrawApplication(requestId: string, applicationId: string): Promise<JobApplication>;
-  signContract(requestId: string, applicationId: string, signature: string): Promise<MyJob>;
+  signContract(requestId: string, applicationId: string, signature: string, forClone?: boolean): Promise<MyJob>;
   myJob(): Promise<MyJob | null>;
   quitJob(
     requestId: string,
     immediate?: boolean,
+    forClone?: boolean,
   ): Promise<{ noticeEndsAt: string | null; ended: boolean; paidCents: number }>;
-  cancelQuit(requestId: string): Promise<MyJob>;
+  cancelQuit(requestId: string, forClone?: boolean): Promise<MyJob>;
   employer(): Promise<EmployerView | null>;
   requestRaise(
     requestId: string,
     raiseBps: number,
+    forClone?: boolean,
   ): Promise<{ status: "accepted" | "pending"; salaryCentsPerHour: number }>;
   /** Ask the boss for the next rank (ADR-094). */
-  requestPromotion(requestId: string): Promise<PromotionResult>;
+  requestPromotion(requestId: string, forClone?: boolean): Promise<PromotionResult>;
+  /** The clone and its job (ADR-206). */
+  clone(): Promise<CloneState>;
+  createClone(requestId: string): Promise<CloneState>;
   upgrades(): Promise<UpgradesState>;
   buyUpgrade(requestId: string, key: UpgradeKey): Promise<BuyUpgradeResult>;
   /** Cryptocurrencies (ADR-101). */

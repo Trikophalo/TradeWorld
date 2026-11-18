@@ -619,6 +619,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         text: "Die Verbesserung „Grundeinkommen“ hat jetzt 12 Stufen ab Level 3 (alle zwei Level eine neue), jede +50 %, zusammen bis zum Siebenfachen (700 € pro…",
       },
       {
+        id: "startseite-waehrung-zur-wahl-freundescode-d6c80d70",
+        title: "Dein Klon und bessere Jobs",
+        text: "Ab Level 20 erschaffst du im Job-Tab einmalig einen Klon (25 000 €).",
+      },
+      {
         id: "startseite-waehrung-zur-wahl-freundescode-a997be02",
         title: "Pack Battles mit Modi",
         text: "Beim Eröffnen wählst du jetzt „Twist“ (nach jedem Pack wird der ganze bisher gezogene Wert zufällig unter allen Spielern vertauscht) und/oder…",

@@ -154,6 +154,68 @@ export function aiSalaryCeiling(baseCentsPerHour: number, score: number, cfg: Jo
   return Math.round(baseCentsPerHour * factor);
 }
 
+/**
+ * Pay factor from skills in bps (ADR-206): 10 000 + perRelevantScoreBps × relevant score (each required branch up to
+ * relevantScoreCapPerBranch) + perLearnedSkillBps × learned skills, at most capMultiplier × 10 000. Same as the
+ * database function job_skill_pay_bps.
+ */
+export function skillPayBps(
+  required: readonly JobRequirement[],
+  scores: Readonly<BranchScores>,
+  learnedSkills: number,
+  cfg: JobsConfig = BALANCE.jobs,
+): number {
+  const p = cfg.skillPay;
+  const relevant = required.reduce(
+    (sum, req) => sum + Math.min(Math.max(scores[req.branch] ?? 0, 0), p.relevantScoreCapPerBranch),
+    0,
+  );
+  return Math.min(
+    Math.round(10_000 * p.capMultiplier),
+    10_000 + p.perRelevantScoreBps * relevant + p.perLearnedSkillBps * Math.max(0, learnedSkills),
+  );
+}
+
+/** Highest hourly wage an AI employer pays (and the market value of the player) for this base wage (ADR-206). */
+export function skillPayCeiling(
+  baseCentsPerHour: number,
+  required: readonly JobRequirement[],
+  scores: Readonly<BranchScores>,
+  learnedSkills: number,
+  cfg: JobsConfig = BALANCE.jobs,
+): number {
+  return Math.round((baseCentsPerHour * skillPayBps(required, scores, learnedSkills, cfg)) / 10_000);
+}
+
+/** Profit share of a job in bps (ADR-206): rank share from Senior on plus a posting's extra, at most the cap. */
+export function profitShareBps(tier: string, postingBonusBps = 0, cfg: JobsConfig = BALANCE.jobs): number {
+  const base = cfg.rewards.profitShareBpsByTier[tier] ?? 0;
+  if (base <= 0) return 0;
+  return Math.min(cfg.rewards.maxProfitShareBps, base + Math.max(0, postingBonusBps));
+}
+
+/** Chance per paid hour of good work for employee shares, in bps (ADR-206). */
+export function stockGrantChanceBps(tier: string, postingBonusBps = 0, cfg: JobsConfig = BALANCE.jobs): number {
+  return Math.min(10_000, Math.max(0, cfg.rewards.stockGrantChanceBpsByTier[tier] ?? 0) + Math.max(0, postingBonusBps));
+}
+
+/**
+ * Profit shares of one player-company hour (ADR-206): each job's share of the profit, all together at most
+ * maxTotalProfitShareBps (scaled down evenly), nothing without profit. Integer cents, rounded down.
+ */
+export function hourProfitShares(
+  profitCents: number,
+  sharesBps: readonly number[],
+  cfg: JobsConfig = BALANCE.jobs,
+): number[] {
+  if (profitCents <= 0) return sharesBps.map(() => 0);
+  const total = sharesBps.reduce((s, b) => s + Math.max(0, b), 0);
+  const cap = cfg.rewards.maxTotalProfitShareBps;
+  return sharesBps.map((b) =>
+    b <= 0 ? 0 : Math.floor((profitCents * b * Math.min(total, cap)) / Math.max(total, 1) / 10_000),
+  );
+}
+
 /** Largest raise a player may ask for, from the score gained since hiring or the last raise. */
 export function maxRaiseBps(scoreGained: number, cfg: JobsConfig = BALANCE.jobs): number {
   return Math.max(0, Math.floor(scoreGained)) * cfg.raiseRequest.maxRaiseBpsPerScore;

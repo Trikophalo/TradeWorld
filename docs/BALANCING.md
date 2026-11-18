@@ -1611,6 +1611,8 @@ Handwerk und Forschung Qualität +0,6 Punkte. Deckel: Nachfrage +10 %, Kapazitä
 −10 %, Qualität +5 Punkte. Im SQL-Test d2 hebt Daten analysieren 1 + Kosten im Griff 1 den Stundengewinn einer Garage
 von 818,75 € auf 909,25 € (Nachfrage ×1,01, Fixkosten ×0,98).
 
+<<<<<<< HEAD
+
 ## Nachtrag: Titans Revenge – Diamond rauf, Uranium runter (ADR-207)
 
 `TITAN_REBALANCE_FACTOR` in `src/config/nexamon/titans-draft.ts`, auf die Startpreise nach `TITAN_VALUE_FACTOR` 1,125
@@ -1637,3 +1639,16 @@ solange Diamond und Uranium sich im Mittel gleich bewegt haben; sonst ändert er
 und v der mittleren Bewegung seit dem Start (z. B. Diamond + 10 %, Uranium ± 0: + 358 € je Pack). KI-Angebote folgen
 dem neuen Wert, Angebote von Spielern behalten ihren Preis (der Besitzer hat ihn gewählt; ein Diamond-Angebot ist
 danach eher günstig, ein Uranium-Angebot eher teuer, beides kann der Besitzer jederzeit ändern).
+=======
+
+## Klon, Lohn nach Skills, Beteiligungen (ADR-206)
+
+`jobs.clone`: ab Level 20, 25 000 € einmalig. `jobs.skillPay`: 3 % je relevantem Score-Punkt (bis 40 je Bereich),
+0,5 % je gelerntem Skill, höchstens ×3. Vorher: 3 % je Treffer-Punkt (bis zum Doppelten der Anforderung), höchstens
+×1,5. Senior IT mit IT 30 und 40 Skills: 952 → 1 470 €/Std.; Teamleitung mit IT 40, Management 20 und 60 Skills:
+1 950 → 3 900 €/Std. `jobs.rewards`: Gewinnbeteiligung Senior 0,5 %, Teamleitung 2 %, C-Level 5 % (höchstens 5 %,
+Anzeigen bis +3 %, je Stunde zusammen höchstens 25 % des Gewinns); KI-Firmen auf den Gewinn einer Abteilung von 50
+Leuten, höchstens der halbe Lohn. Aktien-Chance je Stunde Junior 1 %, Senior 3 %, Teamleitung 5 %, C-Level 8 %
+(Anzeigen bis +5 %), Paket 4 Stunden Lohn: Erwartung Senior + 12 % Lohn, C-Level + 32 %.
+
+> > > > > > > worktree-agent-ac7e74a95ed153787

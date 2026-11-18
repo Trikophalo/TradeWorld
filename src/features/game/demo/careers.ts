@@ -3,7 +3,6 @@ import { SKILL_BRANCHES, type SkillBranch } from "@/config/skills";
 import { DEMO_COMPANIES } from "@/lib/demo/market";
 import {
   aiPostingSpec,
-  aiSalaryCeiling,
   branchScores,
   emptyBranches,
   learnCheck,
@@ -14,12 +13,17 @@ import {
   oneSalaryCents,
   payForSkill,
   productivityBps,
+  profitShareBps,
   skillNode,
+  skillPayBps,
+  skillPayCeiling,
+  stockGrantChanceBps,
 } from "@/lib/sim/skills";
 import {
   GameError,
   type ApplyInput,
   type CareerTier,
+  type CloneState,
   type DailyRewardResult,
   type DailyRewardState,
   type Employer,
@@ -61,6 +65,8 @@ interface DemoApplication {
   message: string;
   createdAt: number;
   updatedAt: number;
+  /** Application of the clone (ADR-206). */
+  forClone?: boolean;
 }
 
 interface DemoJob {
@@ -102,6 +108,9 @@ export interface CareerState {
   workTask?: { task: WorkTask; correctIndex: number; done: boolean } | null;
   /** Last time the player was in the game (ADR-103). */
   lastActiveAt?: number;
+  /** The clone and its job (ADR-206). */
+  clone?: { createdAt: number } | null;
+  cloneJob?: DemoJob | null;
 }
 
 export function initialCareer(): CareerState {
@@ -170,7 +179,21 @@ export function tycoonAvatar(id: string): string {
   return pool[hash % pool.length]!.key;
 }
 
-const POSTINGS: { posting: Omit<JobPosting, "maxSalaryCentsPerHour" | "matchScore" | "eligible" | "myApplication"> }[] =
+type ComputedPostingKeys =
+  | "maxSalaryCentsPerHour"
+  | "matchScore"
+  | "eligible"
+  | "myApplication"
+  | "skillPayBps"
+  | "marketSalaryCentsPerHour"
+  | "profitShareBps"
+  | "stockGrantChanceBps"
+  | "postingProfitShareBps"
+  | "postingStockGrantBps"
+  | "ownCompany"
+  | "myCloneApplication";
+
+const POSTINGS: { posting: Omit<JobPosting, ComputedPostingKeys> }[] =
   // The first 15 companies keep their places (postings and saved demo jobs refer to them); later ones follow.
   [
     ...DEMO_COMPANIES.slice(0, 15).sort((a, b) => a.ticker.localeCompare(b.ticker)),
@@ -234,8 +257,29 @@ export function createCareerEngine(host: CareerHost) {
     return found;
   }
 
+  /** ADR-206: the AI ceiling follows the relevant branch scores and all learned skills. */
   function ceilingFor(posting: (typeof POSTINGS)[number]["posting"]): number {
-    return aiSalaryCeiling(posting.salaryCentsPerHour, matchScore(posting.required, scores()));
+    return skillPayCeiling(posting.salaryCentsPerHour, posting.required, scores(), st().learned.length);
+  }
+
+  /** True while an action runs for the clone (ADR-206). */
+  let cloning = false;
+
+  /** Runs a job action on the clone's job: the clone job sits in `job` meanwhile. */
+  function asHolder<T>(forClone: boolean, run: () => T): T {
+    if (!forClone) return run();
+    const s = st();
+    if (!s.clone) throw new GameError("clone_missing");
+    const own = s.job;
+    s.job = s.cloneJob ?? null;
+    cloning = true;
+    try {
+      return run();
+    } finally {
+      cloning = false;
+      s.cloneJob = s.job;
+      s.job = own;
+    }
   }
 
   function toApplication(a: DemoApplication): JobApplication {
@@ -258,6 +302,7 @@ export function createCareerEngine(host: CareerHost) {
       message: a.message || null,
       createdAt: iso(a.createdAt),
       updatedAt: iso(a.updatedAt),
+      forClone: a.forClone ?? false,
     };
   }
 
@@ -285,18 +330,20 @@ export function createCareerEngine(host: CareerHost) {
   /** Passive salary: up to the daily cap, paid for the time since the last payout. */
   function accrue(now = Date.now()) {
     const s = st();
-    const job = s.job;
     const lastActive = s.lastActiveAt ?? now;
-    if (job) {
+    // the own job and the clone's (ADR-206): the clone follows the owner's presence
+    for (const key of ["job", "cloneJob"] as const) {
+      const job = s[key];
+      if (!job) continue;
       // Away too long (ADR-103): pay up to the firing, then the job ends.
       const fireAt = lastActive + careers.inactivity.fireAfterHours * HOUR;
       if (now >= fireAt) {
         accrueUntil(job, fireAt, lastActive);
-        s.job = null;
+        s[key] = null;
       } else if (job.noticeEndsAt && now >= job.noticeEndsAt) {
         // The notice period is over: pay up to its end, then the job ends (ADR-063).
         accrueUntil(job, job.noticeEndsAt, lastActive);
-        s.job = null;
+        s[key] = null;
       } else accrueUntil(job, now, lastActive);
     }
     // The demo engine is only called while the player is in the game.
@@ -383,6 +430,24 @@ export function createCareerEngine(host: CareerHost) {
         payBps: 10_000,
         fireAt: iso((st().lastActiveAt ?? Date.now()) + careers.inactivity.fireAfterHours * HOUR),
       },
+      isClone: cloning,
+      holderName: cloning ? `Klon von ${host.nickname()}` : host.nickname(),
+      skillPayBps: skillPayBps(posting.required, scores(), st().learned.length),
+      profitShareBps: profitShareBps(tier),
+      stockGrantChanceBps: stockGrantChanceBps(tier),
+      // the demo has no company profits or share grants
+      rewards: { profitShareCents: 0, stockGrants: 0, stockGrantCents: 0, sharesE6: 0 },
+    };
+  }
+
+  function cloneState(): CloneState {
+    const s = st();
+    return {
+      minLevel: jobs.clone.minLevel,
+      feeCents: jobs.clone.feeCents,
+      level: host.level(),
+      clone: s.clone ? { name: `Klon von ${host.nickname()}`, createdAt: iso(s.clone.createdAt) } : null,
+      job: s.clone ? asHolder(true, () => myJobNow()) : null,
     };
   }
 
@@ -501,7 +566,28 @@ export function createCareerEngine(host: CareerHost) {
     | "playerCard"
     | "workTask"
     | "submitWorkTask"
+    | "clone"
+    | "createClone"
   > = {
+    async clone() {
+      accrue();
+      return cloneState();
+    },
+
+    async createClone(requestId) {
+      return host.idempotent(requestId, () => {
+        const s = st();
+        if (host.level() < jobs.clone.minLevel) throw new GameError("clone_level_too_low");
+        if (s.clone) throw new GameError("clone_exists");
+        if (host.cashCents() < jobs.clone.feeCents) throw new GameError("insufficient_funds");
+        host.addCash(-jobs.clone.feeCents);
+        s.clone = { createdAt: Date.now() };
+        s.cloneJob = null;
+        host.persist();
+        return cloneState();
+      });
+    },
+
     async setAvatar(requestId, avatarKey) {
       return host.idempotent(requestId, () => {
         const needed = avatarLevel(avatarKey);
@@ -576,18 +662,31 @@ export function createCareerEngine(host: CareerHost) {
       const level = host.level();
       return {
         postings: POSTINGS.map(({ posting }) => {
-          const mine = st()
-            .applications.filter((a) => a.postingId === posting.id)
-            .sort((a, b) => b.createdAt - a.createdAt)[0];
+          const latest = (clone: boolean) =>
+            st()
+              .applications.filter((a) => a.postingId === posting.id && (a.forClone ?? false) === clone)
+              .sort((a, b) => b.createdAt - a.createdAt)[0];
+          const mine = latest(false);
+          const cloneApp = latest(true);
+          const pay = skillPayBps(posting.required, current, st().learned.length);
           return {
             ...posting,
             maxSalaryCentsPerHour: ceilingFor(posting),
             matchScore: matchScore(posting.required, current),
             eligible: level >= posting.minLevel && meetsRequirements(posting.required, current),
             myApplication: mine ? { id: mine.id, status: mine.status } : null,
+            skillPayBps: pay,
+            marketSalaryCentsPerHour: Math.round((posting.salaryCentsPerHour * pay) / 10_000),
+            profitShareBps: profitShareBps(posting.tier),
+            stockGrantChanceBps: stockGrantChanceBps(posting.tier),
+            postingProfitShareBps: 0,
+            postingStockGrantBps: 0,
+            ownCompany: false,
+            myCloneApplication: cloneApp ? { id: cloneApp.id, status: cloneApp.status } : null,
           };
         }),
         nextRefreshAt: null,
+        hasClone: Boolean(st().clone),
       };
     },
 
@@ -595,16 +694,16 @@ export function createCareerEngine(host: CareerHost) {
       return host.idempotent(input.requestId, () => {
         sweep();
         const posting = postingById(input.postingId);
+        const forClone = input.forClone ?? false;
+        const s = st();
+        if (forClone && !s.clone) throw new GameError("clone_missing");
         if (host.level() < posting.minLevel) throw new GameError("job_level_too_low");
         if (!meetsRequirements(posting.required, scores())) throw new GameError("job_skills_missing");
-        const s = st();
-        if (
-          s.applications.some((a) => a.postingId === posting.id && (a.status === "pending" || a.status === "offered"))
-        )
+        const holderApps = s.applications.filter((a) => (a.forClone ?? false) === forClone);
+        if (holderApps.some((a) => a.postingId === posting.id && (a.status === "pending" || a.status === "offered")))
           throw new GameError("application_exists");
         if (
-          s.applications.filter((a) => a.status === "pending" || a.status === "offered").length >=
-          jobs.maxOpenApplications
+          holderApps.filter((a) => a.status === "pending" || a.status === "offered").length >= jobs.maxOpenApplications
         )
           throw new GameError("application_limit");
         if (input.salaryWishCentsPerHour <= 0) throw new GameError("invalid_argument");
@@ -619,6 +718,7 @@ export function createCareerEngine(host: CareerHost) {
           message: input.message.slice(0, jobs.applicationMessageMaxLength),
           createdAt: now,
           updatedAt: now,
+          forClone,
         };
         aiOffer(application, now);
         s.applications.unshift(application);
@@ -655,40 +755,51 @@ export function createCareerEngine(host: CareerHost) {
       });
     },
 
-    async signContract(requestId, applicationId, signature) {
+    async signContract(requestId, applicationId, signature, forClone = false) {
       return host.idempotent(requestId, () => {
         sweep();
         const s = st();
         const a = s.applications.find((x) => x.id === applicationId);
-        if (!a) throw new GameError("application_not_found");
+        if (!a || (a.forClone ?? false) !== forClone) throw new GameError("application_not_found");
         if (a.status === "expired") throw new GameError("offer_expired");
         if (a.status !== "offered" || a.offer === null) throw new GameError("application_not_offered");
-        if (s.job) throw new GameError("job_active_exists");
-        if (host.ownsCompany()) throw new GameError("owns_company");
-        const now = Date.now();
         const posting = postingById(a.postingId);
-        a.status = "signed";
-        a.updatedAt = now;
-        for (const other of s.applications) {
-          if (other !== a && (other.status === "pending" || other.status === "offered")) {
-            other.status = "closed";
-            other.updatedAt = now;
+        // ADR-206: owner and clone never at the same company
+        const otherJob = forClone ? s.job : (s.cloneJob ?? null);
+        if (otherJob && postingById(otherJob.postingId).company.id === posting.company.id)
+          throw new GameError("clone_same_company");
+        return asHolder(forClone, () => {
+          if (s.job) throw new GameError("job_active_exists");
+          // founders work in their own company; the clone may work elsewhere (ADR-206)
+          if (!forClone && host.ownsCompany()) throw new GameError("owns_company");
+          const now = Date.now();
+          a.status = "signed";
+          a.updatedAt = now;
+          for (const other of s.applications) {
+            if (
+              other !== a &&
+              (other.forClone ?? false) === forClone &&
+              (other.status === "pending" || other.status === "offered")
+            ) {
+              other.status = "closed";
+              other.updatedAt = now;
+            }
           }
-        }
-        s.job = {
-          id: `job-${++s.seq}`,
-          postingId: posting.id,
-          salary: a.offer,
-          startedAt: now,
-          lastPaidAt: now,
-          payDay: host.day(now),
-          paidMinutesToday: 0,
-          earnedTotal: 0,
-          scoreAtRaise: matchScore(posting.required, scores()),
-          lastRaiseAt: null,
-          signature: signature.slice(0, 8000),
-        };
-        return myJobNow()!;
+          s.job = {
+            id: `job-${++s.seq}`,
+            postingId: posting.id,
+            salary: a.offer ?? 0,
+            startedAt: now,
+            lastPaidAt: now,
+            payDay: host.day(now),
+            paidMinutesToday: 0,
+            earnedTotal: 0,
+            scoreAtRaise: matchScore(posting.required, scores()),
+            lastRaiseAt: null,
+            signature: signature.slice(0, 8000),
+          };
+          return myJobNow()!;
+        });
       });
     },
 
@@ -697,32 +808,36 @@ export function createCareerEngine(host: CareerHost) {
       return myJobNow();
     },
 
-    async quitJob(requestId, immediate = false) {
+    async quitJob(requestId, immediate = false, forClone = false) {
       return host.idempotent(requestId, () => {
         accrue();
-        const s = st();
-        if (!s.job) throw new GameError("no_active_job");
-        if (immediate) {
-          // At once for a day's wage, paid to the company (ADR-066).
-          const cost = s.job.salary * jobs.quitNowCostHours;
-          if (host.cashCents() < cost) throw new GameError("insufficient_funds");
-          host.addCash(-cost);
-          s.job = null;
-          return { noticeEndsAt: null, ended: true, paidCents: cost };
-        }
-        s.job.noticeEndsAt ??= Date.now() + jobs.quitNoticeHours * HOUR;
-        return { noticeEndsAt: iso(s.job.noticeEndsAt), ended: false, paidCents: 0 };
+        return asHolder(forClone, () => {
+          const s = st();
+          if (!s.job) throw new GameError("no_active_job");
+          if (immediate) {
+            // At once for a day's wage, paid to the company (ADR-066).
+            const cost = s.job.salary * jobs.quitNowCostHours;
+            if (host.cashCents() < cost) throw new GameError("insufficient_funds");
+            host.addCash(-cost);
+            s.job = null;
+            return { noticeEndsAt: null, ended: true, paidCents: cost };
+          }
+          s.job.noticeEndsAt ??= Date.now() + jobs.quitNoticeHours * HOUR;
+          return { noticeEndsAt: iso(s.job.noticeEndsAt), ended: false, paidCents: 0 };
+        });
       });
     },
 
-    async cancelQuit(requestId) {
+    async cancelQuit(requestId, forClone = false) {
       return host.idempotent(requestId, () => {
         accrue();
-        const job = st().job;
-        if (!job) throw new GameError("no_active_job");
-        if (!job.noticeEndsAt) throw new GameError("invalid_argument");
-        job.noticeEndsAt = null;
-        return myJobNow()!;
+        return asHolder(forClone, () => {
+          const job = st().job;
+          if (!job) throw new GameError("no_active_job");
+          if (!job.noticeEndsAt) throw new GameError("invalid_argument");
+          job.noticeEndsAt = null;
+          return myJobNow()!;
+        });
       });
     },
 
@@ -744,54 +859,58 @@ export function createCareerEngine(host: CareerHost) {
       };
     },
 
-    async requestPromotion(requestId): Promise<PromotionResult> {
+    async requestPromotion(requestId, forClone = false): Promise<PromotionResult> {
       return host.idempotent(requestId, () => {
         accrue();
-        const job = st().job;
-        if (!job) throw new GameError("no_active_job");
-        const promotion = promotionNow(job);
-        if (!promotion.nextTier || !promotion.ready) throw new GameError("promotion_not_ready");
-        if (promotion.retryAt) throw new GameError("promotion_too_soon");
-        const chance = promotion.chanceBps ?? 0;
-        // The demo has no server dice; a uniform draw is fine for a local preview.
-        if (Math.random() * 10_000 >= chance) {
-          job.promotionRetryAt = Date.now() + careers.promotion.retryHours * HOUR;
+        return asHolder(forClone, () => {
+          const job = st().job;
+          if (!job) throw new GameError("no_active_job");
+          const promotion = promotionNow(job);
+          if (!promotion.nextTier || !promotion.ready) throw new GameError("promotion_not_ready");
+          if (promotion.retryAt) throw new GameError("promotion_too_soon");
+          const chance = promotion.chanceBps ?? 0;
+          // The demo has no server dice; a uniform draw is fine for a local preview.
+          if (Math.random() * 10_000 >= chance) {
+            job.promotionRetryAt = Date.now() + careers.promotion.retryHours * HOUR;
+            return {
+              status: "declined" as const,
+              tier: job.tier ?? postingById(job.postingId).tier,
+              salaryCentsPerHour: job.salary,
+              retryAt: iso(job.promotionRetryAt),
+              chanceBps: chance,
+            };
+          }
+          job.tier = promotion.nextTier;
+          job.salary = promotion.nextSalaryCentsPerHour ?? job.salary;
+          job.rankMinutes = 0;
+          job.promotionRetryAt = null;
+          job.scoreAtRaise = matchScore(postingById(job.postingId).required, scores());
+          host.feedPost?.("promoted", { tier: job.tier, company: postingById(job.postingId).company.name });
           return {
-            status: "declined" as const,
-            tier: job.tier ?? postingById(job.postingId).tier,
+            status: "promoted" as const,
+            tier: job.tier,
             salaryCentsPerHour: job.salary,
-            retryAt: iso(job.promotionRetryAt),
+            retryAt: null,
             chanceBps: chance,
           };
-        }
-        job.tier = promotion.nextTier;
-        job.salary = promotion.nextSalaryCentsPerHour ?? job.salary;
-        job.rankMinutes = 0;
-        job.promotionRetryAt = null;
-        job.scoreAtRaise = matchScore(postingById(job.postingId).required, scores());
-        host.feedPost?.("promoted", { tier: job.tier, company: postingById(job.postingId).company.name });
-        return {
-          status: "promoted" as const,
-          tier: job.tier,
-          salaryCentsPerHour: job.salary,
-          retryAt: null,
-          chanceBps: chance,
-        };
+        });
       });
     },
 
-    async requestRaise(requestId, raiseBps) {
+    async requestRaise(requestId, raiseBps, forClone = false) {
       return host.idempotent(requestId, () => {
         accrue();
-        const job = st().job;
-        const info = myJobNow();
-        if (!job || !info) throw new GameError("no_active_job");
-        if (info.raiseAvailableAt) throw new GameError("raise_too_soon");
-        if (raiseBps <= 0 || raiseBps > info.raiseMaxBps) throw new GameError("raise_too_high");
-        job.salary = Math.round((job.salary * (10_000 + raiseBps)) / 10_000);
-        job.lastRaiseAt = Date.now();
-        job.scoreAtRaise = matchScore(postingById(job.postingId).required, scores());
-        return { status: "accepted" as const, salaryCentsPerHour: job.salary };
+        return asHolder(forClone, () => {
+          const job = st().job;
+          const info = myJobNow();
+          if (!job || !info) throw new GameError("no_active_job");
+          if (info.raiseAvailableAt) throw new GameError("raise_too_soon");
+          if (raiseBps <= 0 || raiseBps > info.raiseMaxBps) throw new GameError("raise_too_high");
+          job.salary = Math.round((job.salary * (10_000 + raiseBps)) / 10_000);
+          job.lastRaiseAt = Date.now();
+          job.scoreAtRaise = matchScore(postingById(job.postingId).required, scores());
+          return { status: "accepted" as const, salaryCentsPerHour: job.salary };
+        });
       });
     },
 
@@ -834,6 +953,7 @@ export function createCareerEngine(host: CareerHost) {
       if (nickname.toLowerCase() !== host.nickname().toLowerCase()) throw new GameError("player_not_found");
       const s = st();
       const job = myJobNow();
+      const cloneJob = s.clone ? asHolder(true, () => myJobNow()) : null;
       return {
         nickname: host.nickname(),
         tag: host.tag(),
@@ -856,6 +976,15 @@ export function createCareerEngine(host: CareerHost) {
               title: job.title,
               tier: job.tier,
               since: job.startedAt,
+            }
+          : null,
+        cloneJob: cloneJob
+          ? {
+              companyName: cloneJob.company.name,
+              titleKey: cloneJob.titleKey,
+              title: cloneJob.title,
+              tier: cloneJob.tier,
+              since: cloneJob.startedAt,
             }
           : null,
         company: host.ownCompany(),

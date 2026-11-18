@@ -377,6 +377,7 @@ const applicantSchema = z.object({
 const memberSchema = z.object({
   player_job_id: z.string(),
   nickname: z.string(),
+  is_clone: z.boolean().default(false),
   avatar_key: z.string(),
   title: z.string(),
   salary_cents_per_hour: num,
@@ -455,6 +456,7 @@ export const COMPANY_RPC_SCHEMAS = {
   }),
   get_company_postings: z.object({ postings: z.array(postingSchema) }),
   create_job_posting: z.object({ id: z.string() }).passthrough(),
+  set_job_posting_perks: z.object({ id: z.string() }).passthrough(),
   close_job_posting: z.object({ id: z.string(), status: z.literal("closed") }),
   get_company_applications: z.object({
     applications: z.array(applicationSchema.extend({ applicant: applicantSchema })),
@@ -953,7 +955,7 @@ export const liveCompanyEngine: CompanyEngine = {
   },
 
   async createJobPosting(input) {
-    await rpc(
+    const created = await rpc(
       "create_job_posting",
       {
         p_request_id: input.requestId,
@@ -967,6 +969,19 @@ export const liveCompanyEngine: CompanyEngine = {
       },
       S.create_job_posting,
     );
+    // ADR-206: profit share and employee shares on top, set right after creating the posting
+    if ((input.profitShareBps ?? 0) > 0 || (input.stockGrantBps ?? 0) > 0) {
+      await rpc(
+        "set_job_posting_perks",
+        {
+          p_request_id: crypto.randomUUID(),
+          p_posting_id: created.id,
+          p_profit_share_bps: input.profitShareBps ?? 0,
+          p_stock_grant_bps: input.stockGrantBps ?? 0,
+        },
+        S.set_job_posting_perks,
+      );
+    }
   },
 
   async closeJobPosting(requestId, postingId) {
@@ -1006,6 +1021,7 @@ export const liveCompanyEngine: CompanyEngine = {
     return r.members.map((m) => ({
       playerJobId: m.player_job_id,
       nickname: m.nickname,
+      isClone: m.is_clone,
       avatarKey: m.avatar_key,
       title: m.title,
       salaryCentsPerHour: m.salary_cents_per_hour,

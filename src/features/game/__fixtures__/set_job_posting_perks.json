@@ -1,0 +1,17 @@
+{
+  "id": "2a4b77be-2826-4984-99b0-38f1ae9e1464",
+  "tier": "senior",
+  "title": "Werkstudium Klone",
+  "company": {
+    "id": "6436b2dd-2846-405c-abbb-499ff27f8e29",
+    "logo": null,
+    "name": "Fixture Werke",
+    "color": "#336699",
+    "is_ai": false,
+    "sector": "tech",
+    "ticker": null
+  },
+  "required": [{ "branch": "it", "min_score": 0 }],
+  "title_key": null,
+  "required_skills": []
+}

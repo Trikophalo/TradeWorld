@@ -4848,3 +4848,72 @@ im Mittel 20,3 statt 22,1 Mio. € wert. Der Erwartungswert zu Startpreisen blei
 er sich nur, wenn Diamond und Uranium sich seit dem Start unterschiedlich bewegt haben, um 3.584,25 € × (d − v)
 (BALANCING.md). Angebote von Spielern für Diamond sind nach der Umstellung eher günstig, für Uranium eher teuer; das
 regelt der Markt. Einzelwerte in `docs/BALANCING.md`.
+
+## ADR-206: Klon mit eigenem Job, Lohn nach Skills, Gewinnbeteiligung und Mitarbeiteraktien — `Annahme`
+
+**Kontext.** Der Eigentümer wünscht: Ab Level 20 kann man einen Klon von sich erschaffen, der sich bei anderen Firmen
+bewirbt, damit man neben der eigenen Firma woanders arbeiten kann. Jobs sollen bei vielen Skills deutlich besser
+zahlen. Ab Senior gibt es einen kleinen Anteil am Gewinn, mit dem Rang steigend bis höchstens 5 %, und für gute Arbeit
+ab und zu Aktien der Firma. Die Nachricht brach mitten im Satz ab („Passe deine Stellenanzeigen so an, dass du …“);
+angenommen ist: Stellenanzeigen zeigen Skill-Passung, erwarteten Lohn, Gewinnbeteiligung und Aktien-Chance, damit man
+vergleichen kann, und Gründer können ihre Anzeigen damit zuschneiden. Nicht zu verwechseln mit den „Talenten“
+(NPC-Angestellte der Firmen, eigener ADR): Hier geht es um den Spieler, der bei Firmen arbeitet.
+
+**Entscheidung.**
+
+- **Klon** (`jobs.clone`): ab Level 20, einmal pro Spieler, kostet einmalig 25 000 € (an die Staatskasse, Ledger).
+  Der Klon hat einen eigenen Job-Platz: eine zweite Zeile in `player_jobs` mit `is_clone = true` und der `player_id`
+  des Besitzers. Ein aktiver Job je Spieler **und** Halter (eindeutiger Index `player_jobs_active_holder_uq`).
+  - Er bewirbt sich bei KI- und Spielerfirmen über dieselben Abläufe: `clone_apply_for_job`, `clone_sign_contract`,
+    `clone_quit_job` (mit Frist oder sofort), `clone_cancel_quit`, `clone_request_raise`, `clone_request_promotion`.
+    Die Wrapper setzen die Transaktions-Einstellung `nexa.acting_clone`, die Job-RPCs lesen `job_acting_clone()` und
+    arbeiten dann auf dem Job des Klons. So gibt es keine zweite Kopie der Regeln.
+  - Nie in der eigenen Firma (`clone_own_company`), nie in derselben Firma wie der Spieler selbst
+    (`clone_same_company`). Gründer dürfen über den Klon also eine Firma führen **und** einen Job haben: Die Vollzeitregel
+    (ADR-066) und der halbe Gründer-Beitrag bei einem Nebenjob gelten nur für den eigenen Job, nicht für den des Klons.
+  - Er arbeitet automatisch wie jeder Job (ADR-064). Lohn, Gewinnbeteiligung und Aktien gehen an den Besitzer. Er hat
+    seine eigenen 8 bezahlten Stunden am Tag, sammelt Erfahrung, Rang-Stunden, XP und Bereichspunkte wie ein Job und
+    richtet sich nach der Anwesenheit des Besitzers (ADR-103): Wer lange weg ist, verliert Lohn und nach fünf Tagen
+    auch den Job des Klons. Im Team erscheint er als „Klon von …“, ebenso auf der Visitenkarte und im Job-Tab.
+  - Ein Kontoneustart behält den Klon; nutzbar ist er erst wieder ab Level 20 (kündigen geht immer).
+- **Lohn nach Skills** (`jobs.skillPay`): Faktor = 1 + 3 % je Punkt in den geforderten Bereichen (je Bereich bis 40
+  gezählt) + 0,5 % je gelerntem Skill insgesamt, höchstens das Dreifache. Ersetzt die alte KI-Lohndecke (1 + 3 % je
+  Treffer-Punkt, der Treffer-Score endet beim Doppelten der Anforderung, höchstens ×1,5). Spielerfirmen verhandeln
+  weiter frei; das Jobportal zeigt ihnen den „Marktwert“ (Stufenlohn × Faktor) als Vergleich.
+
+  | Beispiel (Grundlohn)                                      | vorher              | nachher                  |
+  | --------------------------------------------------------- | ------------------- | ------------------------ |
+  | Praktikum (150 €), 3 Skills, Score 0                      | 150 €/Std.          | 152,25 €/Std.            |
+  | Senior IT (700 €), IT 12, 15 Skills                       | 952 €/Std. (×1,36)  | 1 004,50 €/Std. (×1,435) |
+  | Senior IT (700 €), IT 30, 40 Skills                       | 952 €/Std. (×1,36)  | 1 470 €/Std. (×2,1)      |
+  | Teamleitung IT (1 300 €), IT 40, Management 20, 60 Skills | 1 950 €/Std. (×1,5) | 3 900 €/Std. (×3)        |
+
+- **Gewinnbeteiligung** (`jobs.rewards`): Senior 0,5 %, Teamleitung 2 %, C-Level 5 % vom Gewinn des Arbeitgebers,
+  darunter nichts. Gründer können in einer Anzeige bis zu 3 % drauflegen (`set_job_posting_perks`), zusammen höchstens
+  5 %. Gezahlt wird nur bei Gewinn, aus der Firmenkasse an den Spieler (Ledger, Summe 0), nie mehr als die Kasse hat.
+  - Spielerfirmen: nach jeder abgerechneten Stunde (Trigger auf `player_company_hours`), nach der CEO-Auszahlung. Alle
+    Beteiligungen einer Stunde zusammen höchstens 25 % des Stundengewinns (gleichmäßig gekürzt).
+    Beispiel Garage mit 818,75 € Stundengewinn: Senior 4,09 €, C-Level 40,94 € je Stunde.
+  - KI-Firmen: mit jeder Lohnzahlung (Trigger auf `salary_payouts`). Der Gewinn eines Konzerns ist riesig, darum zählt
+    der Gewinn einer Abteilung von 50 Leuten: Jahresgewinn / 4 / Quartalsstunden × 50 / Mitarbeiter, höchstens die
+    Hälfte des Lohns. Beispiel Vulcan Energy (470 Mio. € Jahresgewinn, 21 000 Leute): 46 600 € Abteilungsgewinn je
+    Stunde, Senior 233 €/Std., C-Level bis 2 331 €/Std. (gedeckelt auf den halben Lohn).
+- **Mitarbeiteraktien**: Chance je bezahlter Stunde guter Arbeit (der Spieler war da, die Firma macht Gewinn):
+  Junior 1 %, Senior 3 %, Teamleitung 5 %, C-Level 8 %, in Anzeigen bis zu 5 % mehr. Der Wurf ist deterministisch
+  (Hash aus Job und Stunde), dieselbe Stunde würfelt nie zweimal. Ein Paket ist 4 Stunden Vertragslohn wert und wird von
+  der Firma bezahlt.
+  - Börsennotiert (KI-Firmen und Spieler-AGs): ganze Aktien aus dem freien Bestand (ADR-153) zum letzten Kurs; die Firma
+    zahlt den Gegenwert an den Markt, dem die freien Aktien gehören. Die Zahl der Aktien wächst dadurch nie, gehaltene
+    Aktien bleiben unter `shares_outstanding`.
+  - Nicht notiert (oder nichts frei): „Phantomaktien“, der Wert wird bar ausgezahlt (`stock_grant_cash`).
+  - Erwartungswert Senior: 3 % × 4 Stunden = + 12 % auf den Lohn.
+- **Stellenanzeigen**: Das Jobportal zeigt für jede Stelle den Lohn-Aufschlag durch Skills, bei Spielerfirmen den
+  Marktwert, die Gewinnbeteiligung, die Aktien-Chance und ob die Firma etwas drauflegt. Mit Klon gibt es oben den
+  Umschalter „Bewerben für: Mich / Meinen Klon“; Bewerbungen und Verträge gelten je Halter.
+
+**Folgen.** Ab Level 20 kann ein Spieler zwei Löhne beziehen; das ist gewollt und kostet einmal 25 000 €. Gut
+ausgebildete Spieler verdienen bei KI-Firmen bis zum Dreifachen des Stufenlohns, Gewinnbeteiligung und Aktien kommen
+dazu. Spielerfirmen zahlen Beteiligungen aus ihrem Gewinn; die Quartalsberichte (aus `player_company_hours`) zeigen sie
+nicht als Kosten. Die Funktionen `job_state`, `sign_contract`, `apply_for_job`, `get_job_board`, `quit_job`,
+`cancel_quit`, `request_raise`, `request_promotion`, `get_employer`, `company_full_time_check`,
+`player_company_team`, `get_player_card` und einige Leser sind in Migration 9810 neu geschrieben (Stand 9800).
