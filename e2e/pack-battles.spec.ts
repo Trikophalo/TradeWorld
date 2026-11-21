@@ -70,6 +70,8 @@ async function preparePlayer(page: Page, theme: "dark" | "light" = "dark", extra
 }
 
 const SHOTS = process.env.NEXA_SHOT_DIR;
+/** packBattle.maxPerSet (src/config/nexamon-rules.ts). */
+const BALANCE_PER_SET = 10;
 
 test("presence strip, a pack battle against a demo friend and the live spectator view", async ({ page }, info) => {
   test.setTimeout(120_000);
@@ -114,16 +116,29 @@ test("a four-player pack battle over three packs (ADR-192)", async ({ page }, in
   await expect(page.getByTestId("nexamon-lobby")).toBeVisible();
   await page.getByTestId("battle-create").click();
   await page.getByRole("radio", { name: "4 Spieler" }).click();
+  // per set a count: the packs of a set stand together as one group of the lineup
   await page.getByTestId("challenge-set-super_apex").click();
   await page.getByTestId("challenge-set-mystic_energy").click();
-  await expect(page.getByTestId("lineup-item")).toHaveCount(3);
-  // reorder and remove: the lineup keeps its order, the total follows it
+  await expect(page.getByTestId("challenge-set-count-mystic_energy")).toHaveAttribute("data-count", "2");
+  await expect(page.getByTestId("lineup-item")).toHaveCount(2);
+  await expect(page.getByTestId("lineup-item").first()).toHaveAttribute("data-count", "2");
+  // the slider picks up to ten packs of a set at once
+  const slider = page.getByTestId("challenge-set-row-mystic_energy").getByRole("slider");
+  await slider.focus();
+  await page.keyboard.press("End");
+  await expect(page.getByTestId("challenge-set-count-mystic_energy")).toHaveAttribute(
+    "data-count",
+    String(BALANCE_PER_SET),
+  );
+  // reorder and remove whole groups: the lineup keeps its order, the total follows it
   await page.getByTestId("lineup-up").nth(1).click();
   await expect(page.getByTestId("lineup-item").first()).toHaveAttribute("data-set", "super_apex");
-  await page.getByTestId("lineup-remove").nth(2).click();
-  await expect(page.getByTestId("lineup-item")).toHaveCount(2);
+  await page.getByTestId("lineup-remove").nth(1).click();
+  await expect(page.getByTestId("lineup-item")).toHaveCount(1);
   await page.getByTestId("challenge-set-mystic_energy").click();
-  await expect(page.getByTestId("lineup-item")).toHaveCount(3);
+  await page.getByTestId("challenge-set-mystic_energy").click();
+  await expect(page.getByTestId("lineup-item")).toHaveCount(2);
+  await expect(page.getByTestId("lineup-item").nth(1)).toHaveAttribute("data-count", "2");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-create-${info.project.name}.png` });
   await page.getByTestId("challenge-send").click();
   const view = page.getByTestId("battle-view");
@@ -133,6 +148,17 @@ test("a four-player pack battle over three packs (ADR-192)", async ({ page }, in
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-lobby-${info.project.name}.png` });
   await expect(view).toHaveAttribute("data-phase", "revealing", { timeout: 30_000 });
   await expect(page.getByTestId("battle-seat")).toHaveCount(4);
+  // the fifth card of the first pack shows before the next pack tears (owner bug: it was never seen)
+  const first = page.getByTestId("battle-seat").first();
+  await expect
+    .poll(async () => `${await view.getAttribute("data-phase")}:${await first.getAttribute("data-shown")}`, {
+      timeout: 30_000,
+      intervals: [100],
+    })
+    .toBe("revealing:5");
+  // the entering card (the fourth may still be leaving) with the reveal of the last card of a pack
+  await expect(first.getByTestId("battle-seat-spotlight").last()).toBeVisible();
+  await expect(first.getByTestId("battle-reveal-fx").last()).toBeVisible();
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/multi-battle-${info.project.name}.png` });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

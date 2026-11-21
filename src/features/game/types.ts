@@ -2702,10 +2702,12 @@ export class GameError extends Error {
   /**
    * @param detail What the server said, for errors without a message of their own ("unknown"): shown to the player
    *   instead of a guess about the connection.
+   * @param retryAfterSeconds For rate_limited: how long until the server takes the action again (ADR-182 Nachtrag).
    */
   constructor(
     public readonly key: GameErrorKey,
     public readonly detail?: string,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(key);
     this.name = "GameError";

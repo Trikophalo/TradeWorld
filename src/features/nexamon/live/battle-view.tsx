@@ -14,14 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { NexamonBattle, NexamonBattleSeat, NexamonShownPull } from "@/features/game/pack-battle-types";
 import { formatMoney } from "@/lib/format";
 import { DURATION, EASE, SPRING } from "@/lib/motion";
-import {
-  multiShownCards,
-  multiTwistAt,
-  multiTwistsShown,
-  rarityRank,
-  twistCycles,
-  twistScores,
-} from "@/lib/sim/nexamon-battle";
+import { rarityRank, twistCycles, twistScores } from "@/lib/sim/nexamon-battle";
 import { playSound, type SoundName } from "@/lib/sound";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
@@ -32,6 +25,7 @@ import { CardThumb, NexamonCardBack, NexamonCardFace } from "../components/card-
 import { NexamonPack } from "../components/pack";
 import { useNexamonBattle, useServerClock } from "./hooks";
 import { BattleLobby, BattleModeBadges } from "./battle-lobby";
+import { battlePhase, type BattlePhase } from "./battle-phase";
 import { battleRevealTier } from "./battle-reveal";
 import { BattleRevealFx } from "./battle-reveal-fx";
 import { Reactions } from "./reactions";
@@ -50,38 +44,7 @@ const REVEAL_SOUND: Record<NexamonRarity, SoundName> = {
   uranium: "pullUranium",
 };
 
-export type BattlePhase = "waiting" | "countdown" | "tearing" | "revealing" | "twisting" | "decided";
-
-/**
- * Where the shared clock stands (ADR-172/192): before the start, a pack tearing, revealing card n of the lineup,
- * (ADR-205, Twist) the twist after a pack, decided. `pack` is the pack of the lineup on screen (1 = the first);
- * `twists` how many twists apply to the scores (the clock reached them and the server sent them).
- */
-export function battlePhase(b: NexamonBattle, now: number | null) {
-  const total = b.packs.length * cfg.packSize;
-  const at = (phase: BattlePhase, shown: number, pack: number, twists = 0, countdown = 0) => ({
-    phase,
-    shown,
-    countdown,
-    pack,
-    twists,
-  });
-  if (!b.startsAt || now === null) return at("waiting", 0, 1);
-  const startsAt = Date.parse(b.startsAt);
-  if (now < startsAt) return at("countdown", 0, 1, 0, Math.ceil((startsAt - now) / 1000));
-  const known = Math.min(...b.seats.map((s) => s.cards.length));
-  const shown = Math.min(multiShownCards(startsAt, now, b.packs.length, cfg, b.twistMs), known);
-  const clockTwists = b.twist ? multiTwistsShown(startsAt, now, b.packs.length, cfg, b.twistMs) : 0;
-  const twists = Math.min(clockTwists, b.twists.length);
-  const decided = b.winnerSeat !== null && b.decideAt !== null && now >= Date.parse(b.decideAt) && shown >= total;
-  if (decided) return at("decided", shown, b.packs.length, twists);
-  // ADR-205: the twist after a pack plays for twistMs before the next pack tears
-  if (clockTwists > 0 && now < multiTwistAt(startsAt, clockTwists, cfg, b.twistMs) + b.twistMs)
-    return at("twisting", shown, clockTwists, twists);
-  // between two packs (and before the first card) the next pack tears
-  if (shown % cfg.packSize === 0 && shown < total) return at("tearing", shown, shown / cfg.packSize + 1, twists);
-  return at("revealing", shown, Math.floor((shown - 1) / cfg.packSize) + 1, twists);
-}
+export { battlePhase, type BattlePhase } from "./battle-phase";
 
 export interface BattleViewProps {
   battleId: string | null;

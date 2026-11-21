@@ -12,6 +12,13 @@ export function serverDetail(fn: string, error: { message?: string; code?: strin
   return [fn, error.code, text].filter(Boolean).join(" · ");
 }
 
+/** The wait a rate_limited error carries (detail "retry_after=<s>", api_rate_limited), else undefined. */
+export function retryAfterSeconds(details: string | null | undefined): number | undefined {
+  const m = /retry_after=(\d+)/.exec(details ?? "");
+  const s = m ? Number(m[1]) : NaN;
+  return Number.isFinite(s) && s > 0 ? s : undefined;
+}
+
 /** Calls a Postgres RPC and validates the answer, so a server change shows up as a clear error. */
 export async function rpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
   const supabase = getSupabaseBrowserClient();
@@ -21,7 +28,11 @@ export async function rpc<T>(fn: string, args: Record<string, unknown>, schema: 
     if (process.env.NODE_ENV !== "production") console.warn(`[rpc ${fn}]`, error);
     const key = toErrorKey(error.message);
     // An error the client has no sentence for (a database error, a timeout, a missing function): keep its text.
-    throw new GameError(key, key === "unknown" ? serverDetail(fn, error) : undefined);
+    throw new GameError(
+      key,
+      key === "unknown" ? serverDetail(fn, error) : undefined,
+      key === "rate_limited" ? retryAfterSeconds((error as { details?: string | null }).details) : undefined,
+    );
   }
   const parsed = schema.safeParse(data);
   if (!parsed.success) {

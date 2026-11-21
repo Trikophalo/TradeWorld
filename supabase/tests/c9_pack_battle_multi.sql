@@ -72,8 +72,8 @@ select tests.throws_key($$select public.create_nexamon_pack_battle(gen_random_uu
   'invalid_argument', 'create: at least two players');
 select tests.throws_key($$select public.create_nexamon_pack_battle(gen_random_uuid(), array[]::text[], 2)$$,
   'invalid_argument', 'create: at least one pack');
-select tests.throws_key($$select public.create_nexamon_pack_battle(gen_random_uuid(), array_fill('mystic_energy'::text, array[11]), 2)$$,
-  'invalid_argument', 'create: at most packBattle.maxPacks (10) packs');
+select tests.throws_key($$select public.create_nexamon_pack_battle(gen_random_uuid(), array_fill('mystic_energy'::text, array[31]), 2)$$,
+  'invalid_argument', 'create: at most packBattle.maxPacks (30) packs');
 select tests.throws_key($$select public.create_nexamon_pack_battle(gen_random_uuid(), array['mystic_energy', 'nope'], 2)$$,
   'nexamon_unknown', 'create: every pack of a known set');
 select tests.throws_key($$select public.create_nexamon_pack_battle(gen_random_uuid(), array['mystic_energy'], 2, array['Mb_Emil'])$$,

@@ -4,6 +4,11 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Pack Battles und Booster ohne Ärger: Die fünfte Karte jedes Packs bleibt im Pack Battle jetzt sichtbar, bevor das
+  nächste Pack aufreißt. Beim Erstellen wählst du pro Set einfach 0 bis 10 Packs mit Zähler oder Schieberegler, bis zu
+  30 Packs pro Battle, und legst die Reihenfolge der Sets fest. Und zehn Booster auf einmal kannst du jetzt mehrmals
+  hintereinander kaufen; greift doch einmal ein Limit, steht da, wie viele Sekunden du warten musst.
+
 - Mehr Platz und mehr Klasse: Unter „Wachstum & Ausbau“ kaufst du jetzt Büroflächen, bis deine Firma 1.000 Plätze
   hat. Jede Fläche kostet mehr als die letzte (von 250.000 € bis 600 Mio. €), braucht ab Fläche 4 eine AG und einen
   passenden Firmenwert, und jeder Büroplatz kostet Miete. Große Teams stellst du in größeren Schritten ein. Und deine

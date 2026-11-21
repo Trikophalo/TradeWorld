@@ -161,7 +161,7 @@ select tests.assert(
 
 -- an iron pull counts as no rare for the missions, a titanium as an ultra
 select tests.assert(
-  position('nexamon_rarity_rank(r.rarity) >= 1' in pg_get_functiondef('public.buy_nexamon_pack(uuid, text)'::regprocedure)) > 0
+  position('nexamon_rarity_rank(r.rarity) >= 1' in pg_get_functiondef('public.nexamon_buy_pack_as(uuid, uuid, text, boolean)'::regprocedure)) > 0
   and position('nexamon_rarity_rank(r.rarity) >= 2' in pg_get_functiondef('public.open_nexamon_sealed_pack(uuid, uuid)'::regprocedure)) > 0
   and position('nexamon_rarity_rank(r.rarity) >= 2'
                in pg_get_functiondef('public.nexamon_battle_pull(public.nexamon_battles, uuid, timestamptz)'::regprocedure)) > 0,

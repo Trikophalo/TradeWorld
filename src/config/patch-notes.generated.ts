@@ -1047,6 +1047,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Mehr Platz und mehr Klasse: Unter „Wachstum & Ausbau“ kaufst du jetzt Büroflächen, bis deine Firma 1.000 Plätze hat.",
       },
+      {
+        id: "m0-fundament-8c82feb1",
+        title: null,
+        text: "Pack Battles und Booster ohne Ärger: Die fünfte Karte jedes Packs bleibt im Pack Battle jetzt sichtbar, bevor das nächste Pack aufreißt.",
+      },
     ],
   },
 ];

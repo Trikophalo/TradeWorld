@@ -26,8 +26,8 @@ import { DURATION, EASE } from "@/lib/motion";
 import { playSound } from "@/lib/sound";
 import { useMountTime } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
-import { NexamonPack } from "../components/pack";
 import { BattleView } from "./battle-view";
+import { BattleLineupPicker } from "./battle-lineup-picker";
 import { BattleModeBadges, LineupStrip, useBattleAction } from "./battle-lobby";
 import { useNexamonLobby } from "./hooks";
 import { SpectatorView } from "./spectator-view";
@@ -255,7 +255,7 @@ function LobbyFigure({
 const SIZES = ["2", "3", "4"] as const;
 
 /**
- * A new Pack Battle (ADR-192): the lineup (packs of any released set, in order: add, move, remove), the number of
+ * A new Pack Battle (ADR-192): the lineup (per released set 0..10 packs, grouped, the groups in order), the number of
  * players (2-4) and friends to invite; the running total is the stake per player. Opened from a friend's figure,
  * that friend is invited.
  */
@@ -300,18 +300,9 @@ function CreateBattleSheet({
   const players = Number(size);
   const available = NEXAMON_SETS.filter((set) => mountedAt === null || nexamonSetReleased(set, mountedAt));
   const price = packBattleCostCents(lineup);
-  const maxPacks = cfg.packBattle.maxPacks;
   const short = cash < price;
   const full = limits.used >= limits.perHour;
   const invites = invited.slice(0, players - 1);
-  const move = (from: number, to: number) =>
-    setLineup((l) => {
-      if (to < 0 || to >= l.length) return l;
-      const next = [...l];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item!);
-      return next;
-    });
   return (
     <Sheet
       open={open}
@@ -405,93 +396,7 @@ function CreateBattleSheet({
           </p>
         </section>
 
-        <section className="space-y-2">
-          <div className="flex items-baseline justify-between gap-2">
-            <h3 className="label-pixel text-fg-3">{t("create.lineup", { count: lineup.length, max: maxPacks })}</h3>
-            <span className="nums text-sm font-semibold text-fg-1" data-testid="lineup-total" data-cents={price}>
-              {t("create.total", { price: formatMoney(price, { whole: true }) })}
-            </span>
-          </div>
-          {lineup.length === 0 ? (
-            <p className="rounded-md border-2 border-dashed border-line-1 p-3 text-center text-xs text-fg-3">
-              {t("create.empty")}
-            </p>
-          ) : (
-            <ol className="space-y-1" data-testid="lineup">
-              {lineup.map((set, i) => (
-                <li
-                  key={`${i}-${set}`}
-                  className="flex items-center gap-2 rounded-md border-2 border-line-1 bg-surface-1 p-1.5"
-                  data-testid="lineup-item"
-                  data-set={set}
-                >
-                  <span className="w-5 text-center nums text-xs text-fg-3">{i + 1}</span>
-                  <NexamonPack set={set} scale={1} sheen={false} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-fg-1">{t(`sets.${set}`)}</span>
-                    <span className="block nums text-xs text-fg-2">
-                      {formatMoney(cfg.sets[set].packPriceCents, { whole: true })}
-                    </span>
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t("create.up")}
-                    disabled={i === 0}
-                    onClick={() => move(i, i - 1)}
-                    data-testid="lineup-up"
-                  >
-                    ↑
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t("create.down")}
-                    disabled={i === lineup.length - 1}
-                    onClick={() => move(i, i + 1)}
-                    data-testid="lineup-down"
-                  >
-                    ↓
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t("create.remove")}
-                    onClick={() => setLineup((l) => l.filter((_, k) => k !== i))}
-                    data-testid="lineup-remove"
-                  >
-                    ✕
-                  </Button>
-                </li>
-              ))}
-            </ol>
-          )}
-          <div className="grid grid-cols-2 gap-2" aria-label={t("challenge.setLabel")}>
-            {available.map((set) => (
-              <button
-                key={set}
-                type="button"
-                disabled={lineup.length >= maxPacks}
-                onClick={() => setLineup((l) => (l.length >= maxPacks ? l : [...l, set]))}
-                data-testid={`challenge-set-${set}`}
-                className="flex min-w-0 items-center gap-2 rounded-md border-2 border-line-1 bg-surface-1 p-1.5 text-left focus-ring transition duration-fast ease-standard hover:bg-surface-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span aria-hidden className="font-pixel text-sm text-accent">
-                  +
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-semibold text-fg-1">{t(`sets.${set}`)}</span>
-                  <span className="block nums text-2xs text-fg-2">
-                    {formatMoney(cfg.sets[set].packPriceCents, { whole: true })}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-          {lineup.length >= maxPacks && (
-            <p className="text-xs text-fg-3">{t("create.maxPacks", { count: maxPacks })}</p>
-          )}
-        </section>
+        <BattleLineupPicker lineup={lineup} onChange={setLineup} sets={available} price={price} />
 
         {friends.length > 0 && (
           <section className="space-y-2">

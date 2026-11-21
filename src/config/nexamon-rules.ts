@@ -24,10 +24,15 @@ export const NEXAMON_RULES = {
     yin_yang: { name: "Nexamon: Yin Yang", packPriceCents: 200_000, releaseAt: "2026-11-17T16:30:00Z" },
   },
   packs: {
-    /** At most this many packs per player and minute. */
+    /**
+     * At most this many pack purchases (single or multi-buy; and sealed purchases and openings) per player and
+     * minute. ADR-182 Nachtrag: a multi-buy counts once.
+     */
     perMinute: 20,
-    /** Packs of one set in one purchase (ADR-182); every one counts for perMinute. */
+    /** Packs of one set in one purchase (ADR-182). */
     maxPerBuy: 10,
+    /** Abuse cap: packs bought with multi-buys per player and minute (every pack of a multi-buy counts). */
+    maxPacksPerMinute: 100,
   },
   /**
    * Pull rates. Slots 1 to 3 always hold a common. Slot 4 and slot 5 roll once each, in parts of `denominator`;
@@ -439,7 +444,10 @@ export const NEXAMON_RULES = {
    * `lobbySeconds`, or that the creator cancels, refunds every seat in full.
    */
   packBattle: {
-    maxPacks: 10,
+    /** Packs in one lineup (ADR-192 Nachtrag: 30, so three sets with ten packs each fit). */
+    maxPacks: 30,
+    /** The create sheet's stepper: at most this many packs of one set (the lineup groups them). */
+    maxPerSet: 10,
     minPlayers: 2,
     maxPlayers: 4,
     lobbySeconds: 120,

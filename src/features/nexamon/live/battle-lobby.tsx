@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { NexamonPack } from "../components/pack";
 import { useNexamonRefresh } from "../hooks";
 import { useLobbyRefresh } from "./hooks";
+import { lineupGroups } from "./battle-lineup";
 
 /** Runs a battle action with button state and an error toast. */
 export function useBattleAction() {
@@ -78,10 +79,17 @@ export function LineupStrip({ battle: b, className }: { battle: NexamonBattle; c
   const t = useTranslations("nexamonLive");
   return (
     <ol className={cn("flex flex-wrap items-end gap-1", className)} aria-label={t("lobbyView.lineup")}>
-      {b.packs.map((p, i) => (
-        <li key={i} className="flex flex-col items-center" title={t(`sets.${p.set}`)}>
-          <NexamonPack set={p.set} scale={1} sheen={false} />
-          <span className="nums text-2xs text-fg-3">{i + 1}</span>
+      {/* ADR-192 Nachtrag: packs of the same set in a row as one pack with their count */}
+      {lineupGroups(b.packs.map((p) => p.set)).map((g, i) => (
+        <li
+          key={i}
+          className="flex flex-col items-center"
+          title={t(`sets.${g.set}`)}
+          data-testid="lineup-strip-group"
+          data-count={g.count}
+        >
+          <NexamonPack set={g.set} scale={1} sheen={false} />
+          <span className="nums text-2xs text-fg-3">{t("create.groupCount", { count: g.count })}</span>
         </li>
       ))}
     </ol>

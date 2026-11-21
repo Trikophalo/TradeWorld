@@ -1368,6 +1368,9 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   32 s länger). Der Twist ändert nicht, wer was zieht, nur wer welchen Wert hält: Der Erwartungswert je Spieler bleibt
   bei n Spielern 1/n des Topfs, die Streuung steigt (nach dem letzten Twist gewinnt praktisch ein zufälliger Haufen).
   „Umgekehrt“ belohnt schwache Pulls, ändert aber ebenso keinen Betrag.
+- **Pack-Auswahl (Nachtrag ADR-192):** je Set 0 bis `packBattle.maxPerSet` 10 Packs, zusammen höchstens
+  `packBattle.maxPacks` 30 (vorher 10). 30 Packs dauern 30 × 11,4 s ≈ 5,7 min (Twist: ≈ 7,3 min); der Einsatz wächst
+  mit, der Erwartungswert je Spieler bleibt 1/n des Topfs.
 - **Stellschrauben, falls Booster zu lohnend oder zu teuer sind:** `ai.dailyBudgetPacks`, `ai.buysPerCardWindow`,
   `ai.premiumBps`, `ai.gradePremiumBps`, `ai.maxPremiumBps`, `ai.buyChanceBps`, `ai.packsPerHour`, `grading.valueBps`, `quickSell.bps` und die Startpreise im Katalog. Mit den
   Platzhalter-Preisen (gleichmäßig über die Spannen) liegt der Inhalt eines Boosters rechnerisch über seinem Preis;
@@ -1601,7 +1604,7 @@ Startpreise je Seltenheit):
 | Titans Revenge | 100.000 € | Iron 4,678 · Titanium 0,300 · Diamond 0,020 · Uranium 0,002         |     89.901 € |  89,9 % |      87,7 % |
 | Yin Yang       | 2.000 €   | Common 4,403 · Rare 0,510 · Ultra 0,075 · Prisma 0,011 · Leg. 0,001 |      4.453 € | 222,7 % |     217,3 % |
 
-Weitere Werte: `packs.maxPerBuy` 10 Packs je Kauf (jedes zählt für `packs.perMinute`), `live.continueSeconds` 30 s,
+Weitere Werte: `packs.maxPerBuy` 10 Packs je Kauf (ein Kauf ist eine Aktion von `packs.perMinute` 20; seine Packs zählen gegen `packs.maxPacksPerMinute` 100, Nachtrag ADR-182), `live.continueSeconds` 30 s,
 `sets.titans_revenge.releaseAt` und `sets.yin_yang.releaseAt` 2026-11-17T16:30:00Z, `newsShow.announcements` (Sendung
 um 16:00 UTC).
 

@@ -8682,3 +8682,15 @@ total, max, used}, rent_cents_per_hour, worth_cents, free_cash_cents, next{n, se
 tiers[]} | null, block}` mit `block` ∈ `max_level`, `seats_max`, `legal_form`, `worth`, `cash` oder `null`.
 - `buy_company_office(p_request_id uuid)` (Gründer) → `{offices: OFFICES}`; Fehler `office_max_level`,
   `office_seats_max`, `office_legal_form`, `office_worth`, `insufficient_funds`. Idempotent über `request_id`.
+
+## Pack-Käufe und Pack Battles: Nachträge (ADR-182/192/205, Migration `20261204011400_nexamon_pack_buy_limits.sql`)
+
+- `api_rate_limited(p_window_seconds)` (intern): Fehler `rate_limited` (NX004) mit `detail` `retry_after=<s>` (Sekunden
+  bis zum Ende des festen Fensters von `rate_limit_hit`). Der Client zeigt „Kurz warten: noch X s“.
+- `nexamon_buy_pack_as(p_player, p_request_id, p_set, p_count)` (intern, nicht für Spieler): Kauf und Öffnung eines
+  Packs (bisheriger Inhalt von `buy_nexamon_pack`, 8100); `p_count` nimmt den Treffer von `packs.perMinute` selbst.
+- `buy_nexamon_pack(p_request_id, p_set)`: unverändert, ruft `nexamon_buy_pack_as(…, true)`.
+- `buy_nexamon_packs(p_request_id, p_set, p_count)`: **ein** Treffer `nexamon_pack` (`packs.perMinute`) für den ganzen
+  Kauf, je Pack ein Treffer `nexamon_pack_volume` (`packs.maxPacksPerMinute`, 100); alles oder nichts, Antwort
+  unverändert.
+- `create_nexamon_pack_battle`: bis zu `packBattle.maxPacks` = 30 Packs (vorher 10), nur Konfiguration.

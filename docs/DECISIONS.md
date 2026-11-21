@@ -4112,6 +4112,14 @@ das einzige Set, das im Mittel Geld kostet; der Reiz liegt in Uranium (1 in 500,
   `lingerMs` vorbei sind. Zuschauer behalten Live-ID und Zuschauerzählung und sehen „Pack 2“. Die Demo macht es nach
   (eigene Packs; der erfundene Freund öffnet zwei Packs in einer Sitzung).
 
+**Nachtrag (Fehler: „mehr als zweimal 10 Packs hintereinander: zu viele Aktionen“).** Bisher zählte jedes Pack eines
+Mehrfachkaufs einzeln gegen `packs.perMinute` (20 je Minute): nach zwei Käufen à 10 war Schluss. Jetzt ist ein
+Mehrfachkauf (`buy_nexamon_packs`) **eine** Aktion von `packs.perMinute`, wie ein Einzelkauf; seine Packs zählen
+gegen die neue Obergrenze `packs.maxPacksPerMinute` (100 Packs je Minute, gegen Missbrauch). Fünf Käufe à 10 in
+Folge gehen durch. Greift ein Limit doch, sagt die Meldung, wie lange: „Kurz warten: noch X s“ (Fehler `rate_limited`
+mit `detail` `retry_after=<s>` aus `api_rate_limited`; der Client liest es in `rpc()`). Migration 011400, Test
+`supabase/tests/f7_pack_fixes.sql`.
+
 ## ADR-183: Firma-Überarbeitung – Ruf für jede Firma, robuste Stunde, „Was jeder leistet“ wie die Abrechnung, flacher Aufbau — `Annahme`
 
 **Kontext.** Aktive Spieler melden: Die Firma ist zu verschachtelt, der Ruf wirkt nicht oder nur teilweise, „Wo es
@@ -4737,6 +4745,14 @@ Annehmen.
 zwei Minuten. Das Stundenlimit `battles.perHour` und die Abklingzeit gelten pro gestartetem Battle wie bisher. Test
 `supabase/tests/c9_pack_battle_multi.sql`, Formeln in `src/lib/sim/nexamon-battle.ts`.
 
+**Nachtrag (Eigentümer: „von jedem Set 1–10 Packs wählen“).** Die Pack-Auswahl im Erstellen-Fenster
+(`BattleLineupPicker`) hat pro Set einen Zähler mit − und + und einen Schieberegler für 0 bis `packBattle.maxPerSet`
+(10) Packs. Die Packs eines Sets stehen als Gruppe zusammen; darunter legt die Liste „Reihenfolge“ fest, welches Set
+zuerst aufgeht (Gruppe hoch, runter, entfernen). Damit drei Sets mit je zehn Packs passen, steigt `packBattle.maxPacks`
+von 10 auf 30; ein Battle mit 30 Packs dauert knapp sechs Minuten (mit Twist gut sieben). Der Server prüft wie bisher
+nur die Gesamtzahl, `maxPerSet` gilt in der Oberfläche. Die Lobby zeigt die Reihe gruppiert („10 ×“). Logik in
+`src/features/nexamon/live/battle-lineup.ts` (Tests daneben), Test `supabase/tests/f7_pack_fixes.sql`.
+
 ## ADR-186: Mehr Schiebe- und Sehaufgaben, weniger Rechnen und Tippen bei den Firmenaufgaben — `Annahme`
 
 **Kontext.** Der Owner: „Weniger Rechen- und Schreibaufgaben bitte bei den Unternehmensaufgaben. Mehr Schiebe- und
@@ -5047,6 +5063,14 @@ Karten jedes Packs in der Live-Ansicht spannender aufgehen.
 `d7_battle_modes.sql` rechnen die erwartete Kartenzahl aus `server_time` und `starts_at` derselben Antwort und
 hängen so nicht mehr an der Maschinenlast. Test `supabase/tests/d7_battle_modes.sql`, Formeln in
 `src/lib/sim/nexamon-battle.ts` (Tests `nexamon-battle-modes.test.ts`).
+
+**Nachtrag (Fehler: „die letzte Karte der 5 sieht man nie“).** Der Server lieferte die fünfte Karte jedes Packs
+rechtzeitig, aber `battlePhase` schaltete schon in dem Moment, in dem sie aufgedeckt wurde, auf „Pack reißt“ für das
+nächste Pack (die Bedingung „gezeigte Karten durch 5 teilbar“ galt sofort). Jetzt bleibt die letzte Karte eines Packs
+ihren ganzen Slot (`battles.slotMs`) stehen, mit dem Effekt der letzten Karte; erst danach kommt der Twist bzw. das
+nächste Pack (`multiTwistAt`, ohne Twist derselbe Zeitpunkt). `battlePhase` liegt jetzt in `battle-phase.ts` mit
+Tests; `f7_pack_fixes.sql` prüft, dass zwischen fünfter Karte und nächstem Pack alle fünf Karten von Pack 1 und keine
+von Pack 2 geliefert werden und die letzte Karte vor der Entscheidung.
 
 ## ADR-207: Titans Revenge – Diamond 30 % mehr wert, Uranium so viel weniger, dass der Erwartungswert bleibt — `Entscheidung (Eigentümer)`
 

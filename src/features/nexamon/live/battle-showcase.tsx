@@ -5,7 +5,10 @@ import { NEXAMON_SAMPLE_CARDS } from "@/components/pixel/nexamon-samples";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BALANCE } from "@/config/balance";
+import { NEXAMON_SETS, type NexamonSetKey } from "@/config/nexamon";
+import { packBattleCostCents } from "@/lib/sim/nexamon-battle";
 import { NexamonCardFace } from "../components/card-face";
+import { BattleLineupPicker } from "./battle-lineup-picker";
 import { BattleModeBadges } from "./battle-lobby";
 import { battleRevealTier } from "./battle-reveal";
 import { BattleRevealFx } from "./battle-reveal-fx";
@@ -26,12 +29,28 @@ const PERMS = [
 ] as const;
 const NAMES = ["Lena", "Max", "Ida", "Tom"];
 
-/** Pack Battle modes on /dev/ui (ADR-205): mode badges, the reveal of the last two cards, the twist. */
+/**
+ * Pack Battle modes on /dev/ui (ADR-205): mode badges, the reveal of the last two cards, the twist; the lineup picker
+ * of the create sheet (ADR-192 Nachtrag).
+ */
 export function BattleModesShowcase() {
   const [round, setRound] = useState(0);
   const [perm, setPerm] = useState(0);
+  const [lineup, setLineup] = useState<NexamonSetKey[]>([
+    ...Array<NexamonSetKey>(3).fill(NEXAMON_SETS[0]),
+    ...Array<NexamonSetKey>(2).fill(NEXAMON_SETS[1]),
+  ]);
   return (
     <div className="space-y-4" data-testid="battle-modes-showcase">
+      <Card padding="lg" className="min-w-0">
+        <p className="mb-3 label-pixel text-fg-3">Packs pro Set wählen</p>
+        <BattleLineupPicker
+          lineup={lineup}
+          onChange={setLineup}
+          sets={NEXAMON_SETS.slice(0, 3)}
+          price={packBattleCostCents(lineup)}
+        />
+      </Card>
       <Card padding="lg" className="min-w-0">
         <p className="mb-3 label-pixel text-fg-3">Modus-Badges</p>
         <div className="flex flex-wrap gap-3">
