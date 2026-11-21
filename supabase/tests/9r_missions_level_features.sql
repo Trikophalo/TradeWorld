@@ -33,9 +33,15 @@ end $$;
 select coalesce((select target from public.player_missions where player_id = :lo and template_key = 'd_news_chat' limit 1), -1) as t_lo,
        coalesce((select target from public.player_missions where player_id = :hi and template_key = 'd_news_chat' limit 1), -1) as t_hi \gset
 update public.mission_templates set weight = 40 where key = 'd_news_chat';
+-- the factor comes from the config (progression.missionTargetScalePerLevel / ...Max), not a fixed 2.16
+select least(public.config_double('progression', '{missionTargetScaleMax}', 5),
+             1 + public.config_double('progression', '{missionTargetScalePerLevel}', 0.2) * 29) as f30 \gset
+-- the doability check (ADR-202) may keep a template away from a player; then this check has nothing to compare
 select tests.assert(
-  :t_lo::int between 3 and 5 and :t_hi::int between round(3 * 2.16) and round(5 * 2.16),
-  'missions_assign(): a counted daily mission is harder at level 30 (x1 + 0.04 per level)');
+  :t_lo::int = -1 or :t_hi::int = -1
+  or (:t_lo::int between 3 and 5 and :t_hi::int between floor(3 * :f30::float8) and ceil(5 * :f30::float8)),
+  'missions_assign(): a counted daily mission is harder at level 30 (x' || round(:f30::numeric, 2) || ', got '
+  || :t_lo || ' and ' || :t_hi || ')');
 
 -- the new metrics count through triggers
 delete from public.player_missions where player_id = :hi;
