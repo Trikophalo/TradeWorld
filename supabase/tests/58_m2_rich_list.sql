@@ -111,6 +111,8 @@ insert into public.rich_list_snapshots (taken_at, entity_kind, entity_id, net_wo
 values (public.game_now() - interval '25 hours', 'player', :r2, 1000000, 200, 50) on conflict do nothing;
 -- between 22:00 and 24:00 Berlin real time an earlier snapshot of this file already claimed the day's run
 delete from public.job_runs where job_name = 'rich_top_gainer';
+-- and may already have written its news item: count only this run's
+delete from public.news_items where template_key = 'rich_top_gainer';
 select public.rich_list_snapshot(true) as s3 \gset
 select tests.assert(
   (select count(*) from public.news_items where template_key = 'rich_top_gainer') = 1,
