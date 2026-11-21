@@ -33,9 +33,9 @@ end $$;
 select coalesce((select target from public.player_missions where player_id = :lo and template_key = 'd_news_chat' limit 1), -1) as t_lo,
        coalesce((select target from public.player_missions where player_id = :hi and template_key = 'd_news_chat' limit 1), -1) as t_hi \gset
 update public.mission_templates set weight = 40 where key = 'd_news_chat';
--- the factor comes from the config (progression.missionTargetScalePerLevel / ...Max), not a fixed 2.16
-select least(public.config_double('progression', '{missionTargetScaleMax}', 5),
-             1 + public.config_double('progression', '{missionTargetScalePerLevel}', 0.2) * 29) as f30 \gset
+-- the factor comes from the config (progression.missionCountScalePerLevel / ...Max), not a fixed 2.16
+select least(public.config_double('progression', '{missionCountScaleMax}', 1),
+             1 + public.config_double('progression', '{missionCountScalePerLevel}', 0) * 29) as f30 \gset
 -- the doability check (ADR-202) may keep a template away from a player; then this check has nothing to compare
 select tests.assert(
   :t_lo::int = -1 or :t_hi::int = -1
