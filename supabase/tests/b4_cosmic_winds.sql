@@ -149,35 +149,41 @@ select tests.assert(
 select tests.set_cfg('nexamon', '{oneOfOne,packs}', '5000');
 
 -- =============================================================================
--- E. The AI never holds or buys a One of One; players trade it
+-- E. The AI never holds a One of One as seller stock; players trade it; at or below its value the game's vault
+--    buys it (ADR-195, Nachtrag), never above
 -- =============================================================================
 select c.id as c1 from public.nexamon_copies c where c.card_key = :'k1' \gset
 select tests.throws_key(format($$update public.nexamon_copies set owner_id = null, ai_owner = 'Karten-Kalle' where id = %L$$, :'c1'),
   'nexamon_ai_excluded', 'the AI can never own a One of One (NX271)');
 select tests.assert(
-  public.nexamon_ai_buy_chance_bps(1, 100, 'mint', null, 'one_of_one', 1) = 0
+  public.nexamon_ai_buy_chance_bps(101, 100, 'mint', null, 'one_of_one', 1) = 0
+  and public.nexamon_ai_buy_chance_bps(1, 100, 'mint', null, 'one_of_one', 1) = 10000
   and public.nexamon_ai_buy_chance_bps(1, 100, 'mint', null, 'legendary', 1) = 10000
   and public.nexamon_pressure_bps('one_of_one', 1, 0, 5) = 0
   and public.nexamon_rarity_rank('one_of_one') > public.nexamon_rarity_rank('legendary'),
-  'AI collectors never buy a One of One; its value has no supply-and-demand step; it ranks above a legendary');
+  'AI collectors never buy a One of One above its value; its value has no supply-and-demand step; it ranks above a legendary');
 select tests.login_as('authenticated', :a);
 select public.list_nexamon_card(gen_random_uuid(), :'c1', 100) as li \gset
 reset role;
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '3000');
-select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '300');
-select public.nexamon_run_due() is not null as ok \gset
-select tests.assert(
-  (select owner_id from public.nexamon_copies where id = :'c1') = :a::uuid
-  and exists (select 1 from public.nexamon_listings where copy_id = :'c1'),
-  'a One of One listed far below its value stays on the market: the AI does not buy it');
-select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
-select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 select tests.login_as('authenticated', :b);
 select public.buy_nexamon_listing(gen_random_uuid(), (:'li'::jsonb #>> '{listing,id}')::uuid, 100) is not null as ok \gset
 reset role;
 select tests.assert((select owner_id from public.nexamon_copies where id = :'c1') = :b::uuid
   and (select population from public.nexamon_cards where card_key = :'k1') = 1,
   'players trade a One of One; its population stays 1');
+select tests.login_as('authenticated', :b);
+select public.list_nexamon_card(gen_random_uuid(), :'c1', 100) as li2 \gset
+reset role;
+select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '3000');
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '300');
+select public.nexamon_run_due() is not null as ok \gset
+select tests.assert(
+  (select ai_owner from public.nexamon_copies where id = :'c1') = 'NEXA-Tresor'
+  and not exists (select 1 from public.nexamon_listings where copy_id = :'c1')
+  and (select population from public.nexamon_cards where card_key = :'k1') = 1,
+  'a One of One listed below its value is bought by the game''s vault (never AI seller stock)');
+select tests.set_cfg('nexamon', '{ai,buyChanceBps}', '0');
+select tests.set_cfg('nexamon', '{ai,dailyBudgetPacks}', '0');
 
 -- =============================================================================
 -- F. Collections leave the One of Ones out
@@ -263,7 +269,7 @@ select tests.assert(
   (:'rs'::jsonb ->> 'deleted')::integer > 0 and :'rs2'::jsonb ->> 'skipped' = 'not due'
   and (select count(*) from public.nexamon_copies where card_key = 'me-001' and ai_owner is not null and grade is null) = 12
   and not exists (select 1 from public.nexamon_copies c join public.nexamon_cards k on k.card_key = c.card_key
-                   where c.ai_owner is not null and c.grade is null
+                   where c.ai_owner is not null and c.ai_owner <> 'NEXA-Tresor' and c.grade is null
                    group by c.card_key, k.rarity
                   having count(*) > (:'nx_cfg'::jsonb #>> array['ai', 'stockCap', k.rarity])::integer)
   and (select count(*) from public.nexamon_listings l join public.nexamon_copies c on c.id = l.copy_id

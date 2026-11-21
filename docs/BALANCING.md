@@ -1360,6 +1360,11 @@ Werte in `BALANCE.nexamon` (`src/config/nexamon-rules.ts`), Startpreise im Katal
   also im Mittel nach gut vier Stunden; Common: fast nie). Höchstens 100 Käufe je Lauf. Nur Käufe über dem Wert
   prüfen das Budget je Set und Tag von 300 Booster-Preisen (60.000 € / 300.000 € / 3 Mio. € …, gezählt werden alle
   KI-Käufe des Sets). Höchste KI-Ausgabe am Tag also: diese Budgets plus die Summe aller fair angebotenen Karten.
+- **Teuerste Karten (ADR-195 Nachtrag, Migration 011500):** Auch One of One und Uran kauft das Spiel zum Wert oder
+  darunter, für den NEXA-Tresor (darüber nie). Reicht das Geld der Haushalte nicht, stockt die Staatskasse um genau
+  den Fehlbetrag auf, solange ihr 25 Mio. € bleiben (`ai.treasuryFloorCents`); sonst nächster Lauf. Der Tresor bietet
+  eine Kopie nach 72 h mit 10 % je Tag wieder an (`vault`), zu Wert + 15 bis 25 %, höchstens 2 Angebote zugleich,
+  24 h lang.
   Den Wert heben nur KI-Käufe im Band ± 25 %, höchstens 6 / 6 / 4 / 3 / 2 je Karte und Tag. Das ist die einzige
   Stelle, an der Karten zu neuem Geld werden; Gebühren, Booster und ASP nehmen es wieder heraus.
 - **Sofortverkauf:** rohe Commons und Rares zu 50 % des Werts, bis zu 50 Kopien je Aufruf.

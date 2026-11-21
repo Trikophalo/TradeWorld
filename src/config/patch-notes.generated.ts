@@ -1052,6 +1052,11 @@ export const PATCH_NOTES: readonly PatchNoteRelease[] = [
         title: null,
         text: "Pack Battles und Booster ohne Ärger: Die fünfte Karte jedes Packs bleibt im Pack Battle jetzt sichtbar, bevor das nächste Pack aufreißt.",
       },
+      {
+        id: "m0-fundament-9adf0da5",
+        title: null,
+        text: "Auch Einzelstücke finden einen Käufer: Bietest du eine Karte zum Marktwert oder darunter an, kauft das Spiel sie jetzt binnen Minuten, egal wie…",
+      },
     ],
   },
 ];

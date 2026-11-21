@@ -4,6 +4,10 @@
 
 Erste, navigierbare Fassung ohne Spiellogik.
 
+- Auch Einzelstücke finden einen Käufer: Bietest du eine Karte zum Marktwert oder darunter an, kauft das Spiel sie
+  jetzt binnen Minuten, egal wie teuer, auch One of Ones, Uran-Karten und Black-Label-Slabs. Einzelstücke wandern in
+  den NEXA-Tresor, der ab und zu eines wieder an Spieler anbietet, mit 15 bis 25 % Aufschlag.
+
 - Pack Battles und Booster ohne Ärger: Die fünfte Karte jedes Packs bleibt im Pack Battle jetzt sichtbar, bevor das
   nächste Pack aufreißt. Beim Erstellen wählst du pro Set einfach 0 bis 10 Packs mit Zähler oder Schieberegler, bis zu
   30 Packs pro Battle, und legst die Reihenfolge der Sets fest. Und zehn Booster auf einmal kannst du jetzt mehrmals

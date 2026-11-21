@@ -5,6 +5,7 @@ import {
   nexamonAiAskCents,
   nexamonAiSlabHoldMs,
   nexamonAiBuyChanceBps,
+  nexamonAiBuyerIsVault,
   nexamonAiBuyCounts,
   nexamonCentsFromE4,
   nexamonClampValue,
@@ -565,7 +566,9 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
         const perMinute = chanceBps / 10_000;
         if (chanceBps < 10_000 && host.random() >= 1 - Math.pow(1 - perMinute, minutes)) continue;
         bought++;
-        const buyer = sellerOf(Math.floor(host.random() * SELLERS.length));
+        // One of Ones and uranium cards go to the game's vault, which keeps them (ADR-195, Nachtrag)
+        const vault = nexamonAiBuyerIsVault(card.rarity, cfg);
+        const buyer = vault ? cfg.instantSell.vaultOwner : sellerOf(Math.floor(host.random() * SELLERS.length));
         const fee = nexamonMarketFeeCents(price);
         host.earn(price - fee);
         // the value moves only for a plausible price and a few AI buys per card and window (anti-manipulation)
@@ -592,7 +595,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
           counted,
         });
         s.copies = s.copies.filter((c) => c.id !== copy.id);
-        if (copy.grade !== null)
+        // a vault copy is kept, never AI seller stock
+        if (!vault && copy.grade !== null)
           // graded copies never leave circulation: the AI holds the slab for a while, then lists it again
           (state.slabs ??= []).push({
             serial: copy.serial,
@@ -600,7 +604,8 @@ export function createNexamonEngine(host: NexamonHost): NexamonEngine & DemoBatt
             grade: copy.grade,
             holdUntil: now + nexamonAiSlabHoldMs(host.random()),
           });
-        else if (state.ai.length < AI_STOCK_CAP) state.ai.push({ serial: copy.serial, condition: copy.condition });
+        else if (!vault && state.ai.length < AI_STOCK_CAP)
+          state.ai.push({ serial: copy.serial, condition: copy.condition });
         host.notify("nexamon_sale", "Nexamon-Karte verkauft", `${buyer} hat deine Karte gekauft.`, "/nexamon");
         host.track("nexamon_sold");
       }

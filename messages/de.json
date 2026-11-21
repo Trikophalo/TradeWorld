@@ -10586,9 +10586,9 @@
       "note": "Innerhalb einer Seltenheit ist jede Karte des Sets gleich wahrscheinlich. Bezahlt wird nur mit Spielgeld.",
       "cardsInSets": "{count} je Set, {cosmic} in Cosmic Winds",
       "oneOfOne": "1 in {count} Packs, jede Karte nur einmal",
-      "titansNote": "Titans Revenge füllt seine Booster anders: Jedes hat Iron-Karten. Titanium kommt in 1 von {titanium} Boostern (1 bis 2 Karten), Diamond in 1 von {diamond}, Uranium in 1 von {uranium}. Uranium zieht die KI nie und bietet sie nie an.",
+      "titansNote": "Titans Revenge füllt seine Booster anders: Jedes hat Iron-Karten. Titanium kommt in 1 von {titanium} Boostern (1 bis 2 Karten), Diamond in 1 von {diamond}, Uranium in 1 von {uranium}. Uranium zieht die KI nie. Zum Marktwert oder darunter kauft sie der NEXA-Tresor, der sie selten mit Aufschlag wieder anbietet.",
       "yinYangNote": "Yin Yang ist härter: Ab Ultra Rare ist jede Chance 10 % kleiner (Ultra auf Platz 5 {ultra}, Prisma {prisma}, Legendary {legendary}). Was frei wird, geht an die Rares.",
-      "oneOfOneNote": "Nur in Cosmic Winds: Platz 5 würfelt zuerst 1 zu {count} auf eine der drei One of Ones. Jede gibt es im ganzen Spiel nur ein einziges Mal; ist sie gezogen, ist sie weg. Die KI zieht und kauft sie nie."
+      "oneOfOneNote": "Nur in Cosmic Winds: Platz 5 würfelt zuerst 1 zu {count} auf eine der drei One of Ones. Jede gibt es im ganzen Spiel nur ein einziges Mal; ist sie gezogen, ist sie weg. Die KI zieht sie nie. Zum Marktwert oder darunter kauft sie der NEXA-Tresor, der sie selten mit Aufschlag wieder anbietet."
     },
     "contents": {
       "value": "Marktwert:",

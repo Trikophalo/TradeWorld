@@ -343,8 +343,15 @@ export const NEXAMON_RULES = {
     /** Budget per set and Berlin day for buys above the value (ADR-195): this many pack prices. */
     dailyBudgetPacks: 300,
     /**
-     * Rarities the AI never pulls, holds or buys (ADR-174): One of Ones change hands only between players, and so do
-     * the uranium cards of Titans Revenge (ADR-182; an AI pack that rolls uranium gets iron in that slot).
+     * A buy at or below the value that the households' cash cannot pay (ADR-195, Nachtrag): the treasury tops the
+     * households up by exactly the shortfall (ledger `transfer` treasury -> households, sum 0), as long as the
+     * treasury keeps at least `treasuryFloorCents`. Otherwise the listing stays and the next minute run tries again.
+     */
+    treasuryFloorCents: 2_500_000_000,
+    /**
+     * Rarities the AI never pulls or holds as seller stock (ADR-174): One of Ones and the uranium cards of Titans
+     * Revenge (ADR-182; an AI pack that rolls uranium gets iron in that slot). A player listing of them at or below
+     * its value is still bought (ADR-195, Nachtrag), by the game's vault (`instantSell.vaultOwner`), never above it.
      */
     excludedRarities: ["one_of_one", "uranium"],
     /**
@@ -399,6 +406,21 @@ export const NEXAMON_RULES = {
     maxPerCall: 200,
     callsPerMinute: 20,
     vaultOwner: "NEXA-Tresor",
+  },
+  /**
+   * The game's vault (ADR-195, Nachtrag): it holds the One of Ones and uranium cards it bought or took in and puts
+   * one back on the market now and then. After `minHoldHours` each copy it holds goes on sale with a chance of
+   * `relistChancePerDayBps` per day (rolled every minute), at its value plus `premiumMinBps` to `premiumMaxBps`
+   * (uniform), at most `maxListed` vault listings at a time; an unsold listing is withdrawn after `listHours`.
+   * The AI resets never touch the vault; the AI never buys a vault listing.
+   */
+  vault: {
+    minHoldHours: 72,
+    relistChancePerDayBps: 1_000,
+    premiumMinBps: 1_500,
+    premiumMaxBps: 2_500,
+    maxListed: 2,
+    listHours: 24,
   },
   /**
    * Pulling a card of these rarities is news for the friends (feed kind nexamon_pull). A Black Label always is

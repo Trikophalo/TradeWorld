@@ -7865,6 +7865,22 @@ double precision)`, `nexamon_ai_buy_chance_bps(bigint, bigint, text, double prec
   und `gradedBuyMaxBps` entfallen). `nexamon_sell`: ein KI-Kauf zählt (`counted`, hebt den Wert) nur im Band und
   bis `buysPerCardWindow` je Karte und Fenster.
 
+## Nachtrag: Die KI kauft auch die teuersten Karten (ADR-195, Nachtrag)
+
+Migration `20261204011500_nexamon_ai_top_cards.sql` (Kopie in `updates/`).
+
+- `nexamon_ai_buy_chance_bps`: 10 000 zum Wert oder darunter für jede Seltenheit; über dem Wert 0 für
+  `ai.excludedRarities` (One of One, Uran), sonst wie ADR-195.
+- `nexamon_run_due`: One of Ones und Uran kauft `instantSell.vaultOwner` („NEXA-Tresor“). Reicht das Konto
+  `households` für einen Kauf zum Wert nicht, Ledger `transfer` `treasury` → `households` über genau den Fehlbetrag
+  (`ref_type` `nexamon_listing`, Schlüssel `nexamon:ai:fund:<listing>:<epoch>`), solange `treasury` danach
+  `ai.treasuryFloorCents` hält; sonst `raise log` und nächster Lauf. Ein fehlerhafter Kauf wird mit `raise warning`
+  übersprungen. Abschnitt 2b: Wiederangebot des Tresors nach `game_config.nexamon.vault` (`minHoldHours`,
+  `relistChancePerDayBps`, `premiumMinBps`, `premiumMaxBps`, `maxListed`, `listHours`). Ergebnis zusätzlich
+  `ai_unaffordable`, `ai_failed`, `ai_funded_cents`, `vault_listed`.
+- Neu intern: `nexamon_vault_ask_cents(bigint, double precision)`. `nexamon_ai_restock` lässt Tresor-Kopien aus,
+  `nexamon_ai_reset` löscht keine Tresor-Angebote und zieht keine Tresor-Kopien ein.
+
 ## Nachtrag: Bezahlbare Missionen, Missionen neu würfeln (ADR-166)
 
 Migration `20261204005350_mission_reset.sql`.

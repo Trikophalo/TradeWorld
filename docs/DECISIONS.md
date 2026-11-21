@@ -4581,6 +4581,46 @@ was die Karte wert ist (abzüglich 5 % Gebühr), und eine Karte ist danach weg v
 **Folgen.** `nexamonAiBuyChanceBps` und `nexamonAiPremiumBps` (TS) gelten wie in SQL; die Demo prüft das Budget nur
 über dem Wert. SQL-Test `d3_ai_buys_expensive.sql`.
 
+### Nachtrag zu ADR-195: Auch die teuersten Karten, One of One und Uran inklusive (Migration 011500)
+
+**Kontext.** Wunsch des Inhabers: „Die KI soll auch die teuersten Karten auf dem Markt für Marktpreis oder weniger
+kaufen.“ Zwei Lücken blieben: One of Ones und Uran-Karten (`ai.excludedRarities`) kaufte die KI nie, und ein Angebot
+über das Bargeld der Haushalte hinaus (zweistellige Millionen) scheiterte still am Kontostand.
+
+**Entscheidung.**
+
+- Jedes Spielerangebot, roh oder Slab, Black Label, One of One und Uran eingeschlossen, zum Wert der Kopie (wie in der
+  Oberfläche) oder darunter kauft die KI im nächsten Minutenlauf. Über dem Wert gilt ADR-195 unverändert (selten,
+  höchstens + 15 %); One of Ones und Uran über dem Wert nie.
+- One of Ones und Uran kauft der **NEXA-Tresor** (`instantSell.vaultOwner`, aus ADR-196): Der KI-Wächter
+  `nexamon_copies_ai_guard` lässt genau diesen Besitzer zu. `nexamon_ai_restock` bietet Tresor-Kopien nie an (auch
+  keine Slabs nach der Haltezeit), `nexamon_ai_reset` lässt Tresor-Kopien und -Angebote stehen; die KI kauft nie ein
+  Tresor-Angebot.
+- **Rückkehr in den Umlauf:** Der Tresor bietet eine Kopie, die er mindestens `vault.minHoldHours` (72 h) hält, mit
+  `vault.relistChancePerDayBps` (10 % je Tag, jede Minute gewürfelt) wieder an, zum Wert + 15 bis 25 %
+  (`premiumMinBps`/`premiumMaxBps`, gleichverteilt; `nexamonVaultAskCents`), höchstens `vault.maxListed` (2) Angebote
+  zugleich; unverkauft nach `vault.listHours` (24 h) zurückgezogen. Selten genug, dass der Tresor kein Händler wird,
+  oft genug, dass Einzelstücke nicht für immer verschwinden. Ein Kauf beim Tresor geht wie jeder KI-Verkauf voll an
+  die Haushalte.
+- **Geldquelle:** Bezahlt wird wie bisher von den Haushalten (`nexamon_sell`). Reicht ihr Bargeld für einen Kauf zum
+  Wert nicht, stockt die Staatskasse (`treasury`) genau um den Fehlbetrag auf: eine Ledger-Buchung `transfer`
+  treasury → households (Summe 0, Schlüssel `nexamon:ai:fund:<Angebot>:<Lauf>`), solange die Staatskasse danach noch
+  `ai.treasuryFloorCents` (25 Mio. €) hält. Kein Kredit, kein neues Geld: Das System bleibt geschlossen. Käufe über dem
+  Wert werden nie aufgestockt.
+- **Nie still scheitern:** Reicht auch die Staatskasse nicht, schreibt der Job eine Log-Zeile (`raise log`), meldet
+  `ai_unaffordable` im Ergebnis und lässt das Angebot stehen; der nächste Lauf versucht es wieder. Ein Kauf, der mit
+  einem Fehler abbricht, rollt nicht mehr den ganzen Minutenjob zurück (`ai_failed`, `raise warning`). Das Ergebnis
+  nennt außerdem `ai_funded_cents` und `vault_listed`.
+
+**Risiko.** Der Wert einer One of One bewegt sich nur durch Spielerhandel (ADR-174). Wer ihn mit Absprachen hochtreibt,
+um beim Tresor abzuladen, stößt an die bestehenden Grenzen (Band 25 %, je Paar und Tag ein zählender Handel, Schritt
+höchstens 2 %); das bleibt zu beobachten.
+
+**Folgen.** `nexamonAiBuyChanceBps` (10 000 zum Wert für jede Seltenheit), `nexamonAiBuyerIsVault`,
+`nexamonAiFundingCents`, `nexamonVaultAskCents` (TS, mit Tests). Die Demo kauft One of Ones und Uran für den Tresor und
+legt sie nicht in den KI-Bestand; ein Wiederangebot des Tresors gibt es nur auf dem Server. SQL-Test
+`f8_ai_buys_top_cards.sql`; `b4_cosmic_winds.sql` erwartet jetzt den Tresorkauf.
+
 ## ADR-196: Frisch gezogene Karten sofort an das Spiel, Bulk-Gebühr 20 % — `Annahme`
 
 **Kontext.** Wunsch des Inhabers: Bulk soll mit nur 20 % statt 35 % Gebühr verkauft werden können. Außerdem soll man

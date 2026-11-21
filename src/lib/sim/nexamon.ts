@@ -692,7 +692,8 @@ export function nexamonAiMaxPriceCents(
 
 /**
  * Chance per minute that an AI collector buys a player's listing, in basis points: certain (10 000) at or below the
- * copy's value, whatever the price (ADR-195); above it `buyChanceBps` x (`buyChanceMinShareBps` + the
+ * copy's value, whatever the price and rarity (ADR-195; One of Ones and uranium go to the vault); above it, never for
+ * those, `buyChanceBps` x (`buyChanceMinShareBps` + the
  * rest x popularity), falling linearly to `atMaxChanceBps` of that at the
  * most the AI pays (nexamonAiMaxPriceCents); 0 above that or for a price of 0.
  */
@@ -707,12 +708,13 @@ export function nexamonAiBuyChanceBps(
   },
   cfg: Config = BALANCE.nexamon,
 ): number {
+  if (i.priceCents <= 0) return 0;
+  if (i.priceCents <= i.copyValueCents) return 10_000;
+  // the vault buys One of Ones and uranium cards at or below the value only (ADR-195, Nachtrag)
   if (!nexamonAiAllowed(i.rarity, cfg)) return 0;
   const pop = nexamonPopularityBps(i.rarity, i.population, cfg);
   const minShare = cfg.ai.buyChanceMinShareBps;
   const full = mulDivFloor(cfg.ai.buyChanceBps, minShare + mulDivFloor(10_000 - minShare, pop, 10_000), 10_000);
-  if (i.priceCents <= 0) return 0;
-  if (i.priceCents <= i.copyValueCents) return 10_000;
   const max = nexamonAiMaxPriceCents(i.copyValueCents, i.condition, i.grade, cfg);
   if (i.priceCents > max) return 0;
   // linear from the full chance at the value to atMaxChanceBps of it at the maximum
@@ -732,6 +734,31 @@ export function nexamonAiBuyCounts(
   if (!nexamonAiAllowed(i.rarity, cfg) || i.countedInWindow >= cfg.ai.buysPerCardWindow[i.rarity]) return false;
   const norm = nexamonPricePerCardE4(i.priceCents, i.factorBps);
   return norm > 0 && Math.abs(norm - i.valueE4) * 10_000 <= i.valueE4 * cfg.value.trade.bandBps;
+}
+
+/** Who buys a player's listing on the AI side: the game's vault for the rarities the AI may not hold. */
+export function nexamonAiBuyerIsVault(rarity: NexamonRarity, cfg: Config = BALANCE.nexamon): boolean {
+  return !nexamonAiAllowed(rarity, cfg);
+}
+
+/**
+ * The treasury's top-up for an AI buy at or below the value (ADR-195, Nachtrag): 0 if the households can pay, the
+ * shortfall if the treasury keeps at least `ai.treasuryFloorCents` after it, else null (not affordable: retried).
+ */
+export function nexamonAiFundingCents(
+  i: { priceCents: number; householdsCents: number; treasuryCents: number },
+  cfg: Config = BALANCE.nexamon,
+): number | null {
+  const short = i.priceCents - Math.max(0, i.householdsCents);
+  if (short <= 0) return 0;
+  return i.treasuryCents - short >= cfg.ai.treasuryFloorCents ? short : null;
+}
+
+/** The vault's asking price for a copy: its value plus a premium from `vault.premiumMinBps` to `premiumMaxBps` (u in [0, 1)). */
+export function nexamonVaultAskCents(copyValueCents: number, u: number, cfg: Config = BALANCE.nexamon): number {
+  const v = cfg.vault;
+  const premium = v.premiumMinBps + Math.floor((v.premiumMaxBps - v.premiumMinBps) * Math.min(1, Math.max(0, u)));
+  return Math.max(1, mulDivFloor(copyValueCents, 10_000 + premium, 10_000));
 }
 
 /** Minutes until an AI collector buys, on average, at a chance per minute (null: never). */

@@ -21,6 +21,9 @@ import {
   nexamonTierRarities,
   nexamonTradeOnly,
   nexamonAiBuyChanceBps,
+  nexamonAiBuyerIsVault,
+  nexamonAiFundingCents,
+  nexamonVaultAskCents,
   nexamonAiBuyCounts,
   nexamonAiExpectedMinutes,
   nexamonAiMaxPriceCents,
@@ -346,16 +349,56 @@ describe("Nexamon packs (ADR-165)", () => {
     expect(nexamonSeedCopies("one_of_one", 0)).toBe(0);
     expect(nexamonTradeOnly("one_of_one")).toBe(true);
     expect(nexamonPressureBps({ rarity: "one_of_one", population: 1, supply: 0, recentBuys: 5 })).toBe(0);
+    // the vault buys them at or below the value, never above it (ADR-195, Nachtrag)
+    const ooo = (priceCents: number, rarity: "one_of_one" | "uranium" = "one_of_one") =>
+      nexamonAiBuyChanceBps({ priceCents, copyValueCents: 100, condition: "mint", grade: null, rarity, population: 1 });
+    expect(ooo(1)).toBe(10_000);
+    expect(ooo(100)).toBe(10_000);
+    expect(ooo(100, "uranium")).toBe(10_000);
+    expect(ooo(101)).toBe(0);
+    expect(ooo(110, "uranium")).toBe(0);
     expect(
       nexamonAiBuyChanceBps({
-        priceCents: 1,
-        copyValueCents: 100,
+        priceCents: 3_000_000_000,
+        copyValueCents: 3_000_000_000,
         condition: "mint",
-        grade: null,
+        grade: 11,
         rarity: "one_of_one",
         population: 1,
       }),
-    ).toBe(0);
+    ).toBe(10_000);
+    expect(nexamonAiBuyerIsVault("one_of_one")).toBe(true);
+    expect(nexamonAiBuyerIsVault("uranium")).toBe(true);
+    expect(nexamonAiBuyerIsVault("legendary")).toBe(false);
+  });
+
+  it("funds a huge AI buy from the treasury, never below its floor", () => {
+    const floor = BALANCE.nexamon.ai.treasuryFloorCents;
+    expect(nexamonAiFundingCents({ priceCents: 1_000, householdsCents: 5_000, treasuryCents: 0 })).toBe(0);
+    expect(
+      nexamonAiFundingCents({
+        priceCents: 3_000_000_000,
+        householdsCents: 1_000_000,
+        treasuryCents: floor + 3_000_000_000,
+      }),
+    ).toBe(2_999_000_000);
+    expect(
+      nexamonAiFundingCents({ priceCents: 3_000_000_000, householdsCents: -5, treasuryCents: floor + 3_000_000_000 }),
+    ).toBe(3_000_000_000);
+    expect(
+      nexamonAiFundingCents({ priceCents: 3_000_000_000, householdsCents: 0, treasuryCents: floor + 2_999_999_999 }),
+    ).toBe(null);
+  });
+
+  it("asks a vault premium between the configured bounds", () => {
+    const v = BALANCE.nexamon.vault;
+    expect(nexamonVaultAskCents(100_000, 0)).toBe(100_000 + (100_000 * v.premiumMinBps) / 10_000);
+    expect(nexamonVaultAskCents(100_000, 0.999_999)).toBeLessThanOrEqual(
+      100_000 + (100_000 * v.premiumMaxBps) / 10_000,
+    );
+    expect(nexamonVaultAskCents(100_000, 0.5)).toBe(120_000);
+    expect(nexamonVaultAskCents(0, 0.5)).toBe(1);
+    expect(v.premiumMinBps).toBeGreaterThan(BALANCE.nexamon.ai.maxPremiumBps - 1);
   });
 
   it("refuses a set without the needed rarity", () => {
