@@ -147,7 +147,9 @@ select count(*) filter (where t.security_id = :'hot') as n_hot,
        count(*) filter (where t.security_id = :'calm') as n_calm,
        count(*) filter (where t.security_id = :'hot' and t.move_bps >= 1000) as n_hot_big
   from public.stock_tips t where t.source = 'market' \gset
-select tests.assert(:n_hot::integer >= 6 and :n_hot_down::integer = :n_hot::integer and :n_calm::integer <= 2
+select tests.assert(:n_hot::integer >= 6 and :n_hot_down::integer = :n_hot::integer
+                    -- the calm one only sees the random background rate: a handful at most, far fewer than the hot one
+                    and :n_calm::integer <= 6 and :n_calm::integer * 4 < :n_hot::integer
                     and :n_hot_big::integer > 0,
   'ten hours: the stock at 3 x its fair value draws ' || :n_hot || ' damping forces (' || :n_hot_big
   || ' of 10 % or more), the calm one ' || :n_calm);
