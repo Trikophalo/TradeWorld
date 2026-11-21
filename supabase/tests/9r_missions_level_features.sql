@@ -16,9 +16,22 @@ insert into public.player_missions (player_id, template_key, kind, period_start,
 select p, 'd_news_chat', 'daily', date '1999-01-01', 1, 1 from unnest(array[:lo, :hi]::uuid[]) p;
 update public.mission_templates set weight = case when key = 'd_news_chat' then 100000 else weight end where kind = 'daily';
 delete from public.player_missions where template_key = 'd_news_chat' and period_start = date '1999-01-01';
-select public.missions_assign(:lo) is not null and public.missions_assign(:hi) is not null as ok \gset
-select (select target from public.player_missions where player_id = :lo and template_key = 'd_news_chat') as t_lo,
-       (select target from public.player_missions where player_id = :hi and template_key = 'd_news_chat') as t_hi \gset
+-- the no-repeat draw (ADR-202) may skip the template on one try: draw until both have it (fresh daily slots each time)
+select set_config('t9r.lo', :lo, false) is not null and set_config('t9r.hi', :hi, false) is not null as ok \gset
+do $$
+declare i integer; v_lo uuid := current_setting('t9r.lo')::uuid; v_hi uuid := current_setting('t9r.hi')::uuid;
+begin
+  for i in 1..30 loop
+    exit when (select count(distinct player_id) from public.player_missions
+                where player_id in (v_lo, v_hi) and template_key = 'd_news_chat') = 2;
+    delete from public.player_missions where player_id in (v_lo, v_hi) and kind = 'daily'
+       and template_key <> 'd_news_chat';
+    perform public.missions_assign(v_lo);
+    perform public.missions_assign(v_hi);
+  end loop;
+end $$;
+select coalesce((select target from public.player_missions where player_id = :lo and template_key = 'd_news_chat' limit 1), -1) as t_lo,
+       coalesce((select target from public.player_missions where player_id = :hi and template_key = 'd_news_chat' limit 1), -1) as t_hi \gset
 update public.mission_templates set weight = 40 where key = 'd_news_chat';
 select tests.assert(
   :t_lo::int between 3 and 5 and :t_hi::int between round(3 * 2.16) and round(5 * 2.16),
